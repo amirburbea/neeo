@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Remote.Broadlink
 {
-    public sealed class RMDeviceDiscovery
+    public sealed class RMDeviceDiscovery : IDisposable
     {
         private readonly Dictionary<string, RMDevice> _devices = new();
 
@@ -54,7 +54,7 @@ namespace Remote.Broadlink
                     int checksum = packet.Checksum();
                     packet[0x20] = (byte)(checksum & 0xff);
                     packet[0x21] = (byte)(checksum >> 8);
-                    await client.SendAsync(packet, packet.Length, new IPEndPoint(IPAddress.Broadcast, 80)).ConfigureAwait(false);
+                    await client.SendAsync(packet, packet.Length, new(IPAddress.Broadcast, 80)).ConfigureAwait(false);
                     Task<UdpReceiveResult> task = client.ReceiveAsync();
                     if (!task.Wait(TimeSpan.FromSeconds(2d)))
                     {
@@ -78,7 +78,7 @@ namespace Remote.Broadlink
                         // Not my device type (the protocol needs to be adapted slightly based on the device type).
                         continue;
                     }
-                    RMDevice device = new (localEndPoint.Address, result.RemoteEndPoint, mac);
+                    RMDevice device = new(localEndPoint.Address, result.RemoteEndPoint, mac);
                     await device.Authenticate().ConfigureAwait(false);
                     TaskCompletionSource source = new();
 
@@ -100,6 +100,17 @@ namespace Remote.Broadlink
                 }
             }
             throw new DiscoveryException();
+        }
+
+        public void Dispose()
+        {
+            if (this._devices.Count == 0)
+            {
+                return;
+            }
+            RMDevice[] array = this._devices.Values.ToArray();
+            this._devices.Clear();
+            Array.ForEach(array, device => device.Dispose());
         }
     }
 }

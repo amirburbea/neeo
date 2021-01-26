@@ -5,31 +5,26 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Remote.Neeo;
+using Remote.Broadlink;
 
 namespace Remote.HodgePodge
 {
     internal static class Program
     {
-        static async Task Main()
-        {
-            var x = await BrainDiscovery.DiscoverBrainsAsync();
-        }
-
-        /*
         private static async Task Main()
         {
-            using Device device = await DeviceDiscovery.DiscoverNextDevice();
+            using RMDeviceDiscovery discovery = new();
+            using RMDevice rmDevice = await discovery.DiscoverDeviceAsync();
             while (true)
             {
                 Console.Write("Mode: (0 - Learn, 1 - Test, else quit): ");
                 switch (Console.ReadLine())
                 {
                     case "0":
-                        await Program.LearnCodes(device);
+                        await Program.LearnCodes(rmDevice);
                         break;
                     case "1":
-                        await Program.TestCodes(device);
+                        await Program.TestCodes(rmDevice);
                         break;
                     default:
                         return;
@@ -37,7 +32,7 @@ namespace Remote.HodgePodge
             }
         }
 
-        private static async Task TestCodes(Device device)
+        private static async Task TestCodes(RMDevice device)
         {
             string? fileName = Program.QueryFileName();
             if (fileName == null)
@@ -62,7 +57,7 @@ namespace Remote.HodgePodge
             }
         }
 
-        private static async Task LearnCodes(Device device)
+        private static async Task LearnCodes(RMDevice device)
         {
             string? fileName = Program.QueryFileName();
             if (fileName == null)
@@ -115,6 +110,5 @@ namespace Remote.HodgePodge
             Array.ForEach(bytes, b => builder.Append(b.ToString("x2")));
             return builder.ToString();
         }
-        */
     }
 }
