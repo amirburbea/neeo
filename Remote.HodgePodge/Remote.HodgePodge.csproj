@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Remote.Broadlink\Remote.Broadlink.csproj" />
     <ProjectReference Include="..\Remote.Neeo\Remote.Neeo.csproj" />
+    <ProjectReference Include="..\Remote.Utilities\Remote.Utilities.csproj" />
   </ItemGroup>
 
 </Project>

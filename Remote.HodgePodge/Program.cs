@@ -1,18 +1,56 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Remote.Broadlink;
+using Remote.Neeo;
+using Remote.Neeo.Devices;
+using Remote.Neeo.Server;
+using Remote.Utilities;
 
 namespace Remote.HodgePodge
 {
     internal static class Program
     {
+        private static async Task LearnCodes(RMDevice device)
+        {
+            string? fileName = Program.QueryFileName();
+            if (fileName == null)
+            {
+                return;
+            }
+            Dictionary<string, string> dictionary = new();
+            while (true)
+            {
+                if (Query("Command name?") is not string name)
+                {
+                    break;
+                }
+                await device.BeginLearning();
+                await device.WaitForAck();
+                byte[] data = await device.WaitForData();
+                dictionary[name] = data.ToHex();
+            }
+            File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
+        }
+
         private static async Task Main()
         {
+            var brain = await BrainDiscovery.GetFirstBrainAsync();
+
+            DeviceBuilder d = DeviceBuilder.BuildDevice("abc", DeviceType.TV);
+            d.SetManufacturer(new string('1', 48));
+            StartServer.SS();
+        }
+
+        private static async Task MainASRM()
+        {
+            PgpMethods.GenerateKeys();
+
+            //StartServer.SS();
+
             using RMDeviceDiscovery discovery = new();
             using RMDevice rmDevice = await discovery.DiscoverDeviceAsync();
             while (true)
@@ -32,53 +70,6 @@ namespace Remote.HodgePodge
             }
         }
 
-        private static async Task TestCodes(RMDevice device)
-        {
-            string? fileName = Program.QueryFileName();
-            if (fileName == null)
-            {
-                return;
-            }
-
-            Dictionary<string,string> dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(fileName, Encoding.UTF8))!;
-            while (true)
-            {
-                if (Program.Query("Command name?") is not string name)
-                {
-                    return;
-                }
-                if (!dictionary.TryGetValue(name, out string? text))
-                {
-                    Console.Error.WriteLine($"Command {name} not found");
-                    continue;
-                }
-                await device.SendData(Program.GetBytes(text));
-                await device.WaitForAck();
-            }
-        }
-
-        private static async Task LearnCodes(RMDevice device)
-        {
-            string? fileName = Program.QueryFileName();
-            if (fileName == null)
-            {
-                return;
-            }
-            Dictionary<string, string> dictionary = new();
-            while (true)
-            {
-                if (Query("Command name?") is not string name)
-                {
-                    break;
-                }
-                await device.BeginLearning();
-                await device.WaitForAck();
-                byte[] data = await device.WaitForData();
-                dictionary[name] = Program.GetText(data);
-            }
-            File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
-        }
-
         private static string? Query(string prompt, string quitCommand = "Done")
         {
             Console.Write($"{prompt} ({quitCommand} to end) ");
@@ -94,21 +85,29 @@ namespace Remote.HodgePodge
                 : null;
         }
 
-        private static byte[] GetBytes(string text)
+        private static async Task TestCodes(RMDevice device)
         {
-            byte[] bytes = new byte[text.Length / 2];
-            for (int i = 0; i < bytes.Length; i++)
+            string? fileName = Program.QueryFileName();
+            if (fileName == null)
             {
-                bytes[i] = byte.Parse(text.Substring(i * 2, 2), NumberStyles.HexNumber);
+                return;
             }
-            return bytes;
-        }
 
-        public static string GetText(byte[] bytes)
-        {
-            StringBuilder builder = new(bytes.Length * 2);
-            Array.ForEach(bytes, b => builder.Append(b.ToString("x2")));
-            return builder.ToString();
+            Dictionary<string, string> dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(fileName, Encoding.UTF8))!;
+            while (true)
+            {
+                if (Program.Query("Command name?") is not string name)
+                {
+                    return;
+                }
+                if (!dictionary.TryGetValue(name, out string? text))
+                {
+                    Console.Error.WriteLine($"Command {name} not found");
+                    continue;
+                }
+                await device.SendData(ByteArray.FromHex(text));
+                await device.WaitForAck();
+            }
         }
     }
 }

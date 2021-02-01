@@ -7,12 +7,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Remote.Broadlink", "Remote.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Remote.HodgePodge", "Remote.HodgePodge\Remote.HodgePodge.csproj", "{96D1E6F8-72F4-4139-9236-90D7689380A9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Remote.Neeo", "Remote.Neeo\Remote.Neeo.csproj", "{99805BEB-BE4A-46CF-AF5A-3AD16060A2BC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Remote.Neeo", "Remote.Neeo\Remote.Neeo.csproj", "{99805BEB-BE4A-46CF-AF5A-3AD16060A2BC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{EFEC82F5-21B4-4261-B13C-5D4972752CC6}"
 	ProjectSection(SolutionItems) = preProject
 		README.md = README.md
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Remote.Utilities", "Remote.Utilities\Remote.Utilities.csproj", "{F078C2D6-8319-4778-9922-43772642928E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,6 +34,10 @@ Global
 		{99805BEB-BE4A-46CF-AF5A-3AD16060A2BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99805BEB-BE4A-46CF-AF5A-3AD16060A2BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{99805BEB-BE4A-46CF-AF5A-3AD16060A2BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F078C2D6-8319-4778-9922-43772642928E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F078C2D6-8319-4778-9922-43772642928E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F078C2D6-8319-4778-9922-43772642928E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F078C2D6-8319-4778-9922-43772642928E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

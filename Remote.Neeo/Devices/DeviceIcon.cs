@@ -4,9 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Remote.Neeo
+namespace Remote.Neeo.Devices
 {
-    class DeviceType
+    public enum DeviceIcon
     {
+        Neeo = 0,
+        Sonos = 1
     }
 }
