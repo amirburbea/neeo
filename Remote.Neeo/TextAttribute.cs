@@ -9,7 +9,7 @@ namespace Remote.Neeo
 
         public string Text { get; }
 
-        public static string GeEnumtText<TValue>(TValue value)
+        public static string GeEnumText<TValue>(TValue value)
             where TValue : struct, Enum
         {
             return AttributeValue.GetEnumAttributeData(value, (TextAttribute attribute) => attribute.Text) ?? value.ToString();

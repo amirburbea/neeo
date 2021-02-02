@@ -16,7 +16,7 @@
             or DeviceType.MusicPlayer
             or DeviceType.VideoOnDemand;
 
-        public static bool SupportsTiming(this DeviceType type) => type is not DeviceType.Accessory 
+        public static bool SupportsDelays(this DeviceType type) => type is not DeviceType.Accessory 
             or DeviceType.Light;
     }
 }

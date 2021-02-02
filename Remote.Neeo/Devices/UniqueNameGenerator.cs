@@ -5,7 +5,7 @@ using Remote.Utilities;
 
 namespace Remote.Neeo.Devices
 {
-    public static class UniqueName
+    public static class UniqueNameGenerator
     {
         public static string Generate(string root, string? prefix = null)
         {

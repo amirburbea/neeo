@@ -38,11 +38,15 @@ namespace Remote.HodgePodge
 
         private static async Task Main()
         {
-            var brain = await BrainDiscovery.GetFirstBrainAsync();
-
-            DeviceBuilder d = DeviceBuilder.BuildDevice("abc", DeviceType.TV);
-            d.SetManufacturer(new string('1', 48));
-            StartServer.SS();
+            var brain = await BrainDiscovery.DiscoverBrainAsync();
+            if (brain == null)
+            {
+                return;
+            }
+            DeviceBuilder d = new DeviceBuilder("abc") { Type = DeviceType.TV }
+                .SetManufacturer(new string('1', 48))
+                .AddButtonGroup(ButtonGroup.ChannelZapper);
+            HostManager.StartAsync(brain, devices: new[] { d });
         }
 
         private static async Task MainASRM()
@@ -51,18 +55,21 @@ namespace Remote.HodgePodge
 
             //StartServer.SS();
 
-            using RMDeviceDiscovery discovery = new();
-            using RMDevice rmDevice = await discovery.DiscoverDeviceAsync();
+            using RMDevice? remote = await RMDiscovery.DiscoverDeviceAsync();
+            if (remote == null)
+            {
+                return;
+            }
             while (true)
             {
                 Console.Write("Mode: (0 - Learn, 1 - Test, else quit): ");
                 switch (Console.ReadLine())
                 {
                     case "0":
-                        await Program.LearnCodes(rmDevice);
+                        await Program.LearnCodes(remote);
                         break;
                     case "1":
-                        await Program.TestCodes(rmDevice);
+                        await Program.TestCodes(remote);
                         break;
                     default:
                         return;
@@ -85,7 +92,7 @@ namespace Remote.HodgePodge
                 : null;
         }
 
-        private static async Task TestCodes(RMDevice device)
+        private static async Task TestCodes(RMDevice remote)
         {
             string? fileName = Program.QueryFileName();
             if (fileName == null)
@@ -105,8 +112,8 @@ namespace Remote.HodgePodge
                     Console.Error.WriteLine($"Command {name} not found");
                     continue;
                 }
-                await device.SendData(ByteArray.FromHex(text));
-                await device.WaitForAck();
+                await remote.SendData(ByteArray.FromHex(text));
+                await remote.WaitForAck();
             }
         }
     }

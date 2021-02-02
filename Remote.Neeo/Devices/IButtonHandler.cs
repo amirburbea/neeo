@@ -4,6 +4,6 @@ namespace Remote.Neeo.Devices
 {
     public interface IButtonHandler
     {
-        Task HandleButtonAsync(string button, string deviceId);
+        Task HandleButtonPressAsync(string button, string deviceId);
     }
 }

@@ -2,9 +2,9 @@
 
 namespace Remote.Neeo
 {
-    public record BrainDescriptor
+    public record Brain
     {
-        internal BrainDescriptor(string ipAddress, int port, string name, string hostName, string version, string region, DateTime updated)
+        public Brain(string ipAddress, int port, string name, string hostName, string version, string region, DateTime updated)
         {
             (this.IPAddress, this.Port, this.Name, this.HostName, this.Version, this.Region, this.Updated) = (ipAddress, port, name, hostName, version, region, updated);
         }
@@ -19,8 +19,8 @@ namespace Remote.Neeo
 
         public string Region { get; }
 
-        public string Version { get; }
-
         public DateTime Updated { get; }
+
+        public string Version { get; }
     }
 }

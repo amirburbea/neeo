@@ -1,26 +1,79 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Remote.Neeo.Devices
 {
-    public sealed class DeviceBuilder
+    public interface IDeviceBuilder
+    {
+        
+
+        IReadOnlyCollection<string> AdditionalSearchTokens { get; }
+
+        IButtonHandler? ButtonHandler { get; }
+
+        IReadOnlyCollection<ButtonDescriptor> Buttons { get; }
+
+        DelaysSpecifier? Delays { get; }
+
+        uint DriverVersion { get; }
+
+        IFavoritesHandler? FavoritesHandler { get; }
+
+        DeviceIcon Icon { get; }
+
+        string Identifier { get; }
+
+        string Manufacturer { get; }
+
+        string Name { get; }
+
+        string? SpecificName { get; }
+
+        DeviceType Type { get; }
+
+        IDeviceBuilder AddAdditionalSearchToken(string text);
+
+        IDeviceBuilder AddButton(string name, string? label = default);
+
+        IDeviceBuilder AddButtonGroup(ButtonGroup group);
+
+        IDeviceBuilder SetButtonHandler(IButtonHandler handler);
+
+        IDeviceBuilder SetDelays(DelaysSpecifier delays);
+
+        IDeviceBuilder SetDriverVersion(uint version);
+
+        IDeviceBuilder SetFavoritesHandler(IFavoritesHandler handler);
+
+        IDeviceBuilder SetIcon(DeviceIcon icon);
+
+        IDeviceBuilder SetManufacturer(string manufacturer);
+
+        IDeviceBuilder SetSpecificName(string? specificName);
+    }
+
+    public sealed class DeviceBuilder : IDeviceBuilder
     {
         private readonly HashSet<string> _additionalSearchTokens = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<ButtonDescriptor> _buttons = new();
 
-        private DeviceBuilder(string name)
+        public DeviceBuilder(string name)
         {
-            Validator.ValidateStringLength(name, prefix: "Device name");
-            this.Identifier = $"apt-{UniqueName.Generate(this.Name = name)}";
+            Validator.ValidateStringLength(this.Name = name ?? throw new ArgumentNullException(nameof(name)), prefix: "Device name");
+            this.Identifier = $"apt-{UniqueNameGenerator.Generate(name)}";
         }
 
         public IReadOnlyCollection<string> AdditionalSearchTokens => this._additionalSearchTokens;
 
-        public int DriverVersion
-        {
-            get;
-            private set;
-        }
+        public IButtonHandler? ButtonHandler { get; private set; }
+
+        public IReadOnlyCollection<ButtonDescriptor> Buttons => this._buttons;
+
+        public DelaysSpecifier? Delays { get; private set; }
+
+        public uint DriverVersion { get; private set; }
+
+        public IFavoritesHandler? FavoritesHandler { get; private set; }
 
         public DeviceIcon Icon { get; private set; }
 
@@ -34,7 +87,7 @@ namespace Remote.Neeo.Devices
 
         public DeviceType Type { get; init; }
 
-        public static DeviceBuilder BuildDevice(string name, DeviceType type = DeviceType.Accessory) => new(name) { Type = type };
+        IDeviceBuilder IDeviceBuilder.AddAdditionalSearchToken(string text) => this.AddAdditionalSearchToken(text);
 
         public DeviceBuilder AddAdditionalSearchToken(string text)
         {
@@ -42,11 +95,15 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
+        IDeviceBuilder IDeviceBuilder.AddButton(string name, string? label) => this.AddButton(name, label);
+
         public DeviceBuilder AddButton(string name, string? label = default)
         {
-
+            this._buttons.Add(new(name, label));
             return this;
         }
+
+        IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroup group) => this.AddButtonGroup(group);
 
         public DeviceBuilder AddButtonGroup(ButtonGroup group)
         {
@@ -57,17 +114,47 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
-        public DeviceBuilder ClearAdditionalSearchTokens()
+        public DeviceBuilder SetButtonHandler(IButtonHandler handler)
         {
-            this._additionalSearchTokens.Clear();
+            this.ButtonHandler = handler ?? throw new ArgumentNullException(nameof(handler));
             return this;
         }
 
-        public DeviceBuilder SetDriverVersion(byte version)
+        IDeviceBuilder IDeviceBuilder.SetButtonHandler(IButtonHandler handler) => this.SetButtonHandler(handler);
+
+        IDeviceBuilder IDeviceBuilder.SetDelays(DelaysSpecifier delays) => this.SetDelays(delays);
+
+        public DeviceBuilder SetDelays(DelaysSpecifier delays)
+        {
+            if (!this.Type.SupportsDelays())
+            {
+                throw new NotSupportedException($"Device type {this.Type} does not support delays.");
+            }
+            this.Delays = delays ?? throw new ArgumentNullException(nameof(delays));
+            return this;
+        }
+
+        IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version) => this.SetDriverVersion(version);
+
+        public DeviceBuilder SetDriverVersion(uint version)
         {
             this.DriverVersion = version;
             return this;
         }
+
+        IDeviceBuilder IDeviceBuilder.SetFavoritesHandler(IFavoritesHandler handler) => this.SetFavoritesHandler(handler);
+
+        public DeviceBuilder SetFavoritesHandler(IFavoritesHandler handler)
+        {
+            if (!this.Type.SupportsFavorites())
+            {
+                throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
+            }
+            this.FavoritesHandler = handler ?? throw new ArgumentNullException(nameof(handler));
+            return this;
+        }
+
+        IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIcon icon) => this.SetIcon(icon);
 
         public DeviceBuilder SetIcon(DeviceIcon icon)
         {
@@ -75,11 +162,15 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
+        IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
+
         public DeviceBuilder SetManufacturer(string manufacturer = "NEEO")
         {
-            Validator.ValidateStringLength(this.Manufacturer = manufacturer);
+            Validator.ValidateStringLength(this.Manufacturer = manufacturer ?? throw new ArgumentNullException(nameof(manufacturer)));
             return this;
         }
+
+        IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
 
         public DeviceBuilder SetSpecificName(string? specificName)
         {

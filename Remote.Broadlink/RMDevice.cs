@@ -8,7 +8,7 @@ using Remote.Utilities;
 
 namespace Remote.Broadlink
 {
-    public sealed class RMDevice : IDisposable
+    public class RMDevice : IDisposable
     {
         private static readonly byte[] _dataHeader = new byte[] { 0xd0, 0x00, 0x02, 0x00, 0x00, 0x00, };
         private static readonly byte[] _iv = new byte[] { 0x56, 0x2e, 0x17, 0x99, 0x6d, 0x09, 0x3d, 0x28, 0xdd, 0xb3, 0xba, 0x69, 0x5a, 0x2e, 0x6f, 0x58, };
@@ -21,12 +21,13 @@ namespace Remote.Broadlink
         private byte[] _id = new byte[] { 0x00, 0x00, 0x00, 0x00, };
         private byte[] _key = new byte[] { 0x09, 0x76, 0x28, 0x34, 0x3f, 0xe9, 0x9e, 0x23, 0x76, 0x5c, 0x15, 0x13, 0xac, 0xcf, 0x8b, 0x02, };
 
-        public RMDevice(IPAddress localAddress, IPEndPoint remoteEndPoint, byte[] macAddress)
+        public RMDevice(IPAddress localAddress, IPEndPoint remoteEndPoint, byte[] macAddress, int deviceType)
         {
+            this.DeviceType = deviceType;
             this._client = new(new IPEndPoint(localAddress, 0));
             this._client.Connect(remoteEndPoint);
             this._macAddress = macAddress;
-            this._listeningTask = Task.Factory.StartNew(this.Listen, TaskCreationOptions.LongRunning);
+            this._listeningTask = new Task(this.Listen, TaskCreationOptions.LongRunning);
         }
 
         public event EventHandler? AckReceived;
@@ -35,11 +36,19 @@ namespace Remote.Broadlink
 
         public event EventHandler? Ready;
 
+        public event EventHandler<DataEventArgs<double>>? TemperatureReceived;
+
         private enum RequestType : byte
         {
             Authenticate = 0x65,
             Command = 0x6a
         }
+
+        public int DeviceType { get; }
+
+        public virtual bool SupportsRF => false;
+
+        public virtual bool SupportsTemperature => false;
 
         public IPEndPoint RemoteEndPoint => (IPEndPoint)this._client.Client.RemoteEndPoint!;
 
@@ -49,12 +58,19 @@ namespace Remote.Broadlink
 
         public Task CheckData() => this.SendCommand(0x04);
 
+        public Task CheckTemperature() => this.SupportsTemperature ? this.SendCommand(0x01) : throw new NotSupportedException();
+
+        public Task CheckRFData() => this.SupportsRF ? this.SendCommand(0x1a) : throw new NotSupportedException();
+
+        public Task CheckRFData2() => this.SupportsRF ? this.SendCommand(0x1b) : throw new NotSupportedException();
+
         public void Dispose()
         {
-            this._disposed = true;
-            this._client.Dispose();
-            this._listeningTask.Wait();
+            this.Dispose(true);
+            GC.SuppressFinalize(this);
         }
+
+        public Task EnterRFSweep() => this.SupportsRF ? this.SendCommand(0x19) : throw new NotSupportedException();
 
         public Task SendData(byte[] data) => this.SendRequest(RequestType.Command, RMDevice.Combine(RMDevice._dataHeader, data));
 
@@ -98,6 +114,7 @@ namespace Remote.Broadlink
 
         internal Task Authenticate()
         {
+            this._listeningTask.Start(TaskScheduler.Default);
             byte[] payload = new byte[0x50];
             payload[0x04] = 0x31;
             payload[0x05] = 0x31;
@@ -124,6 +141,13 @@ namespace Remote.Broadlink
             payload[0x35] = (byte)' ';
             payload[0x36] = (byte)'1';
             return this.SendRequest(RequestType.Authenticate, payload);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            this._disposed = true;
+            this._client.Dispose();
+            this._listeningTask.Wait();
         }
 
         private static byte[] Combine(byte[] left, byte[] right)
@@ -189,6 +213,10 @@ namespace Remote.Broadlink
                     byte command = result.Buffer[0x26];
                     switch (command)
                     {
+                        case 0x0a:
+                            double value = (payload[0x06] * 10 + payload[0x07]) / 10.0;
+                            this.TemperatureReceived?.Invoke(this, new(value));
+                            continue;
                         case 0xe9:
                             Buffer.BlockCopy(payload, 0x00, this._id = new byte[0x04], 0x00, 0x04);
                             Buffer.BlockCopy(payload, 0x04, this._key = new byte[0x10], 0x00, 0x10);

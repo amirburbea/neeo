@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 
 namespace Remote.Broadlink
 {
-    public sealed class RMDeviceDiscovery : IDisposable
+    public static class RMDiscovery 
     {
-        private readonly Dictionary<string, RMDevice> _devices = new();
+        private static readonly Dictionary<string, RMDevice> _remotes = new();
 
-        public async Task<RMDevice> DiscoverDeviceAsync()
+        public static async Task<RMDevice?> DiscoverDeviceAsync(Func<RMDevice, bool>? predicate = default)
         {
             foreach (IPAddress address in await Dns.GetHostAddressesAsync(Dns.GetHostName()).ConfigureAwait(false))
             {
@@ -67,7 +67,7 @@ namespace Remote.Broadlink
                         mac[index] = result.Buffer[0x3f - index];
                     }
                     string macAddress = String.Join(':', mac.Select(b => b.ToString("x2")));
-                    if (this._devices.ContainsKey(macAddress))
+                    if (RMDiscovery._remotes.ContainsKey(macAddress))
                     {
                         continue;
                     }
@@ -78,19 +78,23 @@ namespace Remote.Broadlink
                         // Not my device type (the protocol needs to be adapted slightly based on the device type).
                         continue;
                     }
-                    RMDevice device = new(localEndPoint.Address, result.RemoteEndPoint, mac);
-                    await device.Authenticate().ConfigureAwait(false);
+                    RMDevice current = new(localEndPoint.Address, result.RemoteEndPoint, mac, deviceType);
+                    if (predicate != null && !predicate(current))
+                    {
+                        continue;
+                    }
+                    await current.Authenticate().ConfigureAwait(false);
                     TaskCompletionSource source = new();
 
                     void OnReady(object? sender, EventArgs e)
                     {
                         source.TrySetResult();
-                        device.Ready -= OnReady;
+                        current.Ready -= OnReady;
                     }
 
-                    device.Ready += OnReady;
+                    current.Ready += OnReady;
                     await source.Task.ConfigureAwait(false);
-                    return this._devices[macAddress] = device;
+                    return RMDiscovery._remotes[macAddress] = current;
                 }
                 catch (SocketException)
                 {
@@ -99,18 +103,7 @@ namespace Remote.Broadlink
                 {
                 }
             }
-            throw new DiscoveryException();
-        }
-
-        public void Dispose()
-        {
-            if (this._devices.Count == 0)
-            {
-                return;
-            }
-            RMDevice[] array = this._devices.Values.ToArray();
-            this._devices.Clear();
-            Array.ForEach(array, device => device.Dispose());
+            return default;
         }
     }
 }

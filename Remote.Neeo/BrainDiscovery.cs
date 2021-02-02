@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Zeroconf;
@@ -10,51 +9,53 @@ namespace Remote.Neeo
 {
     public static class BrainDiscovery
     {
-        public static async Task<BrainDescriptor[]> DiscoverBrainsAsync(CancellationToken cancellationToken = default)
+        public static async Task<Brain?> DiscoverBrainAsync(Func<Brain, bool>? predicate = default)
         {
-            IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, cancellationToken: cancellationToken).ConfigureAwait(false);
-            BrainDescriptor[] array = new BrainDescriptor[hosts.Count];
-            for (int index = 0; index < array.Length; index++)
-            {
-                array[index] = BrainDiscovery.CreateDescriptor(hosts[index]);
-            }
-            return array;
-        }
-
-        public static async Task<BrainDescriptor?> GetFirstBrainAsync(Func<BrainDescriptor, bool>? predicate = default)
-        {
-            using CancellationTokenSource tokenSource = new();
-            TaskCompletionSource<BrainDescriptor?> taskSource = new();
-
-            void OnHostDiscovered(IZeroconfHost host)
-            {
-                BrainDescriptor descriptor = BrainDiscovery.CreateDescriptor(host);
-                if (predicate != null && !predicate(descriptor))
-                {
-                    return;
-                }
-                tokenSource.Cancel();
-                taskSource.TrySetResult(descriptor);
-            }
-
+            TaskCompletionSource<Brain?> taskCompletionSource = new();
+            using CancellationTokenSource cancellationTokenSource = new();
             return await Task.WhenAny(
                 ZeroconfResolver.ResolveAsync(
                     Constants.ServiceName,
                     callback: OnHostDiscovered,
-                    cancellationToken: tokenSource.Token
+                    cancellationToken: cancellationTokenSource.Token
                 ).ContinueWith(
-                    _ => default(BrainDescriptor), // If ResolveAsync has completed, no matching Brain was found.
+                    _ => default(Brain), // ZeroconfResolver.ResolveAsync has completed with no matching Brain found.
                     TaskContinuationOptions.NotOnFaulted
                 ),
-                taskSource.Task
+                taskCompletionSource.Task
             ).Unwrap().ConfigureAwait(false);
+
+            void OnHostDiscovered(IZeroconfHost host)
+            {
+                Brain brain = BrainDiscovery.CreateBrain(host);
+                if (predicate != null && !predicate(brain))
+                {
+                    return;
+                }
+                cancellationTokenSource.Cancel();
+                taskCompletionSource.TrySetResult(brain);
+            }
         }
 
-        private static BrainDescriptor CreateDescriptor(IZeroconfHost host)
+        public static async Task<Brain[]> DiscoverBrainsAsync(CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(
+                Constants.ServiceName,
+                cancellationToken: cancellationToken
+            ).ConfigureAwait(false);
+            Brain[] array = new Brain[hosts.Count];
+            for (int index = 0; index < array.Length; index++)
+            {
+                array[index] = BrainDiscovery.CreateBrain(hosts[index]);
+            }
+            return array;
+        }
+
+        private static Brain CreateBrain(IZeroconfHost host)
         {
             IService service = host.Services[Constants.ServiceName];
             IReadOnlyDictionary<string, string> properties = service.Properties[0];
-            return new BrainDescriptor(
+            return new Brain(
                 host.IPAddress,
                 service.Port,
                 host.DisplayName,
