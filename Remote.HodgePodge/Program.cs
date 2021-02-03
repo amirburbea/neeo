@@ -38,7 +38,7 @@ namespace Remote.HodgePodge
 
         private static async Task Main()
         {
-            var brain = await NeeoApi.DiscoverBrainAsync();
+            var brain = await Brain.DiscoverAsync();
             if (brain == null)
             {
                 return;

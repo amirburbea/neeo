@@ -1,10 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
+using Zeroconf;
 
 namespace Remote.Neeo
 {
@@ -35,6 +39,45 @@ namespace Remote.Neeo
 
         public string Version { get; }
 
+        public static async Task<Brain?> DiscoverAsync(Func<Brain, bool>? predicate = default)
+        {
+            TaskCompletionSource<Brain?> taskCompletionSource = new();
+            using CancellationTokenSource cancellationTokenSource = new();
+            return await Task.WhenAny(
+                ZeroconfResolver.ResolveAsync(
+                    Constants.ServiceName,
+                    callback: OnHostDiscovered,
+                    cancellationToken: cancellationTokenSource.Token
+                ).ContinueWith(
+                    _ => default(Brain), // ZeroconfResolver.ResolveAsync has completed with no matching Brain found.
+                    TaskContinuationOptions.NotOnFaulted
+                ),
+                taskCompletionSource.Task
+            ).Unwrap().ConfigureAwait(false);
+
+            void OnHostDiscovered(IZeroconfHost host)
+            {
+                Brain brain = Brain.Create(host);
+                if (predicate != null && !predicate(brain))
+                {
+                    return;
+                }
+                cancellationTokenSource.Cancel();
+                taskCompletionSource.TrySetResult(brain);
+            }
+        }
+
+        public static async Task<Brain[]> DiscoverAllAsync()
+        {
+            IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName).ConfigureAwait(false);
+            Brain[] array = new Brain[hosts.Count];
+            for (int index = 0; index < array.Length; index++)
+            {
+                array[index] = Brain.Create(hosts[index]);
+            }
+            return array;
+        }
+
         internal async Task<string> GetAsync(string suffix)
         {
             using HttpClient client = new();
@@ -52,6 +95,31 @@ namespace Remote.Neeo
             return await message.Content.ReadAsStringAsync().ConfigureAwait(false);
         }
 
+        private static Brain Create(IZeroconfHost host)
+        {
+            IService service = host.Services[Constants.ServiceName];
+            IReadOnlyDictionary<string, string> properties = service.Properties[0];
+            return new Brain(
+                IPAddress.Parse(host.IPAddress),
+                service.Port,
+                host.DisplayName,
+                $"{properties["hon"]}.local",
+                properties["rel"],
+                properties["reg"],
+                DateTime.ParseExact(
+                    properties["upd"],
+                    "yyyy-M-d",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal
+                )
+            );
+        }
+
         private string GetApiUri(string suffix) => $"http://{this.HostName}:{this.Port}/v1/api/{suffix}";
+
+        private static class Constants
+        {
+            public const string ServiceName = "_neeo._tcp.local.";
+        }
     }
 }

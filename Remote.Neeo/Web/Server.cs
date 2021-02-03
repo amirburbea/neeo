@@ -25,6 +25,22 @@ namespace Remote.Neeo.Web
             {
                 throw new InvalidOperationException("Host is already running - it must be stopped to start a new host.");
             }
+            if (brain == null)
+            {
+                throw new ArgumentNullException(nameof(brain));
+            }
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new ArgumentException("Non-blank name is required.", nameof(name));
+            }
+            if (devices == null || devices.Length == 0 || Array.IndexOf(devices, default) != -1)
+            {
+                throw new ArgumentException("Devices collection can not be null/empty or contain null.", nameof(devices));
+            }
+            if (port < 0 || port > ushort.MaxValue)
+            {
+                throw new ArgumentException("Invalid port.", nameof(port));
+            }
             string adapterName = $"src-{UniqueNameGenerator.Generate(name)}";
             IHost host = Server.CreateHostBuilder(brain, adapterName, devices, ipAddress, port).Build();
             await host.StartAsync(cancellationToken).ConfigureAwait(false);
