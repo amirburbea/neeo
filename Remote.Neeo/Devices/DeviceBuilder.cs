@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace Remote.Neeo.Devices
 {
+    /// <summary>
+    /// Fluent interface for building device.
+    /// </summary>
     public interface IDeviceBuilder
     {
         IReadOnlyCollection<string> AdditionalSearchTokens { get; }
@@ -25,6 +28,8 @@ namespace Remote.Neeo.Devices
 
         string Name { get; }
 
+        IPowerStateSensor? PowerStateSensor { get; }
+
         string? SpecificName { get; }
 
         DeviceType Type { get; }
@@ -46,6 +51,8 @@ namespace Remote.Neeo.Devices
         IDeviceBuilder SetIcon(DeviceIcon icon);
 
         IDeviceBuilder SetManufacturer(string manufacturer);
+
+        IDeviceBuilder SetPowerStateSensor(IPowerStateSensor sensor);
 
         IDeviceBuilder SetSpecificName(string? specificName);
 
@@ -82,6 +89,8 @@ namespace Remote.Neeo.Devices
         public string Manufacturer { get; private set; } = "NEEO";
 
         public string Name { get; }
+
+        public IPowerStateSensor? PowerStateSensor { get; private set; }
 
         public string? SpecificName { get; private set; }
 
@@ -132,7 +141,7 @@ namespace Remote.Neeo.Devices
             {
                 throw new NotSupportedException($"Device type {this.Type} does not support delays.");
             }
-            this.Delays = delays ?? throw new ArgumentNullException(nameof(delays));
+            this.Delays = delays;
             return this;
         }
 
@@ -169,6 +178,14 @@ namespace Remote.Neeo.Devices
         public DeviceBuilder SetManufacturer(string manufacturer = "NEEO")
         {
             Validator.ValidateStringLength(this.Manufacturer = manufacturer ?? throw new ArgumentNullException(nameof(manufacturer)));
+            return this;
+        }
+
+        IDeviceBuilder IDeviceBuilder.SetPowerStateSensor(IPowerStateSensor sensor) => this.SetPowerStateSensor(sensor);
+
+        public DeviceBuilder SetPowerStateSensor(IPowerStateSensor sensor)
+        {
+            this.PowerStateSensor = sensor;
             return this;
         }
 

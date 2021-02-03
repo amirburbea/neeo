@@ -1,6 +1,6 @@
 ﻿namespace Remote.Neeo.Devices
 {
-    public record ButtonDescriptor
+    public readonly struct ButtonDescriptor
     {
         public ButtonDescriptor(string name, string? label = default) => (this.Name, this.Label) = (name, label);
 

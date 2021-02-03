@@ -19,11 +19,11 @@ namespace Remote.Neeo.Web
     {
         private static IHost? _host;
 
-        public static async Task StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress ipAddress, int port, CancellationToken cancellationToken)
+        public static async Task StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress ipAddress, ushort port, CancellationToken cancellationToken)
         {
             if (Server._host != null)
             {
-                throw new InvalidOperationException("Host is already running - it must be stopped to start a new host.");
+                throw new InvalidOperationException("Host is already running.");
             }
             if (brain == null)
             {
@@ -37,10 +37,6 @@ namespace Remote.Neeo.Web
             {
                 throw new ArgumentException("Devices collection can not be null/empty or contain null.", nameof(devices));
             }
-            if (port < 0 || port > ushort.MaxValue)
-            {
-                throw new ArgumentException("Invalid port.", nameof(port));
-            }
             string adapterName = $"src-{UniqueNameGenerator.Generate(name)}";
             IHost host = Server.CreateHostBuilder(brain, adapterName, devices, ipAddress, port).Build();
             await host.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -51,7 +47,7 @@ namespace Remote.Neeo.Web
             {
                 try
                 {
-                    await brain.PostAsync("registerSdkDeviceAdapter", new { Name = adapterName, BaseUrl = baseUrl }, cancellationToken).ConfigureAwait(false);
+                    await brain.PostAsync("api/registerSdkDeviceAdapter", new { Name = adapterName, BaseUrl = baseUrl }, cancellationToken).ConfigureAwait(false);
                     logger.LogInformation("SDK Adapter registered on brain @ http://{host}:{port}", brain.HostName, brain.Port);
                     return;
                 }
@@ -73,12 +69,12 @@ namespace Remote.Neeo.Web
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
             Brain brain = host.Services.GetRequiredService<Brain>();
             string adapterName = host.Services.GetRequiredService<SdkAdapterName>().Name;
-            await brain.PostAsync("unregisterSdkDeviceAdapter", new { Name = adapterName }, cancellationToken).ConfigureAwait(false);
+            await brain.PostAsync("api/unregisterSdkDeviceAdapter", new { Name = adapterName }, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("SDK Adapter unregistered from brain @ http://{host}:{port}", brain.HostName, brain.Port);
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        private static IHostBuilder CreateHostBuilder(Brain brain, string adapterName, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
+        private static IHostBuilder CreateHostBuilder(Brain brain, string adapterName, IDeviceBuilder[] devices, IPAddress ipAddress, ushort port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
         {
             builder
                 .ConfigureKestrel((context, options) =>
@@ -104,8 +100,8 @@ namespace Remote.Neeo.Web
                         .AddSingleton(brain)
                         .AddSingleton(new DeviceDatabase(Array.ConvertAll(devices, devices => devices.BuildAdapter())))
                         .AddSingleton(new SdkAdapterName(adapterName))
-                        .AddSingleton<PgpKeys>()
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+                        .AddSingleton<PgpKeys>()
                         .AddControllers()
                         .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()));
                 })
@@ -135,7 +131,7 @@ namespace Remote.Neeo.Web
             protected override bool IsController(TypeInfo info) => info.Assembly == typeof(Server).Assembly && info.IsAssignableTo(typeof(ControllerBase));
         }
 
-        private record SdkAdapterName
+        private sealed record SdkAdapterName
         {
             public SdkAdapterName(string name) => this.Name = name;
 

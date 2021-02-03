@@ -81,7 +81,7 @@ namespace Remote.Neeo
         internal async Task<string> GetAsync(string apiPath, CancellationToken cancellationToken = default)
         {
             using HttpClient client = new();
-            HttpResponseMessage message = await client.GetAsync(this.GetApiUri(apiPath), cancellationToken).ConfigureAwait(false);
+            HttpResponseMessage message = await client.GetAsync(this.GetUri(apiPath), cancellationToken).ConfigureAwait(false);
             return await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -89,7 +89,7 @@ namespace Remote.Neeo
         {
             using HttpClient client = new();
             HttpResponseMessage message = await client.PostAsync(
-                this.GetApiUri(apiPath), 
+                this.GetUri(apiPath), 
                 new StringContent(JsonSerializer.Serialize(body, Brain._jsonOptions), Encoding.UTF8, "application/json"),
                 cancellationToken
             );
@@ -116,7 +116,7 @@ namespace Remote.Neeo
             );
         }
 
-        private string GetApiUri(string path) => $"http://{this.HostName}:{this.Port}/v1/api/{path}";
+        private string GetUri(string path) => $"http://{this.HostName}:{this.Port}/v1/api/{path}";
 
         private static class Constants
         {

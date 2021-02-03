@@ -8,21 +8,19 @@ using Remote.Neeo.Web;
 
 namespace Remote.Neeo
 {
-    public static class NeeoApi
+    public static class NeeoSdk
     {
         public static IDeviceBuilder CreateDevice(string name, DeviceType deviceType) => new DeviceBuilder(name) { Type = deviceType };
 
-        public static Task StartServerAsync(Brain brain, string name, params IDeviceBuilder[] devices) => NeeoApi.StartServerAsync(brain, name, devices, cancellationToken: default);
+        public static Task StartServerAsync(Brain brain, string name, params IDeviceBuilder[] devices) => NeeoSdk.StartServerAsync(brain, name, devices, cancellationToken: default);
 
-        public static Task StartServerAsync(Brain brain, string name, IDeviceBuilder[] devices, string? hostIPAddress = default, int port = 8080, CancellationToken cancellationToken = default)
+        public static Task StartServerAsync(Brain brain, string name, IDeviceBuilder[] devices, string? hostIPAddress = default, ushort port = 8080, CancellationToken cancellationToken = default)
         {
             return Server.StartAsync(
                 brain,
                 name,
                 devices,
-                hostIPAddress is null
-                    ? GetHostIPAddress(brain.IPAddress)
-                    : IPAddress.Parse(hostIPAddress),
+                hostIPAddress is null ? GetHostIPAddress(brain.IPAddress) : IPAddress.Parse(hostIPAddress),
                 port,
                 cancellationToken
             );

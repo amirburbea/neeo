@@ -2,7 +2,7 @@
 
 namespace Remote.Neeo.Devices
 {
-    public record DelaysSpecifier
+    public readonly struct DelaysSpecifier
     {
         public static readonly DelaysSpecifier Empty = new();
 

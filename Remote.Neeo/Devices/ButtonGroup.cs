@@ -54,7 +54,7 @@ namespace Remote.Neeo.Devices
 
         public static IReadOnlyList<string> GetNames(ButtonGroup buttonGroup)
         {
-            return AttributeValue.GetEnumAttributeData(buttonGroup, (ButtonGroupAttribute attribute) => attribute.Names)!;
+            return AttributeData.GetEnumAttributeData(buttonGroup, (ButtonGroupAttribute attribute) => attribute.Names)!;
         }
     }
 }
