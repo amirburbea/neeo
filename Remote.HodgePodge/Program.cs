@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Remote.Broadlink;
 using Remote.Neeo;
 using Remote.Neeo.Devices;
-using Remote.Neeo.Server;
+using Remote.Neeo.Web;
 using Remote.Utilities;
 
 namespace Remote.HodgePodge
@@ -38,22 +38,26 @@ namespace Remote.HodgePodge
 
         private static async Task Main()
         {
-            var brain = await BrainDiscovery.DiscoverBrainAsync();
+            var brain = await NeeoApi.DiscoverBrainAsync();
             if (brain == null)
             {
                 return;
             }
-            DeviceBuilder d = new DeviceBuilder("abc") { Type = DeviceType.TV }
+            var builder = NeeoApi.CreateDevice("test", DeviceType.Accessory)
                 .SetManufacturer(new string('1', 48))
+                .SetButtonHandler(new ConsoleButtonHandler())
+                .AddButtonGroup(ButtonGroup.Power)
                 .AddButtonGroup(ButtonGroup.ChannelZapper);
-            HostManager.StartAsync(brain, devices: new[] { d });
+            await NeeoApi.StartServerAsync(brain, "C#", builder);
+
+            await Task.Delay(30000);
+
+            await NeeoApi.StopServerAsync();
         }
 
         private static async Task MainASRM()
         {
-            PgpMethods.GenerateKeys();
 
-            //StartServer.SS();
 
             using RMDevice? remote = await RMDiscovery.DiscoverDeviceAsync();
             if (remote == null)

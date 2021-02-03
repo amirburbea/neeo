@@ -1,18 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using Remote.Neeo.Devices;
 
-namespace Remote.Neeo.Server
+namespace Remote.Neeo.Web
 {
-    
-
-    public sealed class DeviceDatabase 
+    public sealed class DeviceDatabase
     {
-        public DeviceDatabase(IEnumerable<IDeviceBuilder> devices)
+        private readonly IReadOnlyCollection<IDeviceAdapter> _devices;
+
+        public DeviceDatabase(IReadOnlyCollection<IDeviceAdapter> devices) => this._devices = devices;
+
+        private static class Constants
         {
+            public const double MatchFactor = 0.5;
+            public const int MaxSearchResults = 10;
         }
     }
 }

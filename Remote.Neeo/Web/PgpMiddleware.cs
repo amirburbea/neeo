@@ -2,9 +2,9 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
-namespace Remote.Neeo.Server
+namespace Remote.Neeo.Web
 {
-    public class PgpMiddleware
+    internal sealed class PgpMiddleware
     {
         private readonly PgpKeys _keys;
         private readonly RequestDelegate _next;
@@ -20,15 +20,13 @@ namespace Remote.Neeo.Server
             using (MemoryStream clone = new())
             {
                 await context.Request.Body.CopyToAsync(clone).ConfigureAwait(false);
-
-                if (clone.Length != 0)
+                if (clone.Length != 0L)
                 {
-                    clone.Seek(0, SeekOrigin.Begin);
+                    clone.Position = 0L;
                     context.Request.Body = PgpMethods.Decrypt(clone, this._keys.PrivateKey);
                 }
             }
-
-            await _next(context).ConfigureAwait(false);
+            await this._next(context).ConfigureAwait(false);
         }
     }
 }

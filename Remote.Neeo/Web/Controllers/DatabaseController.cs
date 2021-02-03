@@ -1,11 +1,18 @@
 ﻿using System;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Remote.Neeo.Server.Controllers
+namespace Remote.Neeo.Web.Controllers
 {
     [ApiController, Route("db")]
-    public sealed class DatabaseController : ControllerBase
+    internal sealed class DatabaseController : ControllerBase
     {
+        private readonly DeviceDatabase _deviceDatabase;
+
+        public DatabaseController(DeviceDatabase deviceDatabase)
+        {
+            this._deviceDatabase = deviceDatabase;
+        }
+
         [HttpGet("adapterdefinition/{adapterName}")]
         public ActionResult<object> GetAdapterDefinition(string adapterName)
         {

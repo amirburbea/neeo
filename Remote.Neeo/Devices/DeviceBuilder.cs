@@ -5,8 +5,6 @@ namespace Remote.Neeo.Devices
 {
     public interface IDeviceBuilder
     {
-        
-
         IReadOnlyCollection<string> AdditionalSearchTokens { get; }
 
         IButtonHandler? ButtonHandler { get; }
@@ -50,16 +48,18 @@ namespace Remote.Neeo.Devices
         IDeviceBuilder SetManufacturer(string manufacturer);
 
         IDeviceBuilder SetSpecificName(string? specificName);
+
+        internal IDeviceAdapter BuildAdapter();
     }
 
-    public sealed class DeviceBuilder : IDeviceBuilder
+    internal sealed class DeviceBuilder : IDeviceBuilder
     {
         private readonly HashSet<string> _additionalSearchTokens = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<ButtonDescriptor> _buttons = new();
 
         public DeviceBuilder(string name)
         {
-            Validator.ValidateStringLength(this.Name = name ?? throw new ArgumentNullException(nameof(name)), prefix: "Device name");
+            Validator.ValidateStringLength(this.Name = name ?? throw new ArgumentNullException(nameof(name)), prefix: nameof(name));
             this.Identifier = $"apt-{UniqueNameGenerator.Generate(name)}";
         }
 
@@ -113,6 +113,8 @@ namespace Remote.Neeo.Devices
             }
             return this;
         }
+
+        IDeviceAdapter IDeviceBuilder.BuildAdapter() => null!;
 
         public DeviceBuilder SetButtonHandler(IButtonHandler handler)
         {

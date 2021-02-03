@@ -3,9 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using Remote.Utilities;
 
-namespace Remote.Neeo.Devices
+namespace Remote.Neeo
 {
-    public static class UniqueNameGenerator
+    internal static class UniqueNameGenerator
     {
         public static string Generate(string root, string? prefix = null)
         {

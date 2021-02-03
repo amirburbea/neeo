@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Org.BouncyCastle.Bcpg;
@@ -14,9 +12,9 @@ using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Utilities.IO;
 
-namespace Remote.Neeo.Server
+namespace Remote.Neeo
 {
-    public static class PgpMethods
+    internal static class PgpMethods
     {
         public static Stream Decrypt(Stream inputStream, PgpPrivateKey privateKey)
         {
@@ -51,22 +49,20 @@ namespace Remote.Neeo.Server
             byte[] bytes = new byte[64];
             random.NextBytes(bytes);
             char[] passphrase = Encoding.ASCII.GetChars(bytes);
-            PgpSecretKey key = new(
+            PgpSecretKey secretKey = new(
                 PgpSignature.DefaultCertification,
                 PublicKeyAlgorithmTag.RsaGeneral,
-                (RsaKeyParameters)pair.Public,
-                (RsaPrivateCrtKeyParameters)pair.Private,
+                pair.Public,
+                pair.Private,
                 DateTime.Now,
-                "{ \"name\": \"NEEO-SDK\", \"email\": \"neeo-sdk@neeo.com\" }",
+                JsonSerializer.Serialize(new { Name = "NEEO-SDK", Email = "neeo-sdk@neeo.com" }, new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
                 SymmetricKeyAlgorithmTag.Aes256,
                 passphrase,
                 default,
                 default,
                 random
             );
-            PgpPrivateKey privateKey = key.ExtractPrivateKey(passphrase);
-            PgpPublicKey publicKey = key.PublicKey;
-            return (privateKey, publicKey);
+            return (secretKey.ExtractPrivateKey(passphrase), secretKey.PublicKey);
         }
 
         public static byte[] GetKeyBytes(Action<Stream> encode)
@@ -79,6 +75,7 @@ namespace Remote.Neeo.Server
             return output.ToArray();
         }
 
+        /*
         public static PgpPublicKey GetNeeoKey()
         {
             HttpClient c = new HttpClient();
@@ -89,7 +86,6 @@ namespace Remote.Neeo.Server
             return pubKey;
         }
 
-        /*
         private static PgpPrivateKey GetPrivateKey(string privateKeyPath)
         {
             using Stream keyIn = File.OpenRead(privateKeyPath);

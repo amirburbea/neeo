@@ -1,10 +1,10 @@
 ﻿using System.Text;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Remote.Neeo.Server.Controllers
+namespace Remote.Neeo.Web.Controllers
 {
     [ApiController, Route("[controller]")]
-    public sealed class SecureController : ControllerBase
+    internal sealed class SecureController : ControllerBase
     {
         private readonly string _publicKey;
 

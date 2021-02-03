@@ -3,7 +3,7 @@
 namespace Remote.Neeo
 {
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
-    public sealed class TextAttribute : Attribute
+    internal sealed class TextAttribute : Attribute
     {
         public TextAttribute(string text) => this.Text = text;
 
