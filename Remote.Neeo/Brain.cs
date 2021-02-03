@@ -78,21 +78,22 @@ namespace Remote.Neeo
             return array;
         }
 
-        internal async Task<string> GetAsync(string suffix)
+        internal async Task<string> GetAsync(string apiPath, CancellationToken cancellationToken = default)
         {
             using HttpClient client = new();
-            HttpResponseMessage message = await client.GetAsync(this.GetApiUri(suffix)).ConfigureAwait(false);
-            return await message.Content.ReadAsStringAsync().ConfigureAwait(false);
+            HttpResponseMessage message = await client.GetAsync(this.GetApiUri(apiPath), cancellationToken).ConfigureAwait(false);
+            return await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        internal async Task<string> PostAsync<T>(string suffix, T body)
+        internal async Task<string> PostAsync<T>(string apiPath, T body, CancellationToken cancellationToken = default)
         {
             using HttpClient client = new();
             HttpResponseMessage message = await client.PostAsync(
-                this.GetApiUri(suffix),
-                new StringContent(JsonSerializer.Serialize(body, Brain._jsonOptions), Encoding.UTF8, "application/json")
+                this.GetApiUri(apiPath), 
+                new StringContent(JsonSerializer.Serialize(body, Brain._jsonOptions), Encoding.UTF8, "application/json"),
+                cancellationToken
             );
-            return await message.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         }
 
         private static Brain Create(IZeroconfHost host)
@@ -115,7 +116,7 @@ namespace Remote.Neeo
             );
         }
 
-        private string GetApiUri(string suffix) => $"http://{this.HostName}:{this.Port}/v1/api/{suffix}";
+        private string GetApiUri(string path) => $"http://{this.HostName}:{this.Port}/v1/api/{path}";
 
         private static class Constants
         {

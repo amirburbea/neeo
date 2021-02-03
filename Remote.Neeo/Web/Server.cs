@@ -51,7 +51,7 @@ namespace Remote.Neeo.Web
             {
                 try
                 {
-                    await brain.PostAsync("registerSdkDeviceAdapter", new { Name = adapterName, BaseUrl = baseUrl }).ConfigureAwait(false);
+                    await brain.PostAsync("registerSdkDeviceAdapter", new { Name = adapterName, BaseUrl = baseUrl }, cancellationToken).ConfigureAwait(false);
                     logger.LogInformation("SDK Adapter registered on brain @ http://{host}:{port}", brain.HostName, brain.Port);
                     return;
                 }
@@ -72,9 +72,8 @@ namespace Remote.Neeo.Web
             }
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
             Brain brain = host.Services.GetRequiredService<Brain>();
-            string name = host.Services.GetRequiredService<SdkAdapterName>().Name;
-
-            await brain.PostAsync("unregisterSdkDeviceAdapter", new { Name = name }).ConfigureAwait(false);
+            string adapterName = host.Services.GetRequiredService<SdkAdapterName>().Name;
+            await brain.PostAsync("unregisterSdkDeviceAdapter", new { Name = adapterName }, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("SDK Adapter unregistered from brain @ http://{host}:{port}", brain.HostName, brain.Port);
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
