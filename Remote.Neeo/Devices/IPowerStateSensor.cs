@@ -1,6 +1,6 @@
 ﻿namespace Remote.Neeo.Devices
 {
-    public interface IPowerStateSensor : ISensor<bool>
+    public interface IPowerStateSensor : ISensorController<bool>
     {
     }
 }

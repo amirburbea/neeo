@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using Remote.Neeo.Devices.Descriptors;
 
 namespace Remote.Neeo.Devices
 {
@@ -8,6 +10,8 @@ namespace Remote.Neeo.Devices
     /// </summary>
     public interface IDeviceBuilder
     {
+        string AdapterName { get; }
+
         IReadOnlyCollection<string> AdditionalSearchTokens { get; }
 
         IButtonHandler? ButtonHandler { get; }
@@ -20,9 +24,9 @@ namespace Remote.Neeo.Devices
 
         IFavoritesHandler? FavoritesHandler { get; }
 
-        DeviceIcon Icon { get; }
+        DeviceIcon? Icon { get; }
 
-        string Identifier { get; }
+        IDeviceInitializer? Initializer { get; }
 
         string Manufacturer { get; }
 
@@ -50,6 +54,8 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder SetIcon(DeviceIcon icon);
 
+        IDeviceBuilder SetInitializer(IDeviceInitializer initializer);
+
         IDeviceBuilder SetManufacturer(string manufacturer);
 
         IDeviceBuilder SetPowerStateSensor(IPowerStateSensor sensor);
@@ -67,8 +73,10 @@ namespace Remote.Neeo.Devices
         public DeviceBuilder(string name)
         {
             Validator.ValidateStringLength(this.Name = name ?? throw new ArgumentNullException(nameof(name)), prefix: nameof(name));
-            this.Identifier = $"apt-{UniqueNameGenerator.Generate(name)}";
+            this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name)}";
         }
+
+        public string AdapterName { get; }
 
         public IReadOnlyCollection<string> AdditionalSearchTokens => this._additionalSearchTokens;
 
@@ -82,9 +90,9 @@ namespace Remote.Neeo.Devices
 
         public IFavoritesHandler? FavoritesHandler { get; private set; }
 
-        public DeviceIcon Icon { get; private set; }
+        public DeviceIcon? Icon { get; private set; }
 
-        public string Identifier { get; }
+        public IDeviceInitializer? Initializer { get; private set; }
 
         public string Manufacturer { get; private set; } = "NEEO";
 
@@ -114,16 +122,12 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroup group) => this.AddButtonGroup(group);
 
-        public DeviceBuilder AddButtonGroup(ButtonGroup group)
-        {
-            foreach (string name in ButtonGroupAttribute.GetNames(group))
-            {
-                this.AddButton(name);
-            }
-            return this;
-        }
+        public DeviceBuilder AddButtonGroup(ButtonGroup group) => ButtonGroupAttribute.GetNames(group).Aggregate(
+            this,
+            static (builder, name) => builder.AddButton(name)
+        );
 
-        IDeviceAdapter IDeviceBuilder.BuildAdapter() => null!;
+        IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
 
         public DeviceBuilder SetButtonHandler(IButtonHandler handler)
         {
@@ -173,6 +177,14 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
+        IDeviceBuilder IDeviceBuilder.SetInitializer(IDeviceInitializer initializer) => this.SetInitializer(initializer);
+
+        public DeviceBuilder SetInitializer(IDeviceInitializer initializer)
+        {
+            this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
+            return this;
+        }
+
         IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
 
         public DeviceBuilder SetManufacturer(string manufacturer = "NEEO")
@@ -200,5 +212,7 @@ namespace Remote.Neeo.Devices
             this.SpecificName = specificName;
             return this;
         }
+
+        private IDeviceAdapter BuildAdapter() => null!;
     }
 }

@@ -23,4 +23,9 @@
     <ProjectReference Include="..\Remote.Utilities\Remote.Utilities.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="Brain.*.cs">
+      <DependentUpon>Brain.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
 </Project>

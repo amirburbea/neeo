@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Remote.Broadlink
 {
-    public static class RMDiscovery 
+    public static class RMDiscovery
     {
         private static readonly Dictionary<string, RMDevice> _remotes = new();
 
@@ -66,7 +66,7 @@ namespace Remote.Broadlink
                     {
                         mac[index] = result.Buffer[0x3f - index];
                     }
-                    string macAddress = String.Join(':', mac.Select(b => b.ToString("x2")));
+                    string macAddress = String.Join(':', Array.ConvertAll(mac, b => b.ToString("x2")));
                     if (RMDiscovery._remotes.ContainsKey(macAddress))
                     {
                         continue;

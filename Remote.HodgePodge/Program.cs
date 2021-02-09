@@ -43,14 +43,21 @@ namespace Remote.HodgePodge
             {
                 return;
             }
-            var builder = NeeoSdk.CreateDevice("test", DeviceType.Accessory)
-                .SetManufacturer(new string('1', 48))
-                .SetButtonHandler(new ConsoleButtonHandler())
-                .AddButtonGroup(ButtonGroup.Power)
-                .AddButtonGroup(ButtonGroup.ChannelZapper);
-            await NeeoSdk.StartServerAsync(brain, "C#", builder);
-                        await Task.Delay(10000);
-                        await NeeoSdk.StopServerAsync();
+            try
+            {
+                brain.OpenWebUI();
+                var builder = Device.Create("test", DeviceType.Accessory)
+                    .SetManufacturer(new string('1', 48))
+                    .SetButtonHandler(new ConsoleButtonHandler())
+                    .AddButtonGroup(ButtonGroup.Power)
+                    .AddButtonGroup(ButtonGroup.ChannelZapper);
+                await brain.StartServerAsync("C#", new[] { builder });
+                await Task.Delay(10000);
+            }
+            finally
+            {
+                await brain.StopServerAsync();
+            }
         }
 
         private static async Task MainASRM()

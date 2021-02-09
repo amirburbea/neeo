@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 using System.Threading;
@@ -17,64 +18,57 @@ namespace Remote.Neeo.Web
 {
     internal static class Server
     {
-        private static IHost? _host;
-
-        public static async Task StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress ipAddress, ushort port, CancellationToken cancellationToken)
+        public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress hostIpAddress, int port, CancellationToken cancellationToken)
         {
-            if (Server._host != null)
-            {
-                throw new InvalidOperationException("Host is already running.");
-            }
-            if (brain == null)
-            {
-                throw new ArgumentNullException(nameof(brain));
-            }
-            if (string.IsNullOrEmpty(name))
-            {
-                throw new ArgumentException("Non-blank name is required.", nameof(name));
-            }
-            if (devices == null || devices.Length == 0 || Array.IndexOf(devices, default) != -1)
-            {
-                throw new ArgumentException("Devices collection can not be null/empty or contain null.", nameof(devices));
-            }
             string adapterName = $"src-{UniqueNameGenerator.Generate(name)}";
-            IHost host = Server.CreateHostBuilder(brain, adapterName, devices, ipAddress, port).Build();
+            IHost host = Server.CreateHostBuilder(
+                brain ?? throw new ArgumentNullException(nameof(brain)), 
+                adapterName, 
+                devices ?? throw new ArgumentNullException(nameof(devices)), 
+                hostIpAddress ?? throw new ArgumentNullException(nameof(hostIpAddress)), 
+                port
+            ).Build();
             await host.StartAsync(cancellationToken).ConfigureAwait(false);
-            Server._host = host;
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
-            string baseUrl = $"http://{ipAddress}:{port}";
+            string baseUrl = $"http://{hostIpAddress}:{port}";
             for (int i = 0; i < Constants.MaxConnectionRetries; i++)
             {
                 try
                 {
-                    await brain.PostAsync("api/registerSdkDeviceAdapter", new { Name = adapterName, BaseUrl = baseUrl }, cancellationToken).ConfigureAwait(false);
+                    await brain.RegisterServerAsync(adapterName, baseUrl, cancellationToken).ConfigureAwait(false);
                     logger.LogInformation("SDK Adapter registered on brain @ http://{host}:{port}", brain.HostName, brain.Port);
-                    return;
+                    return host;
                 }
-                catch
+                catch (Exception e)
                 {
-                    logger.LogWarning("Failed to register with brain {times} time(s).", i + 1);
+                    logger.LogWarning("Failed to register with brain {times} time(s).{nl}{content}", i + 1, Environment.NewLine, e.Message);
                 }
             }
             throw new ApplicationException("Failed to connect to brain.");
         }
 
-        public static async Task StopAsync(CancellationToken cancellationToken)
+        public static async Task StopAsync(IHost? host, CancellationToken cancellationToken)
         {
-            using IHost? host = Interlocked.Exchange(ref Server._host, null);
             if (host == null)
             {
                 return;
             }
-            ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
-            Brain brain = host.Services.GetRequiredService<Brain>();
-            string adapterName = host.Services.GetRequiredService<SdkAdapterName>().Name;
-            await brain.PostAsync("api/unregisterSdkDeviceAdapter", new { Name = adapterName }, cancellationToken).ConfigureAwait(false);
-            logger.LogInformation("SDK Adapter unregistered from brain @ http://{host}:{port}", brain.HostName, brain.Port);
-            await host.StopAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
+                Brain brain = host.Services.GetRequiredService<Brain>();
+                string name = host.Services.GetRequiredService<SdkAdapterName>().Name;
+                await brain.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false);
+                logger.LogInformation("SDK Adapter unregistered from brain @ http://{host}:{port}", brain.HostName, brain.Port);
+                await host.StopAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                host.Dispose();
+            }
         }
 
-        private static IHostBuilder CreateHostBuilder(Brain brain, string adapterName, IDeviceBuilder[] devices, IPAddress ipAddress, ushort port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
+        private static IHostBuilder CreateHostBuilder(Brain brain, string name, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
         {
             builder
                 .ConfigureKestrel((context, options) =>
@@ -98,10 +92,11 @@ namespace Remote.Neeo.Web
                 {
                     services
                         .AddSingleton(brain)
-                        .AddSingleton(new DeviceDatabase(Array.ConvertAll(devices, devices => devices.BuildAdapter())))
-                        .AddSingleton(new SdkAdapterName(adapterName))
-                        .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+                        .AddSingleton<IReadOnlyCollection<IDeviceAdapter>>(Array.ConvertAll(devices, devices => devices.BuildAdapter()))
+                        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
+                        .AddSingleton(new SdkAdapterName(name))
                         .AddSingleton<PgpKeys>()
+                        .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddControllers()
                         .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()));
                 })

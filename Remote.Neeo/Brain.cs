@@ -1,28 +1,30 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
+using System.Diagnostics;
 using System.Net;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Zeroconf;
+using Microsoft.Extensions.Hosting;
+using Remote.Neeo.Devices;
+using Remote.Neeo.Web;
 
 namespace Remote.Neeo
 {
-    public record Brain
+    public partial record Brain
     {
-        private static readonly JsonSerializerOptions _jsonOptions = new()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-        };
+        private IHost? _host;
 
-        internal Brain(IPAddress ipAddress, int port, string name, string hostName, string version, string region, DateTime updated)
+        public Brain(IPAddress ipAddress, int port, string name, string hostName, string version, string region, DateTime updated)
         {
-            (this.IPAddress, this.Port, this.Name, this.HostName, this.Version, this.Region, this.Updated) = (ipAddress, port, name, hostName, version, region, updated);
+            (this.IPAddress, this.Port, this.Name, this.HostName, this.Version, this.Region, this.Updated) = (
+                ipAddress ?? throw new ArgumentNullException(nameof(ipAddress)),
+                port,
+                name ?? throw new ArgumentNullException(nameof(name)),
+                hostName ?? throw new ArgumentNullException(nameof(hostName)),
+                version ?? throw new ArgumentNullException(nameof(version)),
+                region ?? throw new ArgumentNullException(nameof(region)),
+                updated
+            );
         }
 
         public string HostName { get; }
@@ -39,88 +41,28 @@ namespace Remote.Neeo
 
         public string Version { get; }
 
-        public static async Task<Brain?> DiscoverAsync(Func<Brain, bool>? predicate = default)
-        {
-            TaskCompletionSource<Brain?> taskCompletionSource = new();
-            using CancellationTokenSource cancellationTokenSource = new();
-            return await Task.WhenAny(
-                ZeroconfResolver.ResolveAsync(
-                    Constants.ServiceName,
-                    callback: OnHostDiscovered,
-                    cancellationToken: cancellationTokenSource.Token
-                ).ContinueWith(
-                    _ => default(Brain), // ZeroconfResolver.ResolveAsync has completed with no matching Brain found.
-                    TaskContinuationOptions.NotOnFaulted
-                ),
-                taskCompletionSource.Task
-            ).Unwrap().ConfigureAwait(false);
+        public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.HostName}:3200/eui") { UseShellExecute = true });
 
-            void OnHostDiscovered(IZeroconfHost host)
+        public async Task StartServerAsync(string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port = 8080, CancellationToken cancellationToken = default)
+        {
+            this._host = await Server.StartAsync(this, name, devices, hostIPAddress, port, cancellationToken).ConfigureAwait(false);
+        }
+
+        public Task StartServerAsync(string name, IDeviceBuilder[] devices, int port = 8080, CancellationToken cancellationToken = default)
+        {
+            IPAddress GetHostIPAddress()
             {
-                Brain brain = Brain.Create(host);
-                if (predicate != null && !predicate(brain))
-                {
-                    return;
-                }
-                cancellationTokenSource.Cancel();
-                taskCompletionSource.TrySetResult(brain);
+                IPAddress[] addresses;
+                return !this.IPAddress.Equals(IPAddress.Loopback) &&
+                    Array.IndexOf(addresses = Dns.GetHostAddresses(Dns.GetHostName()), this.IPAddress) == -1 &&
+                    Array.Find(addresses, address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address)) is IPAddress address
+                        ? address
+                        : IPAddress.Loopback;
             }
+
+            return this.StartServerAsync(name, devices, GetHostIPAddress(), port, cancellationToken);
         }
 
-        public static async Task<Brain[]> DiscoverAllAsync()
-        {
-            IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName).ConfigureAwait(false);
-            Brain[] array = new Brain[hosts.Count];
-            for (int index = 0; index < array.Length; index++)
-            {
-                array[index] = Brain.Create(hosts[index]);
-            }
-            return array;
-        }
-
-        internal async Task<string> GetAsync(string apiPath, CancellationToken cancellationToken = default)
-        {
-            using HttpClient client = new();
-            HttpResponseMessage message = await client.GetAsync(this.GetUri(apiPath), cancellationToken).ConfigureAwait(false);
-            return await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        internal async Task<string> PostAsync<T>(string apiPath, T body, CancellationToken cancellationToken = default)
-        {
-            using HttpClient client = new();
-            HttpResponseMessage message = await client.PostAsync(
-                this.GetUri(apiPath), 
-                new StringContent(JsonSerializer.Serialize(body, Brain._jsonOptions), Encoding.UTF8, "application/json"),
-                cancellationToken
-            );
-            return await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        private static Brain Create(IZeroconfHost host)
-        {
-            IService service = host.Services[Constants.ServiceName];
-            IReadOnlyDictionary<string, string> properties = service.Properties[0];
-            return new Brain(
-                IPAddress.Parse(host.IPAddress),
-                service.Port,
-                host.DisplayName,
-                $"{properties["hon"]}.local",
-                properties["rel"],
-                properties["reg"],
-                DateTime.ParseExact(
-                    properties["upd"],
-                    "yyyy-M-d",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal
-                )
-            );
-        }
-
-        private string GetUri(string path) => $"http://{this.HostName}:{this.Port}/v1/api/{path}";
-
-        private static class Constants
-        {
-            public const string ServiceName = "_neeo._tcp.local.";
-        }
+        public Task StopServerAsync(CancellationToken cancellationToken = default) => Server.StopAsync(Interlocked.Exchange(ref this._host, null), cancellationToken);
     }
 }
