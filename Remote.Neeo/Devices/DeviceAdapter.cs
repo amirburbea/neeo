@@ -7,10 +7,12 @@ namespace Remote.Neeo.Devices
     {
         string AdapterName { get; }
 
-        string ApiVersion { get; }
+        [JsonPropertyName("apiverson")]
+        string ApiVersion => "1.0";
 
         IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
+        [JsonPropertyName("timing")]
         DelaysSpecifier Delays { get; }
 
         IReadOnlyCollection<DeviceInfo> Devices { get; }
@@ -56,12 +58,8 @@ namespace Remote.Neeo.Devices
 
         public string AdapterName { get; }
 
-        [JsonPropertyName("apiverson")]
-        public string ApiVersion => "1.0";
-
         public IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        [JsonPropertyName("timing")]
         public DelaysSpecifier Delays { get; }
 
         public IReadOnlyCollection<DeviceInfo> Devices { get; }

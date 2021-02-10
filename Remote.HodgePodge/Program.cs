@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Remote.Broadlink;
 using Remote.Neeo;
 using Remote.Neeo.Devices;
-using Remote.Neeo.Web;
 using Remote.Utilities;
 
 namespace Remote.HodgePodge
@@ -49,7 +48,11 @@ namespace Remote.HodgePodge
                 brain.OpenWebUI();
                 var builder = Device.Create("test", DeviceType.Accessory)
                     .SetManufacturer(new string('1', 48))
-                    .SetButtonHandler(new ConsoleButtonHandler())
+                    .SetButtonHandler((x, y) =>
+                    {
+                        Console.WriteLine(new[] { x, y });
+                        return Task.CompletedTask;
+                    })
                     .AddButtonGroup(ButtonGroup.Power)
                     .AddButtonGroup(ButtonGroup.ChannelZapper);
                 await brain.StartServerAsync("C#", new[] { builder });
@@ -63,8 +66,6 @@ namespace Remote.HodgePodge
 
         private static async Task MainASRM()
         {
-
-
             using RMDevice? remote = await RMDiscovery.DiscoverDeviceAsync();
             if (remote == null)
             {

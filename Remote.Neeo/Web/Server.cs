@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -102,11 +100,7 @@ namespace Remote.Neeo.Web
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()))
-                        .AddJsonOptions(options =>
-                        {
-                            options.JsonSerializerOptions.IgnoreNullValues = true;
-                            options.JsonSerializerOptions.DictionaryKeyPolicy = options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-                        });
+                        .AddJsonOptions(options => options.JsonSerializerOptions.ApplyBrainSettings());
                 })
                 .Configure((context, builder) =>
                 {

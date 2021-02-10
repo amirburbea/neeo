@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Remote.Neeo.Devices.Descriptors;
+using Remote.Neeo.Devices.Discovery;
 
 namespace Remote.Neeo.Devices
 {
@@ -14,7 +15,7 @@ namespace Remote.Neeo.Devices
 
         IReadOnlyCollection<string> AdditionalSearchTokens { get; }
 
-        IButtonHandler? ButtonHandler { get; }
+        ButtonHandler? ButtonHandler { get; }
 
         IReadOnlyCollection<ButtonDescriptor> Buttons { get; }
 
@@ -34,7 +35,7 @@ namespace Remote.Neeo.Devices
 
         string Name { get; }
 
-        IPowerStateSensor? PowerStateSensor { get; }
+        DeviceValueGetter<bool>? PowerStateSensor { get; }
 
         IDeviceSetup Setup { get; }
 
@@ -50,14 +51,18 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder AddCapability(StaticDeviceCapability capability);
 
-        IDeviceBuilder SetButtonHandler(IButtonHandler handler);
+        IDeviceAdapter BuildAdapter();
+
+        IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryController controller);
+
+        IDeviceBuilder SetButtonHandler(ButtonHandler handler);
 
         IDeviceBuilder SetDelays(DelaysSpecifier delays);
 
         /// <summary>
         /// Setting the version allows you to tell the Brain about changes to your devices components. If you for example add new buttons to a device,
-        /// you can increase the version and this will let the Brain know to fetch the new components. 
-        /// You do not need to update the version if you do not change the components.  When adding the version to a device that was previously not versioned, 
+        /// you can increase the version and this will let the Brain know to fetch the new components.
+        /// You do not need to update the version if you do not change the components. When adding a version to a device that was previously not versioned,
         /// start with 1. The Brain will assume it was previously 0 and update.
         /// <para />
         /// Note: The Brain will only add new components, updating or removing old components is not supported)
@@ -72,21 +77,19 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder SetManufacturer(string manufacturer);
 
-        IDeviceBuilder SetPowerStateSensor(IPowerStateSensor sensor);
+        IDeviceBuilder SetPowerStateSensor(DeviceValueGetter<bool> sensor);
 
         /// <summary>
-        /// Sets an optional name to use when adding the device to a room (a name based on the type will be used by default, for example: 'Accessory'). 
+        /// Sets an optional name to use when adding the device to a room (a name based on the type will be used by default, for example: 'Accessory').
         /// <para />
         /// Note: This does not apply to devices using discovery.
         /// </summary>
         IDeviceBuilder SetSpecificName(string? specificName);
-
-        internal IDeviceAdapter BuildAdapter();
     }
 
     internal sealed class DeviceBuilder : IDeviceBuilder
     {
-        private readonly HashSet<string> _additionalSearchTokens = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> _additionalSearchTokens = new();
         private readonly List<ButtonDescriptor> _buttons = new();
         private readonly HashSet<DeviceCapability> _capabilities = new();
 
@@ -100,7 +103,7 @@ namespace Remote.Neeo.Devices
 
         public IReadOnlyCollection<string> AdditionalSearchTokens => this._additionalSearchTokens;
 
-        public IButtonHandler? ButtonHandler { get; private set; }
+        public ButtonHandler? ButtonHandler { get; private set; }
 
         public IReadOnlyCollection<ButtonDescriptor> Buttons => this._buttons;
 
@@ -120,11 +123,11 @@ namespace Remote.Neeo.Devices
 
         public string Name { get; }
 
-        public IPowerStateSensor? PowerStateSensor { get; private set; }
+        public DeviceValueGetter<bool>? PowerStateSensor { get; private set; }
 
-        IDeviceSetup IDeviceBuilder.Setup => this.Setup; 
+        IDeviceSetup IDeviceBuilder.Setup => this.Setup;
 
-        public DeviceSetup Setup { get; } = new();
+        public IDeviceSetup Setup { get; } = new DeviceSetup();
 
         public string? SpecificName { get; private set; }
 
@@ -140,7 +143,12 @@ namespace Remote.Neeo.Devices
 
         IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
 
-        IDeviceBuilder IDeviceBuilder.SetButtonHandler(IButtonHandler handler) => this.SetButtonHandler(handler);
+        IDeviceBuilder IDeviceBuilder.EnableDiscovery(
+            DiscoveryOptions options,
+            DiscoveryController controller
+        ) => this.EnableDiscovery(options, controller);
+
+        IDeviceBuilder IDeviceBuilder.SetButtonHandler(ButtonHandler handler) => this.SetButtonHandler(handler);
 
         IDeviceBuilder IDeviceBuilder.SetDelays(DelaysSpecifier delays) => this.SetDelays(delays);
 
@@ -154,7 +162,7 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
 
-        IDeviceBuilder IDeviceBuilder.SetPowerStateSensor(IPowerStateSensor sensor) => this.SetPowerStateSensor(sensor);
+        IDeviceBuilder IDeviceBuilder.SetPowerStateSensor(DeviceValueGetter<bool> sensor) => this.SetPowerStateSensor(sensor);
 
         IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
 
@@ -183,6 +191,14 @@ namespace Remote.Neeo.Devices
 
         private DeviceAdapter BuildAdapter()
         {
+            if (this.Buttons.Count != 0 && this.ButtonHandler == null)
+            {
+                throw new InvalidOperationException();
+            }
+            if (this.Type.RequiresInput() && !this.Buttons.Any(button => button.Name.StartsWith(Constants.InputPrefix)))
+            {
+                throw new InvalidOperationException();
+            }
             return new(
                 this.AdapterName,
                 this.Name,
@@ -199,7 +215,12 @@ namespace Remote.Neeo.Devices
             );
         }
 
-        private DeviceBuilder SetButtonHandler(IButtonHandler handler)
+        private IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryController controller)
+        {
+            throw new NotImplementedException();
+        }
+
+        private DeviceBuilder SetButtonHandler(ButtonHandler handler)
         {
             this.ButtonHandler = handler ?? throw new ArgumentNullException(nameof(handler));
             return this;
@@ -250,7 +271,7 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
-        private DeviceBuilder SetPowerStateSensor(IPowerStateSensor sensor)
+        private DeviceBuilder SetPowerStateSensor(DeviceValueGetter<bool> sensor)
         {
             this.PowerStateSensor = sensor;
             return this;
@@ -264,6 +285,11 @@ namespace Remote.Neeo.Devices
             }
             this.SpecificName = specificName;
             return this;
+        }
+
+        private static class Constants
+        {
+            public const string InputPrefix = "INPUT";
         }
     }
 }

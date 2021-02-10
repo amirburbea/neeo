@@ -9,12 +9,7 @@ namespace Remote.Neeo
 {
     partial record Brain
     {
-        private static readonly JsonSerializerOptions _jsonOptions = new()
-        {
-            IgnoreNullValues = true,
-            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        };
+        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions().ApplyBrainSettings();
 
         internal Task RegisterServerAsync(string name, string baseUrl, CancellationToken cancellationToken = default) => this.PostAsync(
             "api/registerSdkDeviceAdapter",
