@@ -1,28 +1,55 @@
-﻿using System;
-
-namespace Remote.Neeo.Devices
+﻿namespace Remote.Neeo.Devices
 {
     public interface IDeviceModel
     {
         string AdapterName { get; }
+
+        uint? DriverVersion { get; }
+
         int Id { get; }
+
         string Manufacturer { get; }
 
         string Name { get; }
 
         string Tokens { get; }
+
         DeviceType Type { get; }
     }
 
-    public sealed class DeviceModel : IDeviceModel
+    internal sealed class DeviceModel : IDeviceModel
     {
-        public string AdapterName => throw new NotImplementedException();
-        public int Id => throw new NotImplementedException();
-        public string Manufacturer => throw new NotImplementedException();
+        public DeviceModel(
+            int id, 
+            string adapterName, 
+            DeviceType type, 
+            string name, 
+            uint? driverVersion,
+            string manufacturer, 
+            string tokens
+        )
+        {
+            this.Id = id;
+            this.AdapterName = adapterName;
+            this.Type = type;
+            this.Name = name;
+            this.DriverVersion = driverVersion;
+            this.Manufacturer = manufacturer;
+            this.Tokens = tokens;
+        }
 
-        public string Name => throw new NotImplementedException();
+        public string AdapterName { get; }
 
-        public string Tokens => throw new NotImplementedException();
-        public DeviceType Type => throw new NotImplementedException();
+        public uint? DriverVersion { get; }
+
+        public int Id { get; }
+
+        public string Manufacturer { get; }
+
+        public string Name { get; }
+
+        public string Tokens { get; }
+
+        public DeviceType Type { get; }
     }
 }

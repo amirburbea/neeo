@@ -2,7 +2,6 @@
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,8 +11,9 @@ namespace Remote.Neeo
     {
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
+            IgnoreNullValues = true,
+            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
         };
 
         internal Task RegisterServerAsync(string name, string baseUrl, CancellationToken cancellationToken = default) => this.PostAsync(

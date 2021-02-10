@@ -1,5 +1,8 @@
-﻿namespace Remote.Neeo.Devices
+﻿using System.Text.Json.Serialization;
+
+namespace Remote.Neeo.Devices
 {
+    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<DirectoryRole>))]
     public enum DirectoryRole
     {
         [Text("ROOT")]

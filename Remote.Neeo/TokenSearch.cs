@@ -51,7 +51,7 @@ namespace Remote.Neeo
         /// </summary>
         public bool Unique { get; set; }
 
-        public IReadOnlyCollection<SearchResult<T>> Search(string query)
+        public IReadOnlyCollection<SearchResult<T>> Search(string query, int maxSearchResults = 20)
         {
             return Array.Empty<SearchResult<T>>();
         }

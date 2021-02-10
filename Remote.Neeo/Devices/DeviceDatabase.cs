@@ -10,53 +10,80 @@ namespace Remote.Neeo.Devices
     {
         Task<IDeviceAdapter> GetAdapterAsync(string adapterName);
 
-        IEnumerable<SearchResult<IDeviceModel>> Search(string? query);
+        IDeviceModel GetDevice(int id);
+
+        IReadOnlyCollection<SearchResult<IDeviceModel>> Search(string? query);
     }
 
     internal sealed class DeviceDatabase : IDeviceDatabase
     {
-        private readonly IReadOnlyDictionary<string, IDeviceAdapter> _adapters;
+        private readonly Dictionary<string, IDeviceAdapter> _adapters = new();
         private readonly TokenSearch<IDeviceModel> _deviceIndex;
         private readonly List<IDeviceModel> _devices;
-        private readonly HashSet<string> _initializedAdapterss;
+        private readonly HashSet<string> _initializedAdapters;
         private readonly ILogger<IDeviceDatabase> _logger;
 
         public DeviceDatabase(IReadOnlyCollection<IDeviceAdapter> adapters, ILogger<IDeviceDatabase> logger)
         {
             this._adapters = adapters.ToDictionary(adapter => adapter.AdapterName);
-            this._devices = new();
-            this._deviceIndex = new(this._devices,  nameof(IDeviceModel.Manufacturer), nameof(IDeviceModel.Name), nameof(IDeviceModel.Type), nameof(IDeviceModel.Tokens))
+            this._initializedAdapters = new();
+            this._logger = logger;
+            int id = 0;
+            this._devices = new(
+                from adapter in adapters
+                from device in adapter.Devices
+                select new DeviceModel(
+                    id++,
+                    adapter.AdapterName,
+                    adapter.Type,
+                    device.Name,
+                    adapter.DriverVersion,
+                    adapter.Manufacturer,
+                    string.Join(' ', device.Tokens)
+                )
+            );
+
+            this._deviceIndex = new(this._devices, nameof(IDeviceModel.Manufacturer), nameof(IDeviceModel.Name), nameof(IDeviceModel.Type), nameof(IDeviceModel.Tokens))
             {
                 Delimiter = Constants.Delimiter,
-                Threshold = Constants.MatchFactor
+                Threshold = Constants.MatchFactor,
+                Unique = true,
             };
-            this._initializedAdapterss = new();
-            this._logger = logger;
         }
 
         public async Task<IDeviceAdapter> GetAdapterAsync(string adapterName)
         {
             if (string.IsNullOrEmpty(adapterName) || !this._adapters.TryGetValue(adapterName, out IDeviceAdapter? adapter))
             {
-                throw new ArgumentException("No matching adapter name.", nameof(adapterName));
+                throw new ArgumentException($"No matching adapter with name \"{adapterName}\".", nameof(adapterName));
             }
             await this.InitializeAsync(adapter).ConfigureAwait(false);
             return adapter;
         }
 
-        public IEnumerable<SearchResult<IDeviceModel>> Search(string? query)
+        public IDeviceModel GetDevice(int id)
         {
-            if (String.IsNullOrEmpty(query))
-            {
-                return Array.Empty<SearchResult<IDeviceModel>>();
-            }
-            IReadOnlyCollection<SearchResult<IDeviceModel>> results = this._deviceIndex.Search(query);
-            return results.Count > Constants.MaxSearchResults ? results.Take(Constants.MaxSearchResults) : results;
+            return id < 0 || id >= this._devices.Count
+                ? throw new ArgumentException($"No matching device with id {id}.", nameof(id))
+                : this._devices[id];
+        }
+
+        public IDeviceModel GetDeviceByAdapterName(string adapterName)
+        {
+            return this._devices.FirstOrDefault(model => model.AdapterName == adapterName)
+                ?? throw new ArgumentException($"No matching device with adapter name \"{adapterName}\".", nameof(adapterName));
+        }
+
+        public IReadOnlyCollection<SearchResult<IDeviceModel>> Search(string? query)
+        {
+            return String.IsNullOrEmpty(query)
+                ? Array.Empty<SearchResult<IDeviceModel>>()
+                : this._deviceIndex.Search(query, Constants.MaxSearchResults);
         }
 
         private async Task InitializeAsync(IDeviceAdapter adapter)
         {
-            if (!this._initializedAdapterss.Add(adapter.AdapterName) || adapter.Initializer == null)
+            if (!this._initializedAdapters.Add(adapter.AdapterName) || adapter.Initializer == null)
             {
                 return;
             }
@@ -67,7 +94,7 @@ namespace Remote.Neeo.Devices
             catch (Exception e)
             {
                 this._logger.LogError("Initializing device failed: {message}", e.Message);
-                this._initializedAdapterss.Remove(adapter.AdapterName);
+                this._initializedAdapters.Remove(adapter.AdapterName);
             }
         }
 

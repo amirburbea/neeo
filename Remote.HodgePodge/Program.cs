@@ -41,6 +41,7 @@ namespace Remote.HodgePodge
             var brain = await Brain.DiscoverAsync();
             if (brain == null)
             {
+                Console.Error.WriteLine("Brain not found.");
                 return;
             }
             try

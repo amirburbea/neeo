@@ -17,16 +17,22 @@ namespace Remote.Neeo.Web
 
         public async Task InvokeAsync(HttpContext context)
         {
-            using (MemoryStream clone = new())
+            if (context.Request.Method == HttpMethods.Post && context.Request.Headers[Constants.SecureHeader].Equals("true"))
             {
+                using MemoryStream clone = new();
                 await context.Request.Body.CopyToAsync(clone).ConfigureAwait(false);
-                if (clone.Length != 0L)
+                if (clone.Length != default)
                 {
-                    clone.Position = 0L;
+                    clone.Position = default;
                     context.Request.Body = PgpMethods.Decrypt(clone, this._keys.PrivateKey);
                 }
             }
             await this._next(context).ConfigureAwait(false);
+        }
+
+        private static class Constants
+        {
+            public const string SecureHeader = "x-neeo-secure";
         }
     }
 }

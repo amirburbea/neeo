@@ -1,8 +1,11 @@
-﻿namespace Remote.Neeo.Devices
+﻿using System.Text.Json.Serialization;
+
+namespace Remote.Neeo.Devices
 {
     /// <summary>
     /// Device Types.
     /// </summary>
+    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceType>))]
     public enum DeviceType
     {
         /// <summary>

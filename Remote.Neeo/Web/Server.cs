@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -18,30 +20,29 @@ namespace Remote.Neeo.Web
 {
     internal static class Server
     {
-        public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress hostIpAddress, int port, CancellationToken cancellationToken)
+        public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port, CancellationToken cancellationToken)
         {
             string adapterName = $"src-{UniqueNameGenerator.Generate(name)}";
             IHost host = Server.CreateHostBuilder(
-                brain ?? throw new ArgumentNullException(nameof(brain)), 
-                adapterName, 
-                devices ?? throw new ArgumentNullException(nameof(devices)), 
-                hostIpAddress ?? throw new ArgumentNullException(nameof(hostIpAddress)), 
+                brain ?? throw new ArgumentNullException(nameof(brain)),
+                adapterName,
+                devices ?? throw new ArgumentNullException(nameof(devices)),
+                hostIPAddress ?? throw new ArgumentNullException(nameof(hostIPAddress)),
                 port
             ).Build();
             await host.StartAsync(cancellationToken).ConfigureAwait(false);
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
-            string baseUrl = $"http://{hostIpAddress}:{port}";
             for (int i = 0; i < Constants.MaxConnectionRetries; i++)
             {
                 try
                 {
-                    await brain.RegisterServerAsync(adapterName, baseUrl, cancellationToken).ConfigureAwait(false);
-                    logger.LogInformation("SDK Adapter registered on brain @ http://{host}:{port}", brain.HostName, brain.Port);
+                    await brain.RegisterServerAsync(adapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false);
+                    logger.LogInformation("Server registered on {brain} (http://{hostIPAddress}:{port}).", brain.HostName, hostIPAddress, port);
                     return host;
                 }
                 catch (Exception e)
                 {
-                    logger.LogWarning("Failed to register with brain {times} time(s).{nl}{content}", i + 1, Environment.NewLine, e.Message);
+                    logger.LogWarning("Failed to register with brain {times} time(s).\n{content}", i + 1, e.Message);
                 }
             }
             throw new ApplicationException("Failed to connect to brain.");
@@ -59,7 +60,7 @@ namespace Remote.Neeo.Web
                 Brain brain = host.Services.GetRequiredService<Brain>();
                 string name = host.Services.GetRequiredService<SdkAdapterName>().Name;
                 await brain.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false);
-                logger.LogInformation("SDK Adapter unregistered from brain @ http://{host}:{port}", brain.HostName, brain.Port);
+                logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
                 await host.StopAsync(cancellationToken).ConfigureAwait(false);
             }
             finally
@@ -82,7 +83,9 @@ namespace Remote.Neeo.Web
                 })
                 .ConfigureLogging((context, builder) =>
                 {
-                    builder.ClearProviders().AddConsole();
+                    builder
+                        .ClearProviders()
+                        .AddConsole();
                     if (context.HostingEnvironment.IsDevelopment())
                     {
                         builder.AddDebug();
@@ -97,8 +100,13 @@ namespace Remote.Neeo.Web
                         .AddSingleton(new SdkAdapterName(name))
                         .AddSingleton<PgpKeys>()
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-                        .AddControllers()
-                        .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()));
+                        .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
+                        .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()))
+                        .AddJsonOptions(options =>
+                        {
+                            options.JsonSerializerOptions.IgnoreNullValues = true;
+                            options.JsonSerializerOptions.DictionaryKeyPolicy = options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+                        });
                 })
                 .Configure((context, builder) =>
                 {
@@ -107,8 +115,8 @@ namespace Remote.Neeo.Web
                         builder.UseDeveloperExceptionPage();
                     }
                     builder
-                        .UseRouting()
                         .UseMiddleware<PgpMiddleware>()
+                        .UseRouting()
                         .UseCors(nameof(CorsPolicy))
                         .UseEndpoints(endpoints => endpoints.MapControllers());
                 });

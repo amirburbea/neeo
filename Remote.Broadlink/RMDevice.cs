@@ -46,11 +46,10 @@ namespace Remote.Broadlink
 
         public int DeviceType { get; }
 
+        public IPEndPoint RemoteEndPoint => (IPEndPoint)this._client.Client.RemoteEndPoint!;
         public virtual bool SupportsRF => false;
 
         public virtual bool SupportsTemperature => false;
-
-        public IPEndPoint RemoteEndPoint => (IPEndPoint)this._client.Client.RemoteEndPoint!;
 
         public Task BeginLearning() => this.SendCommand(0x03);
 
@@ -58,11 +57,11 @@ namespace Remote.Broadlink
 
         public Task CheckData() => this.SendCommand(0x04);
 
-        public Task CheckTemperature() => this.SupportsTemperature ? this.SendCommand(0x01) : throw new NotSupportedException();
-
         public Task CheckRFData() => this.SupportsRF ? this.SendCommand(0x1a) : throw new NotSupportedException();
 
         public Task CheckRFData2() => this.SupportsRF ? this.SendCommand(0x1b) : throw new NotSupportedException();
+
+        public Task CheckTemperature() => this.SupportsTemperature ? this.SendCommand(0x01) : throw new NotSupportedException();
 
         public void Dispose()
         {
@@ -72,7 +71,7 @@ namespace Remote.Broadlink
 
         public Task EnterRFSweep() => this.SupportsRF ? this.SendCommand(0x19) : throw new NotSupportedException();
 
-        public Task SendData(byte[] data) => this.SendRequest(RequestType.Command, RMDevice.Combine(RMDevice._dataHeader, data));
+        public Task SendData(byte[] data) => this.SendRequest(RequestType.Command, RMDevice._dataHeader.Combine(data));
 
         public Task WaitForAck()
         {
@@ -148,14 +147,6 @@ namespace Remote.Broadlink
             this._disposed = true;
             this._client.Dispose();
             this._listeningTask.Wait();
-        }
-
-        private static byte[] Combine(byte[] left, byte[] right)
-        {
-            byte[] output = new byte[left.Length + right.Length];
-            Buffer.BlockCopy(left, 0, output, 0, left.Length);
-            Buffer.BlockCopy(right, 0, output, left.Length, right.Length);
-            return output;
         }
 
         private Aes GetAes()
@@ -287,7 +278,7 @@ namespace Remote.Broadlink
             payload = await this.GetEncryptedBytes(payload).ConfigureAwait(false);
             packet[0x34] = (byte)(checksum & 0xff);
             packet[0x35] = (byte)(checksum >> 8);
-            packet = RMDevice.Combine(packet, payload);
+            packet = packet.Combine(payload);
             checksum = packet.Checksum();
             packet[0x20] = (byte)(checksum & 0xff);
             packet[0x21] = (byte)(checksum >> 8);

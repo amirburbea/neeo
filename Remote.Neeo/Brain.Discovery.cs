@@ -11,23 +11,29 @@ namespace Remote.Neeo
 {
     partial record Brain
     {
+        /// <summary>
+        /// Discovers the first <see cref="Brain"/> on the network matching the specified <paramref name="predicate"/> if provided.
+        /// If no <paramref name="predicate"/> is provided, returns the first <see cref="Brain"/> discovered.
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
         public static async Task<Brain?> DiscoverAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
         {
-            using CancellationTokenSource cts = new();
-            TaskCompletionSource<Brain?> cancellationTask = new();
+            using CancellationTokenSource tokenSource = new();
+            TaskCompletionSource<Brain?> cancellationTaskSource = new();
             cancellationToken.Register(delegate
             {
-                cancellationTask.TrySetCanceled(cancellationToken);
-                cts.Cancel();
+                cancellationTaskSource.TrySetCanceled(cancellationToken);
+                tokenSource.Cancel();
             });
-            TaskCompletionSource<Brain?> brainTask = new();
+            TaskCompletionSource<Brain?> brainTaskSource = new();
             return await Task.WhenAny(
-                ZeroconfResolver.ResolveAsync(Constants.ServiceName, callback: OnHostDiscovered, cancellationToken: cts.Token).ContinueWith(
+                ZeroconfResolver.ResolveAsync(Constants.ServiceName, callback: OnHostDiscovered, cancellationToken: tokenSource.Token).ContinueWith(
                     _ => /* ZeroconfResolver.ResolveAsync has completed with no matching Brain found.*/ default(Brain),
                     TaskContinuationOptions.NotOnFaulted
                 ),
-                brainTask.Task,
-                cancellationTask.Task
+                brainTaskSource.Task,
+                cancellationTaskSource.Task
             ).Unwrap().ConfigureAwait(false);
 
             void OnHostDiscovered(IZeroconfHost host)
@@ -37,11 +43,16 @@ namespace Remote.Neeo
                 {
                     return;
                 }
-                cts.Cancel();
-                brainTask.TrySetResult(brain);
+                tokenSource.Cancel();
+                brainTaskSource.TrySetResult(brain);
             }
         }
 
+        /// <summary>
+        /// Discovers all <see cref="Brain"/>s on the network.
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>s.</returns>
         public static async Task<Brain[]> DiscoverAllAsync(CancellationToken cancellationToken = default)
         {
             return (await ZeroconfResolver.ResolveAsync(Constants.ServiceName, cancellationToken: cancellationToken).ConfigureAwait(false))

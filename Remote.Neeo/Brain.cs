@@ -41,7 +41,10 @@ namespace Remote.Neeo
 
         public string Version { get; }
 
-        public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.HostName}:3200/eui") { UseShellExecute = true });
+        /// <summary>
+        /// Opens the default browser to the <see cref="Brain"/> WebUI.
+        /// </summary>
+        public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.HostName}:3200/eui") { UseShellExecute = true })?.Dispose();
 
         public async Task StartServerAsync(string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port = 8080, CancellationToken cancellationToken = default)
         {
