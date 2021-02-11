@@ -12,8 +12,7 @@ namespace Remote.Neeo.Devices
 
         IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        [JsonPropertyName("timing")]
-        DelaysSpecifier Delays { get; }
+        DeviceTiming Timing { get; }
 
         IReadOnlyCollection<DeviceInfo> Devices { get; }
 
@@ -36,7 +35,7 @@ namespace Remote.Neeo.Devices
             DeviceType type,
             string manufacturer,
             uint? driverVersion,
-            DelaysSpecifier? delays,
+            DeviceTiming? timing,
             IReadOnlyCollection<string> tokens,
             string? specificName,
             DeviceIcon? icon,
@@ -49,7 +48,7 @@ namespace Remote.Neeo.Devices
             this.Type = type;
             this.Manufacturer = manufacturer;
             this.Initializer = initializer;
-            this.Delays = delays ?? DelaysSpecifier.Empty;
+            this.Timing = timing ?? DeviceTiming.Empty;
             this.Capabilities = capabilities;
             this.DriverVersion = driverVersion;
             this.Setup = setup;
@@ -60,7 +59,7 @@ namespace Remote.Neeo.Devices
 
         public IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        public DelaysSpecifier Delays { get; }
+        public DeviceTiming Timing { get; }
 
         public IReadOnlyCollection<DeviceInfo> Devices { get; }
 

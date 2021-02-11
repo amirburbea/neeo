@@ -21,7 +21,9 @@ namespace Remote.Neeo.Devices
 
         IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        DelaysSpecifier? Delays { get; }
+        DeviceTiming? Delays { get; }
+
+        DiscoveryController? DiscoveryController { get; }
 
         uint? DriverVersion { get; }
 
@@ -49,15 +51,22 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder AddButtonGroup(ButtonGroup group);
 
+        IDeviceBuilder AddButtons(KnownButtons buttons);
+
         IDeviceBuilder AddCapability(StaticDeviceCapability capability);
 
         IDeviceAdapter BuildAdapter();
 
+        /// <summary>
+        /// Set timing related information (the delays NEEO should use when interacting with a device),
+        /// which will be used when generating recipes.
+        /// </summary>
+        /// <param name="timing"><see cref="DeviceTiming"/> specifying delays NEEO should use when interacting with a device.</param>
+        IDeviceBuilder DefineTiming(DeviceTiming timing);
+
         IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryController controller);
 
         IDeviceBuilder SetButtonHandler(ButtonHandler handler);
-
-        IDeviceBuilder SetDelays(DelaysSpecifier delays);
 
         /// <summary>
         /// Setting the version allows you to tell the Brain about changes to your devices components. If you for example add new buttons to a device,
@@ -93,10 +102,11 @@ namespace Remote.Neeo.Devices
         private readonly List<ButtonDescriptor> _buttons = new();
         private readonly HashSet<DeviceCapability> _capabilities = new();
 
-        public DeviceBuilder(string name)
+        public DeviceBuilder(string name, DeviceType type, string? prefix)
         {
+            this.Type = type;
             Validator.ValidateStringLength(this.Name = name ?? throw new ArgumentNullException(nameof(name)), prefix: nameof(name));
-            this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name)}";
+            this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name, prefix)}";
         }
 
         public string AdapterName { get; }
@@ -109,7 +119,9 @@ namespace Remote.Neeo.Devices
 
         public IReadOnlyCollection<DeviceCapability> Capabilities => this._capabilities;
 
-        public DelaysSpecifier? Delays { get; private set; }
+        public DeviceTiming? Delays { get; private set; }
+
+        public DiscoveryController? DiscoveryController { get; private set; }
 
         public uint? DriverVersion { get; private set; }
 
@@ -127,30 +139,29 @@ namespace Remote.Neeo.Devices
 
         IDeviceSetup IDeviceBuilder.Setup => this.Setup;
 
-        public IDeviceSetup Setup { get; } = new DeviceSetup();
+        public DeviceSetup Setup { get; } = new DeviceSetup();
 
         public string? SpecificName { get; private set; }
 
-        public DeviceType Type { get; init; }
+        public DeviceType Type { get; }
 
         IDeviceBuilder IDeviceBuilder.AddAdditionalSearchToken(string text) => this.AddAdditionalSearchToken(text);
 
         IDeviceBuilder IDeviceBuilder.AddButton(ButtonDescriptor button) => this.AddButton(button);
 
-        IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroup group) => this.AddButtonGroup(group);
+        IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroup group) => this.AddButtons((KnownButtons)group);
+
+        IDeviceBuilder IDeviceBuilder.AddButtons(KnownButtons button) => this.AddButtons(button);
 
         IDeviceBuilder IDeviceBuilder.AddCapability(StaticDeviceCapability capability) => this.AddCapability(capability);
 
         IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
 
-        IDeviceBuilder IDeviceBuilder.EnableDiscovery(
-            DiscoveryOptions options,
-            DiscoveryController controller
-        ) => this.EnableDiscovery(options, controller);
+        IDeviceBuilder IDeviceBuilder.DefineTiming(DeviceTiming timing) => this.DefineTiming(timing);
+
+        IDeviceBuilder IDeviceBuilder.EnableDiscovery(DiscoveryOptions options, DiscoveryController controller) => this.EnableDiscovery(options, controller);
 
         IDeviceBuilder IDeviceBuilder.SetButtonHandler(ButtonHandler handler) => this.SetButtonHandler(handler);
-
-        IDeviceBuilder IDeviceBuilder.SetDelays(DelaysSpecifier delays) => this.SetDelays(delays);
 
         IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version) => this.SetDriverVersion(version);
 
@@ -174,13 +185,21 @@ namespace Remote.Neeo.Devices
 
         private DeviceBuilder AddButton(ButtonDescriptor button)
         {
+            if (button == null)
+            {
+                throw new ArgumentNullException(nameof(button));
+            }
+            if (this.Buttons.Any(existing => existing.Name == button.Name))
+            {
+                throw new InvalidOperationException($"Button \"{button.Name}\" already defined.");
+            }
             this._buttons.Add(button ?? throw new ArgumentNullException(nameof(button)));
             return this;
         }
 
-        private DeviceBuilder AddButtonGroup(ButtonGroup group) => ButtonGroupAttribute.GetNames(group).Aggregate(
+        private DeviceBuilder AddButtons(KnownButtons buttons) => KnownButton.GetNames(buttons).Aggregate(
             this,
-            static (builder, name) => builder.AddButton(name)
+            static (builder, button) => builder.AddButton(button)
         );
 
         private IDeviceBuilder AddCapability(StaticDeviceCapability capability)
@@ -215,24 +234,29 @@ namespace Remote.Neeo.Devices
             );
         }
 
-        private IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryController controller)
+        private DeviceBuilder DefineTiming(DeviceTiming timing)
         {
-            throw new NotImplementedException();
+            if (!this.Type.SupportsTiming())
+            {
+                throw new NotSupportedException($"Device type {this.Type} does not support timing.");
+            }
+            this.Delays = timing;
+            return this;
+        }
+
+        private DeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryController controller)
+        {
+            this.Setup.Discovery = true;
+            this.Setup.HeaderText = options.HeaderText;
+            this.Setup.Description = options.Description;
+            this.Setup.EnableDynamicDeviceBuilder = options.EnableDynamicDeviceBuilder;
+            this.DiscoveryController = controller ?? throw new ArgumentNullException(nameof(controller));
+            return this;
         }
 
         private DeviceBuilder SetButtonHandler(ButtonHandler handler)
         {
             this.ButtonHandler = handler ?? throw new ArgumentNullException(nameof(handler));
-            return this;
-        }
-
-        private DeviceBuilder SetDelays(DelaysSpecifier delays)
-        {
-            if (!this.Type.SupportsDelays())
-            {
-                throw new NotSupportedException($"Device type {this.Type} does not support delays.");
-            }
-            this.Delays = delays;
             return this;
         }
 

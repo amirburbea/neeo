@@ -13,6 +13,12 @@ namespace Remote.Neeo
 
         public string Text { get; }
 
+        public static T? GetEnum<T>(string text)
+            where T : struct, Enum
+        {
+            return EnumTextMapping<T>.FromText.TryGetValue(text, out T value) ? value : default(T?);
+        }
+
         public static string GetEnumText<T>(T value)
             where T : struct, Enum
         {
@@ -41,7 +47,7 @@ namespace Remote.Neeo
             );
 
             public static readonly Dictionary<T, string> ToText = EnumTextMapping<T>.FromText.ToDictionary(
-                pair => pair.Value, 
+                pair => pair.Value,
                 pair => pair.Key
             );
         }
