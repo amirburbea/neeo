@@ -45,16 +45,16 @@ namespace Remote.HodgePodge
             }
             try
             {
-                brain.OpenWebUI();
                 var builder = Device.Create("test", DeviceType.Accessory)
-                    .SetManufacturer(new string('1', 48))
-                    .SetButtonHandler((x, y) =>
+                    .SetManufacturer("Manufacturer")
+                    .AddButtons(KnownButtons.PowerOn | KnownButtons.PowerOff)
+                    .AddButtonGroup(ButtonGroup.NumberPad)
+                    .AddButtons(KnownButtons.Menu)
+                    .SetButtonHandler((deviceId, button) =>
                     {
-                        Console.WriteLine(new[] { x, y });
+                        Console.WriteLine($"{deviceId}|{button}");
                         return Task.CompletedTask;
-                    })
-                    .AddButtonGroup(ButtonGroup.Power)
-                    .AddButtonGroup(ButtonGroup.ChannelZapper);
+                    });
                 await brain.StartServerAsync("C#", new[] { builder });
                 await Task.Delay(10000);
             }
