@@ -46,12 +46,12 @@ namespace Remote.Neeo
         /// </summary>
         public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.HostName}:3200/eui") { UseShellExecute = true })?.Dispose();
 
-        public async Task StartServerAsync(string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port = 8080, CancellationToken cancellationToken = default)
+        public async Task StartServerAsync(string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port = 9000, CancellationToken cancellationToken = default)
         {
             this._host = await Server.StartAsync(this, name, devices, hostIPAddress, port, cancellationToken).ConfigureAwait(false);
         }
 
-        public Task StartServerAsync(string name, IDeviceBuilder[] devices, int port = 8080, CancellationToken cancellationToken = default)
+        public Task StartServerAsync(string name, IDeviceBuilder[] devices, int port = 9000, CancellationToken cancellationToken = default)
         {
             IPAddress GetHostIPAddress()
             {
