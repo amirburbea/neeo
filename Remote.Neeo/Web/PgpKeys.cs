@@ -2,7 +2,7 @@
 
 namespace Remote.Neeo.Web
 {
-    public sealed class PgpKeys
+    internal sealed class PgpKeys
     {
         public PgpKeys() => (this.PrivateKey, this.PublicKey) = PgpMethods.GenerateKeys();
 

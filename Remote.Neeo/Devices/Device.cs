@@ -26,6 +26,6 @@
             or DeviceType.VideoOnDemand;
 
         public static bool SupportsTiming(this DeviceType type) => type is not DeviceType.Accessory
-            or DeviceType.Light;
+            and not DeviceType.Light;
     }
 }

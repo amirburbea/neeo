@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Remote.Broadlink;
 using Remote.Neeo;
 using Remote.Neeo.Devices;
+using Remote.Neeo.Devices.Discovery;
 using Remote.Utilities;
 
 namespace Remote.HodgePodge
@@ -43,6 +44,17 @@ namespace Remote.HodgePodge
                 Console.Error.WriteLine("Brain not found.");
                 return;
             }
+             Credentials c = new("user", "pass");
+            string text = JsonSerializer.Serialize(c, JsonSerialization.Options);
+
+            var doc = JsonDocument.Parse(text);
+
+
+
+
+
+
+
             try
             {
                 var builder = Device.Create("test", DeviceType.Accessory)
@@ -55,6 +67,8 @@ namespace Remote.HodgePodge
                         Console.WriteLine($"{deviceId}|{button}");
                         return Task.CompletedTask;
                     });
+
+                var info = await brain.GetSystemInfoAsync();
                 await brain.StartServerAsync("C#", new[] { builder });
                 await Task.Delay(10000);
             }

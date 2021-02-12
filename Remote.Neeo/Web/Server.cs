@@ -16,6 +16,9 @@ using Remote.Neeo.Devices;
 
 namespace Remote.Neeo.Web
 {
+    /// <summary>
+    /// Contains <see langword="static"/> methods for starting and stopping a Kestrel server for interacting with the NEEO Brain.
+    /// </summary>
     internal static class Server
     {
         public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port, CancellationToken cancellationToken)
@@ -35,7 +38,7 @@ namespace Remote.Neeo.Web
                 try
                 {
                     await brain.RegisterServerAsync(adapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false);
-                    logger.LogInformation("Server registered on {brain} (http://{hostIPAddress}:{port}).", brain.HostName, hostIPAddress, port);
+                    logger.LogInformation("Server [http://{hostIP}:{port}] registered on {brainHost}.local ({brainIP}).", hostIPAddress, port, brain.HostName, brain.IPAddress);
                     return host;
                 }
                 catch (Exception e)
@@ -100,7 +103,7 @@ namespace Remote.Neeo.Web
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()))
-                        .AddJsonOptions(options => options.JsonSerializerOptions.ApplyBrainSettings());
+                        .AddJsonOptions(options => options.JsonSerializerOptions.ApplySettings());
                 })
                 .Configure((context, builder) =>
                 {

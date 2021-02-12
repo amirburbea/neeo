@@ -18,7 +18,7 @@ namespace Remote.Neeo.Devices
 
         uint? DriverVersion { get; }
 
-        IDeviceInitializer? Initializer { get; }
+        DeviceInitializer? Initializer { get; }
 
         string Manufacturer { get; }
 
@@ -38,10 +38,10 @@ namespace Remote.Neeo.Devices
             DeviceTiming? timing,
             IReadOnlyCollection<string> tokens,
             string? specificName,
-            DeviceIcon? icon,
+            DeviceIconOverride? icon,
             IReadOnlyCollection<DeviceCapability> capabilities,
             IDeviceSetup setup,
-            IDeviceInitializer? initializer
+            DeviceInitializer? initializer
         )
         {
             this.AdapterName = adapterName;
@@ -65,7 +65,7 @@ namespace Remote.Neeo.Devices
 
         public uint? DriverVersion { get; }
 
-        public IDeviceInitializer? Initializer { get; }
+        public DeviceInitializer? Initializer { get; }
 
         public string Manufacturer { get; }
 

@@ -3,10 +3,11 @@
 namespace Remote.Neeo.Devices
 {
     /// <summary>
-    /// Device icons.
+    /// The icon for a device is generally derived from the device type.
+    /// NEEO supports two icon overrides (specifically &quot;sonos&quot; and &quot;neeo&quot;).
     /// </summary>
-    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceIcon>))]
-    public enum DeviceIcon
+    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceIconOverride>))]
+    public enum DeviceIconOverride
     {
         /// <summary>
         /// Neeo.

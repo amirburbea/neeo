@@ -12,8 +12,5 @@ namespace Remote.Neeo.Web.Controllers
         {
             this._database = database;
         }
-
-
-
     }
 }

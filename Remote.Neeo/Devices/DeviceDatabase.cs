@@ -89,7 +89,7 @@ namespace Remote.Neeo.Devices
             }
             try
             {
-                await adapter.Initializer.InitializeAsync().ConfigureAwait(false);
+                await adapter.Initializer().ConfigureAwait(false);
             }
             catch (Exception e)
             {

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Remote.Neeo.Devices.Discovery;
 
 namespace Remote.Neeo.Devices
 {
@@ -15,6 +16,8 @@ namespace Remote.Neeo.Devices
         string? HeaderText { get; }
 
         bool? Registration { get; }
+
+        RegistrationType? RegistrationType { get; }
     }
 
     internal sealed class DeviceSetup : IDeviceSetup
@@ -27,6 +30,8 @@ namespace Remote.Neeo.Devices
 
         public string? HeaderText { get; set; }
 
-        public bool? Registration { get; set; }
+        public bool? Registration => this.RegistrationType.HasValue ? true : default(bool?);
+
+        public RegistrationType? RegistrationType { get; set; }
     }
 }

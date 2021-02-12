@@ -68,15 +68,9 @@ namespace Remote.Neeo
                 IPAddress.Parse(host.IPAddress),
                 service.Port,
                 host.DisplayName,
-                $"{properties["hon"]}.local",
+                properties["hon"],
                 properties["rel"],
-                properties["reg"],
-                DateTime.ParseExact(
-                    properties["upd"],
-                    "yyyy-M-d",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal
-                )
+                properties["reg"]
             );
         }
 

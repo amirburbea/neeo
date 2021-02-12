@@ -23,15 +23,15 @@ namespace Remote.Neeo.Devices
 
         DeviceTiming? Delays { get; }
 
-        DiscoveryController? DiscoveryController { get; }
+        DiscoveryProcessor? DiscoveryProcessor { get; }
 
         uint? DriverVersion { get; }
 
         IFavoritesHandler? FavoritesHandler { get; }
 
-        DeviceIcon? Icon { get; }
+        DeviceIconOverride? Icon { get; }
 
-        IDeviceInitializer? Initializer { get; }
+        DeviceInitializer? Initializer { get; }
 
         string Manufacturer { get; }
 
@@ -47,13 +47,34 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder AddAdditionalSearchToken(string text);
 
+        /// <summary>
+        /// Add a button to the device.
+        /// <para />
+        /// Note that adding buttons to the device requires defining a button handler via <see cref="SetButtonHandler"/>.
+        /// </summary>
+        /// <param name="button">The button to add.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder AddButton(ButtonDescriptor button);
 
+        /// <summary>
+        /// Add a group of buttons to the device.
+        /// <para />
+        /// Note that adding buttons to the device requires defining a button handler via <see cref="SetButtonHandler"/>.
+        /// </summary>
+        /// <param name="group">The <see cref="ButtonGroup"/> to add.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder AddButtonGroup(ButtonGroup group);
 
+        /// <summary>
+        /// Add a button (or bitwise combination of buttons) to the device.
+        /// <para />
+        /// Note that adding buttons to the device requires defining a button handler via <see cref="SetButtonHandler"/>.
+        /// </summary>
+        /// <param name="buttons">The button (or bitwise combination of buttons) to add.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder AddButtons(KnownButtons buttons);
 
-        IDeviceBuilder AddCapability(StaticDeviceCapability capability);
+        IDeviceBuilder AddCapability(DeviceCapability capability);
 
         IDeviceAdapter BuildAdapter();
 
@@ -62,9 +83,10 @@ namespace Remote.Neeo.Devices
         /// which will be used when generating recipes.
         /// </summary>
         /// <param name="timing"><see cref="DeviceTiming"/> specifying delays NEEO should use when interacting with a device.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder DefineTiming(DeviceTiming timing);
 
-        IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryController controller);
+        IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryProcessor controller);
 
         IDeviceBuilder SetButtonHandler(ButtonHandler handler);
 
@@ -76,13 +98,14 @@ namespace Remote.Neeo.Devices
         /// <para />
         /// Note: The Brain will only add new components, updating or removing old components is not supported)
         /// </summary>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetDriverVersion(uint version);
 
         IDeviceBuilder SetFavoritesHandler(IFavoritesHandler handler);
 
-        IDeviceBuilder SetIcon(DeviceIcon icon);
+        IDeviceBuilder SetIcon(DeviceIconOverride icon);
 
-        IDeviceBuilder SetInitializer(IDeviceInitializer initializer);
+        IDeviceBuilder SetInitializer(DeviceInitializer initializer);
 
         IDeviceBuilder SetManufacturer(string manufacturer);
 
@@ -93,6 +116,7 @@ namespace Remote.Neeo.Devices
         /// <para />
         /// Note: This does not apply to devices using discovery.
         /// </summary>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetSpecificName(string? specificName);
     }
 
@@ -121,15 +145,15 @@ namespace Remote.Neeo.Devices
 
         public DeviceTiming? Delays { get; private set; }
 
-        public DiscoveryController? DiscoveryController { get; private set; }
+        public DiscoveryProcessor? DiscoveryProcessor { get; private set; }
 
         public uint? DriverVersion { get; private set; }
 
         public IFavoritesHandler? FavoritesHandler { get; private set; }
 
-        public DeviceIcon? Icon { get; private set; }
+        public DeviceIconOverride? Icon { get; private set; }
 
-        public IDeviceInitializer? Initializer { get; private set; }
+        public DeviceInitializer? Initializer { get; private set; }
 
         public string Manufacturer { get; private set; } = "NEEO";
 
@@ -153,13 +177,13 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.AddButtons(KnownButtons button) => this.AddButtons(button);
 
-        IDeviceBuilder IDeviceBuilder.AddCapability(StaticDeviceCapability capability) => this.AddCapability(capability);
+        IDeviceBuilder IDeviceBuilder.AddCapability(DeviceCapability capability) => this.AddCapability(capability);
 
         IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
 
         IDeviceBuilder IDeviceBuilder.DefineTiming(DeviceTiming timing) => this.DefineTiming(timing);
 
-        IDeviceBuilder IDeviceBuilder.EnableDiscovery(DiscoveryOptions options, DiscoveryController controller) => this.EnableDiscovery(options, controller);
+        IDeviceBuilder IDeviceBuilder.EnableDiscovery(DiscoveryOptions options, DiscoveryProcessor processor) => this.EnableDiscovery(options, processor);
 
         IDeviceBuilder IDeviceBuilder.SetButtonHandler(ButtonHandler handler) => this.SetButtonHandler(handler);
 
@@ -167,9 +191,9 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.SetFavoritesHandler(IFavoritesHandler handler) => this.SetFavoritesHandler(handler);
 
-        IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIcon icon) => this.SetIcon(icon);
+        IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIconOverride icon) => this.SetIcon(icon);
 
-        IDeviceBuilder IDeviceBuilder.SetInitializer(IDeviceInitializer initializer) => this.SetInitializer(initializer);
+        IDeviceBuilder IDeviceBuilder.SetInitializer(DeviceInitializer initializer) => this.SetInitializer(initializer);
 
         IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
 
@@ -191,7 +215,7 @@ namespace Remote.Neeo.Devices
             }
             if (this.Buttons.Any(existing => existing.Name == button.Name))
             {
-                throw new InvalidOperationException($"Button \"{button.Name}\" already defined.");
+                throw new ArgumentException($"Button \"{button.Name}\" already defined.", nameof(button));
             }
             this._buttons.Add(button ?? throw new ArgumentNullException(nameof(button)));
             return this;
@@ -202,9 +226,17 @@ namespace Remote.Neeo.Devices
             static (builder, button) => builder.AddButton(button)
         );
 
-        private IDeviceBuilder AddCapability(StaticDeviceCapability capability)
+        private DeviceBuilder AddCapability(DeviceCapability capability)
         {
-            this._capabilities.Add((DeviceCapability)capability);
+            if (capability == DeviceCapability.CustomFavoriteHandler && this.FavoritesHandler == null)
+            {
+                throw new ArgumentException($"Can not add the capability {capability} before calling {nameof(IDeviceBuilder.SetFavoritesHandler)}.", nameof(capability));
+            }
+            if (capability == DeviceCapability.RegisterUserAccount && !this.Setup.Registration.GetValueOrDefault())
+            {
+                throw new ArgumentException("", nameof(capability));
+            }
+            this._capabilities.Add(capability);
             return this;
         }
 
@@ -244,13 +276,13 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
-        private DeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryController controller)
+        private DeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryProcessor processor)
         {
+            this.DiscoveryProcessor = processor ?? throw new ArgumentNullException(nameof(processor));
             this.Setup.Discovery = true;
             this.Setup.HeaderText = options.HeaderText;
             this.Setup.Description = options.Description;
             this.Setup.EnableDynamicDeviceBuilder = options.EnableDynamicDeviceBuilder;
-            this.DiscoveryController = controller ?? throw new ArgumentNullException(nameof(controller));
             return this;
         }
 
@@ -273,17 +305,16 @@ namespace Remote.Neeo.Devices
                 throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
             }
             this.FavoritesHandler = handler ?? throw new ArgumentNullException(nameof(handler));
-            this._capabilities.Add(DeviceCapability.CustomFavoriteHandler);
-            return this;
+            return this.AddCapability(DeviceCapability.CustomFavoriteHandler);
         }
 
-        private DeviceBuilder SetIcon(DeviceIcon icon)
+        private DeviceBuilder SetIcon(DeviceIconOverride icon)
         {
             this.Icon = icon;
             return this;
         }
 
-        private DeviceBuilder SetInitializer(IDeviceInitializer initializer)
+        private DeviceBuilder SetInitializer(DeviceInitializer initializer)
         {
             this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
             return this;

@@ -12,7 +12,7 @@ using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Utilities.IO;
 
-namespace Remote.Neeo
+namespace Remote.Neeo.Web
 {
     internal static class PgpMethods
     {

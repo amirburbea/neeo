@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -9,45 +10,61 @@ namespace Remote.Neeo
 {
     partial record Brain
     {
-        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions().ApplyBrainSettings();
+        /// <summary>
+        /// Asynchronously fetch data via a GET request to a REST endpoint on the Brain at the specified API <paramref name="path"/>.
+        /// </summary>
+        /// <param name="path">The API path on the NEEO Brain.</param>
+        /// <param name="cancellationToken">A cancellation token for the request.</param>
+        /// <returns><see cref="Task"/> representing the aschronous operation.</returns>
+        public async Task<string> GetAsync(string path, CancellationToken cancellationToken = default)
+        {
+            using HttpClient client = new();
+            HttpResponseMessage message = await client.GetAsync(this.GetUri(path), cancellationToken).ConfigureAwait(false);
+            return await Brain.GetContentAsync(message, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task<Dictionary<string, JsonElement>> GetSystemInfoAsync() => JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+            await this.GetAsync("systeminfo"),
+            JsonSerialization.Options
+        )!;
+
+        /// <summary>
+        /// Asynchronously fetch data via a POST request to a REST endpoint on the Brain at the specified API <paramref name="path"/>.
+        /// </summary>
+        /// <param name="path">The API path on the NEEO Brain.</param>
+        /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
+        /// <param name="cancellationToken">A cancellation token for the request.</param>
+        /// <returns><see cref="Task"/> representing the aschronous operation.</returns>
+        public async Task<string> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
+        {
+            using HttpClient client = new();
+            HttpResponseMessage message = await client.PostAsync(
+                this.GetUri(path),
+                new StringContent(JsonSerializer.Serialize(body, JsonSerialization.Options), Encoding.UTF8, "application/json"),
+                cancellationToken
+            ).ConfigureAwait(false);
+            return await Brain.GetContentAsync(message, cancellationToken).ConfigureAwait(false);
+        }
 
         internal Task RegisterServerAsync(string name, string baseUrl, CancellationToken cancellationToken = default) => this.PostAsync(
-            "api/registerSdkDeviceAdapter",
+            "v1/api/registerSdkDeviceAdapter",
             new { Name = name, BaseUrl = baseUrl },
             cancellationToken
         );
 
         internal Task UnregisterServerAsync(string name, CancellationToken cancellationToken = default) => this.PostAsync(
-            "api/unregisterSdkDeviceAdapter",
+            "v1/api/unregisterSdkDeviceAdapter",
             new { Name = name },
             cancellationToken
         );
 
-        private async Task<string> GetAsync(string apiPath, CancellationToken cancellationToken = default)
-        {
-            using HttpClient client = new();
-            HttpResponseMessage message = await client.GetAsync(this.GetUri(apiPath), cancellationToken).ConfigureAwait(false);
-            return await Brain.GetContentAsync(message, cancellationToken).ConfigureAwait(false);
-        }
-
         private static Task<string> GetContentAsync(HttpResponseMessage message, CancellationToken cancellationToken)
         {
-            return message.StatusCode != HttpStatusCode.OK && message.StatusCode != HttpStatusCode.NoContent
-                ? throw new WebException($"Server returned {message.StatusCode}.")
-                : message.Content.ReadAsStringAsync(cancellationToken);
+            return message.StatusCode is HttpStatusCode.OK or HttpStatusCode.NoContent
+                ? message.Content.ReadAsStringAsync(cancellationToken)
+                : throw new WebException($"Server returned {(int)message.StatusCode}:{message.StatusCode}.");
         }
 
-        private string GetUri(string apiPath) => $"http://{this.HostName}:{this.Port}/v1/{apiPath}";
-
-        private async Task<string> PostAsync<TBody>(string apiPath, TBody body, CancellationToken cancellationToken = default)
-        {
-            using HttpClient client = new();
-            HttpResponseMessage message = await client.PostAsync(
-                this.GetUri(apiPath),
-                new StringContent(JsonSerializer.Serialize(body, Brain._jsonOptions), Encoding.UTF8, "application/json"),
-                cancellationToken
-            ).ConfigureAwait(false);
-            return await Brain.GetContentAsync(message, cancellationToken).ConfigureAwait(false);
-        }
+        private string GetUri(string path) => $"http://{this.HostName}.local:{this.Port}/{path}";
     }
 }

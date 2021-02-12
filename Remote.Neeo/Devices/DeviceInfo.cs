@@ -5,12 +5,12 @@ namespace Remote.Neeo.Devices
 {
     public readonly struct DeviceInfo
     {
-        public DeviceInfo(string name, IReadOnlyCollection<string> tokens, string? specificName, DeviceIcon? icon)
+        public DeviceInfo(string name, IReadOnlyCollection<string> tokens, string? specificName, DeviceIconOverride? icon)
         {
             (this.Name, this.Tokens, this.SpecificName, this.Icon) = (name, tokens, specificName, icon);
         }
 
-        public DeviceIcon? Icon { get; }
+        public DeviceIconOverride? Icon { get; }
 
         public string Name { get; }
 
