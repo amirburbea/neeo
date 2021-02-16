@@ -22,7 +22,7 @@ namespace Remote.Neeo
         private IHost? _host;
 
         /// <summary>
-        /// Initializes an instance of the <see cref="Brain"/> class with details for reaching the NEEO brain on the network.
+        /// Initializes an instance of the <see cref="Brain"/> class with details for reaching the NEEO Brain on the network.
         /// </summary>
         /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
         /// <param name="port">The port on which the NEEO Brain API is running.</param>
@@ -41,6 +41,12 @@ namespace Remote.Neeo
                 region ?? throw new ArgumentNullException(nameof(region))
             );
         }
+
+        /// <summary>
+        /// Gets a value indicating if the Brain firmware version is sufficient for running the SDK.
+        /// The Brain must be running firmware <c>v0.50</c> or above.
+        /// </summary>
+        public bool HasCompatibleFirmware => double.Parse(Brain._versionPrefixRegex.Match(this.Version).Groups["v"].Value, CultureInfo.InvariantCulture) >= 0.5;
 
         /// <summary>
         /// The host name of the NEEO Brain.
@@ -73,19 +79,14 @@ namespace Remote.Neeo
         public string Version { get; }
 
         /// <summary>
-        /// Gets a value indicating if the Brain firmware version is sufficient for running the SDK.
-        /// </summary>
-        public bool IsFirmwareVersionSufficient => double.Parse(Brain._versionPrefixRegex.Match(this.Version).Groups["v"].Value, CultureInfo.InvariantCulture) >= 0.5;
-
-        /// <summary>
         /// Opens the default browser to the Brain WebUI.
         /// </summary>
         public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.HostName}.local:3200/eui") { UseShellExecute = true })?.Dispose();
 
         /// <summary>
-        /// 
+        /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
         /// </summary>
-        /// <param name="name"></param>
+        /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
         /// <param name="devices"></param>
         /// <param name="hostIPAddress"></param>
         /// <param name="port"></param>
@@ -93,7 +94,7 @@ namespace Remote.Neeo
         /// <returns></returns>
         public async Task StartServerAsync(string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port = 9000, CancellationToken cancellationToken = default)
         {
-            if (!this.IsFirmwareVersionSufficient)
+            if (!this.HasCompatibleFirmware)
             {
                 throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version.  It must be upgraded first.");
             }
@@ -101,9 +102,18 @@ namespace Remote.Neeo
             {
                 throw new InvalidOperationException("Server is already running.");
             }
+            
             this._host = await Server.StartAsync(this, name, devices, hostIPAddress, port, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="devices"></param>
+        /// <param name="port"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public Task StartServerAsync(string name, IDeviceBuilder[] devices, int port = 9000, CancellationToken cancellationToken = default)
         {
             IPAddress GetHostIPAddress()
@@ -119,6 +129,11 @@ namespace Remote.Neeo
             return this.StartServerAsync(name, devices, GetHostIPAddress(), port, cancellationToken);
         }
 
+        /// <summary>
+        /// Asynchronously stops the SDK integration server and unregisters it from the Brain.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public Task StopServerAsync(CancellationToken cancellationToken = default) => Server.StopAsync(Interlocked.Exchange(ref this._host, null), cancellationToken);
     }
 }

@@ -8,11 +8,11 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>Remote.Neeo.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\net5.0\Remote.Neeo.xml</DocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DocumentationFile>Remote.Neeo.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\net5.0\Remote.Neeo.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

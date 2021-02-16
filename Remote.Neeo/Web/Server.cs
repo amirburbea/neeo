@@ -102,8 +102,8 @@ namespace Remote.Neeo.Web
                         .AddSingleton<PgpKeys>()
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
-                        .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()))
-                        .AddJsonOptions(options => options.JsonSerializerOptions.ApplySettings());
+                        .AddJsonOptions(options => options.JsonSerializerOptions.ApplyOptions())
+                        .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()));
                 })
                 .Configure((context, builder) =>
                 {
@@ -123,12 +123,12 @@ namespace Remote.Neeo.Web
         {
             public const int MaxConnectionRetries = 8;
 
-            public const int MaxRequestBodySize = 2 * 1024 * 1024; // 2mb
+            public const int MaxRequestBodySize = 2 * 1024 * 1024;
         }
 
         private sealed class AllowInternalsControllerFeatureProvider : ControllerFeatureProvider
         {
-            protected override bool IsController(TypeInfo info) => info.Assembly == typeof(Server).Assembly && info.IsAssignableTo(typeof(ControllerBase));
+            protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
         }
 
         private sealed record SdkAdapterName

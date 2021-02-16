@@ -151,8 +151,8 @@ namespace Remote.Neeo.Devices
         [Text("SKIP SECONDS FORWARD")] 
         SkipSecondsForward = 1ul << 47,
 
-        [Text("STOP")] Stop = 
-            1ul << 48,
+        [Text("STOP")] 
+        Stop = 1ul << 48,
 
         [Text("SUBTITLE")] 
         Subtitle = 1ul << 49,

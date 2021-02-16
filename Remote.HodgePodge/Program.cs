@@ -1,14 +1,14 @@
-﻿using System;
+﻿using Remote.Broadlink;
+using Remote.Neeo;
+using Remote.Neeo.Devices;
+using Remote.Neeo.Devices.Discovery;
+using Remote.Utilities;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Remote.Broadlink;
-using Remote.Neeo;
-using Remote.Neeo.Devices;
-using Remote.Neeo.Devices.Discovery;
-using Remote.Utilities;
 
 namespace Remote.HodgePodge
 {
@@ -44,16 +44,10 @@ namespace Remote.HodgePodge
                 Console.Error.WriteLine("Brain not found.");
                 return;
             }
-             Credentials c = new("user", "pass");
+            Credentials c = new("user", "pass");
             string text = JsonSerializer.Serialize(c, JsonSerialization.Options);
 
             var doc = JsonDocument.Parse(text);
-
-
-
-
-
-
 
             try
             {
@@ -93,9 +87,11 @@ namespace Remote.HodgePodge
                     case "0":
                         await Program.LearnCodes(remote);
                         break;
+
                     case "1":
                         await Program.TestCodes(remote);
                         break;
+
                     default:
                         return;
                 }

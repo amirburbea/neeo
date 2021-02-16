@@ -27,7 +27,7 @@ namespace Remote.Neeo.Devices
 
         uint? DriverVersion { get; }
 
-        IFavoritesHandler? FavoritesHandler { get; }
+        FavoritesHandler? FavoritesHandler { get; }
 
         DeviceIconOverride? Icon { get; }
 
@@ -101,7 +101,7 @@ namespace Remote.Neeo.Devices
         /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetDriverVersion(uint version);
 
-        IDeviceBuilder SetFavoritesHandler(IFavoritesHandler handler);
+        IDeviceBuilder SetFavoritesHandler(FavoritesHandler handler);
 
         IDeviceBuilder SetIcon(DeviceIconOverride icon);
 
@@ -149,7 +149,7 @@ namespace Remote.Neeo.Devices
 
         public uint? DriverVersion { get; private set; }
 
-        public IFavoritesHandler? FavoritesHandler { get; private set; }
+        public FavoritesHandler? FavoritesHandler { get; private set; }
 
         public DeviceIconOverride? Icon { get; private set; }
 
@@ -189,7 +189,7 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version) => this.SetDriverVersion(version);
 
-        IDeviceBuilder IDeviceBuilder.SetFavoritesHandler(IFavoritesHandler handler) => this.SetFavoritesHandler(handler);
+        IDeviceBuilder IDeviceBuilder.SetFavoritesHandler(FavoritesHandler handler) => this.SetFavoritesHandler(handler);
 
         IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIconOverride icon) => this.SetIcon(icon);
 
@@ -298,7 +298,7 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
-        private DeviceBuilder SetFavoritesHandler(IFavoritesHandler handler)
+        private DeviceBuilder SetFavoritesHandler(FavoritesHandler handler)
         {
             if (!this.Type.SupportsFavorites())
             {

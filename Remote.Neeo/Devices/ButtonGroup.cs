@@ -1,5 +1,8 @@
 ﻿namespace Remote.Neeo.Devices
 {
+    /// <summary>
+    /// 
+    /// </summary>
     public enum ButtonGroup : ulong
     {
         ChannelZapper = KnownButtons.ChannelDown | KnownButtons.ChannelUp,

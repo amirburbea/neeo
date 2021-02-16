@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -16,6 +15,7 @@ namespace Remote.Neeo
         /// If no <paramref name="predicate"/> is provided, returns the first <see cref="Brain"/> discovered.
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <param name="predicate">Optional predicate that if provided, must be matched by the Brain to be returned.</param>
         /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
         public static async Task<Brain?> DiscoverAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
         {
