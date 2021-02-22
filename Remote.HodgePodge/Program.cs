@@ -1,14 +1,14 @@
-﻿using Remote.Broadlink;
-using Remote.Neeo;
-using Remote.Neeo.Devices;
-using Remote.Neeo.Devices.Discovery;
-using Remote.Utilities;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Remote.Broadlink;
+using Remote.Neeo;
+using Remote.Neeo.Devices;
+using Remote.Utilities;
+using Remote.Utilities.TokenSearch;
 
 namespace Remote.HodgePodge
 {
@@ -38,17 +38,17 @@ namespace Remote.HodgePodge
 
         private static async Task Main()
         {
-            var brain = await Brain.DiscoverAsync();
+            TokenSearch<string> search = new(new[] { "" });
+
+
+            Console.WriteLine("Discovering brain...");
+            var brain = await Brain.DiscoverAsync().ConfigureAwait(false);
             if (brain == null)
             {
                 Console.Error.WriteLine("Brain not found.");
                 return;
             }
-            Credentials c = new("user", "pass");
-            string text = JsonSerializer.Serialize(c, JsonSerialization.Options);
-
-            var doc = JsonDocument.Parse(text);
-
+            Console.WriteLine($"Brain found! {brain.IPAddress}");
             try
             {
                 var builder = Device.Create("test", DeviceType.Accessory)
@@ -61,10 +61,12 @@ namespace Remote.HodgePodge
                         Console.WriteLine($"{deviceId}|{button}");
                         return Task.CompletedTask;
                     });
-
+                Console.WriteLine("Getting system info from Brain...");
                 var info = await brain.GetSystemInfoAsync();
+                Console.WriteLine("Starting server...");
                 await brain.StartServerAsync("C#", new[] { builder });
-                await Task.Delay(10000);
+                Console.WriteLine("Server started. Press any key to quit...   ");
+                Console.ReadKey();
             }
             finally
             {

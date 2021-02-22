@@ -43,10 +43,10 @@ namespace Remote.Neeo.Web
                 }
                 catch (Exception e)
                 {
-                    logger.LogWarning("Failed to register with brain {times} time(s).\n{content}", i + 1, e.Message);
+                    logger.LogWarning("Failed to register with brain {times} time(s).\n{content}", i, e.Message);
                 }
             }
-            throw new ApplicationException("Failed to connect to brain.");
+            throw new ApplicationException("Failed to register with brain.");
         }
 
         public static async Task StopAsync(IHost? host, CancellationToken cancellationToken)
@@ -60,8 +60,15 @@ namespace Remote.Neeo.Web
                 ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
                 Brain brain = host.Services.GetRequiredService<Brain>();
                 string name = host.Services.GetRequiredService<SdkAdapterName>().Name;
-                await brain.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false);
-                logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
+                try
+                {
+                    await brain.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false);
+                    logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
+                }
+                catch (Exception e)
+                {
+                    logger.LogWarning("Failed to unregister with brain\n{content}", e.Message);
+                }
                 await host.StopAsync(cancellationToken).ConfigureAwait(false);
             }
             finally
@@ -79,7 +86,7 @@ namespace Remote.Neeo.Web
                     options.Listen(ipAddress, port);
                     if (context.HostingEnvironment.IsDevelopment() && !ipAddress.Equals(IPAddress.Loopback))
                     {
-                        options.Listen(IPAddress.Loopback, port);
+                        options.ListenLocalhost(port);
                     }
                 })
                 .ConfigureLogging((context, builder) =>

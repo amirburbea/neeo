@@ -1,7 +1,7 @@
 ﻿namespace Remote.Neeo.Devices.Descriptors
 {
     /// <summary>
-    /// Provides a spec or descriptor for NEEO remote items.
+    /// Provides a spec or descriptor for components.
     /// </summary>
     public abstract record Descriptor
     {

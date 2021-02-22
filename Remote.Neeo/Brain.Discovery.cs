@@ -28,7 +28,12 @@ namespace Remote.Neeo
             });
             TaskCompletionSource<Brain?> brainTaskSource = new();
             return await Task.WhenAny(
-                ZeroconfResolver.ResolveAsync(Constants.ServiceName, callback: OnHostDiscovered, cancellationToken: tokenSource.Token).ContinueWith(
+                ZeroconfResolver.ResolveAsync(
+                    Constants.ServiceName, 
+                    callback: OnHostDiscovered,
+                    scanTime: TimeSpan.FromSeconds(5d),
+                    cancellationToken: tokenSource.Token
+                ).ContinueWith(
                     _ => /* ZeroconfResolver.ResolveAsync has completed with no matching Brain found.*/ default(Brain),
                     TaskContinuationOptions.NotOnFaulted
                 ),

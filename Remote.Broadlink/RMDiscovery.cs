@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Remote.Broadlink
 {
+    /// <summary>
+    /// 
+    /// </summary>
     public static class RMDiscovery
     {
         private static readonly Dictionary<string, RMDevice> _remotes = new();

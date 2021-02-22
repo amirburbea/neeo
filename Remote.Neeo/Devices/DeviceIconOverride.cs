@@ -10,13 +10,13 @@ namespace Remote.Neeo.Devices
     public enum DeviceIconOverride
     {
         /// <summary>
-        /// Neeo.
+        /// &quot;neeo&quot;
         /// </summary>
         [Text("neeo")]
         Neeo = 0,
 
         /// <summary>
-        /// Sonos.
+        /// &quot;sonos&quot;
         /// </summary>
         [Text("sonos")]
         Sonos = 1

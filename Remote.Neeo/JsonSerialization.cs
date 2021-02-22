@@ -11,7 +11,7 @@ namespace Remote.Neeo
     public static class JsonSerialization
     {
         /// <summary>
-        /// An instance of <see cref="JsonSerializerOptions"/> suitable for interactions with the NEEO brain.
+        /// An instance of <see cref="JsonSerializerOptions"/> suitable for interactions with the NEEO <see cref="Brain"/>.
         /// </summary>
         public static readonly JsonSerializerOptions Options = new JsonSerializerOptions(JsonSerializerDefaults.Web).ApplyOptions();
 

@@ -79,44 +79,45 @@ namespace Remote.Neeo
         public string Version { get; }
 
         /// <summary>
+        /// Asynchronously fetch Brain system information via a GET request.
+        /// </summary>
+        /// <param name="cancellationToken">A cancellation token for the request.</param>
+        /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+        public Task<BrainInformation> GetSystemInfoAsync(CancellationToken cancellationToken = default) => this.GetAsync<BrainInformation>(
+            "systeminfo",
+            cancellationToken
+        );
+
+        /// <summary>
         /// Opens the default browser to the Brain WebUI.
         /// </summary>
-        public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.HostName}.local:3200/eui") { UseShellExecute = true })?.Dispose();
+        public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.IPAddress}:3200/eui") { UseShellExecute = true })?.Dispose();
 
         /// <summary>
         /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
         /// </summary>
         /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
-        /// <param name="devices"></param>
-        /// <param name="hostIPAddress"></param>
-        /// <param name="port"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        public async Task StartServerAsync(string name, IDeviceBuilder[] devices, IPAddress hostIPAddress, int port = 9000, CancellationToken cancellationToken = default)
+        /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
+        /// <param name="hostIPAddress">
+        /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
+        /// <para />
+        /// Note: If in development, the server also listens on localhost at the specified <paramref name="port"/>.
+        /// </param>
+        /// <param name="port">The port to listen on.</param>
+        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <returns><see cref="Task"/> to indicate completion.</returns>
+        public async Task StartServerAsync(string name, IDeviceBuilder[] devices, IPAddress? hostIPAddress = null, int port = 9000, CancellationToken cancellationToken = default)
         {
-            if (!this.HasCompatibleFirmware)
-            {
-                throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version.  It must be upgraded first.");
-            }
             if (this._host != null)
             {
                 throw new InvalidOperationException("Server is already running.");
             }
-            
-            this._host = await Server.StartAsync(this, name, devices, hostIPAddress, port, cancellationToken).ConfigureAwait(false);
-        }
+            if (!this.HasCompatibleFirmware)
+            {
+                throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version.  It must be upgraded first.");
+            }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="name"></param>
-        /// <param name="devices"></param>
-        /// <param name="port"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        public Task StartServerAsync(string name, IDeviceBuilder[] devices, int port = 9000, CancellationToken cancellationToken = default)
-        {
-            IPAddress GetHostIPAddress()
+            IPAddress GetFallbackHostIPAddress()
             {
                 IPAddress[] addresses;
                 return !this.IPAddress.Equals(IPAddress.Loopback) &&
@@ -126,14 +127,14 @@ namespace Remote.Neeo
                         : IPAddress.Loopback;
             }
 
-            return this.StartServerAsync(name, devices, GetHostIPAddress(), port, cancellationToken);
+            this._host = await Server.StartAsync(this, name, devices, hostIPAddress ?? GetFallbackHostIPAddress(), port, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Asynchronously stops the SDK integration server and unregisters it from the Brain.
         /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
+        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <returns><see cref="Task"/> to indicate completion.</returns>
         public Task StopServerAsync(CancellationToken cancellationToken = default) => Server.StopAsync(Interlocked.Exchange(ref this._host, null), cancellationToken);
     }
 }

@@ -3,7 +3,7 @@
 namespace Remote.Neeo.Devices
 {
     /// <summary>
-    /// A (potentially) asynchronous method which is invoked in response to favorites being requested on the NEEO remote
+    /// A callback which is invoked in response to favorites being requested on the NEEO remote
     /// in order to allow the driver to respond accordingly.
     /// <para/>
     /// Example: The favorite &quot;42&quot; - rather than the NEEO Brain invoking the button handler twice

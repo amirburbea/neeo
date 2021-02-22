@@ -1,12 +1,17 @@
-﻿namespace Remote.Neeo.Devices.Discovery
+﻿using System;
+
+namespace Remote.Neeo.Devices.Discovery
 {
-    public abstract class RegistrationOptions
+    public readonly struct RegistrationOptions
     {
-        protected RegistrationOptions(RegistrationType type)
+        public RegistrationOptions(string headerText, string description)
         {
-            this.Type = type;
+            this.HeaderText = headerText ?? throw new ArgumentNullException(nameof(headerText));
+            this.Description = description ?? throw new ArgumentNullException(nameof(description));
         }
 
-        public RegistrationType Type { get; }
+        public string Description { get; }
+
+        public string HeaderText { get; }
     }
 }

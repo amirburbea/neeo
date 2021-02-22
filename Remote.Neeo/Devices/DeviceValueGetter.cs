@@ -1,8 +1,14 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace Remote.Neeo.Devices
 {
-    public delegate Task<object> DeviceValueGetter(string deviceId);
-
-    public delegate Task<TValue> DeviceValueGetter<TValue>(string deviceId);
+    /// <summary>
+    /// Callback invoked by the NEEO Brain to asynchronously get a value from a device.
+    /// </summary>
+    /// <typeparam name="TValue"></typeparam>
+    /// <param name="deviceId"></param>
+    /// <returns><see cref="Task"/> of the device value.</returns>
+    public delegate Task<TValue> DeviceValueGetter<TValue>(string deviceId)
+        where TValue : notnull, IConvertible;
 }

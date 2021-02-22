@@ -6,10 +6,12 @@ namespace Remote.Neeo.Web.Controllers
     [ApiController, Route("[controller]")]
     internal sealed class DeviceController : ControllerBase
     {
+        private readonly Brain _brain;
         private readonly IDeviceDatabase _database;
 
-        public DeviceController(IDeviceDatabase database)
+        public DeviceController(Brain brain, IDeviceDatabase database)
         {
+            this._brain = brain;
             this._database = database;
         }
     }

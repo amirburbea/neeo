@@ -1,8 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
 using Remote.Neeo.Devices;
+using Remote.Utilities.TokenSearch;
 
 namespace Remote.Neeo.Web.Controllers
 {
@@ -14,22 +13,15 @@ namespace Remote.Neeo.Web.Controllers
         public DatabaseController(IDeviceDatabase database) => this._database = database;
 
         [HttpGet("adapterdefinition/{adapterName}")]
-        public ActionResult<object> GetAdapterDefinition(string adapterName)
-        {
-            return this.Ok(adapterName);
-        }
+        public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => this.Ok(this._database.GetDeviceByAdapterName(adapterName));
 
         [HttpGet("{deviceId}")]
-        public ActionResult<object> GetDevice(string deviceId)
-        {
-            return this.Ok(deviceId);
-        }
+        public ActionResult<IDeviceModel> GetDevice(int deviceId) => this.Ok(this._database.GetDevice(deviceId));
 
         [HttpGet("search")]
-        public ActionResult<IReadOnlyCollection<SearchResult<IDeviceModel>>> Search([FromQuery(Name = "q")] string? query = null)
+        public ActionResult<IEnumerable<SearchItem<IDeviceModel>>> Search([FromQuery(Name = "q")] string? query = null)
         {
-            IEnumerable<SearchResult<IDeviceModel>> results = this._database.Search(query);
-            return this.Ok(results as IReadOnlyCollection<SearchResult<IDeviceModel>> ?? results.ToList());
+            return this.Ok(this._database.Search(query));
         }
     }
 }

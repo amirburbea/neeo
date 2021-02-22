@@ -15,7 +15,13 @@ namespace Remote.Neeo.Devices
         [JsonPropertyName("introheader")]
         string? HeaderText { get; }
 
-        bool? Registration { get; }
+        bool? Registration => this.RegistrationType.HasValue ? true : default(bool?);
+
+        [JsonPropertyName("registrationText")]
+        string? RegistrationDescription { get; }
+
+        [JsonPropertyName("registrationHeader")]
+        string? RegistrationHeaderText { get; }
 
         RegistrationType? RegistrationType { get; }
     }
@@ -30,7 +36,9 @@ namespace Remote.Neeo.Devices
 
         public string? HeaderText { get; set; }
 
-        public bool? Registration => this.RegistrationType.HasValue ? true : default(bool?);
+        public string? RegistrationDescription { get; set; }
+
+        public string? RegistrationHeaderText { get; set; }
 
         public RegistrationType? RegistrationType { get; set; }
     }

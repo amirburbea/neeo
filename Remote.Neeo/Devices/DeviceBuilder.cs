@@ -1,51 +1,73 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
 using Remote.Neeo.Devices.Descriptors;
 using Remote.Neeo.Devices.Discovery;
 
 namespace Remote.Neeo.Devices
 {
     /// <summary>
-    /// Fluent interface for building device.
+    /// Fluent interface for building devices.
     /// </summary>
     public interface IDeviceBuilder
     {
+        /// <summary>
+        /// Gets the generated unique name for the device adapter.
+        /// </summary>
         string AdapterName { get; }
 
         IReadOnlyCollection<string> AdditionalSearchTokens { get; }
 
+        /// <summary>
+        /// Gets the callback to be invoked in response to calls from the NEEO Brain to handle button presses.
+        /// </summary>
         ButtonHandler? ButtonHandler { get; }
 
         IReadOnlyCollection<ButtonDescriptor> Buttons { get; }
 
         IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        DeviceTiming? Delays { get; }
-
         DiscoveryProcessor? DiscoveryProcessor { get; }
 
+        /// <summary>
+        /// Version of the device driver.
+        /// Incrementing this version will cause the brain to query for new components.
+        /// </summary>
         uint? DriverVersion { get; }
 
         FavoritesHandler? FavoritesHandler { get; }
 
+        /// <summary>
+        /// Gets the device icon override, if <c>null</c> a default is selected depending on the device type.
+        /// </summary>
         DeviceIconOverride? Icon { get; }
 
+        /// <summary>
+        /// Device initializer callback.
+        /// </summary>
         DeviceInitializer? Initializer { get; }
 
+        /// <summary>
+        /// Gets the device manufacturer name.
+        /// <para/>
+        /// If not set via <see cref="IDeviceBuilder.SetManufacturer"/>, the default value is &quot;NEEO&quot;.
+        /// </summary>
         string Manufacturer { get; }
 
         string Name { get; }
-
         DeviceValueGetter<bool>? PowerStateSensor { get; }
-
         IDeviceSetup Setup { get; }
-
         string? SpecificName { get; }
+        DeviceTiming? Timing { get; }
 
+        /// <summary>
+        /// The device type.
+        /// </summary>
         DeviceType Type { get; }
 
-        IDeviceBuilder AddAdditionalSearchToken(string text);
+        IDeviceBuilder AddAdditionalSearchToken(string token);
 
         /// <summary>
         /// Add a button to the device.
@@ -88,6 +110,22 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryProcessor controller);
 
+        IDeviceBuilder EnableRegistration(RegistrationOptions options, CredentialsProcessor processor, QueryIsRegistered queryIsRegistered);
+
+        IDeviceBuilder EnableRegistration(RegistrationOptions options, SecurityCodeProcessor processor, QueryIsRegistered queryIsRegistered);
+
+        /// <summary>
+        /// Sets a callback to be invoked to initialize the device before making it available to the NEEO Brain.
+        /// </summary>
+        /// <param name="initializer">The device initializer callback.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+        IDeviceBuilder RegisterInitializer(DeviceInitializer initializer);
+
+        /// <summary>
+        /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle button presses.
+        /// </summary>
+        /// <param name="handler">The button handler callback.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetButtonHandler(ButtonHandler handler);
 
         /// <summary>
@@ -101,12 +139,29 @@ namespace Remote.Neeo.Devices
         /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetDriverVersion(uint version);
 
+        /// <summary>
+        /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
+        /// </summary>
+        /// <param name="handler">The favorites handler callback.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetFavoritesHandler(FavoritesHandler handler);
 
+        /// <summary>
+        /// Sets the device icon override.
+        /// <para/>
+        /// The icon for a device is generally derived from the device type.
+        /// NEEO supports two icon overrides (specifically &quot;sonos&quot; and &quot;neeo&quot;).
+        /// </summary>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetIcon(DeviceIconOverride icon);
 
-        IDeviceBuilder SetInitializer(DeviceInitializer initializer);
-
+        /// <summary>
+        /// Sets the device manufacturer name (used in searching for devices).
+        /// <para/>
+        /// If not specified, the default of &quot;NEEO&quot; is used.
+        /// </summary>
+        /// <param name="manufacturer">Name of the device manufacturer.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder SetManufacturer(string manufacturer);
 
         IDeviceBuilder SetPowerStateSensor(DeviceValueGetter<bool> sensor);
@@ -125,6 +180,8 @@ namespace Remote.Neeo.Devices
         private readonly List<string> _additionalSearchTokens = new();
         private readonly List<ButtonDescriptor> _buttons = new();
         private readonly HashSet<DeviceCapability> _capabilities = new();
+        private QueryIsRegistered? _queryIsRegistered;
+        private Func<JsonElement, Task>? _registrationProcessor;
 
         public DeviceBuilder(string name, DeviceType type, string? prefix)
         {
@@ -143,8 +200,6 @@ namespace Remote.Neeo.Devices
 
         public IReadOnlyCollection<DeviceCapability> Capabilities => this._capabilities;
 
-        public DeviceTiming? Delays { get; private set; }
-
         public DiscoveryProcessor? DiscoveryProcessor { get; private set; }
 
         public uint? DriverVersion { get; private set; }
@@ -161,15 +216,19 @@ namespace Remote.Neeo.Devices
 
         public DeviceValueGetter<bool>? PowerStateSensor { get; private set; }
 
+        public Func<JsonElement, Task>? RegistrationProcessor { get; private set; }
+
         IDeviceSetup IDeviceBuilder.Setup => this.Setup;
 
         public DeviceSetup Setup { get; } = new DeviceSetup();
 
         public string? SpecificName { get; private set; }
 
+        public DeviceTiming? Timing { get; private set; }
+
         public DeviceType Type { get; }
 
-        IDeviceBuilder IDeviceBuilder.AddAdditionalSearchToken(string text) => this.AddAdditionalSearchToken(text);
+        IDeviceBuilder IDeviceBuilder.AddAdditionalSearchToken(string token) => this.AddAdditionalSearchToken(token);
 
         IDeviceBuilder IDeviceBuilder.AddButton(ButtonDescriptor button) => this.AddButton(button);
 
@@ -185,6 +244,26 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.EnableDiscovery(DiscoveryOptions options, DiscoveryProcessor processor) => this.EnableDiscovery(options, processor);
 
+        IDeviceBuilder IDeviceBuilder.EnableRegistration(RegistrationOptions options, CredentialsProcessor processor, QueryIsRegistered queryIsRegistered) => this.EnableRegistration(
+            options,
+            RegistrationType.Credentials,
+            processor == null
+                ? throw new ArgumentNullException(nameof(processor))
+                : element => processor(element.ToObject<Credentials>()),
+            queryIsRegistered
+        );
+
+        IDeviceBuilder IDeviceBuilder.EnableRegistration(RegistrationOptions options, SecurityCodeProcessor processor, QueryIsRegistered queryIsRegistered) => this.EnableRegistration(
+            options,
+            RegistrationType.SecurityCode,
+            processor == null
+                ? throw new ArgumentNullException(nameof(processor))
+                : element => processor(element.ToObject<SecurityCodeContainer>().SecurityCode),
+            queryIsRegistered
+        );
+
+        IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer) => this.RegisterInitializer(initializer);
+
         IDeviceBuilder IDeviceBuilder.SetButtonHandler(ButtonHandler handler) => this.SetButtonHandler(handler);
 
         IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version) => this.SetDriverVersion(version);
@@ -193,31 +272,26 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIconOverride icon) => this.SetIcon(icon);
 
-        IDeviceBuilder IDeviceBuilder.SetInitializer(DeviceInitializer initializer) => this.SetInitializer(initializer);
-
         IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
 
         IDeviceBuilder IDeviceBuilder.SetPowerStateSensor(DeviceValueGetter<bool> sensor) => this.SetPowerStateSensor(sensor);
 
         IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
 
-        private DeviceBuilder AddAdditionalSearchToken(string text)
+        private DeviceBuilder AddAdditionalSearchToken(string token)
         {
-            this._additionalSearchTokens.Add(text);
+            this._additionalSearchTokens.Add(token);
             return this;
         }
 
         private DeviceBuilder AddButton(ButtonDescriptor button)
         {
-            if (button == null)
-            {
-                throw new ArgumentNullException(nameof(button));
-            }
-            if (this.Buttons.Any(existing => existing.Name == button.Name))
+            int index = this._buttons.BinarySearch(button ?? throw new ArgumentNullException(nameof(button)));
+            if (index >= 0)
             {
                 throw new ArgumentException($"Button \"{button.Name}\" already defined.", nameof(button));
             }
-            this._buttons.Add(button ?? throw new ArgumentNullException(nameof(button)));
+            this._buttons.Insert(~index, button);
             return this;
         }
 
@@ -228,15 +302,10 @@ namespace Remote.Neeo.Devices
 
         private DeviceBuilder AddCapability(DeviceCapability capability)
         {
-            if (capability == DeviceCapability.CustomFavoriteHandler && this.FavoritesHandler == null)
+            if (capability is not DeviceCapability.CustomFavoriteHandler and not DeviceCapability.RegisterUserAccount)
             {
-                throw new ArgumentException($"Can not add the capability {capability} before calling {nameof(IDeviceBuilder.SetFavoritesHandler)}.", nameof(capability));
+                this._capabilities.Add(capability);
             }
-            if (capability == DeviceCapability.RegisterUserAccount && !this.Setup.Registration.GetValueOrDefault())
-            {
-                throw new ArgumentException("", nameof(capability));
-            }
-            this._capabilities.Add(capability);
             return this;
         }
 
@@ -256,7 +325,7 @@ namespace Remote.Neeo.Devices
                 this.Type,
                 this.Manufacturer,
                 this.DriverVersion,
-                this.Delays,
+                this.Timing,
                 this.AdditionalSearchTokens,
                 this.SpecificName,
                 this.Icon,
@@ -272,7 +341,7 @@ namespace Remote.Neeo.Devices
             {
                 throw new NotSupportedException($"Device type {this.Type} does not support timing.");
             }
-            this.Delays = timing;
+            this.Timing = timing;
             return this;
         }
 
@@ -283,6 +352,34 @@ namespace Remote.Neeo.Devices
             this.Setup.HeaderText = options.HeaderText;
             this.Setup.Description = options.Description;
             this.Setup.EnableDynamicDeviceBuilder = options.EnableDynamicDeviceBuilder;
+            return this;
+        }
+
+        private DeviceBuilder EnableRegistration(RegistrationOptions options, RegistrationType type, Func<JsonElement, Task> registrationProcessor, QueryIsRegistered queryIsRegistered)
+        {
+            if (!this.Setup.Discovery.GetValueOrDefault())
+            {
+                throw new InvalidOperationException();
+            }
+            if (this.Setup.RegistrationType.HasValue)
+            {
+                throw new InvalidOperationException();
+            }
+            if (options.Description == null) // Default constructor instance.
+            {
+                throw new ArgumentException($"Can not use uninitialized {nameof(options)}.", nameof(options));
+            }
+            this.Setup.RegistrationDescription = options.Description;
+            this.Setup.RegistrationHeaderText = options.HeaderText;
+            this.Setup.RegistrationType = type;
+            this._registrationProcessor = registrationProcessor;
+            this._queryIsRegistered = queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered));
+            return this;
+        }
+
+        private DeviceBuilder RegisterInitializer(DeviceInitializer initializer)
+        {
+            this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
             return this;
         }
 
@@ -314,12 +411,6 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
-        private DeviceBuilder SetInitializer(DeviceInitializer initializer)
-        {
-            this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
-            return this;
-        }
-
         private DeviceBuilder SetManufacturer(string manufacturer = "NEEO")
         {
             Validator.ValidateStringLength(this.Manufacturer = manufacturer ?? throw new ArgumentNullException(nameof(manufacturer)));
@@ -328,7 +419,7 @@ namespace Remote.Neeo.Devices
 
         private DeviceBuilder SetPowerStateSensor(DeviceValueGetter<bool> sensor)
         {
-            this.PowerStateSensor = sensor;
+            this.PowerStateSensor = sensor ?? throw new ArgumentNullException(nameof(sensor));
             return this;
         }
 

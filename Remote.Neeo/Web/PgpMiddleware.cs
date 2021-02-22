@@ -11,8 +11,7 @@ namespace Remote.Neeo.Web
 
         public PgpMiddleware(RequestDelegate next, PgpKeys keys)
         {
-            this._next = next;
-            this._keys = keys;
+            (this._next, this._keys) = (next, keys);
         }
 
         public async Task InvokeAsync(HttpContext context)

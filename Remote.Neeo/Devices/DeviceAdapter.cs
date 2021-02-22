@@ -1,5 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace Remote.Neeo.Devices
 {
@@ -7,12 +10,13 @@ namespace Remote.Neeo.Devices
     {
         string AdapterName { get; }
 
-        [JsonPropertyName("apiverson")]
+        /// <summary>
+        /// The API version is always &quot;1.0&quot;.
+        /// </summary>
+        [JsonPropertyName("apiverson"), EditorBrowsable(EditorBrowsableState.Never), Browsable(false)]
         string ApiVersion => "1.0";
 
         IReadOnlyCollection<DeviceCapability> Capabilities { get; }
-
-        DeviceTiming Timing { get; }
 
         IReadOnlyCollection<DeviceInfo> Devices { get; }
 
@@ -23,6 +27,8 @@ namespace Remote.Neeo.Devices
         string Manufacturer { get; }
 
         IDeviceSetup Setup { get; }
+
+        DeviceTiming Timing { get; }
 
         DeviceType Type { get; }
     }
@@ -59,8 +65,6 @@ namespace Remote.Neeo.Devices
 
         public IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        public DeviceTiming Timing { get; }
-
         public IReadOnlyCollection<DeviceInfo> Devices { get; }
 
         public uint? DriverVersion { get; }
@@ -70,6 +74,8 @@ namespace Remote.Neeo.Devices
         public string Manufacturer { get; }
 
         public IDeviceSetup Setup { get; }
+
+        public DeviceTiming Timing { get; }
 
         public DeviceType Type { get; }
     }
