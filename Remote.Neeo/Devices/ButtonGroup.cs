@@ -1,34 +1,69 @@
 ﻿namespace Remote.Neeo.Devices
 {
+    using static KnownButtons;
+
     /// <summary>
-    /// 
+    /// Groups of buttons which can be added via a single call to <see cref="IDeviceBuilder.AddButtonGroup"/>.
     /// </summary>
     public enum ButtonGroup : ulong
     {
-        ChannelZapper = KnownButtons.ChannelDown | KnownButtons.ChannelUp,
+        /// <summary>
+        /// &quot;CHANNEL DOWN&quot;, &quot;CHANNEL UP&quot;.
+        /// </summary>
+        ChannelZapper = ChannelDown | ChannelUp,
 
-        ColorButtons = KnownButtons.FunctionBlue | KnownButtons.FunctionGreen | KnownButtons.FunctionRed | KnownButtons.FunctionYellow,
+        /// <summary>
+        /// &quot;FUNCTION BLUE&quot;, &quot;FUNCTION GREEN&quot;, &quot;FUNCTION RED&quot;,
+        /// &quot;FUNCTION YELLOW&quot;.
+        /// </summary>
+        ColorButtons = FunctionBlue | FunctionGreen | FunctionRed | FunctionYellow,
 
-        ControlPad = KnownButtons.CursorDown | KnownButtons.CursorEnter | KnownButtons.CursorLeft | KnownButtons.CursorRight | KnownButtons.CursorUp,
+        /// <summary>
+        /// &quot;CURSOR DOWN&quot;, &quot;CURSOR ENTER&quot;, &quot;CURSOR LEFT&quot;, &quot;CURSOR RIGHT&quot;,
+        /// &quot;CURSOR UP&quot;.
+        /// </summary>
+        ControlPad = CursorDown | CursorEnter | CursorLeft | CursorRight | CursorUp,
 
-        Language = KnownButtons.Subtitle | KnownButtons.Language,
+        /// <summary>
+        /// &quot;SUBTITLE&quot;, &quot;LANGUAGE&quot;.
+        /// </summary>
+        Locale = Subtitle | Language,
 
-        MenuAndBack = KnownButtons.Menu | KnownButtons.Back,
+        /// <summary>
+        /// &quot;MENU&quot;, &quot;BACK&quot;.
+        /// </summary>
+        MenuAndBack = Menu | Back,
 
-        NumberPad = KnownButtons.Digit0 | KnownButtons.Digit1 | KnownButtons.Digit2 | KnownButtons.Digit3 | KnownButtons.Digit4 | KnownButtons.Digit5 | KnownButtons.Digit6 | KnownButtons.Digit7 | KnownButtons.Digit8 | KnownButtons.Digit9,
+        /// <summary>
+        /// &quot;DIGIT 0&quot;, &quot;DIGIT 1&quot;, &quot;DIGIT 2&quot;, &quot;DIGIT 3&quot;, &quot;DIGIT 4&quot;, 
+        /// &quot;DIGIT 5&quot;, &quot;DIGIT 6&quot;, &quot;DIGIT 7&quot;, &quot;DIGIT 8&quot;, &quot;DIGIT 9&quot;.
+        /// </summary>
+        NumberPad = Digit0 | Digit1 | Digit2 | Digit3 | Digit4 | Digit5 | Digit6 | Digit7 | Digit8 | Digit9,
 
-        Power = KnownButtons.PowerOn | KnownButtons.PowerOff,
+        /// <summary>
+        /// &quot;POWER ON&quot;, &quot;POWER OFF&quot;.
+        /// </summary>
+        Power = PowerOn | PowerOff,
 
-        Record = KnownButtons.MyRecordings | KnownButtons.Record | KnownButtons.Live,
+        /// <summary>
+        /// &quot;MY RECORDINGS&quot;, &quot;RECORD&quot;, &quot;LIVE&quot;.
+        /// </summary>
+        Recording = MyRecordings | Record | Live,
 
-        Transport = KnownButtons.Play | KnownButtons.Pause | KnownButtons.Stop,
+        /// <summary>
+        /// &quot;PLAY&quot;, &quot;PAUSE&quot;, &quot;STOP&quot;.
+        /// </summary>
+        Transport = Play | Pause | Stop,
 
-        TransportScan = KnownButtons.Previous | KnownButtons.Next,
+        /// <summary>
+        /// &quot;PREVIOUS&quot;, &quot;NEXT&quot;.
+        /// </summary>
+        TransportScan = Previous | Next,
 
-        TransportSearch = KnownButtons.Reverse | KnownButtons.Forward,
+        TransportSearch = Reverse | Forward,
 
-        TransportSkip = KnownButtons.SkipSecondsBackward | KnownButtons.SkipSecondsForward,
+        TransportSkip = SkipSecondsBackward | SkipSecondsForward,
 
-        Volume = KnownButtons.VolumeUp | KnownButtons.VolumeDown | KnownButtons.MuteToggle
+        Volume = VolumeUp | VolumeDown | MuteToggle
     }
 }

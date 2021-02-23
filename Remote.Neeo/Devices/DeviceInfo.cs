@@ -3,7 +3,19 @@ using System.Text.Json.Serialization;
 
 namespace Remote.Neeo.Devices
 {
-    public readonly struct DeviceInfo
+    public interface IDeviceInfo
+    {
+        DeviceIconOverride? Icon { get; }
+
+        string Name { get; }
+
+        [JsonPropertyName("specificname")]
+        string? SpecificName { get; }
+
+        IReadOnlyCollection<string> Tokens { get; }
+    }
+
+    internal sealed class DeviceInfo : IDeviceInfo
     {
         public DeviceInfo(string name, IReadOnlyCollection<string> tokens, string? specificName, DeviceIconOverride? icon)
         {
@@ -14,7 +26,6 @@ namespace Remote.Neeo.Devices
 
         public string Name { get; }
 
-        [JsonPropertyName("specificname")]
         public string? SpecificName { get; }
 
         public IReadOnlyCollection<string> Tokens { get; }

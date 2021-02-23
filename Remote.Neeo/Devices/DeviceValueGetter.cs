@@ -8,7 +8,7 @@ namespace Remote.Neeo.Devices
     /// </summary>
     /// <typeparam name="TValue"></typeparam>
     /// <param name="deviceId"></param>
-    /// <returns><see cref="Task"/> of the device value.</returns>
+    /// <returns><see cref="Task"/> to indicate completion.</returns>
     public delegate Task<TValue> DeviceValueGetter<TValue>(string deviceId)
         where TValue : notnull, IConvertible;
 }

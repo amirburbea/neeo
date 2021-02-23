@@ -18,7 +18,7 @@ namespace Remote.Neeo.Devices
 
         IDeviceModel GetDeviceByAdapterName(string adapterName);
 
-        SearchItem<IDeviceModel>[] Search(string? query);
+        IEnumerable<SearchItem<IDeviceModel>> Search(string? query);
     }
 
     internal sealed class DeviceDatabase : IDeviceDatabase
@@ -53,7 +53,12 @@ namespace Remote.Neeo.Devices
                 SearchProperties = new[] { nameof(IDeviceModel.Manufacturer), nameof(IDeviceModel.Name), nameof(IDeviceModel.Type), nameof(IDeviceModel.Tokens) },
                 Threshold = Constants.MatchFactor,
                 Delimiter = new[] { Constants.Delimiter },
-                Unique = true
+                Unique = true,
+                SortAlgorithm = (left, right) =>
+                {
+                    int comparison = left.Score.CompareTo(right.Score);
+                    return comparison != 0 ? comparison : StringComparer.OrdinalIgnoreCase.Compare(left.Item.Name, right.Item.Name);
+                }
             });
         }
 
@@ -69,31 +74,23 @@ namespace Remote.Neeo.Devices
 
         public IDeviceModel GetDevice(int id)
         {
-            return id < 0 || id >= this._devices.Count
-                ? throw new ArgumentException($"No matching device with id {id}.", nameof(id))
-                : this._devices[id];
+            return id >= 0 && id < this._devices.Count
+                ? this._devices[id]
+                : throw new ArgumentException($"No matching device with id {id}.", nameof(id));
         }
 
-        public IDeviceModel GetDeviceByAdapterName(string adapterName)
+        public IDeviceModel GetDeviceByAdapterName(string name)
         {
-            return this._devices.FirstOrDefault(model => model.AdapterName == adapterName)
-                ?? throw new ArgumentException($"No matching device with adapter name \"{adapterName}\".", nameof(adapterName));
+            return this._devices.FirstOrDefault(device => device.AdapterName == name) is DeviceModel device
+                ? device
+                : throw new ArgumentException($"No matching device with adapter name \"{name}\".", nameof(name));
         }
 
-        public SearchItem<IDeviceModel>[] Search(string? query)
+        public IEnumerable<SearchItem<IDeviceModel>> Search(string? query)
         {
-            if (string.IsNullOrEmpty(query))
-            {
-                return Array.Empty<SearchItem<IDeviceModel>>();
-            }
-            SearchItem<IDeviceModel>[] results = this._deviceIndex.Search(query);
-            if (results.Length <= Constants.MaxSearchResults)
-            {
-                return results;
-            }
-            SearchItem<IDeviceModel>[] output = new SearchItem<IDeviceModel>[Constants.MaxSearchResults];
-            Array.Copy(results, 0, output, 0, output.Length);
-            return output;
+            return string.IsNullOrEmpty(query)                
+                ? Enumerable.Empty<SearchItem<IDeviceModel>>()                
+                : this._deviceIndex.Search(query).Take(Constants.MaxSearchResults);
         }
 
         private async Task InitializeAsync(IDeviceAdapter adapter)

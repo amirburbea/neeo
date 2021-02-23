@@ -5,7 +5,7 @@ namespace Remote.Neeo
 {
     internal static class AttributeData
     {
-        public static TData? GetEnumAttributeData<TValue, TAttribute, TData>(TValue value, Func<TAttribute, TData> projection)
+        public static T? GetEnumAttributeData<TValue, TAttribute, T>(TValue value, Func<TAttribute, T> projection)
             where TValue : struct, Enum
             where TAttribute : Attribute
         {

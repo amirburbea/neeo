@@ -17,12 +17,15 @@ namespace Remote.Neeo
     /// </summary>
     public partial record Brain
     {
-        private static readonly Regex _versionPrefixRegex = new Regex(@"^(?<v>\d+\.\d+)[\.-]", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+        private static readonly Regex _versionPrefixRegex = new(
+            @"^(?<v>\d+\.\d+)[\.-]",
+            RegexOptions.Compiled | RegexOptions.ExplicitCapture
+        );
 
         private IHost? _host;
 
         /// <summary>
-        /// Initializes an instance of the <see cref="Brain"/> class with details for reaching the NEEO Brain on the network.
+        /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
         /// </summary>
         /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
         /// <param name="port">The port on which the NEEO Brain API is running.</param>
@@ -46,7 +49,10 @@ namespace Remote.Neeo
         /// Gets a value indicating if the Brain firmware version is sufficient for running the SDK.
         /// The Brain must be running firmware <c>v0.50</c> or above.
         /// </summary>
-        public bool HasCompatibleFirmware => double.Parse(Brain._versionPrefixRegex.Match(this.Version).Groups["v"].Value, CultureInfo.InvariantCulture) >= 0.5;
+        public bool HasCompatibleFirmware => double.Parse(
+            Brain._versionPrefixRegex.Match(this.Version).Groups["v"].Value,
+            CultureInfo.InvariantCulture
+        ) >= 0.5;
 
         /// <summary>
         /// The host name of the NEEO Brain.
@@ -77,6 +83,8 @@ namespace Remote.Neeo
         /// The firmware version of the NEEO Brain.
         /// </summary>
         public string Version { get; }
+
+        
 
         /// <summary>
         /// Asynchronously fetch Brain system information via a GET request.

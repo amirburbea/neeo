@@ -36,11 +36,15 @@ namespace Remote.Neeo
         }
 
         /// <summary>
-        /// Gets the text associated with the specified enumerated value (falling back to <c>value.ToString()</c> if not found).
+        /// Gets the text associated with the specified enumerated value
+        /// (falling back to <c>value.ToString()</c> if not found).
         /// </summary>
         /// <typeparam name="T">The type of the enumerated value.</typeparam>
         /// <param name="value">The enumerated value.</param>
-        /// <returns>Text specified for the enumerated value via a <see cref="TextAttribute"/>, falling back to <c>value.ToString()</c> if not found.</returns>
+        /// <returns>
+        /// Text specified for the enumerated value via a <see cref="TextAttribute"/>,
+        /// falling back to <c>value.ToString()</c> if not found.
+        /// </returns>
         public static string GetEnumText<T>(T value)
             where T : struct, Enum
         {
@@ -68,18 +72,27 @@ namespace Remote.Neeo
         private sealed class EnumMapping<T>
             where T : struct, Enum
         {
-            private static readonly Dictionary<string, T> _fromText = Enum.GetValues<T>().ToDictionary(
-                value => AttributeData.GetEnumAttributeData(value, (TextAttribute attribute) => attribute.Text) ?? value.ToString()
+            private static readonly IReadOnlyDictionary<string, T> _fromText = Enum.GetValues<T>().ToDictionary(
+                value => AttributeData.GetEnumAttributeData(
+                    value, 
+                    (TextAttribute attribute) => attribute.Text
+                ) ?? value.ToString()
             );
 
-            private static readonly Dictionary<T, string> _toText = EnumMapping<T>._fromText.ToDictionary(
+            private static readonly IReadOnlyDictionary<T, string> _toText = EnumMapping<T>._fromText.ToDictionary(
                 pair => pair.Value,
                 pair => pair.Key
             );
 
-            public static T? GetEnum(string text) => EnumMapping<T>._fromText.TryGetValue(text, out T value) ? value : default(T?);
+            public static T? GetEnum(string text)
+            {
+                return EnumMapping<T>._fromText.TryGetValue(text, out T value) ? value : default(T?);
+            }
 
-            public static string GetEnumText(T value) => EnumMapping<T>._toText.TryGetValue(value, out string? text) ? text : value.ToString();
+            public static string GetEnumText(T value)
+            {
+                return EnumMapping<T>._toText.TryGetValue(value, out string? text) ? text : value.ToString();
+            }
         }
     }
 }

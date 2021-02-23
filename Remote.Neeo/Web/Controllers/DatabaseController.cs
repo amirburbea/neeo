@@ -13,15 +13,12 @@ namespace Remote.Neeo.Web.Controllers
         public DatabaseController(IDeviceDatabase database) => this._database = database;
 
         [HttpGet("adapterdefinition/{adapterName}")]
-        public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => this.Ok(this._database.GetDeviceByAdapterName(adapterName));
+        public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => new(this._database.GetDeviceByAdapterName(adapterName));
 
         [HttpGet("{deviceId}")]
-        public ActionResult<IDeviceModel> GetDevice(int deviceId) => this.Ok(this._database.GetDevice(deviceId));
+        public ActionResult<IDeviceModel> GetDevice(int deviceId) => new(this._database.GetDevice(deviceId));
 
         [HttpGet("search")]
-        public ActionResult<IEnumerable<SearchItem<IDeviceModel>>> Search([FromQuery(Name = "q")] string? query = null)
-        {
-            return this.Ok(this._database.Search(query));
-        }
+        public ActionResult<IEnumerable<SearchItem<IDeviceModel>>> Search([FromQuery(Name = "q")] string? query = null) => new(this._database.Search(query));
     }
 }

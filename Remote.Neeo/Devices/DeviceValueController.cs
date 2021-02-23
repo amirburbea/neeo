@@ -33,7 +33,7 @@ namespace Remote.Neeo.Devices
     /// Device value controller.
     /// </summary>
     /// <typeparam name="TValue">The type of the value.</typeparam>
-    public sealed class DeviceValueController<TValue> : IDeviceValueController
+    public class DeviceValueController<TValue> : IDeviceValueController
         where TValue : notnull, IConvertible
     {
         private readonly DeviceValueGetter<TValue> _getter;

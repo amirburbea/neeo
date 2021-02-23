@@ -7,8 +7,6 @@ namespace Remote.Neeo.Devices
     /// </summary>
     public readonly struct DeviceTiming
     {
-        public static readonly DeviceTiming Empty = new();
-
         /// <summary>
         /// Initialize a new <see cref="DeviceTiming"/> instance.
         /// </summary>

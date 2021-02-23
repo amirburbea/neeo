@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Remote.Neeo.Web.Controllers
@@ -12,6 +11,6 @@ namespace Remote.Neeo.Web.Controllers
         public SecureController(PgpKeys keys) => this._publicKey = Encoding.ASCII.GetString(PgpMethods.GetKeyBytes(keys.PublicKey.Encode));
 
         [HttpGet("pubkey")]
-        public ActionResult<object> GetPublicKey() => this.Ok(new { Publickey = this._publicKey });
+        public ActionResult<object> GetPublicKey() => new(new { Publickey = this._publicKey });
     }
 }

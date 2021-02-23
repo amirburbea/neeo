@@ -1,8 +1,7 @@
-﻿using System;
-
-namespace Remote.Utilities.TokenSearch
+﻿namespace Remote.Utilities.TokenSearch
 {
-    public sealed class SearchItem<T> : IComparable<SearchItem<T>>
+    public sealed class SearchItem<T>
+        where T : notnull
     {
         public SearchItem(T item) => this.Item = item;
 
@@ -10,8 +9,6 @@ namespace Remote.Utilities.TokenSearch
 
         public double Score { get; set; }
 
-        public int CompareTo(SearchItem<T>? other) => other == null ? 1 : this.Score.CompareTo(other.Score);
-
-        public object? GetValue(string propertyName) => TokenSearch<T>.GetItemValue(this.Item, propertyName);
+        internal object? GetValue(string propertyName) => TokenSearch<T>.GetItemValue(this.Item, propertyName);
     }
 }

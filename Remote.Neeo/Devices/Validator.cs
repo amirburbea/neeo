@@ -17,8 +17,25 @@ namespace Remote.Neeo.Devices
             }
         }
 
-        public static void ValidateStringLength(string text, int minLength = 1, int maxLength = 48, [CallerMemberName] string prefix = null)
+        public static void ValidateRange(double low, double high, string? units)
         {
+            Validator.ValidateString(units, prefix: nameof(units));
+            if (double.IsNaN(low) || double.IsNaN(high) || double.IsInfinity(low) || double.IsInfinity(high) || low >= high)
+            {
+                throw new ValidationException("Range low must be less than range high and neither value can be infinity or NaN.");
+            }
+        }
+
+        public static void ValidateString(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerMemberName] string prefix = null)
+        {
+            if (text == null)
+            {
+                if (allowNull)
+                {
+                    return;
+                }
+                throw new ValidationException($"{GetPrefix(prefix)} is null.");
+            }
             if (text.Length < minLength)
             {
                 throw new ValidationException($"{GetPrefix(prefix)} is too short (minimum is .{minLength}).");

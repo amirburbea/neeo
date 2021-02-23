@@ -11,13 +11,17 @@ namespace Remote.Neeo
     partial record Brain
     {
         /// <summary>
-        /// Discovers the first <see cref="Brain"/> on the network matching the specified <paramref name="predicate"/> if provided.
-        /// If no <paramref name="predicate"/> is provided, returns the first <see cref="Brain"/> discovered.
+        /// Discovers the first <see cref="Brain"/> on the network matching the specified
+        /// <paramref name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the first
+        /// <see cref="Brain"/> discovered.
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token.</param>
-        /// <param name="predicate">Optional predicate that if provided, must be matched by the Brain to be returned.</param>
+        /// <param name="predicate">Optional predicate that must be matched by the Brain (if not <c>null</c>).</param>
         /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
-        public static async Task<Brain?> DiscoverAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
+        public static async Task<Brain?> DiscoverAsync(
+            Func<Brain, bool>? predicate = default,
+            CancellationToken cancellationToken = default
+        )
         {
             using CancellationTokenSource tokenSource = new();
             TaskCompletionSource<Brain?> cancellationTaskSource = new();
@@ -29,7 +33,7 @@ namespace Remote.Neeo
             TaskCompletionSource<Brain?> brainTaskSource = new();
             return await Task.WhenAny(
                 ZeroconfResolver.ResolveAsync(
-                    Constants.ServiceName, 
+                    Constants.ServiceName,
                     callback: OnHostDiscovered,
                     scanTime: TimeSpan.FromSeconds(5d),
                     cancellationToken: tokenSource.Token
@@ -60,9 +64,11 @@ namespace Remote.Neeo
         /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>s.</returns>
         public static async Task<Brain[]> DiscoverAllAsync(CancellationToken cancellationToken = default)
         {
-            return (await ZeroconfResolver.ResolveAsync(Constants.ServiceName, cancellationToken: cancellationToken).ConfigureAwait(false))
-                .Select(Brain.Create)
-                .ToArray();
+            IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(
+                Constants.ServiceName,
+                cancellationToken: cancellationToken
+            ).ConfigureAwait(false);
+            return hosts.Select(Brain.Create).ToArray();
         }
 
         private static Brain Create(IZeroconfHost host)

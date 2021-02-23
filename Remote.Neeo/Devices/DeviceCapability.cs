@@ -5,7 +5,7 @@ using Remote.Neeo.Devices.Discovery;
 namespace Remote.Neeo.Devices
 {
     /// <summary>
-    /// Specifies special capabilities supported by the device.
+    /// Specifies capabilities supported by the device.
     /// </summary>
     [JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceCapability>))]
     public enum DeviceCapability
@@ -18,9 +18,11 @@ namespace Remote.Neeo.Devices
 
         /// <summary>
         /// This capability is used when the device does not need to be powered on to be useable.
-        /// <para />
-        /// Drivers with this capability do not need to specify 'POWER ON'/'POWER OFF' buttons and the device is not identified as "stupid".
         /// </summary>
+        /// <remarks>
+        /// Drivers with this capability do not need to specify &quot;POWER ON&quot;/&quot;POWER OFF&quot;
+        /// buttons and will not be identified as &quot;stupid&quot;.
+        /// </remarks>
         [Text("alwaysOn")]
         AlwaysOn,
 
@@ -34,9 +36,8 @@ namespace Remote.Neeo.Devices
 
         /// <summary>
         /// The device has a custom favorites handler. (See <see cref="IDeviceBuilder.SetFavoritesHandler"/>).
-        /// <para />
-        /// This should only be used internally by the API and not added directly via <see cref="IDeviceBuilder.AddCapability"/>.
         /// </summary>
+        /// <remarks>This should only be used internally by the API and not added directly via <see cref="IDeviceBuilder.AddCapability"/>.</remarks>
         [Text("customFavoriteHandler"), Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         CustomFavoriteHandler,
 
@@ -48,9 +49,8 @@ namespace Remote.Neeo.Devices
 
         /// <summary>
         /// The device uses registration (<see cref="IDeviceBuilder.EnableRegistration"/>).
-        /// <para />
-        /// This should only be used internally by the API and not added directly via <see cref="IDeviceBuilder.AddCapability"/>.
         /// </summary>
+        /// <remarks>This should only be used internally by the API and not added directly via <see cref="IDeviceBuilder.AddCapability"/>.</remarks>
         [Text("register-user-account"), Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         RegisterUserAccount,
     }

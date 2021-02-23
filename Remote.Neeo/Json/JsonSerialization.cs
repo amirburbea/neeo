@@ -3,7 +3,7 @@ using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Remote.Neeo
+namespace Remote.Neeo.Json
 {
     /// <summary>
     /// Contains <see langword="static"/> methods and fields related to JSON serialization.

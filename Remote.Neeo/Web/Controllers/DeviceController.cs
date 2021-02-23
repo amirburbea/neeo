@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Remote.Neeo.Devices;
 
 namespace Remote.Neeo.Web.Controllers
@@ -6,13 +7,19 @@ namespace Remote.Neeo.Web.Controllers
     [ApiController, Route("[controller]")]
     internal sealed class DeviceController : ControllerBase
     {
-        private readonly Brain _brain;
         private readonly IDeviceDatabase _database;
 
-        public DeviceController(Brain brain, IDeviceDatabase database)
+        public DeviceController(IDeviceDatabase database) => this._database = database;
+
+        //private Task<IDeviceAdapter> GetAdapterAsync(string adapterName) => this._database.GetAdapterAsync(adapterName);
+
+        public async Task<ActionResult<bool>> GetIsRegistered(string adapterName)
         {
-            this._brain = brain;
-            this._database = database;
+            IDeviceAdapter adapter = await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false);
+
+            adapter.GetHandler(ComponentType.Registration);
+
+            throw new();
         }
     }
 }

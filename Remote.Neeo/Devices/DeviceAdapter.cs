@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
 namespace Remote.Neeo.Devices
 {
@@ -18,7 +16,7 @@ namespace Remote.Neeo.Devices
 
         IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        IReadOnlyCollection<DeviceInfo> Devices { get; }
+        IReadOnlyCollection<IDeviceInfo> Devices { get; }
 
         uint? DriverVersion { get; }
 
@@ -27,6 +25,8 @@ namespace Remote.Neeo.Devices
         string Manufacturer { get; }
 
         IDeviceSetup Setup { get; }
+
+        void GetHandler(ComponentType componentType)=>ToString();
 
         DeviceTiming Timing { get; }
 
@@ -54,7 +54,7 @@ namespace Remote.Neeo.Devices
             this.Type = type;
             this.Manufacturer = manufacturer;
             this.Initializer = initializer;
-            this.Timing = timing ?? DeviceTiming.Empty;
+            this.Timing = timing ?? new();
             this.Capabilities = capabilities;
             this.DriverVersion = driverVersion;
             this.Setup = setup;
@@ -65,7 +65,7 @@ namespace Remote.Neeo.Devices
 
         public IReadOnlyCollection<DeviceCapability> Capabilities { get; }
 
-        public IReadOnlyCollection<DeviceInfo> Devices { get; }
+        public IReadOnlyCollection<IDeviceInfo> Devices { get; }
 
         public uint? DriverVersion { get; }
 

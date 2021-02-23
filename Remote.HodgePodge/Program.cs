@@ -8,7 +8,6 @@ using Remote.Broadlink;
 using Remote.Neeo;
 using Remote.Neeo.Devices;
 using Remote.Utilities;
-using Remote.Utilities.TokenSearch;
 
 namespace Remote.HodgePodge
 {
@@ -38,9 +37,6 @@ namespace Remote.HodgePodge
 
         private static async Task Main()
         {
-            TokenSearch<string> search = new(new[] { "" });
-
-
             Console.WriteLine("Discovering brain...");
             var brain = await Brain.DiscoverAsync().ConfigureAwait(false);
             if (brain == null)
@@ -56,11 +52,12 @@ namespace Remote.HodgePodge
                     .AddButtons(KnownButtons.PowerOn | KnownButtons.PowerOff)
                     .AddButtonGroup(ButtonGroup.NumberPad)
                     .AddButtons(KnownButtons.Menu)
-                    .SetButtonHandler((deviceId, button) =>
+                    .AddButtonHandler((deviceId, button) =>
                     {
                         Console.WriteLine($"{deviceId}|{button}");
                         return Task.CompletedTask;
                     });
+                
                 Console.WriteLine("Getting system info from Brain...");
                 var info = await brain.GetSystemInfoAsync();
                 Console.WriteLine("Starting server...");
