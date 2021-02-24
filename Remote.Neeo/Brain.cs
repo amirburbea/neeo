@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Remote.Neeo.Devices;
-using Remote.Neeo.Web;
+using Remote.Neeo.Rest;
 
 namespace Remote.Neeo
 {

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Remote.Neeo.Devices;
 using Remote.Utilities.TokenSearch;
 
-namespace Remote.Neeo.Web.Controllers
+namespace Remote.Neeo.Rest.Controllers
 {
     [ApiController, Route("db")]
     internal sealed class DatabaseController : ControllerBase

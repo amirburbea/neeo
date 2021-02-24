@@ -1,6 +1,6 @@
 ﻿using Org.BouncyCastle.Bcpg.OpenPgp;
 
-namespace Remote.Neeo.Web
+namespace Remote.Neeo.Rest
 {
     internal sealed class PgpKeys
     {

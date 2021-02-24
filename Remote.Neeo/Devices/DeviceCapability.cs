@@ -35,7 +35,7 @@ namespace Remote.Neeo.Devices
         BridgeDevice,
 
         /// <summary>
-        /// The device has a custom favorites handler. (See <see cref="IDeviceBuilder.SetFavoritesHandler"/>).
+        /// The device has a custom favorites handler. (See <see cref="IDeviceBuilder.RegisterFavoritesHandler"/>).
         /// </summary>
         /// <remarks>This should only be used internally by the API and not added directly via <see cref="IDeviceBuilder.AddCapability"/>.</remarks>
         [Text("customFavoriteHandler"), Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]

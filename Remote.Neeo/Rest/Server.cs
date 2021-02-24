@@ -15,10 +15,11 @@ using Microsoft.Extensions.Logging;
 using Remote.Neeo.Devices;
 using Remote.Neeo.Json;
 
-namespace Remote.Neeo.Web
+namespace Remote.Neeo.Rest
 {
     /// <summary>
-    /// Contains <see langword="static"/> methods for starting and stopping a Kestrel server for interacting with the NEEO Brain.
+    /// Contains <see langword="static"/> methods for starting and stopping a REST server for interacting with the NEEO
+    /// Brain.
     /// </summary>
     internal static class Server
     {
@@ -78,7 +79,7 @@ namespace Remote.Neeo.Web
             }
         }
 
-        private static IHostBuilder CreateHostBuilder(Brain brain, string name, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
+        private static IHostBuilder CreateHostBuilder(Brain brain, SdkAdapterName name, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
         {
             builder
                 .ConfigureKestrel((context, options) =>
@@ -106,7 +107,7 @@ namespace Remote.Neeo.Web
                         .AddSingleton(brain)
                         .AddSingleton<IReadOnlyCollection<IDeviceAdapter>>(Array.ConvertAll(devices, devices => devices.BuildAdapter()))
                         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-                        .AddSingleton(new SdkAdapterName(name))
+                        .AddSingleton(name)
                         .AddSingleton<PgpKeys>()
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
@@ -139,11 +140,5 @@ namespace Remote.Neeo.Web
             protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
         }
 
-        private sealed record SdkAdapterName
-        {
-            public SdkAdapterName(string name) => this.Name = name;
-
-            public string Name { get; }
-        }
     }
 }

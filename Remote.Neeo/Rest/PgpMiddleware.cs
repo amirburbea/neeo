@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
-namespace Remote.Neeo.Web
+namespace Remote.Neeo.Rest
 {
     internal sealed class PgpMiddleware
     {

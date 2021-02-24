@@ -65,6 +65,8 @@ namespace Remote.Neeo.Devices
         /// </summary>
         string Name { get; }
 
+        DeviceSubscriptionController? DeviceSubscriptionHandler { get; }
+
         QueryIsRegistered? QueryIsRegistered { get; }
 
         Func<JsonElement, Task>? RegistrationProcessor { get; }
@@ -131,31 +133,14 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
-        IDeviceBuilder AddSensor(
-            string name, 
-            string? label, 
-            double rangeLow, 
-            double rangeHigh, 
-            string units, 
-            DeviceValueGetter<double> getter
-        );
+        IDeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units,
+            DeviceValueGetter<double> getter);
 
-        IDeviceBuilder AddSlider(
-            string name, 
-            string? label, 
-            double rangeLow, 
-            double rangeHigh, 
-            string units, 
-            DeviceValueGetter<double> getter, 
-            DeviceValueSetter<double> setter
-        );
+        IDeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units,
+            DeviceValueGetter<double> getter, DeviceValueSetter<double> setter);
 
-        IDeviceBuilder AddSwitch(
-            string name, 
-            string? label, 
-            DeviceValueGetter<bool> getter, 
-            DeviceValueSetter<bool> setter
-        );
+        IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter,
+            DeviceValueSetter<bool> setter);
 
         IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter);
 
@@ -172,7 +157,23 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryProcessor controller);
 
-        IDeviceBuilder EnableRegistration(RegistrationOptions options, RegistrationController controller);
+        IDeviceBuilder EnableRegistration(RegistrationOptions options, RegistrationCallbacks controller);
+
+        /// <summary>
+        /// Method which allows tracking which devices are currently in use on the NEEO Brain.
+        /// It can be used to avoid sending Brain notifications for devices not added on the Brain, to remove
+        /// registration credentials when the last device is removed, or to free up resources if no devices are in use.
+        /// </summary>
+        /// <param name="controller">The device subscription controller.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+        IDeviceBuilder RegisterDeviceSubscriptionHandler(DeviceSubscriptionController controller);
+
+        /// <summary>
+        /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
+        /// </summary>
+        /// <param name="handler">The favorites handler callback.</param>
+        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+        IDeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler);
 
         /// <summary>
         /// Sets a callback to be invoked to initialize the device before making it available to the NEEO Brain.
@@ -193,13 +194,6 @@ namespace Remote.Neeo.Devices
         IDeviceBuilder SetDriverVersion(uint version);
 
         /// <summary>
-        /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
-        /// </summary>
-        /// <param name="handler">The favorites handler callback.</param>
-        /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-        IDeviceBuilder SetFavoritesHandler(FavoritesHandler handler);
-
-        /// <summary>
         /// Sets the device icon override.
         /// <para/>
         /// The icon for a device is generally derived from the device type.
@@ -217,7 +211,7 @@ namespace Remote.Neeo.Devices
         IDeviceBuilder SetManufacturer(string manufacturer);
 
         /// <summary>
-        /// Sets an optional name to use when adding the device to a room 
+        /// Sets an optional name to use when adding the device to a room
         /// (a name based on the type will be used by default, for example: 'Accessory').
         /// </summary>
         /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
@@ -228,7 +222,7 @@ namespace Remote.Neeo.Devices
     internal sealed class DeviceBuilder : IDeviceBuilder
     {
         private static readonly ProjectionComparer<Feature, string> _nameComparer = new(
-            feature => feature.Name, 
+            feature => feature.Name,
             StringComparer.OrdinalIgnoreCase
         );
 
@@ -304,22 +298,14 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroup group) => this.AddButtons((KnownButtons)group);
 
-        IDeviceBuilder IDeviceBuilder.AddButtonHandler(ButtonHandler handler)
-        {
-            return this.AddButtonHandler(handler);
-        }
+        IDeviceBuilder IDeviceBuilder.AddButtonHandler(ButtonHandler handler) => this.AddButtonHandler(handler);
 
-        IDeviceBuilder IDeviceBuilder.AddButtons(KnownButtons button)
-        {
-            return this.AddButtons(button);
-        }
+        IDeviceBuilder IDeviceBuilder.AddButtons(KnownButtons button) => this.AddButtons(button);
 
-        IDeviceBuilder IDeviceBuilder.AddCapability(DeviceCapability capability)
-        {
-            return this.AddCapability(capability);
-        }
+        IDeviceBuilder IDeviceBuilder.AddCapability(DeviceCapability capability) => this.AddCapability(capability);
 
-        IDeviceBuilder IDeviceBuilder.AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter)
+        IDeviceBuilder IDeviceBuilder.AddImageUrl(string name, string? label, ImageSize size,
+            DeviceValueGetter<string> getter)
         {
             return this.AddImageUrl(name, label, size, getter);
         }
@@ -329,17 +315,20 @@ namespace Remote.Neeo.Devices
             return this.AddPowerStateSensor(sensor);
         }
 
-        IDeviceBuilder IDeviceBuilder.AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter)
+        IDeviceBuilder IDeviceBuilder.AddSensor(string name, string? label, double rangeLow, double rangeHigh,
+            string units, DeviceValueGetter<double> getter)
         {
             return this.AddSensor(name, label, rangeLow, rangeHigh, units, getter);
         }
 
-        IDeviceBuilder IDeviceBuilder.AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
+        IDeviceBuilder IDeviceBuilder.AddSlider(string name, string? label, double rangeLow, double rangeHigh,
+            string units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
         {
             return this.AddSlider(name, label, rangeLow, rangeHigh, units, getter, setter);
         }
 
-        IDeviceBuilder IDeviceBuilder.AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
+        IDeviceBuilder IDeviceBuilder.AddSwitch(string name, string? label, DeviceValueGetter<bool> getter,
+            DeviceValueSetter<bool> setter)
         {
             return this.AddSwitch(name, label, getter, setter);
         }
@@ -364,9 +353,19 @@ namespace Remote.Neeo.Devices
             return this.EnableDiscovery(options, processor);
         }
 
-        IDeviceBuilder IDeviceBuilder.EnableRegistration(RegistrationOptions options, RegistrationController controller)
+        IDeviceBuilder IDeviceBuilder.EnableRegistration(RegistrationOptions options, RegistrationCallbacks controller)
         {
             return this.EnableRegistration(options, controller);
+        }
+
+        IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionHandler(DeviceSubscriptionController controller)
+        {
+            return this.RegisterDeviceSubscriptionHandler(controller);
+        }
+
+        IDeviceBuilder IDeviceBuilder.RegisterFavoritesHandler(FavoritesHandler handler)
+        {
+            return this.RegisterFavoritesHandler(handler);
         }
 
         IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer)
@@ -377,11 +376,6 @@ namespace Remote.Neeo.Devices
         IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version)
         {
             return this.SetDriverVersion(version);
-        }
-
-        IDeviceBuilder IDeviceBuilder.SetFavoritesHandler(FavoritesHandler handler)
-        {
-            return this.SetFavoritesHandler(handler);
         }
 
         IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIconOverride icon)
@@ -453,25 +447,40 @@ namespace Remote.Neeo.Devices
             {
                 throw new InvalidOperationException("PowerStateSensor already added.");
             }
-            this._sensors.Add(new Feature<bool>(ComponentType.Power, "powerstate", "Powerstate") { Controller = new(getter) });
+            this._sensors.Add(new Feature<bool>(ComponentType.Power, "powerstate", "Powerstate")
+            {
+                Controller = new(getter)
+            });
             return this;
         }
 
-        private DeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter)
+        private DeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units,
+            DeviceValueGetter<double> getter)
         {
-            this._sensors.Add(new Feature<double>(ComponentType.Slider, name, label, rangeLow, rangeHigh, units) { Controller = new(getter) });
+            this._sensors.Add(new Feature<double>(ComponentType.Slider, name, label, rangeLow, rangeHigh, units)
+            {
+                Controller = new(getter)
+            });
             return this;
         }
 
-        private DeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
+        private DeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units,
+            DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
         {
-            this._sliders.Add(new(ComponentType.Slider, name, label, rangeLow, rangeHigh, units) { Controller = new(getter, setter ?? throw new ArgumentNullException(nameof(setter))) });
+            this._sliders.Add(new(ComponentType.Slider, name, label, rangeLow, rangeHigh, units)
+            {
+                Controller = new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+            });
             return this;
         }
 
-        private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
+        private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter,
+            DeviceValueSetter<bool> setter)
         {
-            this._switches.Add(new(ComponentType.Switch, name, label) { Controller = new(getter, setter ?? throw new ArgumentNullException(nameof(setter))) });
+            this._switches.Add(new(ComponentType.Switch, name, label)
+            {
+                Controller = new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+            });
             return this;
         }
 
@@ -495,12 +504,10 @@ namespace Remote.Neeo.Devices
             {
                 throw new InvalidOperationException("There are buttons defined but no handler was specified.");
             }
-
             if (this.Type.RequiresInput() && !this.Buttons.Any(button => button.Name.StartsWith(Constants.InputPrefix)))
             {
                 throw new InvalidOperationException();
             }
-
             return new(
                 this.AdapterName,
                 this.Name,
@@ -537,11 +544,12 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
-        private DeviceBuilder EnableRegistration(RegistrationOptions options, RegistrationController controller)
+        private DeviceBuilder EnableRegistration(RegistrationOptions options, RegistrationCallbacks controller)
         {
             if (!this.Setup.Discovery.GetValueOrDefault())
             {
-                throw new InvalidOperationException($"Registration is only supported on devices with discovery. (Call {nameof(this.EnableDiscovery)} first).");
+                throw new InvalidOperationException("Registration is only supported on devices with discovery. " +
+                    $"(Call {nameof(this.EnableDiscovery)} first).");
             }
             if (this.Setup.RegistrationType.HasValue)
             {
@@ -559,6 +567,21 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
+        private DeviceBuilder RegisterDeviceSubscriptionHandler(DeviceSubscriptionController controller)
+        {
+            throw new NotImplementedException();
+        }
+
+        private DeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler)
+        {
+            if (!this.Type.SupportsFavorites())
+            {
+                throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
+            }
+            this.FavoritesHandler = handler ?? throw new ArgumentNullException(nameof(handler));
+            return this.AddCapability(DeviceCapability.CustomFavoriteHandler);
+        }
+
         private DeviceBuilder RegisterInitializer(DeviceInitializer initializer)
         {
             if (this.Initializer != null)
@@ -573,16 +596,6 @@ namespace Remote.Neeo.Devices
         {
             this.DriverVersion = version;
             return this;
-        }
-
-        private DeviceBuilder SetFavoritesHandler(FavoritesHandler handler)
-        {
-            if (!this.Type.SupportsFavorites())
-            {
-                throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
-            }
-            this.FavoritesHandler = handler ?? throw new ArgumentNullException(nameof(handler));
-            return this.AddCapability(DeviceCapability.CustomFavoriteHandler);
         }
 
         private DeviceBuilder SetIcon(DeviceIconOverride icon)

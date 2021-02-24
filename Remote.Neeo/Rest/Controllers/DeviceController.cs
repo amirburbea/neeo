@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Remote.Neeo.Devices;
 
-namespace Remote.Neeo.Web.Controllers
+namespace Remote.Neeo.Rest.Controllers
 {
     [ApiController, Route("[controller]")]
     internal sealed class DeviceController : ControllerBase

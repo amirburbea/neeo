@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Remote.Neeo.Web.Controllers
+namespace Remote.Neeo.Rest.Controllers
 {
     [ApiController, Route("[controller]")]
     internal sealed class SecureController : ControllerBase

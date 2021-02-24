@@ -1,6 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace Remote.Neeo.Devices
 {
-    public delegate Task DeviceSubscriptionHandler(string deviceId);
+    public delegate Task DeviceSubscriptionHandler(string deviceId);    
 }
