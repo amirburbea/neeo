@@ -5,29 +5,31 @@ using Remote.Neeo.Devices.Discovery;
 namespace Remote.Neeo.Devices
 {
     /// <summary>
-    /// Specifies capabilities supported by the device.
+    /// Specifies special/unique characteristics supported by the device.
     /// </summary>
-    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceCapability>))]
-    public enum DeviceCapability
+    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<Characteristic>))]
+    public enum Characteristic
     {
         /// <summary>
-        /// This capability is used after you add a new device that uses discovery. It gives the option to select &quot;Add another {name}.&quot;.
+        /// This characteristic is optionally specified for devices that uses discovery.
+        /// It gives the option to select &quot;Add another {name}.&quot;.
         /// </summary>
         [Text("addAnotherDevice")]
         AddAnotherDevice,
 
         /// <summary>
-        /// This capability is used when the device does not need to be powered on to be useable.
+        /// This characteristic is used when the device does not need to be powered on to be useable.
         /// </summary>
         /// <remarks>
-        /// Drivers with this capability do not need to specify &quot;POWER ON&quot;/&quot;POWER OFF&quot;
+        /// Drivers with this characteristic do not need to specify &quot;POWER ON&quot;/&quot;POWER OFF&quot;
         /// buttons and will not be identified as &quot;stupid&quot;.
         /// </remarks>
         [Text("alwaysOn")]
         AlwaysOn,
 
         /// <summary>
-        /// This capability is used after you add a hub/gateway device. It gives the option to select &quot;Add more from this bridge&quot;.
+        /// This characteristic is used after you add a hub/gateway device. 
+        /// It gives the option to select &quot;Add more from this bridge&quot;.
         /// <para />
         /// Example: Philips Hue - the discovered device (gateway) supports multiple devices (lamps).
         /// </summary>
@@ -37,12 +39,16 @@ namespace Remote.Neeo.Devices
         /// <summary>
         /// The device has a custom favorites handler. (See <see cref="IDeviceBuilder.RegisterFavoritesHandler"/>).
         /// </summary>
-        /// <remarks>This should only be used internally by the API and not added directly via <see cref="IDeviceBuilder.AddCapability"/>.</remarks>
+        /// <remarks>
+        /// This should only be used internally by the API and not added directly via 
+        /// <see cref="IDeviceBuilder.AddCharacteristic"/>.
+        /// </remarks>
         [Text("customFavoriteHandler"), Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         CustomFavoriteHandler,
 
         /// <summary>
-        /// If <see cref="DiscoveryOptions.EnableDynamicDeviceBuilder"/> is enabled, dynamically defined devices should set this capability.
+        /// If <see cref="DiscoveryOptions.EnableDynamicDeviceBuilder"/> is enabled, dynamically defined devices should
+        /// specify this characteristic.
         /// </summary>
         [Text("dynamicDevice")]
         DynamicDevice,
@@ -50,7 +56,10 @@ namespace Remote.Neeo.Devices
         /// <summary>
         /// The device uses registration (<see cref="IDeviceBuilder.EnableRegistration"/>).
         /// </summary>
-        /// <remarks>This should only be used internally by the API and not added directly via <see cref="IDeviceBuilder.AddCapability"/>.</remarks>
+        /// <remarks>
+        /// This should only be used internally by the API and not added directly via 
+        /// <see cref="IDeviceBuilder.AddCharacteristic"/>.
+        /// </remarks>
         [Text("register-user-account"), Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
         RegisterUserAccount,
     }

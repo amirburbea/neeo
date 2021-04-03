@@ -14,9 +14,9 @@ namespace Remote.Neeo.Json
 
         private static Type GetConverterType(Type interfaceType)
         {
-            return (interfaceType ?? throw new ArgumentNullException(nameof(interfaceType))).IsInterface
-                ? typeof(ObjectConverter<>).MakeGenericType(interfaceType)
-                : throw new ArgumentException($"{interfaceType.FullName} is not an interface.", nameof(interfaceType));
+            return !(interfaceType ?? throw new ArgumentNullException(nameof(interfaceType))).IsInterface
+                ? throw new ArgumentException($"{interfaceType.FullName} is not an interface.", nameof(interfaceType))
+                : typeof(ObjectConverter<>).MakeGenericType(interfaceType);
         }
 
         private sealed class ObjectConverter<T> : JsonConverter<T>

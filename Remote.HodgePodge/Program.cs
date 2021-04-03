@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -57,9 +58,6 @@ namespace Remote.HodgePodge
                         Console.WriteLine($"{deviceId}|{button}");
                         return Task.CompletedTask;
                     });
-                
-                Console.WriteLine("Getting system info from Brain...");
-                var info = await brain.GetSystemInfoAsync();
                 Console.WriteLine("Starting server...");
                 await brain.StartServerAsync("C#", new[] { builder });
                 Console.WriteLine("Server started. Press any key to quit...   ");

@@ -2,18 +2,18 @@
 
 namespace Remote.Neeo.Devices
 {
-    public sealed class DeviceSubscriptionController
+    public sealed class DeviceSubscriptionCallbacks
     {
-        public DeviceSubscriptionController(DeviceSubscriptionHandler deviceAdded, DeviceSubscriptionHandler deviceRemoved, DeviceListInitializer initializeDeviceList)
+        public DeviceSubscriptionCallbacks(DeviceAddedHandler deviceAdded, DeviceRemovedHandler deviceRemoved, DeviceListInitializer initializeDeviceList)
         {
             this.DeviceAdded = deviceAdded ?? throw new ArgumentNullException(nameof(deviceAdded));
             this.DeviceRemoved = deviceRemoved ?? throw new ArgumentNullException(nameof(deviceRemoved));
             this.InitializeDeviceList = initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList));
         }
 
-        public DeviceSubscriptionHandler DeviceAdded { get; }
+        public DeviceAddedHandler DeviceAdded { get; }
 
-        public DeviceSubscriptionHandler DeviceRemoved { get; }
+        public DeviceRemovedHandler DeviceRemoved { get; }
 
         public DeviceListInitializer InitializeDeviceList { get; }
     }

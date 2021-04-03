@@ -3,8 +3,9 @@
 namespace Remote.Neeo.Devices
 {
     /// <summary>
-    /// A callback to be invoked to initialize the device adapter before making it available to the NEEO Brain.
+    /// Callback invoked by the Brain when a device is removed.
     /// </summary>
+    /// <param name="deviceId">The device identifier.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    public delegate Task DeviceInitializer();
+    public delegate Task DeviceRemovedHandler(string deviceId);
 }

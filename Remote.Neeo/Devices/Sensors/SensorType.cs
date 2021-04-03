@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Remote.Neeo.Devices
+namespace Remote.Neeo.Devices.Sensors
 {
     /// <summary>
     /// An enumeration of the types of sensors available in NEEO.
@@ -8,9 +8,6 @@ namespace Remote.Neeo.Devices
     [JsonConverter(typeof(TextAttribute.EnumJsonConverter<SensorType>))]
     public enum SensorType
     {
-        [Text("array")]
-        Array = 0,
-
         [Text("binary")]
         Binary,
 
@@ -23,7 +20,7 @@ namespace Remote.Neeo.Devices
         [Text("range")]
         Range,
 
-        [Text("switch")]
+        [Text("string")]
         String,
     }
 }

@@ -35,11 +35,12 @@ namespace Remote.Neeo.Rest
             ).Build();
             await host.StartAsync(cancellationToken).ConfigureAwait(false);
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
+            IApiClient client = host.Services.GetRequiredService<IApiClient>();
             for (int i = 0; i < Constants.MaxConnectionRetries; i++)
             {
                 try
                 {
-                    await brain.RegisterServerAsync(adapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false);
+                    await client.RegisterServerAsync(adapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false);
                     logger.LogInformation("Server [http://{hostIP}:{port}] registered on {brainHost}.local ({brainIP}).", hostIPAddress, port, brain.HostName, brain.IPAddress);
                     return host;
                 }
@@ -51,20 +52,17 @@ namespace Remote.Neeo.Rest
             throw new ApplicationException("Failed to register with brain.");
         }
 
-        public static async Task StopAsync(IHost? host, CancellationToken cancellationToken)
+        public static async Task StopAsync(IHost host, CancellationToken cancellationToken)
         {
-            if (host == null)
-            {
-                return;
-            }
             try
             {
                 ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
                 Brain brain = host.Services.GetRequiredService<Brain>();
-                string name = host.Services.GetRequiredService<SdkAdapterName>().Name;
+                IApiClient client = host.Services.GetRequiredService<IApiClient>();
+                string name = host.Services.GetRequiredService<SdkEnvironment>().Name;
                 try
                 {
-                    await brain.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false);
+                    await client.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false);
                     logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
                 }
                 catch (Exception e)
@@ -79,54 +77,72 @@ namespace Remote.Neeo.Rest
             }
         }
 
-        private static IHostBuilder CreateHostBuilder(Brain brain, SdkAdapterName name, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
+        private static IHostBuilder CreateHostBuilder(Brain brain, string name, IDeviceBuilder[] devices, IPAddress ipAddress, int port)
         {
-            builder
-                .ConfigureKestrel((context, options) =>
-                {
-                    options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
-                    options.Listen(ipAddress, port);
-                    if (context.HostingEnvironment.IsDevelopment() && !ipAddress.Equals(IPAddress.Loopback))
+            return Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
+            {
+                builder
+                    .ConfigureKestrel((context, options) =>
                     {
-                        options.ListenLocalhost(port);
-                    }
-                })
-                .ConfigureLogging((context, builder) =>
-                {
-                    builder
-                        .ClearProviders()
-                        .AddConsole();
-                    if (context.HostingEnvironment.IsDevelopment())
+                        options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
+                        options.Listen(ipAddress, port);
+                        if (context.HostingEnvironment.IsDevelopment() && !ipAddress.Equals(IPAddress.Loopback))
+                        {
+                            options.ListenLocalhost(port);
+                        }
+                    })
+                    .ConfigureLogging((context, builder) =>
                     {
-                        builder.AddDebug();
-                    }
-                })
-                .ConfigureServices((context, services) =>
-                {
-                    services
-                        .AddSingleton(brain)
-                        .AddSingleton<IReadOnlyCollection<IDeviceAdapter>>(Array.ConvertAll(devices, devices => devices.BuildAdapter()))
-                        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-                        .AddSingleton(name)
-                        .AddSingleton<PgpKeys>()
-                        .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-                        .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
-                        .AddJsonOptions(options => options.JsonSerializerOptions.ApplyOptions())
-                        .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()));
-                })
-                .Configure((context, builder) =>
-                {
-                    if (context.HostingEnvironment.IsDevelopment())
+                        builder
+                            .ClearProviders()
+                            .AddConsole();
+                        if (context.HostingEnvironment.IsDevelopment())
+                        {
+                            builder.AddDebug();
+                        }
+                    })
+                    .ConfigureServices((context, services) =>
                     {
-                        builder.UseDeveloperExceptionPage();
-                    }
-                    builder
-                        .UseMiddleware<PgpMiddleware>()
-                        .UseRouting()
-                        .UseCors(nameof(CorsPolicy))
-                        .UseEndpoints(endpoints => endpoints.MapControllers());
-                });
-        });
+                        services
+                            .AddSingleton(brain)
+                            .AddSingleton<IApiClient, ApiClient>()
+                            .AddSingleton<IReadOnlyCollection<IDeviceAdapter>>(Array.ConvertAll(devices, device => device.BuildAdapter(name)))
+                            .AddSingleton<IDeviceDatabase, DeviceDatabase>()
+                            .AddSingleton(new SdkEnvironment(name))
+                            .AddSingleton<PgpKeys>()
+                            .AddCors(options => options.AddPolicy(
+                                nameof(CorsPolicy),
+                                builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()
+                            ))
+                            .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
+                            .AddJsonOptions(options => options.JsonSerializerOptions.ApplyOptions())
+                            .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AllowInternalsControllerFeatureProvider()));
+                    })
+                    .Configure((context, builder) =>
+                    {
+                        if (context.HostingEnvironment.IsDevelopment())
+                        {
+                            builder.UseDeveloperExceptionPage();
+                        }
+                        builder
+                            .UseMiddleware<PgpMiddleware>()
+                            .UseRouting()
+                            .UseCors(nameof(CorsPolicy))
+                            .UseEndpoints(endpoints => endpoints.MapControllers());
+                    });
+            });
+        }
+
+        private static Task<SuccessResult> RegisterServerAsync(this IApiClient client, string name, string baseUrl, CancellationToken cancellationToken)
+        {
+            return client.PostAsync<object, SuccessResult>(UrlPaths.RegisterServer, new { Name = name, BaseUrl = baseUrl }, cancellationToken);
+        }
+
+        private static Task<SuccessResult> UnregisterServerAsync(this IApiClient client, string name, CancellationToken cancellationToken)
+        {
+            return client.PostAsync<object, SuccessResult>(UrlPaths.UnregisterServer, new { Name = name },
+                cancellationToken);
+        }
 
         private static class Constants
         {
@@ -139,6 +155,5 @@ namespace Remote.Neeo.Rest
         {
             protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
         }
-
     }
 }

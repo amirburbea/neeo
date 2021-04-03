@@ -333,6 +333,11 @@ namespace Remote.Neeo.Devices
     /// </summary>
     public static class KnownButton
     {
+        /// <summary>
+        /// Gets the button names in the specified combination of <paramref name="buttons"/>.
+        /// </summary>
+        /// <param name="buttons">The (potentially flagged) <see cref="KnownButtons"/> value.</param>
+        /// <returns>The collection of button names.</returns>
         public static IEnumerable<string> GetNames(KnownButtons buttons)
         {
             ulong value = (ulong)buttons;
@@ -346,6 +351,11 @@ namespace Remote.Neeo.Devices
                 : KnownButton.ExtractBits(value).Select(bit => TextAttribute.GetEnumText((KnownButtons)bit));
         }
 
+        /// <summary>
+        /// Attempts to get the associated <see cref="KnownButtons"/> value for a button name.
+        /// </summary>
+        /// <param name="name">The name of the button.</param>
+        /// <returns><see cref="KnownButtons"/> value if found, otherwise <c>null</c>.</returns>
         public static KnownButtons? TryGetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
 
         private static IEnumerable<ulong> ExtractBits(ulong value)

@@ -1,19 +1,19 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Remote.Neeo.Devices
+namespace Remote.Neeo.Devices.Components
 {
     /// <summary>
-    /// An enumeration of the NEEO remote component types.
+    /// An enumeration of NEEO component types.
     /// </summary>
     [JsonConverter(typeof(TextAttribute.EnumJsonConverter<ComponentType>))]
     public enum ComponentType
     {
         [Text("button")]
         Button = 0,
-        
+
         [Text("discover")]
         Discovery,
-        
+
         [Text("directory")]
         Directory,
 
@@ -31,16 +31,16 @@ namespace Remote.Neeo.Devices
 
         [Text("sensor")]
         Sensor,
-        
+
         [Text("slider")]
         Slider,
 
         [Text("devicesubscription")]
         Subscription,
-        
+
         [Text("switch")]
         Switch,
-        
+
         [Text("textlabel")]
         TextLabel,
     }

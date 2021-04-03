@@ -17,31 +17,28 @@ namespace Remote.Utilities.TokenSearch
 
         private readonly char[] _delimiter;
         private readonly int _maxFilterTokenEntries;
-        private readonly PostProcessAlgorithm<T> _postProcessAlgorithm;
-        private readonly Func<T, bool> _preProcessCheck;
-        private readonly ScoringAlgorithm _scoringAlgorithm;
+        private readonly PostProcessAlgorithm<T> _postProcess;
+        private readonly Func<T, bool>? _preProcessCheck;
+        private readonly ScoringAlgorithm _getScore;
         private readonly string[]? _searchProperties;
-        private readonly Comparer<SearchItem<T>> _sortAlgorithm;
+        private readonly Comparer<SearchItem<T>> _comparer;
         private readonly double _threshold;
         private readonly bool _unique;
 
-        public TokenSearch(IReadOnlyCollection<T> collection, SearchOptions<T>? options = default)
+        public TokenSearch(SearchOptions<T>? options = default)
         {
-            this.Collection = collection ?? throw new ArgumentNullException(nameof(collection));
             this._delimiter = options?.Delimiter ?? new[] { ' ', '_', '-' };
             this._maxFilterTokenEntries = options?.MaxFilterTokenEntries ?? 5;
             this._threshold = options?.Threshold ?? 0.7;
-            this._preProcessCheck = options?.PreProcessCheck ?? TokenSearch<T>.DefaultPreProcessCheck;
-            this._sortAlgorithm = Comparer<SearchItem<T>>.Create(options?.SortAlgorithm ?? TokenSearch<T>.DefaultSortAlgorithm);
-            this._scoringAlgorithm = options?.ScoringAlgorithm ?? TokenSearch<T>.DefaultSearchAlgorithm;
-            this._postProcessAlgorithm = options?.PostProcessAlgorithm ?? TokenSearch<T>.DefaultPostProcessAlgorithm;
+            this._preProcessCheck = options?.PreProcessCheck;
+            this._comparer = Comparer<SearchItem<T>>.Create(options?.SortAlgorithm ?? TokenSearch<T>.DefaultSortAlgorithm);
+            this._getScore = options?.ScoringAlgorithm ?? TokenSearch<T>.DefaultSearchAlgorithm;
+            this._postProcess = options?.PostProcessAlgorithm ?? TokenSearch<T>.DefaultPostProcessAlgorithm;
             this._searchProperties = options?.SearchProperties is { Length: > 1 } ? options.SearchProperties : null;
             this._unique = options?.Unique ?? false;
         }
 
-        public IReadOnlyCollection<T> Collection { get; }
-
-        public SearchItem<T>[] Search(string query)
+        public IEnumerable<SearchItem<T>> Search(IEnumerable<T> collection, string query)
         {
             string[] searchTokens = (query ?? throw new ArgumentNullException(nameof(query)))
                 .Split(this._delimiter, StringSplitOptions.RemoveEmptyEntries)
@@ -50,12 +47,19 @@ namespace Remote.Utilities.TokenSearch
                 .ToArray();
             List<SearchItem<T>> list = new();
             int maxScore = 0;
-            foreach (T item in this.Collection.Where(this._preProcessCheck))
+            foreach (T item in collection ?? throw new ArgumentNullException(nameof(collection)))
             {
+                if (this._preProcessCheck != null && !this._preProcessCheck(item))
+                {
+                    continue;
+                }
                 string[] dataTokens = this._searchProperties == null
                     ? new[] { item.ToString() ?? string.Empty }
-                    : Array.ConvertAll(this._searchProperties, property => TokenSearch<T>.GetItemValue(item, property)?.ToString() ?? string.Empty);
-                int score = dataTokens.Sum(token => this._scoringAlgorithm(token, searchTokens));
+                    : Array.ConvertAll(
+                        this._searchProperties, 
+                        property => TokenSearch<T>.GetItemValue(item, property)?.ToString() ?? string.Empty
+                      );
+                int score = dataTokens.Sum(token => this._getScore(token, searchTokens));
                 if (score <= 0)
                 {
                     continue;
@@ -63,9 +67,8 @@ namespace Remote.Utilities.TokenSearch
                 maxScore = Math.Max(score, maxScore);
                 list.Add(new(item) { Score = score });
             }
-            SearchItem<T>[] array = this._postProcessAlgorithm(list, maxScore, this._threshold, this._unique, this._searchProperties).ToArray();
-            Array.Sort(array, this._sortAlgorithm);
-            return array;
+            return this._postProcess(list, maxScore, this._threshold, this._unique, this._searchProperties)
+                .OrderBy(x => x, this._comparer);
         }
 
         /// <summary>
@@ -121,8 +124,6 @@ namespace Remote.Utilities.TokenSearch
                 }
             }
         }
-
-        private static bool DefaultPreProcessCheck(T _) => true;
 
         private static int DefaultSearchAlgorithm(string text, IEnumerable<string> searchTokens)
         {

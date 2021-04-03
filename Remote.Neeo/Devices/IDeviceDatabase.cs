@@ -48,23 +48,31 @@ namespace Remote.Neeo.Devices
                     string.Join(' ', device.Tokens)
                 )
             );
-            this._deviceIndex = new(this._devices, new()
+            this._deviceIndex = new(new()
             {
-                SearchProperties = new[] { nameof(IDeviceModel.Manufacturer), nameof(IDeviceModel.Name), nameof(IDeviceModel.Type), nameof(IDeviceModel.Tokens) },
+                SearchProperties = new[]
+                {
+                    nameof(IDeviceModel.Manufacturer),
+                    nameof(IDeviceModel.Name),
+                    nameof(IDeviceModel.Tokens),
+                    nameof(IDeviceModel.Type),
+                },
                 Threshold = Constants.MatchFactor,
                 Delimiter = new[] { Constants.Delimiter },
                 Unique = true,
                 SortAlgorithm = (left, right) =>
                 {
                     int comparison = left.Score.CompareTo(right.Score);
-                    return comparison != 0 ? comparison : StringComparer.OrdinalIgnoreCase.Compare(left.Item.Name, right.Item.Name);
+                    return comparison != 0
+                        ? comparison
+                        : StringComparer.OrdinalIgnoreCase.Compare(left.Item.Name, right.Item.Name);
                 }
             });
         }
 
         public async Task<IDeviceAdapter> GetAdapterAsync(string adapterName)
         {
-            if (string.IsNullOrEmpty(adapterName) || !this._adapters.TryGetValue(adapterName, out IDeviceAdapter? adapter))
+            if (adapterName == null || !this._adapters.TryGetValue(adapterName, out IDeviceAdapter? adapter))
             {
                 throw new ArgumentException($"No matching adapter with name \"{adapterName}\".", nameof(adapterName));
             }
@@ -88,24 +96,25 @@ namespace Remote.Neeo.Devices
 
         public IEnumerable<SearchItem<IDeviceModel>> Search(string? query)
         {
-            return string.IsNullOrEmpty(query)                
-                ? Enumerable.Empty<SearchItem<IDeviceModel>>()                
-                : this._deviceIndex.Search(query).Take(Constants.MaxSearchResults);
+            return string.IsNullOrEmpty(query)
+                ? Enumerable.Empty<SearchItem<IDeviceModel>>()
+                : this._deviceIndex.Search(this._devices, query).Take(Constants.MaxSearchResults);
         }
 
         private async Task InitializeAsync(IDeviceAdapter adapter)
         {
+            if (this._initializedAdapters.Contains(adapter.AdapterName))
+            {
+                return;
+            }
             if (adapter.Initializer == null)
             {
                 this._initializedAdapters.Add(adapter.AdapterName);
                 return;
             }
-            else if (this._initializedAdapters.Contains(adapter.AdapterName))
-            {
-                return;
-            }
             try
             {
+                this._logger.LogInformation("Initializing device: {name}", adapter.AdapterName);
                 await adapter.Initializer().ConfigureAwait(false);
                 this._initializedAdapters.Add(adapter.AdapterName);
             }

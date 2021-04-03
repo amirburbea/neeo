@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Remote.Neeo.Devices.Components;
 using Remote.Neeo.Devices.Discovery;
-using Remote.Neeo.Devices.Features;
 using Remote.Utilities;
 
 namespace Remote.Neeo.Devices
@@ -19,6 +19,9 @@ namespace Remote.Neeo.Devices
         /// </summary>
         string AdapterName { get; }
 
+        /// <summary>
+        /// Gets the collection of additional search tokens defined for the device.
+        /// </summary>
         IReadOnlyCollection<string> AdditionalSearchTokens { get; }
 
         /// <summary>
@@ -26,9 +29,22 @@ namespace Remote.Neeo.Devices
         /// </summary>
         ButtonHandler? ButtonHandler { get; }
 
-        IReadOnlyCollection<IFeature> Buttons { get; }
+        /// <summary>
+        /// Gets the collection of buttons defined.
+        /// </summary>
+        IReadOnlyCollection<DeviceFeature> Buttons { get; }
 
-        IReadOnlyCollection<DeviceCapability> Capabilities { get; }
+        /// <summary>
+        /// Gets the collection of special characteristics of the device.
+        /// </summary>
+        IReadOnlyCollection<Characteristic> Characteristics { get; }
+
+        /// <summary>
+        /// Gets a set of callbacks which allow tracking which devices are currently in use on the NEEO Brain.
+        /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
+        /// resource and/or remove credentials when the last device is removed.
+        /// </summary>
+        DeviceSubscriptionCallbacks? DeviceSubscriptionHandlers { get; }
 
         DiscoveryProcessor? DiscoveryProcessor { get; }
 
@@ -40,6 +56,9 @@ namespace Remote.Neeo.Devices
 
         FavoritesHandler? FavoritesHandler { get; }
 
+        /// <summary>
+        /// Gets a value indicating if a power state sensor has been defined for the device.
+        /// </summary>
         bool HasPowerStateSensor { get; }
 
         /// <summary>
@@ -47,7 +66,10 @@ namespace Remote.Neeo.Devices
         /// </summary>
         DeviceIconOverride? Icon { get; }
 
-        IReadOnlyCollection<IImageUrlFeature> ImageUrls { get; }
+        /// <summary>
+        /// Gets the collection of ImageUrl features defined for the device.
+        /// </summary>
+        IReadOnlyCollection<DeviceFeature> ImageUrls { get; }
 
         /// <summary>
         /// Device initializer callback.
@@ -65,24 +87,51 @@ namespace Remote.Neeo.Devices
         /// </summary>
         string Name { get; }
 
-        DeviceSubscriptionController? DeviceSubscriptionHandler { get; }
-
+        /// <summary>
+        /// Gets a function used by the Brain to determine if registration is not required.
+        /// </summary>
         QueryIsRegistered? QueryIsRegistered { get; }
 
+        /// <summary>
+        /// Gets a function used by the Brain to attempt registration of the device.
+        /// </summary>
         Func<JsonElement, Task>? RegistrationProcessor { get; }
 
-        IReadOnlyCollection<ISensorFeature> Sensors { get; }
+        /// <summary>
+        /// Gets the collection of sensors defined for the device.
+        /// </summary>
+        IReadOnlyCollection<DeviceFeature> Sensors { get; }
 
         IDeviceSetup Setup { get; }
 
-        IReadOnlyCollection<ISensorFeature> Sliders { get; }
+        /// <summary>
+        /// Gets the collection of sliders defined for the device.
+        /// </summary>
+        IReadOnlyCollection<DeviceFeature> Sliders { get; }
 
+        /// <summary>
+        /// Gets an optional name to use when adding the device to a room
+        /// (a name based on the type will be used by default, for example: 'Accessory').
+        /// </summary>
+        /// <remarks>Note: This does not apply to devices using discovery.</remarks>
         string? SpecificName { get; }
 
-        IReadOnlyCollection<IFeature> Switches { get; }
+        SubscriptionFunction? SubscriptionFunction { get; }
 
-        IReadOnlyCollection<IFeature> TextLabels { get; }
+        /// <summary>
+        /// Gets the collection of switches defined for the device.
+        /// </summary>
+        IReadOnlyCollection<DeviceFeature> Switches { get; }
 
+        /// <summary>
+        /// Gets the collection of text labels defined for the device.
+        /// </summary>
+        IReadOnlyCollection<DeviceFeature> TextLabels { get; }
+
+        /// <summary>
+        /// Get timing related information (the delays NEEO should use when interacting with a device),
+        /// which will be used when generating recipes.
+        /// </summary>
         DeviceTiming? Timing { get; }
 
         /// <summary>
@@ -127,24 +176,21 @@ namespace Remote.Neeo.Devices
         /// <see cref="AddButtonHandler"/>.</remarks>
         IDeviceBuilder AddButtons(KnownButtons buttons);
 
-        IDeviceBuilder AddCapability(DeviceCapability capability);
+        IDeviceBuilder AddCharacteristic(Characteristic characteristic);
 
         IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter);
 
         IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
-        IDeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units,
-            DeviceValueGetter<double> getter);
+        IDeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter);
 
-        IDeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units,
-            DeviceValueGetter<double> getter, DeviceValueSetter<double> setter);
+        IDeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter);
 
-        IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter,
-            DeviceValueSetter<bool> setter);
+        IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
-        IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter);
+        IDeviceBuilder AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter);
 
-        IDeviceAdapter BuildAdapter();
+        IDeviceAdapter BuildAdapter(string sdkAdapterName);
 
         /// <summary>
         /// Set timing related information (the delays NEEO should use when interacting with a device),
@@ -157,16 +203,16 @@ namespace Remote.Neeo.Devices
 
         IDeviceBuilder EnableDiscovery(DiscoveryOptions options, DiscoveryProcessor controller);
 
-        IDeviceBuilder EnableRegistration(RegistrationOptions options, RegistrationCallbacks controller);
+        IDeviceBuilder EnableRegistration(RegistrationOptions options, RegistrationCallbacks callbacks);
 
         /// <summary>
-        /// Method which allows tracking which devices are currently in use on the NEEO Brain.
-        /// It can be used to avoid sending Brain notifications for devices not added on the Brain, to remove
-        /// registration credentials when the last device is removed, or to free up resources if no devices are in use.
+        /// Specify a set of callbacks which allow tracking which devices are currently in use on the NEEO Brain.
+        /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
+        /// resource and/or remove credentials when the last device is removed.
         /// </summary>
-        /// <param name="controller">The device subscription controller.</param>
+        /// <param name="handlers">The device subscription handlers.</param>
         /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-        IDeviceBuilder RegisterDeviceSubscriptionHandler(DeviceSubscriptionController controller);
+        IDeviceBuilder RegisterDeviceSubscriptionHandlers(DeviceSubscriptionCallbacks handlers);
 
         /// <summary>
         /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
@@ -181,6 +227,8 @@ namespace Remote.Neeo.Devices
         /// <param name="initializer">The device initializer callback.</param>
         /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
         IDeviceBuilder RegisterInitializer(DeviceInitializer initializer);
+
+        IDeviceBuilder RegisterSubscriptionFunction(SubscriptionFunction function);
 
         /// <summary>
         /// Setting the version allows you to tell the Brain about changes to your devices components.
@@ -221,24 +269,21 @@ namespace Remote.Neeo.Devices
 
     internal sealed class DeviceBuilder : IDeviceBuilder
     {
-        private static readonly ProjectionComparer<Feature, string> _nameComparer = new(
-            feature => feature.Name,
-            StringComparer.OrdinalIgnoreCase
-        );
+        private static readonly ProjectionComparer<DeviceFeature, string> _nameComparer = new(feature => feature.Name, StringComparer.OrdinalIgnoreCase);
 
         private readonly List<string> _additionalSearchTokens = new();
-        private readonly List<Feature<bool>> _buttons = new();
-        private readonly HashSet<DeviceCapability> _capabilities = new();
-        private readonly List<Feature<string>> _imageUrls = new();
-        private readonly List<Feature> _sensors = new();
-        private readonly List<Feature<double>> _sliders = new();
-        private readonly List<Feature<bool>> _switches = new();
-        private readonly List<Feature<string>> _textLabels = new();
+        private readonly List<DeviceFeature> _buttons = new();
+        private readonly HashSet<Characteristic> _deviceCapabilities = new();
+        private readonly List<DeviceFeature> _imageUrls = new();
+        private readonly List<DeviceFeature> _sensors = new();
+        private readonly List<DeviceFeature> _sliders = new();
+        private readonly List<DeviceFeature> _switches = new();
+        private readonly List<DeviceFeature> _textLabels = new();
 
-        public DeviceBuilder(string name, DeviceType type, string? prefix)
+        internal DeviceBuilder(string name, DeviceType type, string? prefix)
         {
             this.Type = type;
-            Validator.ValidateString(this.Name = name, prefix: nameof(name));
+            Validator.ValidateString(this.Name = name, name: nameof(name));
             this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name, prefix)}";
         }
 
@@ -248,9 +293,11 @@ namespace Remote.Neeo.Devices
 
         public ButtonHandler? ButtonHandler { get; private set; }
 
-        public IReadOnlyCollection<IFeature> Buttons => this._buttons;
+        public IReadOnlyCollection<DeviceFeature> Buttons => this._buttons;
 
-        public IReadOnlyCollection<DeviceCapability> Capabilities => this._capabilities;
+        public IReadOnlyCollection<Characteristic> Characteristics => this._deviceCapabilities;
+
+        public DeviceSubscriptionCallbacks? DeviceSubscriptionHandlers { get; private set; }
 
         public DiscoveryProcessor? DiscoveryProcessor { get; private set; }
 
@@ -258,11 +305,11 @@ namespace Remote.Neeo.Devices
 
         public FavoritesHandler? FavoritesHandler { get; private set; }
 
-        public bool HasPowerStateSensor => this._sensors.Any(sensor => sensor.ComponentType == ComponentType.Power);
+        public bool HasPowerStateSensor => this._sensors.Any(sensor => sensor.Type == ComponentType.Power);
 
         public DeviceIconOverride? Icon { get; private set; }
 
-        public IReadOnlyCollection<IImageUrlFeature> ImageUrls => this._imageUrls;
+        public IReadOnlyCollection<DeviceFeature> ImageUrls => this._imageUrls;
 
         public DeviceInitializer? Initializer { get; private set; }
 
@@ -274,38 +321,57 @@ namespace Remote.Neeo.Devices
 
         public Func<JsonElement, Task>? RegistrationProcessor { get; private set; }
 
-        public IReadOnlyCollection<ISensorFeature> Sensors => this._sensors;
+        public IReadOnlyCollection<DeviceFeature> Sensors => this._sensors;
 
         IDeviceSetup IDeviceBuilder.Setup => this.Setup;
 
         public DeviceSetup Setup { get; } = new DeviceSetup();
 
-        public IReadOnlyCollection<ISensorFeature> Sliders => this._sliders;
+        public IReadOnlyCollection<DeviceFeature> Sliders => this._sliders;
 
         public string? SpecificName { get; private set; }
 
-        public IReadOnlyCollection<IFeature> Switches => this._switches;
+        public SubscriptionFunction? SubscriptionFunction { get; private set; }
 
-        public IReadOnlyCollection<IFeature> TextLabels => this._textLabels;
+        public IReadOnlyCollection<DeviceFeature> Switches => this._switches;
+
+        public IReadOnlyCollection<DeviceFeature> TextLabels => this._textLabels;
 
         public DeviceTiming? Timing { get; private set; }
 
         public DeviceType Type { get; }
 
-        IDeviceBuilder IDeviceBuilder.AddAdditionalSearchToken(string token) => this.AddAdditionalSearchToken(token);
+        IDeviceBuilder IDeviceBuilder.AddAdditionalSearchToken(string token)
+        {
+            return this.AddAdditionalSearchToken(token);
+        }
 
-        IDeviceBuilder IDeviceBuilder.AddButton(string name, string? label) => this.AddButton(name, label);
+        IDeviceBuilder IDeviceBuilder.AddButton(string name, string? label)
+        {
+            return this.AddButton(name, label);
+        }
 
-        IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroup group) => this.AddButtons((KnownButtons)group);
+        IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroup group)
+        {
+            return this.AddButtons((KnownButtons)group);
+        }
 
-        IDeviceBuilder IDeviceBuilder.AddButtonHandler(ButtonHandler handler) => this.AddButtonHandler(handler);
+        IDeviceBuilder IDeviceBuilder.AddButtonHandler(ButtonHandler handler)
+        {
+            return this.AddButtonHandler(handler);
+        }
 
-        IDeviceBuilder IDeviceBuilder.AddButtons(KnownButtons button) => this.AddButtons(button);
+        IDeviceBuilder IDeviceBuilder.AddButtons(KnownButtons button)
+        {
+            return this.AddButtons(button);
+        }
 
-        IDeviceBuilder IDeviceBuilder.AddCapability(DeviceCapability capability) => this.AddCapability(capability);
+        IDeviceBuilder IDeviceBuilder.AddCharacteristic(Characteristic characteristic)
+        {
+            return this.AddCharacteristic(characteristic);
+        }
 
-        IDeviceBuilder IDeviceBuilder.AddImageUrl(string name, string? label, ImageSize size,
-            DeviceValueGetter<string> getter)
+        IDeviceBuilder IDeviceBuilder.AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter)
         {
             return this.AddImageUrl(name, label, size, getter);
         }
@@ -315,32 +381,29 @@ namespace Remote.Neeo.Devices
             return this.AddPowerStateSensor(sensor);
         }
 
-        IDeviceBuilder IDeviceBuilder.AddSensor(string name, string? label, double rangeLow, double rangeHigh,
-            string units, DeviceValueGetter<double> getter)
+        IDeviceBuilder IDeviceBuilder.AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter)
         {
             return this.AddSensor(name, label, rangeLow, rangeHigh, units, getter);
         }
 
-        IDeviceBuilder IDeviceBuilder.AddSlider(string name, string? label, double rangeLow, double rangeHigh,
-            string units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
+        IDeviceBuilder IDeviceBuilder.AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
         {
             return this.AddSlider(name, label, rangeLow, rangeHigh, units, getter, setter);
         }
 
-        IDeviceBuilder IDeviceBuilder.AddSwitch(string name, string? label, DeviceValueGetter<bool> getter,
-            DeviceValueSetter<bool> setter)
+        IDeviceBuilder IDeviceBuilder.AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
         {
             return this.AddSwitch(name, label, getter, setter);
         }
 
-        IDeviceBuilder IDeviceBuilder.AddTextLabel(string name, string? label, DeviceValueGetter<string> getter)
+        IDeviceBuilder IDeviceBuilder.AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter)
         {
-            return this.AddTextLabel(name, label, getter);
+            return this.AddTextLabel(name, label, isLabelVisible, getter);
         }
 
-        IDeviceAdapter IDeviceBuilder.BuildAdapter()
+        IDeviceAdapter IDeviceBuilder.BuildAdapter(string sdkAdapterName)
         {
-            return this.BuildAdapter();
+            return this.BuildAdapter(sdkAdapterName);
         }
 
         IDeviceBuilder IDeviceBuilder.DefineTiming(DeviceTiming timing)
@@ -353,14 +416,14 @@ namespace Remote.Neeo.Devices
             return this.EnableDiscovery(options, processor);
         }
 
-        IDeviceBuilder IDeviceBuilder.EnableRegistration(RegistrationOptions options, RegistrationCallbacks controller)
+        IDeviceBuilder IDeviceBuilder.EnableRegistration(RegistrationOptions options, RegistrationCallbacks callbacks)
         {
-            return this.EnableRegistration(options, controller);
+            return this.EnableRegistration(options, callbacks);
         }
 
-        IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionHandler(DeviceSubscriptionController controller)
+        IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionHandlers(DeviceSubscriptionCallbacks handlers)
         {
-            return this.RegisterDeviceSubscriptionHandler(controller);
+            return this.RegisterDeviceSubscriptionHandlers(handlers);
         }
 
         IDeviceBuilder IDeviceBuilder.RegisterFavoritesHandler(FavoritesHandler handler)
@@ -371,6 +434,11 @@ namespace Remote.Neeo.Devices
         IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer)
         {
             return this.RegisterInitializer(initializer);
+        }
+
+        IDeviceBuilder IDeviceBuilder.RegisterSubscriptionFunction(SubscriptionFunction function)
+        {
+            return this.RegisterSubscriptionFunction(function);
         }
 
         IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version)
@@ -401,7 +469,7 @@ namespace Remote.Neeo.Devices
 
         private DeviceBuilder AddButton(string name, string? label = default)
         {
-            Feature<bool> feature = new(ComponentType.Button, name, label);
+            DeviceFeature feature = new(ComponentType.Button, name, label);
             int index = this._buttons.BinarySearch(feature, DeviceBuilder._nameComparer);
             if (index >= 0)
             {
@@ -422,22 +490,26 @@ namespace Remote.Neeo.Devices
         }
 
         private DeviceBuilder AddButtons(KnownButtons buttons) => KnownButton.GetNames(buttons).Aggregate(
-                    this,
+            this,
             static (builder, name) => builder.AddButton(name)
         );
 
-        private DeviceBuilder AddCapability(DeviceCapability capability)
+        private DeviceBuilder AddCharacteristic(Characteristic capability)
         {
-            if (capability is not DeviceCapability.CustomFavoriteHandler and not DeviceCapability.RegisterUserAccount)
+            if (capability is Characteristic.CustomFavoriteHandler or Characteristic.RegisterUserAccount)
             {
-                this._capabilities.Add(capability);
+                throw new InvalidOperationException("ButtonHandler already defined.");
             }
+            this._deviceCapabilities.Add(capability);
             return this;
         }
 
         private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter)
         {
-            this._imageUrls.Add(new(ComponentType.ImageUrl, name, label, size: size) { Controller = new(getter) });
+            this._imageUrls.Add(new(ComponentType.ImageUrl, name, label, size: size)
+            {
+                Controller = ComponentController.Create(getter)
+            });
             return this;
         }
 
@@ -447,56 +519,66 @@ namespace Remote.Neeo.Devices
             {
                 throw new InvalidOperationException("PowerStateSensor already added.");
             }
-            this._sensors.Add(new Feature<bool>(ComponentType.Power, "powerstate", "Powerstate")
+            this._sensors.Add(new(ComponentType.Power, Constants.PowerSensorName, Constants.PowerSensorLabel)
             {
-                Controller = new(getter)
+                Controller = ComponentController.Create(getter)
             });
             return this;
         }
 
-        private DeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units,
-            DeviceValueGetter<double> getter)
+        private DeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter)
         {
-            this._sensors.Add(new Feature<double>(ComponentType.Slider, name, label, rangeLow, rangeHigh, units)
+            if (name == Constants.PowerSensorName)
             {
-                Controller = new(getter)
+                throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
+            }
+            this._sensors.Add(new(ComponentType.Sensor, name, label, rangeLow: rangeLow, rangeHigh: rangeHigh, unit: units)
+            {
+                Controller = ComponentController.Create(getter)
             });
             return this;
         }
 
-        private DeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units,
-            DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
+        private DeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
         {
-            this._sliders.Add(new(ComponentType.Slider, name, label, rangeLow, rangeHigh, units)
+            this._sliders.Add(new(ComponentType.Slider, name, label, rangeLow: rangeLow, rangeHigh: rangeHigh, unit: units)
             {
-                Controller = new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+                Controller = ComponentController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
             });
             return this;
         }
 
-        private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter,
-            DeviceValueSetter<bool> setter)
+        private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
         {
             this._switches.Add(new(ComponentType.Switch, name, label)
             {
-                Controller = new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+                Controller = ComponentController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
             });
             return this;
         }
 
-        private DeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter)
+        private DeviceBuilder AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter)
         {
-            this._textLabels.Add(new(ComponentType.TextLabel, name, label) { Controller = new(getter) });
+            this._textLabels.Add(new(ComponentType.TextLabel, name, label)
+            {
+                Controller = ComponentController.Create(getter)
+            });
             return this;
         }
 
-        private DeviceAdapter BuildAdapter()
+        private bool HasInputButton() => this.Buttons.Any(button => button.Name.StartsWith(Constants.InputPrefix));
+
+        private DeviceAdapter BuildAdapter(string sdkAdapterName)
         {
-            if (this.ButtonHandler != null)
+            if (this.Type.RequiresInput() && !this.HasInputButton())
             {
-                this._buttons.ForEach(button => button.Controller = new(async deviceId =>
+                throw new InvalidOperationException();
+            }
+            if (this.ButtonHandler is { } handler)
+            {
+                this._buttons.ForEach(button => button.Controller = ComponentController.Create(async deviceId =>
                 {
-                    await this.ButtonHandler(deviceId, button.Name).ConfigureAwait(false);
+                    await handler(deviceId, button.Name).ConfigureAwait(false);
                     return true;
                 }));
             }
@@ -504,23 +586,22 @@ namespace Remote.Neeo.Devices
             {
                 throw new InvalidOperationException("There are buttons defined but no handler was specified.");
             }
-            if (this.Type.RequiresInput() && !this.Buttons.Any(button => button.Name.StartsWith(Constants.InputPrefix)))
-            {
-                throw new InvalidOperationException();
-            }
+            (IReadOnlyDictionary<string, ICapabilityHandler> handlers, IReadOnlyCollection<IComponent> capabilities) = CapabilityHandler.Build(this);
             return new(
                 this.AdapterName,
-                this.Name,
                 this.Type,
                 this.Manufacturer,
                 this.DriverVersion,
                 this.Timing,
+                this.Characteristics,
+                this.Setup,
+                this.Initializer,
+                this.Name,
                 this.AdditionalSearchTokens,
                 this.SpecificName,
                 this.Icon,
-                this.Capabilities,
-                this.Setup,
-                this.Initializer
+                capabilities,
+                handlers
             );
         }
 
@@ -567,28 +648,47 @@ namespace Remote.Neeo.Devices
             return this;
         }
 
-        private DeviceBuilder RegisterDeviceSubscriptionHandler(DeviceSubscriptionController controller)
+        private DeviceBuilder RegisterDeviceSubscriptionHandlers(DeviceSubscriptionCallbacks handlers)
         {
-            throw new NotImplementedException();
+            if (this.DeviceSubscriptionHandlers != null)
+            {
+                throw new InvalidOperationException($"{nameof(this.DeviceSubscriptionHandlers)} already defined.");
+            }
+            this.DeviceSubscriptionHandlers = handlers ?? throw new ArgumentNullException(nameof(handlers));
+            return this;
         }
 
         private DeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler)
         {
+            if (this.FavoritesHandler != null)
+            {
+                throw new InvalidOperationException($"{nameof(FavoritesHandler)} already defined.");
+            }
             if (!this.Type.SupportsFavorites())
             {
                 throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
             }
             this.FavoritesHandler = handler ?? throw new ArgumentNullException(nameof(handler));
-            return this.AddCapability(DeviceCapability.CustomFavoriteHandler);
+            return this.AddCharacteristic(Characteristic.CustomFavoriteHandler);
         }
 
         private DeviceBuilder RegisterInitializer(DeviceInitializer initializer)
         {
             if (this.Initializer != null)
             {
-                throw new InvalidOperationException("Initializer already defined.");
+                throw new InvalidOperationException($"{nameof(DeviceInitializer)} already defined.");
             }
             this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
+            return this;
+        }
+
+        private DeviceBuilder RegisterSubscriptionFunction(SubscriptionFunction function)
+        {
+            if (this.SubscriptionFunction != null)
+            {
+                throw new InvalidOperationException($"{nameof(SubscriptionFunction)} already defined.");
+            }
+            this.SubscriptionFunction = function;
             return this;
         }
 
@@ -619,6 +719,8 @@ namespace Remote.Neeo.Devices
         private static class Constants
         {
             public const string InputPrefix = "INPUT";
+            public const string PowerSensorName = "powerstate";
+            public const string PowerSensorLabel = "Powerstate";
         }
     }
 }

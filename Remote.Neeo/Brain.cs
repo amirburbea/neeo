@@ -17,10 +17,7 @@ namespace Remote.Neeo
     /// </summary>
     public partial record Brain
     {
-        private static readonly Regex _versionPrefixRegex = new(
-            @"^(?<v>\d+\.\d+)[\.-]",
-            RegexOptions.Compiled | RegexOptions.ExplicitCapture
-        );
+        private static readonly Regex _versionPrefixRegex = new(@"^(?<v>0.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
 
         private IHost? _host;
 
@@ -28,31 +25,33 @@ namespace Remote.Neeo
         /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
         /// </summary>
         /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
-        /// <param name="port">The port on which the NEEO Brain API is running.</param>
+        /// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
         /// <param name="name">The name assigned to the NEEO Brain by the end user.</param>
         /// <param name="hostName">The host name of the NEEO Brain.</param>
         /// <param name="version">The firmware version of the NEEO Brain.</param>
         /// <param name="region">The region set in the NEEO Brain firmware.<para/>Example: &quot;US&quot;.</param>
-        public Brain(IPAddress ipAddress, int port, string name, string hostName, string version, string region)
+        public Brain(IPAddress ipAddress, int servicePort, string name, string hostName, string version, string region)
         {
-            (this.IPAddress, this.Port, this.Name, this.HostName, this.Version, this.Region) = (
+            (this.IPAddress, this.ServicePort, this.Name, this.HostName, this.Version, this.Region) = (
                 ipAddress ?? throw new ArgumentNullException(nameof(ipAddress)),
-                port,
+                servicePort,
                 name ?? throw new ArgumentNullException(nameof(name)),
                 hostName ?? throw new ArgumentNullException(nameof(hostName)),
                 version ?? throw new ArgumentNullException(nameof(version)),
                 region ?? throw new ArgumentNullException(nameof(region))
             );
+            double firmwareVersion = double.Parse(
+                Brain._versionPrefixRegex.Match(version).Groups["v"].Value, 
+                CultureInfo.InvariantCulture
+            );
+            this.HasCompatibleFirmware = firmwareVersion > 0.5;
         }
 
         /// <summary>
         /// Gets a value indicating if the Brain firmware version is sufficient for running the SDK.
         /// The Brain must be running firmware <c>v0.50</c> or above.
         /// </summary>
-        public bool HasCompatibleFirmware => double.Parse(
-            Brain._versionPrefixRegex.Match(this.Version).Groups["v"].Value,
-            CultureInfo.InvariantCulture
-        ) >= 0.5;
+        public bool HasCompatibleFirmware { get; }
 
         /// <summary>
         /// The host name of the NEEO Brain.
@@ -70,9 +69,14 @@ namespace Remote.Neeo
         public string Name { get; }
 
         /// <summary>
+        /// The endpoint on which the NEEO Brain API is running.
+        /// </summary>
+        public IPEndPoint ServiceEndPoint => new(this.IPAddress, this.ServicePort);
+
+        /// <summary>
         /// The port on which the NEEO Brain API is running.
         /// </summary>
-        public int Port { get; }
+        public int ServicePort { get; }
 
         /// <summary>
         /// The region set in the NEEO Brain firmware.<para/>Example: &quot;US&quot;.
@@ -84,22 +88,14 @@ namespace Remote.Neeo
         /// </summary>
         public string Version { get; }
 
-        
-
-        /// <summary>
-        /// Asynchronously fetch Brain system information via a GET request.
-        /// </summary>
-        /// <param name="cancellationToken">A cancellation token for the request.</param>
-        /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-        public Task<BrainInformation> GetSystemInfoAsync(CancellationToken cancellationToken = default) => this.GetAsync<BrainInformation>(
-            "systeminfo",
-            cancellationToken
-        );
-
         /// <summary>
         /// Opens the default browser to the Brain WebUI.
         /// </summary>
-        public void OpenWebUI() => Process.Start(new ProcessStartInfo($"http://{this.IPAddress}:3200/eui") { UseShellExecute = true })?.Dispose();
+        public void OpenWebUI()
+        {
+            ProcessStartInfo info = new($"http://{this.IPAddress}:3200/eui") { UseShellExecute = true };
+            Process.Start(info)?.Dispose();
+        }
 
         /// <summary>
         /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
@@ -130,7 +126,7 @@ namespace Remote.Neeo
                 IPAddress[] addresses;
                 return !this.IPAddress.Equals(IPAddress.Loopback) &&
                     Array.IndexOf(addresses = Dns.GetHostAddresses(Dns.GetHostName()), this.IPAddress) == -1 &&
-                    Array.Find(addresses, address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address)) is IPAddress address
+                    Array.Find(addresses, address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address)) is { } address
                         ? address
                         : IPAddress.Loopback;
             }
@@ -143,6 +139,11 @@ namespace Remote.Neeo
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token.</param>
         /// <returns><see cref="Task"/> to indicate completion.</returns>
-        public Task StopServerAsync(CancellationToken cancellationToken = default) => Server.StopAsync(Interlocked.Exchange(ref this._host, null), cancellationToken);
+        public Task StopServerAsync(CancellationToken cancellationToken = default)
+        {
+            return Interlocked.Exchange(ref this._host, null) is { } host 
+                ? Server.StopAsync(host, cancellationToken) 
+                : Task.CompletedTask;
+        }
     }
 }
