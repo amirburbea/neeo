@@ -47,6 +47,7 @@ namespace Remote.Broadlink
         public int DeviceType { get; }
 
         public IPEndPoint RemoteEndPoint => (IPEndPoint)this._client.Client.RemoteEndPoint!;
+
         public virtual bool SupportsRF => false;
 
         public virtual bool SupportsTemperature => false;
@@ -162,11 +163,11 @@ namespace Remote.Broadlink
 
         private async Task<byte[]> GetDecryptedBytes(byte[] bytes)
         {
-            using MemoryStream source = new MemoryStream(bytes);
-            using MemoryStream target = new MemoryStream();
+            using MemoryStream source = new(bytes);
+            using MemoryStream target = new();
             using Aes aes = this.GetAes();
             using ICryptoTransform transform = aes.CreateDecryptor();
-            using (CryptoStream cryptoStream = new CryptoStream(source, transform, CryptoStreamMode.Read))
+            using (CryptoStream cryptoStream = new(source, transform, CryptoStreamMode.Read))
             {
                 await cryptoStream.CopyToAsync(target).ConfigureAwait(false);
             }
@@ -175,11 +176,11 @@ namespace Remote.Broadlink
 
         private async Task<byte[]> GetEncryptedBytes(byte[] bytes)
         {
-            using MemoryStream source = new MemoryStream(bytes);
-            using MemoryStream target = new MemoryStream();
+            using MemoryStream source = new(bytes);
+            using MemoryStream target = new();
             using Aes aes = this.GetAes();
             using ICryptoTransform transform = aes.CreateEncryptor();
-            using (CryptoStream cryptoStream = new CryptoStream(target, transform, CryptoStreamMode.Write))
+            using (CryptoStream cryptoStream = new(target, transform, CryptoStreamMode.Write))
             {
                 await source.CopyToAsync(cryptoStream).ConfigureAwait(false);
             }

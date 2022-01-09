@@ -1,38 +1,37 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Remote.Neeo.Devices.Sensors
+namespace Remote.Neeo.Devices.Sensors;
+
+public interface IRangeSensor : ISensor
 {
-    public interface IRangeSensor : ISensor
-    {
-        IReadOnlyCollection<double> Range { get; }
+    IReadOnlyCollection<double> Range { get; }
 
-        string Unit { get; }
+    string Unit { get; }
+}
+
+public interface ISensor
+{
+    SensorType Type { get; }
+}
+
+internal class RangeSensor : Sensor, IRangeSensor
+{
+    public RangeSensor(double low, double high, string? unit)
+        : base(SensorType.Range)
+    {
+        this.Range = new[] { low, high };
+        this.Unit = unit != null ? Uri.EscapeDataString(unit) : "%";
     }
 
-    public interface ISensor
-    {
-        SensorType Type { get; }
-    }
+    public IReadOnlyCollection<double> Range { get; }
 
-    internal class RangeSensor : Sensor, IRangeSensor
-    {
-        public RangeSensor(double low, double high, string? unit)
-            : base(SensorType.Range)
-        {
-            this.Range = new[] { low, high };
-            this.Unit = unit != null ? Uri.EscapeDataString(unit) : "%";
-        }
+    public string Unit { get; }
+}
 
-        public IReadOnlyCollection<double> Range { get; }
+internal class Sensor : ISensor
+{
+    public Sensor(SensorType type) => this.Type = type;
 
-        public string Unit { get; }
-    }
-
-    internal class Sensor : ISensor
-    {
-        public Sensor(SensorType type) => this.Type = type;
-
-        public SensorType Type { get; }
-    }
+    public SensorType Type { get; }
 }

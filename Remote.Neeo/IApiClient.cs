@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -7,92 +8,133 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Remote.Neeo.Json;
 
-namespace Remote.Neeo
+namespace Remote.Neeo;
+
+/// <summary>
+/// Brain REST API client.
+/// </summary>
+public interface IApiClient
 {
     /// <summary>
-    /// Brain REST API client.
+    /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
+    /// <paramref name="path"/>.
     /// </summary>
-    public interface IApiClient
+    /// <param name="path">The API path on the NEEO Brain.</param>
+    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task<JsonElement> GetAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
+    /// <paramref name="path"/>.
+    /// </summary>
+    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
+    /// <param name="path">The API path on the NEEO Brain.</param>
+    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
+    /// <paramref name="path"/> and return the output of the specified <paramref name="transform"/>.
+    /// </summary>
+    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
+    /// <typeparam name="TOutput">The output type of the transform.</typeparam>
+    /// <param name="path">The API path on the NEEO Brain.</param>
+    /// <param name="transform">The transformation to run on the data.</param>
+    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
+    /// <paramref name="path"/>.
+    /// </summary>
+    /// <typeparam name="TBody">The type of the body.</typeparam>
+    /// <param name="path">The API path on the NEEO Brain.</param>
+    /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
+    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task<JsonElement> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
+    /// <paramref name="path"/>.
+    /// </summary>
+    /// <typeparam name="TBody">The type of the body.</typeparam>
+    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
+    /// <param name="path">The API path on the NEEO Brain.</param>
+    /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
+    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task<TData> PostAsync<TBody, TData>(string path, TBody body, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
+    /// <paramref name="path"/> and return the output of the specified <paramref name="transform"/>.
+    /// </summary>
+    /// <typeparam name="TBody">The type of the body.</typeparam>
+    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
+    /// <typeparam name="TOutput">The output type of the transform.</typeparam>
+    /// <param name="path">The API path on the NEEO Brain.</param>
+    /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
+    /// <param name="transform">The transformation to run on the data.</param>
+    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default);
+}
+
+internal sealed class ApiClient : IApiClient, IDisposable
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<ApiClient> _logger;
+    private readonly string _uriPrefix;
+
+    public ApiClient(Brain brain, ILogger<ApiClient> logger)
     {
-        /// <summary>
-        /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
-        /// <paramref name="path"/>.
-        /// </summary>
-        /// <param name="path">The API path on the NEEO Brain.</param>
-        /// <param name="cancellationToken">A cancellation token for the request.</param>
-        /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-        Task<JsonElement> GetAsync(string path, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
-        /// <paramref name="path"/>.
-        /// </summary>
-        /// <typeparam name="TResult">The type of data to deserialize from the response.</typeparam>
-        /// <param name="path">The API path on the NEEO Brain.</param>
-        /// <param name="cancellationToken">A cancellation token for the request.</param>
-        /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-        Task<TResult> GetAsync<TResult>(string path, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
-        /// <paramref name="path"/>.
-        /// </summary>
-        /// <typeparam name="TBody">The type of the body.</typeparam>
-        /// <param name="path">The API path on the NEEO Brain.</param>
-        /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
-        /// <param name="cancellationToken">A cancellation token for the request.</param>
-        /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-        Task<JsonElement> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
-        /// <paramref name="path"/>.
-        /// </summary>
-        /// <typeparam name="TBody">The type of the body.</typeparam>
-        /// <typeparam name="TResult">The type of data to deserialize from the response.</typeparam>
-        /// <param name="path">The API path on the NEEO Brain.</param>
-        /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
-        /// <param name="cancellationToken">A cancellation token for the request.</param>
-        /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-        Task<TResult> PostAsync<TBody, TResult>(string path, TBody body, CancellationToken cancellationToken = default);
+        (this._uriPrefix, this._logger) = ($"http://{brain.ServiceEndPoint}", logger);
+        this._httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
     }
 
-    internal sealed class ApiClient : IApiClient
+    public void Dispose() => this._httpClient.Dispose();
+
+    public Task<JsonElement> GetAsync(string path, CancellationToken cancellationToken) => this.GetAsync<JsonElement>(path, cancellationToken);
+
+    public Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken) => this.GetAsync(path, (TData data) => data, cancellationToken);
+
+    public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken) => this.FetchAsync(
+        path,
+        HttpMethod.Get,
+        null,
+        transform,
+        cancellationToken
+    );
+
+    public Task<JsonElement> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) => this.PostAsync<TBody, JsonElement>(path, body, cancellationToken);
+
+    public Task<TData> PostAsync<TBody, TData>(string path, TBody body, CancellationToken cancellationToken) => this.PostAsync(path, body, (TData data) => data, cancellationToken);
+
+    public Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken) => this.FetchAsync(
+        path,
+        HttpMethod.Post,
+        new(JsonSerializer.SerializeToUtf8Bytes(body, JsonSerialization.Options)) { Headers = { ContentType = new("application/json") } },
+        transform,
+        cancellationToken
+    );
+
+
+    private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, ByteArrayContent? body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
     {
-        private readonly ILogger<ApiClient> _logger;
-        private readonly string _uriPrefix;
-
-        public ApiClient(Brain brain, ILogger<ApiClient> logger)
+        string uri = this._uriPrefix + path;
+        this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
+        using HttpRequestMessage request = new(method, uri) { Content = body };
+        using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode != HttpStatusCode.OK)
         {
-            (this._uriPrefix, this._logger) = ($"http://{brain.ServiceEndPoint}", logger);
+            throw new WebException($"Server returned {(int)response.StatusCode}:{response.StatusCode}.");
         }
-
-        public Task<JsonElement> GetAsync(string path, CancellationToken cancellationToken) => this.GetAsync<JsonElement>(path, cancellationToken);
-
-        public Task<TResult> GetAsync<TResult>(string path, CancellationToken cancellationToken) => this.FetchAsync<TResult>(path, HttpMethod.Get, token: cancellationToken);
-
-        public Task<JsonElement> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) => this.PostAsync<TBody, JsonElement>(path, body, cancellationToken);
-
-        public Task<TResult> PostAsync<TBody, TResult>(string path, TBody body, CancellationToken cancellationToken) => this.FetchAsync<TResult>(
-            path, HttpMethod.Post,
-            new(JsonSerializer.SerializeToUtf8Bytes(body, JsonSerialization.Options)) { Headers = { ContentType = new("application/json") } },
-            cancellationToken
-        );
-
-        private async Task<TResult> FetchAsync<TResult>(string path, HttpMethod method, ByteArrayContent? content = default, CancellationToken token = default)
-        {
-            string uri = this._uriPrefix + path;
-            this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
-            using HttpClientHandler handler = new() { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate };
-            using HttpClient client = new(handler);
-            HttpRequestMessage request = new(method, uri) { Content = content };
-            using HttpResponseMessage response = await client.SendAsync(request, token).ConfigureAwait(false);
-            if (response.StatusCode != HttpStatusCode.OK)
-            {
-                throw new WebException($"Server returned {(int)response.StatusCode}:{response.StatusCode}.");
-            }
-            using Stream stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
-            return (await JsonSerializer.DeserializeAsync<TResult>(stream, JsonSerialization.Options, token).ConfigureAwait(false))!;
-        }
+        using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        TData data = (await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
+        return transform(data);
     }
 }

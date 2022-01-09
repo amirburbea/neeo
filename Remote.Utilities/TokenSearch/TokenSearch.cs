@@ -86,23 +86,16 @@ namespace Remote.Utilities.TokenSearch
                     Expression.Default(typeof(string)),
                     Array.ConvertAll(
                         typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy),
-                        property =>
-                        {
-                            Expression memberExpression = Expression.Property(
-                                itemParameter,
-                                property
-                            );
-                            return Expression.SwitchCase(
-                                Expression.Convert(
-                                    Expression.Property(
-                                        itemParameter,
-                                        property
-                                    ),
-                                    typeof(object)
+                        property => Expression.SwitchCase(
+                            Expression.Convert(
+                                Expression.Property(
+                                    itemParameter,
+                                    property
                                 ),
-                                Expression.Constant(property.Name)
-                            );
-                        }
+                                typeof(object)
+                            ),
+                            Expression.Constant(property.Name)
+                        )
                     )
                 ),
                 itemParameter,
@@ -114,7 +107,7 @@ namespace Remote.Utilities.TokenSearch
         private static IEnumerable<SearchItem<T>> DefaultPostProcessAlgorithm(IEnumerable<SearchItem<T>> searchItems, int maxScore, double threshold, bool unique, string[]? searchProperties)
         {
             double normalizedScore = 1d / maxScore;
-            Predicate<string> accept = unique ? new HashSet<string>(StringComparer.OrdinalIgnoreCase).Add : key => true;
+            Predicate<string> accept = unique ? new HashSet<string>(StringComparer.OrdinalIgnoreCase).Add : _ => true;
             foreach (SearchItem<T> item in searchItems)
             {
                 item.Score = 1d - item.Score * normalizedScore;
@@ -125,29 +118,26 @@ namespace Remote.Utilities.TokenSearch
             }
         }
 
-        private static int DefaultSearchAlgorithm(string text, IEnumerable<string> searchTokens)
+        private static int DefaultSearchAlgorithm(string text, IEnumerable<string> searchTokens) => searchTokens.Sum(token =>
         {
-            return searchTokens.Sum(token =>
+            int index = text.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+            if (index == -1)
             {
-                int index = text.IndexOf(token, StringComparison.OrdinalIgnoreCase);
-                if (index == -1)
+                return 0;
+            }
+            if (token.Length >= 2)
+            {
+                if (text == token)
                 {
-                    return 0;
+                    return 6;
                 }
-                if (token.Length >= 2)
+                if (index == 0)
                 {
-                    if (text == token)
-                    {
-                        return 6;
-                    }
-                    if (index == 0)
-                    {
-                        return 2;
-                    }
+                    return 2;
                 }
-                return 1;
-            });
-        }
+            }
+            return 1;
+        });
 
         private static int DefaultSortAlgorithm(SearchItem<T> left, SearchItem<T> right) => left.Score.CompareTo(right.Score);
     }

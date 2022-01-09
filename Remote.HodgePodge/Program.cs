@@ -31,7 +31,7 @@ namespace Remote.HodgePodge
                 await device.BeginLearning();
                 await device.WaitForAck();
                 byte[] data = await device.WaitForData();
-                dictionary[name] = data.ToHex();
+                dictionary[name] = ByteArray.ToHex(data);
             }
             File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
         }

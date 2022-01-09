@@ -1,101 +1,100 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Remote.Neeo.Devices
+namespace Remote.Neeo.Devices;
+
+/// <summary>
+/// Device Types.
+/// </summary>
+[JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceType>))]
+public enum DeviceType
 {
     /// <summary>
-    /// Device Types.
+    /// Accessory device.
     /// </summary>
-    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceType>))]
-    public enum DeviceType
-    {
-        /// <summary>
-        /// Accessory device.
-        /// </summary>
-        [Text("ACCESSOIRE")]
-        Accessory = 0,
+    [Text("ACCESSOIRE")]
+    Accessory = 0,
 
-        /// <summary>
-        /// Audio device.
-        /// </summary>
-        [Text("AUDIO")]
-        Audio,
+    /// <summary>
+    /// Audio device.
+    /// </summary>
+    [Text("AUDIO")]
+    Audio,
 
-        /// <summary>
-        /// A/V Receiver or similar device.
-        /// </summary>
-        [Text("AVRECEIVER")]
-        AVReceiver,
+    /// <summary>
+    /// A/V Receiver or similar device.
+    /// </summary>
+    [Text("AVRECEIVER")]
+    AVReceiver,
 
-        /// <summary>
-        /// DVD, Blu-Ray, or similar device.
-        /// </summary>
-        [Text("DVD")]
-        DVDisc,
+    /// <summary>
+    /// DVD, Blu-Ray, or similar device.
+    /// </summary>
+    [Text("DVD")]
+    DVDisc,
 
-        /// <summary>
-        /// Game Console or similar device.
-        /// </summary>
-        [Text("GAMECONSOLE")]
-        GameConsole,
+    /// <summary>
+    /// Game Console or similar device.
+    /// </summary>
+    [Text("GAMECONSOLE")]
+    GameConsole,
 
-        /// <summary>
-        /// Light or similar device.
-        /// </summary>
-        [Text("LIGHT")]
-        Light,
+    /// <summary>
+    /// Light or similar device.
+    /// </summary>
+    [Text("LIGHT")]
+    Light,
 
-        /// <summary>
-        /// Media Player or similar device.
-        /// </summary>
-        [Text("MEDIAPLAYER")]
-        MediaPlayer,
+    /// <summary>
+    /// Media Player or similar device.
+    /// </summary>
+    [Text("MEDIAPLAYER")]
+    MediaPlayer,
 
-        /// <summary>
-        /// Music Player or similar device.
-        /// </summary>
-        [Text("MUSICPLAYER")]
-        MusicPlayer,
+    /// <summary>
+    /// Music Player or similar device.
+    /// </summary>
+    [Text("MUSICPLAYER")]
+    MusicPlayer,
 
-        /// <summary>
-        /// Projector or similar device.
-        /// </summary>
-        [Text("PROJECTOR")]
-        Projector,
+    /// <summary>
+    /// Projector or similar device.
+    /// </summary>
+    [Text("PROJECTOR")]
+    Projector,
 
-        /// <summary>
-        /// TV or similar device.
-        /// </summary>
-        [Text("TV")]
-        TV,
+    /// <summary>
+    /// TV or similar device.
+    /// </summary>
+    [Text("TV")]
+    TV,
 
-        /// <summary>
-        /// Video-On-Demand box such as FireTV or similar device.
-        /// </summary>
-        [Text("VOD")]
-        VideoOnDemand,
+    /// <summary>
+    /// Video-On-Demand box such as FireTV or similar device.
+    /// </summary>
+    [Text("VOD")]
+    VideoOnDemand,
 
-        /// <summary>
-        /// HDMI Switcher or similar device.
-        /// </summary>
-        [Text("HDMISWITCH")]
-        HdmiSwitch,
+    /// <summary>
+    /// HDMI Switcher or similar device.
+    /// </summary>
+    [Text("HDMISWITCH")]
+    HdmiSwitch,
 
-        /// <summary>
-        /// Cable/Satellite Box or similar device.
-        /// </summary>
-        [Text("DVB")]
-        SetTopBox,
+    /// <summary>
+    /// Cable/Satellite Box or similar device.
+    /// </summary>
+    [Text("DVB")]
+    SetTopBox,
 
-        /// <summary>
-        /// Soundbar or similar device.
-        /// </summary>
-        [Text("SOUNDBAR")]
-        SoundBar,
+    /// <summary>
+    /// Soundbar or similar device.
+    /// </summary>
+    [Text("SOUNDBAR")]
+    SoundBar,
 
-        /// <summary>
-        /// Radio Tuner or similar device.
-        /// </summary>
-        [Text("TUNER")]
-        Tuner,
-    }
+    /// <summary>
+    /// Radio Tuner or similar device.
+    /// </summary>
+    [Text("TUNER")]
+    Tuner,
 }

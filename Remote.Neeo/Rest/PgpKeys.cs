@@ -1,7 +1,7 @@
 ﻿using Org.BouncyCastle.Bcpg.OpenPgp;
 
-namespace Remote.Neeo.Rest
-{
+namespace Remote.Neeo.Rest;
+
     internal sealed class PgpKeys
     {
         public PgpKeys() => (this.PrivateKey, this.PublicKey) = PgpMethods.GenerateKeys();
@@ -10,4 +10,3 @@ namespace Remote.Neeo.Rest
 
         public PgpPublicKey PublicKey { get; }
     }
-}

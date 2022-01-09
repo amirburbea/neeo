@@ -1,10 +1,3 @@
-﻿namespace Remote.Neeo.Devices
-{
-    public interface IMessage
-    {
-    }
+﻿namespace Remote.Neeo.Devices;
 
-    internal sealed class Message
-    {
-    }
-}
+public record class Message(string name, object value);

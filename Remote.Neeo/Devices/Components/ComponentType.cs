@@ -1,47 +1,46 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Remote.Neeo.Devices.Components
+namespace Remote.Neeo.Devices.Components;
+
+/// <summary>
+/// An enumeration of NEEO component types.
+/// </summary>
+[JsonConverter(typeof(TextAttribute.EnumJsonConverter<ComponentType>))]
+public enum ComponentType
 {
-    /// <summary>
-    /// An enumeration of NEEO component types.
-    /// </summary>
-    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<ComponentType>))]
-    public enum ComponentType
-    {
-        [Text("button")]
-        Button = 0,
+    [Text("button")]
+    Button = 0,
 
-        [Text("discover")]
-        Discovery,
+    [Text("discover")]
+    Discovery,
 
-        [Text("directory")]
-        Directory,
+    [Text("directory")]
+    Directory,
 
-        [Text("favoritehandler")]
-        FavoritesHandler,
+    [Text("favoritehandler")]
+    FavoritesHandler,
 
-        [Text("imageurl")]
-        ImageUrl,
+    [Text("imageurl")]
+    ImageUrl,
 
-        [Text("power")]
-        Power,
+    [Text("power")]
+    Power,
 
-        [Text("register")]
-        Registration,
+    [Text("register")]
+    Registration,
 
-        [Text("sensor")]
-        Sensor,
+    [Text("sensor")]
+    Sensor,
 
-        [Text("slider")]
-        Slider,
+    [Text("slider")]
+    Slider,
 
-        [Text("devicesubscription")]
-        Subscription,
+    [Text("devicesubscription")]
+    Subscription,
 
-        [Text("switch")]
-        Switch,
+    [Text("switch")]
+    Switch,
 
-        [Text("textlabel")]
-        TextLabel,
-    }
+    [Text("textlabel")]
+    TextLabel,
 }

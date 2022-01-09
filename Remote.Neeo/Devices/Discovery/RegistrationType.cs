@@ -1,23 +1,22 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Remote.Neeo.Devices.Discovery
+namespace Remote.Neeo.Devices.Discovery;
+
+/// <summary>
+/// Registration types supported by NEEO.
+/// </summary>
+[JsonConverter(typeof(TextAttribute.EnumJsonConverter<RegistrationType>))]
+public enum RegistrationType
 {
     /// <summary>
-    /// Registration types supported by NEEO.
+    /// Credentials (or Account) supports a username and password.
     /// </summary>
-    [JsonConverter(typeof(TextAttribute.EnumJsonConverter<RegistrationType>))]
-    public enum RegistrationType
-    {
-        /// <summary>
-        /// Credentials (or Account) supports a username and password.
-        /// </summary>
-        [Text("ACCOUNT")]
-        Credentials,
+    [Text("ACCOUNT")]
+    Credentials,
 
-        /// <summary>
-        /// Security code supports a single string of text.
-        /// </summary>
-        [Text("SECURITY_CODE")]
-        SecurityCode,
-    }
+    /// <summary>
+    /// Security code supports a single string of text.
+    /// </summary>
+    [Text("SECURITY_CODE")]
+    SecurityCode,
 }

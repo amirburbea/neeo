@@ -1,14 +1,13 @@
-﻿namespace Remote.Neeo.Devices.Components
-{
-    public interface IButtonComponent : IComponent
-    {
-    }
+﻿namespace Remote.Neeo.Devices.Components;
 
-    internal sealed class ButtonComponent : Component, IButtonComponent
+public interface IButtonComponent : IComponent
+{
+}
+
+internal sealed class ButtonComponent : Component, IButtonComponent
+{
+    public ButtonComponent(string name, string? label, string pathPrefix)
+        : base(ComponentType.Button, name, label, pathPrefix)
     {
-        public ButtonComponent(string name, string? label, string pathPrefix)
-            : base(ComponentType.Button, name, label, pathPrefix)
-        {
-        }
     }
 }

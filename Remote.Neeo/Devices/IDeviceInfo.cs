@@ -1,17 +1,16 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Remote.Neeo.Devices
+namespace Remote.Neeo.Devices;
+
+public interface IDeviceInfo
 {
-    public interface IDeviceInfo
-    {
-        DeviceIconOverride? Icon { get; }
+    DeviceIconOverride? Icon { get; }
 
-        string Name { get; }
+    string Name { get; }
 
-        [JsonPropertyName("specificname")]
-        string? SpecificName { get; }
+    [JsonPropertyName("specificname")]
+    string? SpecificName { get; }
 
-        IReadOnlyCollection<string> Tokens { get; }
-    }
+    IReadOnlyCollection<string> Tokens { get; }
 }

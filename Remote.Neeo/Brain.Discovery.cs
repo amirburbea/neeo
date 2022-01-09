@@ -8,7 +8,7 @@ using Zeroconf;
 
 namespace Remote.Neeo
 {
-    partial record Brain
+    partial class Brain
     {
         /// <summary>
         /// Discovers the first <see cref="Brain"/> on the network matching the specified
@@ -23,20 +23,20 @@ namespace Remote.Neeo
             CancellationToken cancellationToken = default
         )
         {
-            using CancellationTokenSource tokenSource = new();
+            using CancellationTokenSource resolutionTokenSource = new();
             TaskCompletionSource<Brain?> cancellationTaskSource = new();
             cancellationToken.Register(delegate
             {
                 cancellationTaskSource.TrySetCanceled(cancellationToken);
-                tokenSource.Cancel();
+                resolutionTokenSource.Cancel();
             });
             TaskCompletionSource<Brain?> brainTaskSource = new();
             return await Task.WhenAny(
                 ZeroconfResolver.ResolveAsync(
                     Constants.ServiceName,
                     callback: OnHostDiscovered,
-                    scanTime: TimeSpan.FromSeconds(5d),
-                    cancellationToken: tokenSource.Token
+                    scanTime: TimeSpan.FromSeconds(15d),
+                    cancellationToken: resolutionTokenSource.Token
                 ).ContinueWith(
                     _ => /* ZeroconfResolver.ResolveAsync has completed with no matching Brain found.*/ default(Brain),
                     TaskContinuationOptions.NotOnFaulted
@@ -52,10 +52,12 @@ namespace Remote.Neeo
                 {
                     return;
                 }
-                tokenSource.Cancel();
                 brainTaskSource.TrySetResult(brain);
+                resolutionTokenSource.Cancel();
             }
         }
+
+
 
         /// <summary>
         /// Discovers all <see cref="Brain"/>s on the network.

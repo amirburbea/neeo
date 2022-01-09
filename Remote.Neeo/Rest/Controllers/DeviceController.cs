@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Remote.Neeo.Devices;
 using Remote.Neeo.Devices.Components;
 
-namespace Remote.Neeo.Rest.Controllers
-{
+namespace Remote.Neeo.Rest.Controllers;
+
     [ApiController, Route("[controller]")]
     internal sealed class DeviceController : ControllerBase
     {
@@ -35,7 +35,7 @@ namespace Remote.Neeo.Rest.Controllers
             {
                 throw new();
             }
-
+        await handler.Controller.ExecuteAsync(adapter.AdapterName, credentials);
         }
 
         public readonly struct IsRegisteredResponse
@@ -45,4 +45,3 @@ namespace Remote.Neeo.Rest.Controllers
             public bool Registered { get; }
         }
     }
-}

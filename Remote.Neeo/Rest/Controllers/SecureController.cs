@@ -1,8 +1,8 @@
 ﻿using System.Text;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Remote.Neeo.Rest.Controllers
-{
+namespace Remote.Neeo.Rest.Controllers;
+
     [ApiController, Route("[controller]")]
     internal sealed class SecureController : ControllerBase
     {
@@ -13,4 +13,3 @@ namespace Remote.Neeo.Rest.Controllers
         [HttpGet("pubkey")]
         public ActionResult<object> GetPublicKey() => new(new { Publickey = this._publicKey });
     }
-}

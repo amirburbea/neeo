@@ -1,17 +1,5 @@
 ﻿using System;
 
-namespace Remote.Neeo.Devices.Discovery
-{
-    public readonly struct RegistrationOptions
-    {
-        public RegistrationOptions(string headerText, string description)
-        {
-            this.HeaderText = headerText ?? throw new ArgumentNullException(nameof(headerText));
-            this.Description = description ?? throw new ArgumentNullException(nameof(description));
-        }
+namespace Remote.Neeo.Devices.Discovery;
 
-        public string Description { get; }
-
-        public string HeaderText { get; }
-    }
-}
+public record struct RegistrationOptions(string HeaderText, string Description);

@@ -1,6 +1,5 @@
 ﻿using System.Threading.Tasks;
 
-namespace Remote.Neeo.Devices
-{
-    public delegate Task DeviceAction(string deviceId);
-}
+namespace Remote.Neeo.Devices;
+
+public delegate Task DeviceAction(string deviceId);

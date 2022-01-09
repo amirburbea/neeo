@@ -36,7 +36,7 @@ namespace Remote.Neeo.Devices
             this._logger = logger;
             int id = 0;
             this._devices = new(
-                from adapter in adapters
+                from adapter in this._adapters.Values
                 from device in adapter.Devices
                 select new DeviceModel(
                     id++,
@@ -89,7 +89,7 @@ namespace Remote.Neeo.Devices
 
         public IDeviceModel GetDeviceByAdapterName(string name)
         {
-            return this._devices.FirstOrDefault(device => device.AdapterName == name) is DeviceModel device
+            return this._devices.FirstOrDefault(device => device.AdapterName == name) is { } device
                 ? device
                 : throw new ArgumentException($"No matching device with adapter name \"{name}\".", nameof(name));
         }
