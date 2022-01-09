@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Remote.Neeo.Notifications;
 
-public interface INotificationService
+internal interface INotificationService
 {
     Task<bool> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default);
 }
@@ -15,10 +15,10 @@ internal sealed class NotificationService : INotificationService
 {
     private readonly Dictionary<string, NotificationMessage> _cache = new();
     private readonly IApiClient _client;
-    private readonly ILogger<NotificationService> _logger;
+    private readonly ILogger<INotificationService> _logger;
     private int _queueSize;
 
-    public NotificationService(IApiClient client, ILogger<NotificationService> logger)
+    public NotificationService(IApiClient client, ILogger<INotificationService> logger)
     {
         (this._client, this._logger) = (client, logger);
     }

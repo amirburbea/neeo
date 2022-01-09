@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
 using Remote.Neeo.Devices;
-using Remote.Utilities.TokenSearch;
+using Remote.Neeo.Utilities.TokenSearch;
 
 namespace Remote.Neeo.Rest.Controllers;
 

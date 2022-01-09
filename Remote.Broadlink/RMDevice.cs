@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
-using Remote.Utilities;
 
 namespace Remote.Broadlink
 {

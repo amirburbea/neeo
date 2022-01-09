@@ -57,16 +57,18 @@ internal static class Server
 
     public static async Task StopAsync(IHost host, CancellationToken cancellationToken)
     {
-        try
+        using (host)
         {
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
             Brain brain = host.Services.GetRequiredService<Brain>();
             IApiClient client = host.Services.GetRequiredService<IApiClient>();
-            string name = host.Services.GetRequiredService<SdkEnvironment>().Name;
+            string name = host.Services.GetRequiredService<SdkEnvironment>().SdkAdapterName;
             try
             {
-                await client.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false);
-                logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
+                if (await client.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false))
+                {
+                    logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
+                }
             }
             catch (Exception e)
             {
@@ -74,65 +76,58 @@ internal static class Server
             }
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
-        finally
-        {
-            host.Dispose();
-        }
     }
 
-    private static IHostBuilder CreateHostBuilder(Brain brain, string name, IDeviceBuilder[] devices, IPAddress ipAddress, int port)
+    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
     {
-        return Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
-        {
-            builder
-                .ConfigureKestrel((context, options) =>
+        builder
+            .ConfigureKestrel((context, options) =>
+            {
+                options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
+                options.Listen(ipAddress, port);
+                if (context.HostingEnvironment.IsDevelopment() && !ipAddress.Equals(IPAddress.Loopback))
                 {
-                    options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
-                    options.Listen(ipAddress, port);
-                    if (context.HostingEnvironment.IsDevelopment() && !ipAddress.Equals(IPAddress.Loopback))
-                    {
-                        options.ListenLocalhost(port);
-                    }
-                })
-                .ConfigureLogging((context, builder) =>
+                    options.ListenLocalhost(port);
+                }
+            })
+            .ConfigureLogging((context, builder) =>
+            {
+                builder
+                    .ClearProviders()
+                    .AddConsole();
+                if (context.HostingEnvironment.IsDevelopment())
                 {
-                    builder
-                        .ClearProviders()
-                        .AddConsole();
-                    if (context.HostingEnvironment.IsDevelopment())
-                    {
-                        builder.AddDebug();
-                    }
-                })
-                .ConfigureServices((context, services) =>
+                    builder.AddDebug();
+                }
+            })
+            .ConfigureServices((context, services) =>
+            {
+                services
+                    .AddSingleton<IApiClient, ApiClient>()
+                    .AddSingleton<IDeviceDatabase, DeviceDatabase>()
+                    .AddSingleton<INotificationService, NotificationService>()
+                    .AddSingleton((IReadOnlyCollection<IDeviceAdapter>)Array.ConvertAll(devices, device => device.BuildAdapter(sdkAdapterName)))
+                    .AddSingleton((SdkEnvironment)sdkAdapterName)
+                    .AddSingleton(brain)
+                    .AddSingleton<PgpKeys>()
+                    .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+                    .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
+                    .AddJsonOptions(options => options.JsonSerializerOptions.ApplyOptions())
+                    .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AllowInternalsControllerFeatureProvider.Instance));
+            })
+            .Configure((context, builder) =>
+            {
+                if (context.HostingEnvironment.IsDevelopment())
                 {
-                    services
-                        .AddSingleton<IApiClient, ApiClient>()
-                        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-                        .AddSingleton<INotificationService,NotificationService>()
-                        .AddSingleton((IReadOnlyCollection<IDeviceAdapter>)Array.ConvertAll(devices, device => device.BuildAdapter(name)))
-                        .AddSingleton(new SdkEnvironment(name))
-                        .AddSingleton(brain)
-                        .AddSingleton<PgpKeys>()
-                        .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-                        .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
-                        .AddJsonOptions(options => options.JsonSerializerOptions.ApplyOptions())
-                        .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AllowInternalsControllerFeatureProvider.Instance));
-                })
-                .Configure((context, builder) =>
-                {
-                    if (context.HostingEnvironment.IsDevelopment())
-                    {
-                        builder.UseDeveloperExceptionPage();
-                    }
-                    builder
-                        .UseMiddleware<PgpMiddleware>()
-                        .UseRouting()
-                        .UseCors(nameof(CorsPolicy))
-                        .UseEndpoints(endpoints => endpoints.MapControllers());
-                });
-        });
-    }
+                    builder.UseDeveloperExceptionPage();
+                }
+                builder
+                    .UseMiddleware<PgpMiddleware>()
+                    .UseRouting()
+                    .UseCors(nameof(CorsPolicy))
+                    .UseEndpoints(endpoints => endpoints.MapControllers());
+            });
+    });
 
     private static Task<bool> RegisterServerAsync(this IApiClient client, string name, string baseUrl, CancellationToken cancellationToken) => client.PostAsync(
         UrlPaths.RegisterServer,

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Remote.Utilities;
+namespace Remote.Neeo.Utilities;
 
 public static class ProjectionComparer
 {

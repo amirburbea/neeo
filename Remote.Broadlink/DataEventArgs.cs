@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Remote.Utilities;
+namespace Remote.Broadlink;
 
 public sealed class DataEventArgs<TData> : EventArgs
 {

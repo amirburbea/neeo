@@ -30,7 +30,7 @@ public sealed partial class Brain
     /// <param name="hostName">The host name of the NEEO Brain.</param>
     /// <param name="version">The firmware version of the NEEO Brain.</param>
     /// <param name="region">The region set in the NEEO Brain firmware.<para/>Example: &quot;US&quot;.</param>
-    public Brain(IPAddress ipAddress, int servicePort, string name, string hostName, string version, string region)
+    private Brain(IPAddress ipAddress, int servicePort, string name, string hostName, string version, string region)
     {
         (this.IPAddress, this.ServicePort, this.Name, this.HostName, this.Version, this.Region) = (
             ipAddress ?? throw new ArgumentNullException(nameof(ipAddress)),
@@ -64,6 +64,11 @@ public sealed partial class Brain
     public string Name { get; }
 
     /// <summary>
+    /// The region set in the NEEO Brain firmware.<para/>Example: &quot;US&quot;.
+    /// </summary>
+    public string Region { get; }
+
+    /// <summary>
     /// The endpoint on which the NEEO Brain API is running.
     /// </summary>
     public IPEndPoint ServiceEndPoint => new(this.IPAddress, this.ServicePort);
@@ -72,11 +77,6 @@ public sealed partial class Brain
     /// The port on which the NEEO Brain API is running.
     /// </summary>
     public int ServicePort { get; }
-
-    /// <summary>
-    /// The region set in the NEEO Brain firmware.<para/>Example: &quot;US&quot;.
-    /// </summary>
-    public string Region { get; }
 
     /// <summary>
     /// The firmware version of the NEEO Brain.

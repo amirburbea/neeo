@@ -86,15 +86,11 @@ public interface IApiClient
 
 internal sealed class ApiClient : IApiClient, IDisposable
 {
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _httpClient = new(HttpClientMethods.ClientHandler);
     private readonly ILogger<ApiClient> _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(Brain brain, ILogger<ApiClient> logger)
-    {
-        (this._uriPrefix, this._logger) = ($"http://{brain.ServiceEndPoint}", logger);
-        this._httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
-    }
+    public ApiClient(Brain brain, ILogger<ApiClient> logger) => (this._uriPrefix, this._logger) = ($"http://{brain.ServiceEndPoint}", logger);
 
     public void Dispose() => this._httpClient.Dispose();
 
@@ -127,14 +123,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
     {
         string uri = this._uriPrefix + path;
         this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
-        using HttpRequestMessage request = new(method, uri) { Content = body };
-        using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode != HttpStatusCode.OK)
-        {
-            throw new WebException($"Server returned {(int)response.StatusCode}:{response.StatusCode}.");
-        }
-        using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        TData data = (await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
+        TData data = await this._httpClient.FetchAsync<TData>(uri, method, body, cancellationToken).ConfigureAwait(false);
         return transform(data);
     }
 }

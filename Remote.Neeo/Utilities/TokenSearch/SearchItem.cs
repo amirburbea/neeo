@@ -1,4 +1,4 @@
-﻿namespace Remote.Utilities.TokenSearch;
+﻿namespace Remote.Neeo.Utilities.TokenSearch;
 
 public sealed class SearchItem<T>
     where T : notnull

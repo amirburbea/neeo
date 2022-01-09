@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Remote.Utilities.TokenSearch;
+using Remote.Neeo.Utilities.TokenSearch;
 
 namespace Remote.Neeo.Devices
 {

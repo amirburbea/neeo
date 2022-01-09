@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Remote.Neeo.Devices.Components;
 using Remote.Neeo.Devices.Discovery;
-using Remote.Utilities;
+using Remote.Neeo.Utilities;
 
 namespace Remote.Neeo.Devices;
 
