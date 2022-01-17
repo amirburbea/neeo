@@ -1,30 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Remote.Broadlink;
-using Remote.Neeo;
-using Remote.Neeo.Devices;
-using Remote.Utilities;
+using Neeo.Api;
+using Neeo.Api.Devices;
+using Broadlink.RM;
+using Neeo.Api.Devices.Discovery;
 
 namespace Remote.HodgePodge;
 
 internal static class Program
 {
-    private static byte[] ByteArrayFromHex(string hex)
-    {
-        ReadOnlySpan<char> span = hex.AsSpan();
-        byte[] array = new byte[span.Length / 2];
-        for (int i = 0; i < array.Length; i++)
-        {
-            array[i] = byte.Parse(span.Slice(i * 2, 2), NumberStyles.HexNumber);
-        }
-        return array;
-    }
-
     private static async Task LearnCodes(RMDevice device)
     {
         string? fileName = Program.QueryFileName();
@@ -42,16 +33,29 @@ internal static class Program
             await device.BeginLearning();
             await device.WaitForAck();
             byte[] data = await device.WaitForData();
-            dictionary[name] = ByteArray.ToHex(data);
+            dictionary[name] = Convert.ToHexString(data);
         }
         File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
     }
 
+    private static readonly Regex _ipAddressRegex = new(@"^\d+\.\d+\.\d+\.\d+$");
+
     private static async Task Main()
     {
-        Console.WriteLine("Discovering brain...");
-        var brain = await Brain.DiscoverAsync().ConfigureAwait(false);
-        if (brain == null)
+        var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
+
+        Brain? brain;
+        if (arg != null && _ipAddressRegex.IsMatch(arg))
+        {
+            IPAddress address = IPAddress.Parse(arg.Trim());
+            brain = await Brain.CreateAsync(address);
+        }
+        else
+        {
+            Console.WriteLine("Discovering brain...");
+            brain = await Brain.DiscoverAsync();
+        }
+        if (brain is null)
         {
             Console.Error.WriteLine("Brain not found.");
             return;
@@ -59,31 +63,33 @@ internal static class Program
         Console.WriteLine($"Brain found! {brain.IPAddress}");
         try
         {
-            var builder = Device.Create("test", DeviceType.Accessory)
-                .SetManufacturer("Manufacturer")
-                .AddButtons(KnownButtons.PowerOn | KnownButtons.PowerOff)
-                .AddButtonGroup(ButtonGroup.NumberPad)
-                .AddButtons(KnownButtons.Menu)
+            IDeviceBuilder builder = Device.Create("TV", DeviceType.TV)
+                .SetManufacturer("Amir")
+                .AddAdditionalSearchTokens("Naho")
+                .AddButton("INPUT HDMI1")
+                .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
+                //.EnableDiscovery(new("Header", "Description", false), (_) => Task.FromResult(Array.Empty<DiscoveryResult>()))
                 .AddButtonHandler((deviceId, button) =>
                 {
                     Console.WriteLine($"{deviceId}|{button}");
                     return Task.CompletedTask;
                 });
             Console.WriteLine("Starting server...");
-            await brain.StartServerAsync("C#", new[] { builder }, port:9001);
+            await brain.StartServerAsync(new[] { builder });
             Console.WriteLine("Server started. Press any key to quit...   ");
-            Console.ReadKey();
+            Console.ReadKey(true);
         }
         finally
         {
+            Console.WriteLine("Server stopping...   ");
             await brain.StopServerAsync();
         }
     }
 
-    private static async Task MainASRM()
+    private static async Task MainRM()
     {
         using RMDevice? remote = await RMDiscovery.DiscoverDeviceAsync();
-        if (remote == null)
+        if (remote is null)
         {
             return;
         }
@@ -123,12 +129,11 @@ internal static class Program
 
     private static async Task TestCodes(RMDevice remote)
     {
-        if(QueryFileName() is not { } fileName)
+        if (QueryFileName() is not { } fileName)
         {
             return;
         }
-
-        Dictionary<string, string> dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(fileName, Encoding.UTF8))!;
+        Dictionary<string, string> dictionary = new(JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(fileName, Encoding.UTF8))!, StringComparer.OrdinalIgnoreCase);
         while (true)
         {
             if (Program.Query("Command name?") is not string name)
@@ -140,7 +145,7 @@ internal static class Program
                 Console.Error.WriteLine($"Command {name} not found");
                 continue;
             }
-            await remote.SendData(ByteArrayFromHex(text));
+            await remote.SendData(Convert.FromHexString(text));
             await remote.WaitForAck();
         }
     }
