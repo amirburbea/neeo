@@ -63,11 +63,14 @@ internal static class Program
         Console.WriteLine($"Brain found! {brain.IPAddress}");
         try
         {
-            IDeviceBuilder builder = Device.Create("TV", DeviceType.TV)
+            IDeviceBuilder builder = Device.CreateDevice("TV", DeviceType.TV)
                 .SetManufacturer("Amir")
                 .AddAdditionalSearchTokens("Naho")
                 .AddButton("INPUT HDMI1")
                 .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
+                .AddTextLabel("A", "Label A", true, async (id) => await Task.FromResult(id))
+                .RegisterFavoritesHandler((deviceId, favorite) => Task.CompletedTask)
+                .AddSlider("Slider Name", "Slider Label", 0, 100, null, async (_) => await Task.FromResult(5d), (_, __) => Task.CompletedTask)
                 //.EnableDiscovery(new("Header", "Description", false), (_) => Task.FromResult(Array.Empty<DiscoveryResult>()))
                 .AddButtonHandler((deviceId, button) =>
                 {

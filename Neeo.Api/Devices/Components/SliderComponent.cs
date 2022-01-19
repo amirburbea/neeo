@@ -1,16 +1,15 @@
-﻿namespace Neeo.Api.Devices.Components;
+﻿using System;
 
-public interface ISliderComponent : IComponentWithAssociatedSensor
+namespace Neeo.Api.Devices.Components;
+
+public interface ISliderComponent : IComponent
 {
+    ISlider Slider { get; }
 }
 
-internal sealed class SliderComponent : Component, ISliderComponent
-{
-    public SliderComponent(string name, string? label, string pathPrefix)
-        : base(ComponentType.Slider, name, label, pathPrefix)
-    {
-        this.SensorName = this.GetAssociatedSensorName();
-    }
-
-    public string SensorName { get; }
-}
+internal sealed record class SliderComponent(
+    String Name,
+    String? Label,
+    String Path,
+    ISlider Slider
+) : Component(ComponentType.Slider, Name, Label, Path), ISliderComponent;

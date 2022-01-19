@@ -1,19 +1,12 @@
-﻿using System;
+﻿namespace Neeo.Api.Devices;
 
-namespace Neeo.Api.Devices;
-
-public sealed class DeviceSubscriptionCallbacks
+public interface IDeviceSubscriptionCallbacks
 {
-    public DeviceSubscriptionCallbacks(DeviceAddedHandler deviceAdded, DeviceRemovedHandler deviceRemoved, DeviceListInitializer initializeDeviceList)
-    {
-        this.DeviceAdded = deviceAdded ?? throw new ArgumentNullException(nameof(deviceAdded));
-        this.DeviceRemoved = deviceRemoved ?? throw new ArgumentNullException(nameof(deviceRemoved));
-        this.InitializeDeviceList = initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList));
-    }
+    DeviceListInitializer InitializeDeviceList { get; }
 
-    public DeviceAddedHandler DeviceAdded { get; }
+    DeviceAction OnDeviceAdded { get; }
 
-    public DeviceRemovedHandler DeviceRemoved { get; }
-
-    public DeviceListInitializer InitializeDeviceList { get; }
+    DeviceAction OnDeviceRemoved { get; }
 }
+
+internal sealed record class DeviceSubscriptionCallbacks(DeviceAction OnDeviceAdded, DeviceAction OnDeviceRemoved, DeviceListInitializer InitializeDeviceList) : IDeviceSubscriptionCallbacks;

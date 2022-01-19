@@ -21,7 +21,7 @@ public static class JsonSerialization
     /// <typeparam name="T">The type of object to desrialize.</typeparam>
     /// <param name="element">The JSON element to read.</param>
     /// <returns>Deserialized representation of the JSON object.</returns>
-    public static T ToObject<T>(this JsonElement element) => JsonSerializer.Deserialize<T>(element.GetSpan(), JsonSerialization.Options)!;
+    public static T Deserialize<T>(this JsonElement element) => JsonSerializer.Deserialize<T>(element.GetSpan(), JsonSerialization.Options)!;
 
     /// <summary>
     /// Parses the specified JSON <paramref name="element"/> into an instance of the specified <paramref name="returnType"/>.
@@ -29,7 +29,7 @@ public static class JsonSerialization
     /// <param name="element">The JSON element to read.</param>
     /// <param name="returnType">The type of object to desrialize.</param>
     /// <returns>Deserialized representation of the JSON object.</returns>
-    public static object ToObject(this JsonElement element, Type returnType) => JsonSerializer.Deserialize(element.GetSpan(), returnType, JsonSerialization.Options)!;
+    public static object Deserialize(this JsonElement element, Type returnType) => JsonSerializer.Deserialize(element.GetSpan(), returnType, JsonSerialization.Options)!;
 
     internal static void UpdateConfiguration(this JsonSerializerOptions options)
     {

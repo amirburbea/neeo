@@ -1,30 +1,32 @@
-﻿namespace Neeo.Api.Devices.Components;
+﻿using Neeo.Api.Json;
 
+namespace Neeo.Api.Devices.Components;
+
+/// <summary>
+/// Interface for a device component.
+/// </summary>
+[JsonInterfaceSerializationConverter(typeof(IComponent))]
 public interface IComponent
 {
-    string Label { get; }
+    /// <summary>
+    /// Gets the (optional) name of the component.
+    /// </summary>
+    string? Label { get; }
 
+    /// <summary>
+    /// Gets the name of the component.
+    /// </summary>
     string Name { get; }
 
+    /// <summary>
+    /// Gets the API path to interact with the component.
+    /// </summary>
     string Path { get; }
 
+    /// <summary>
+    /// Gets the type of the component.
+    /// </summary>
     ComponentType Type { get; }
 }
 
-internal abstract class Component : IComponent
-{
-    protected Component(ComponentType type, string name, string? label, string pathPrefix)
-    {
-        (this.Type, this.Name, this.Label, this.Path) = (type, name, label ?? name, pathPrefix + name);
-    }
-
-    public string Label { get; }
-
-    public string Name { get; }
-
-    public string Path { get; }
-
-    public ComponentType Type { get; }
-
-    protected string GetAssociatedSensorName() => $"{this.Name}_SENSOR";
-}
+internal record class Component(ComponentType Type, string Name, string? Label, string Path) : IComponent;

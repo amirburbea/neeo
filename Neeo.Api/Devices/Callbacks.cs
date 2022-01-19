@@ -20,13 +20,6 @@ public delegate Task ButtonHandler(string deviceId, string button);
 public delegate Task DeviceAction(string deviceId);
 
 /// <summary>
-/// Callback invoked by the NEEO Brain when a device is added.
-/// </summary>
-/// <param name="deviceId">The device identifier.</param>
-/// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DeviceAddedHandler(string deviceId);
-
-/// <summary>
 /// A callback to be invoked to initialize the device adapter before making it available to the NEEO Brain.
 /// </summary>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
@@ -39,13 +32,6 @@ public delegate Task DeviceInitializer();
 /// <param name="deviceIds">Array of deviceId string for all devices of this type currently on the Brain.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
 public delegate Task DeviceListInitializer(string[] deviceIds);
-
-/// <summary>
-/// Callback invoked by the NEEO Brain when a device is removed.
-/// </summary>
-/// <param name="deviceId">The device identifier.</param>
-/// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DeviceRemovedHandler(string deviceId);
 
 /// <summary>
 /// Callback invoked by the NEEO Brain to asynchronously get a value from a device.
@@ -77,8 +63,8 @@ public delegate Task DeviceValueSetter<TValue>(string deviceId, TValue value)
 /// Example: Given a favorite of &quot;42&quot;, rather than invoking a button handler twice (&quot;DIGIT 4&quot;
 /// followed by &quot;DIGIT 2&quot;), the handler is invoked with a single value of &quot;42&quot;.
 /// </remarks>
-public delegate Task<bool> FavoritesHandler(string deviceId, string favorite);
+public delegate Task FavoritesHandler(string deviceId, string favorite);
 
-public delegate void SubscriptionFunction(UpdateCallback updateCallback, PowerNotifications? powerNotifications);
+public delegate void SubscriptionFunction(UpdateCallback updateCallback, IPowerCallbacks powerCallbacs);
 
 public delegate Task UpdateCallback(Message message);

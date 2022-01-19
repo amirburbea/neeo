@@ -16,8 +16,8 @@ partial class Brain
         {
             throw new ArgumentException("Must be IPv4 address.", nameof(ipAddress));
         }
-        string uri = $"http://{ipAddress}:{servicePort}{UrlPaths.SystemInformation}";
         using HttpClient httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
+        string uri = $"http://{ipAddress}:{servicePort}{UrlPaths.SystemInformation}";
         SystemInformation sysInfo = await httpClient.FetchAsync<SystemInformation>(uri, HttpMethod.Get, cancellationToken: cancellationToken).ConfigureAwait(false);
         return new(ipAddress, servicePort, sysInfo.HostName, sysInfo.HostName, sysInfo.FirmwareVersion, sysInfo.HardwareRegion);
     }

@@ -29,4 +29,10 @@
       <DependentUpon>Brain.cs</DependentUpon>
     </Compile>
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Devices\DeviceBuilder.*.cs">
+      <DependentUpon>DeviceBuilder.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
 </Project>

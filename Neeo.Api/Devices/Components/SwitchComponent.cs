@@ -1,16 +1,15 @@
-﻿namespace Neeo.Api.Devices.Components;
+﻿using System;
+using System.Text.Json.Serialization;
 
-public interface ISwitchComponent : IComponentWithAssociatedSensor
+namespace Neeo.Api.Devices.Components;
+
+public interface ISwitchComponent : IComponent, IComponentWithAssociatedSensor
 {
 }
 
-internal sealed class SwitchComponent : Component, ISwitchComponent
-{
-    public SwitchComponent(string name, string? label, string pathPrefix)
-        : base(ComponentType.Switch, name, label, pathPrefix)
-    {
-        this.SensorName = this.GetAssociatedSensorName();
-    }
-
-    public string SensorName { get; }
-}
+internal sealed record class SwitchComponent(
+    string Name,
+    string? Label,
+    string Path,
+    [property: JsonPropertyName("sensor")] string SensorName
+) : Component(ComponentType.Switch, Name, Label, Path);

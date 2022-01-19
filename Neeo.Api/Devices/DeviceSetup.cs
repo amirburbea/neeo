@@ -5,15 +5,15 @@ namespace Neeo.Api.Devices;
 
 public interface IDeviceSetup
 {
-    [JsonPropertyName("introtext")]
-    string? Description { get; }
-
     bool? Discovery { get; }
 
-    bool? EnableDynamicDeviceBuilder { get; }
+    [JsonPropertyName("introtext")]
+    string? DiscoveryDescription { get; }
 
     [JsonPropertyName("introheader")]
-    string? HeaderText { get; }
+    string? DiscoveryHeaderText { get; }
+
+    bool? EnableDynamicDeviceBuilder { get; }
 
     bool? Registration => this.RegistrationType.HasValue ? true : default(bool?);
 
@@ -28,13 +28,13 @@ public interface IDeviceSetup
 
 internal sealed class DeviceSetup : IDeviceSetup
 {
-    public string? Description { get; set; }
-
     public bool? Discovery { get; set; }
 
-    public bool? EnableDynamicDeviceBuilder { get; set; }
+    public string? DiscoveryDescription { get; set; }
 
-    public string? HeaderText { get; set; }
+    public string? DiscoveryHeaderText { get; set; }
+
+    public bool? EnableDynamicDeviceBuilder { get; set; }
 
     public string? RegistrationDescription { get; set; }
 

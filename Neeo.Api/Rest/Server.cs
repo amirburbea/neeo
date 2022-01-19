@@ -80,52 +80,55 @@ internal static class Server
         }
     }
 
-    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
-      {
-          builder
-              .ConfigureKestrel((context, options) =>
-              {
-                  options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
-                  options.Listen(ipAddress, port);
-              })
-              .ConfigureLogging((context, builder) =>
-              {
-                  builder
-                      .ClearProviders()
-                      .AddConsole();
-                  if (context.HostingEnvironment.IsDevelopment())
-                  {
-                      builder.AddDebug();
-                  }
-              })
-              .ConfigureServices((context, services) =>
-              {
-                  services
-                      .AddSingleton<IApiClient, ApiClient>()
-                      .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-                      .AddSingleton<INotificationService, NotificationService>()
-                      .AddSingleton((IReadOnlyCollection<IDeviceAdapter>)Array.ConvertAll(devices, device => device.BuildAdapter()))
-                      .AddSingleton(new SdkEnvironment(sdkAdapterName))
-                      .AddSingleton(brain)
-                      .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-                      .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
-                      .AddJsonOptions(options => options.JsonSerializerOptions.UpdateConfiguration())
-                      .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AllowInternalsControllerFeatureProvider.Instance));
-              })
-              .Configure((context, builder) =>
-              {
-                  if (context.HostingEnvironment.IsDevelopment())
-                  {
-                      builder.UseDeveloperExceptionPage();
-                  }
-                  builder
+    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder()
+        .ConfigureWebHostDefaults(builder =>
+        {
+            builder
+                .ConfigureKestrel((context, options) =>
+                {
+                    options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
+                    options.Listen(ipAddress, port);
+                })
+                .ConfigureLogging((context, builder) =>
+                {
+                    builder
+                        .ClearProviders()
+                        .AddConsole();
+                    if (context.HostingEnvironment.IsDevelopment())
+                    {
+                        builder.AddDebug();
+                    }
+                })
+                .ConfigureServices((context, services) =>
+                {
+                    services
+                        .AddSingleton(brain)
+                        .AddSingleton(new SdkEnvironment(sdkAdapterName, new(brain.IPAddress,brain.ServicePort)))
+                        .AddSingleton<IApiClient, ApiClient>()
+                        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
+                        .AddSingleton<INotificationService, NotificationService>()
+                        .AddSingleton<INotificationMapping, NotificationMapping>()
+                        .AddSingleton<IDeviceSubscriptions, DeviceSubscriptions>()
+                        .AddSingleton<IReadOnlyCollection<IDeviceAdapter>>(services => Array.ConvertAll(devices, device => device.BuildAdapter()))
+                        .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+                        .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
+                        .AddJsonOptions(options => options.JsonSerializerOptions.UpdateConfiguration())
+                        .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AllowInternalsControllerFeatureProvider.Instance));
+                })
+                .Configure((context, builder) =>
+                {
+                    if (context.HostingEnvironment.IsDevelopment())
+                    {
+                        builder.UseDeveloperExceptionPage();
+                    }
+                    builder
+                        .UseRouting()
+                        .UseCors(nameof(CorsPolicy))
+                        .UseEndpoints(endpoints => endpoints.MapControllers());
+                });
+        });
 
-                      //.UseMiddleware<PgpMiddleware>()
-                      .UseRouting()
-                      .UseCors(nameof(CorsPolicy))
-                      .UseEndpoints(endpoints => endpoints.MapControllers());
-              });
-      });
+
 
     private static async Task<IPAddress> GetFallbackHostIPAddress(IPAddress brainIPAddress, CancellationToken cancellationToken)
     {
@@ -166,7 +169,8 @@ internal static class Server
         public static readonly ControllerFeatureProvider Instance = new AllowInternalsControllerFeatureProvider();
 
         private AllowInternalsControllerFeatureProvider()
-        { }
+        {
+        }
 
         protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
     }

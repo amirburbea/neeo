@@ -75,10 +75,7 @@ internal sealed class NotificationService : INotificationService
         }
     }
 
-    private bool IsDuplicate(NotificationMessage message)
-    {
-        return this._cache.TryGetValue(message.Type, out NotificationMessage other) && other.Equals(message);
-    }
+    private bool IsDuplicate(NotificationMessage message) => this._cache.TryGetValue(message.Type, out NotificationMessage other) && other == message;
 
     private void UpdateCache(NotificationMessage message)
     {

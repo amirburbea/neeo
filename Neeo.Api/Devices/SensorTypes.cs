@@ -1,13 +1,16 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Neeo.Api.Devices.Sensors;
+namespace Neeo.Api.Devices;
 
 /// <summary>
 /// An enumeration of the types of sensors available in NEEO.
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<SensorType>))]
-public enum SensorType
+[JsonConverter(typeof(TextAttribute.EnumJsonConverter<SensorTypes>))]
+public enum SensorTypes
 {
+    /// <summary>
+    /// A boolean switch.
+    /// </summary>
     [Text("binary")]
     Binary,
 

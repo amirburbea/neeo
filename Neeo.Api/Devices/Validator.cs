@@ -1,50 +1,49 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Neeo.Api.Devices;
+
 
 internal static class Validator
 {
     public static void ValidateDelay(int? value, string name)
     {
-        if (value is not int delay)
+        if (value is null)
         {
             return;
         }
         const int maxDelay = 60 * 1000;
-        if (delay < 0 || delay > maxDelay)
+        if (value < 0 || value > maxDelay)
         {
             throw new ValidationException($"{name} must be between 0 and {maxDelay}.");
         }
     }
 
-    public static void ValidateRange(double low, double high, string? units)
+    public static void ValidateRange(double low, double high)
     {
-        Validator.ValidateString(units, name: nameof(units), allowNull: true);
         if (double.IsNaN(low) || double.IsNaN(high) || double.IsInfinity(low) || double.IsInfinity(high) || low >= high)
         {
             throw new ValidationException("Range low must be less than range high and neither value can be infinity or NaN.");
         }
     }
 
-    public static void ValidateString(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerMemberName] string name = "")
+    [return: NotNullIfNotNull("text")]
+    public static string? ValidateString(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerMemberName] string name = "")
     {
-        if (text == null)
+        if (text == null && allowNull)
         {
-            if (allowNull)
-            {
-                return;
-            }
+            return null;
+        }
+        if (text is not { Length: int length })
+        {
             throw new ValidationException($"{GetName()} is null.");
         }
-        if (text.Length < minLength)
+        if (length < minLength || length > maxLength)
         {
-            throw new ValidationException($"{GetName()} is too short (minimum is .{minLength}).");
+            throw new ValidationException($"{GetName()} must be between {minLength} and {maxLength} characters long.");
         }
-        if (text.Length > maxLength)
-        {
-            throw new ValidationException($"{GetName()} is too long (maximum is {maxLength}).");
-        }
+        return text;
 
         string GetName() => name.StartsWith("Set", StringComparison.Ordinal) ? name[3..] : name;
     }

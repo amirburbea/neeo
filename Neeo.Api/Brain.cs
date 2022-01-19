@@ -69,11 +69,6 @@ public sealed partial class Brain
     public string Region { get; }
 
     /// <summary>
-    /// The endpoint on which the NEEO Brain API is running.
-    /// </summary>
-    public IPEndPoint ServiceEndPoint => new(this.IPAddress, this.ServicePort);
-
-    /// <summary>
     /// The port on which the NEEO Brain API is running.
     /// </summary>
     public int ServicePort { get; }

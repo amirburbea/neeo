@@ -12,15 +12,21 @@ public static class WakeOnLan
     public static async Task WakeAsync(this PhysicalAddress address)
     {
         const int length = 102;
-        byte[] targetBytes = address.GetAddressBytes();
         byte[] magicPacket = ArrayPool<byte>.Shared.Rent(length);
-        magicPacket.AsSpan(0, 6).Fill(byte.MaxValue);
-        for (int i = 0; i < 16; i++)
+        try
         {
-            targetBytes.CopyTo(magicPacket.AsSpan(6 + (i * 6)));
+            byte[] addressBytes = address.GetAddressBytes();
+            magicPacket.AsSpan(0, 6).Fill(byte.MaxValue);
+            for (int i = 0; i < 16; i++)
+            {
+                addressBytes.CopyTo(magicPacket.AsSpan(6 + (i * 6)));
+            }
+            using UdpClient client = new();
+            await client.SendAsync(magicPacket, length, new(IPAddress.Broadcast, 9)).ConfigureAwait(false);
         }
-        using UdpClient client = new();
-        await client.SendAsync(magicPacket, length, new(IPAddress.Broadcast, 9)).ConfigureAwait(false);
-        ArrayPool<byte>.Shared.Return(magicPacket);
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(magicPacket);
+        }
     }
 }

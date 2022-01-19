@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Neeo.Api.Devices;
@@ -17,11 +18,11 @@ internal sealed class DeviceController : ControllerBase
     public async Task<ActionResult<IsRegisteredResponse>> GetIsRegistered(string adapterId)
     {
         IDeviceAdapter adapter = await this._database.GetAdapterAsync(adapterId);
-        ICapabilityHandler? handler = adapter.GetCapabilityHandler(ComponentType.Registration);
-        if (handler == null)
+        if (adapter.Setup.RegistrationType is null)
         {
-            throw new();
+            throw new InvalidOperationException("Device does not support registration.");
         }
+        ICapabilityHandler handler = adapter.GetCapabilityHandler(ComponentType.Registration)!;
         bool registered = (bool)await handler.Controller.GetValueAsync(adapter.AdapterName);
         return new IsRegisteredResponse(registered);
     }

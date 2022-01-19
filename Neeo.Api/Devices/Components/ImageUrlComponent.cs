@@ -1,20 +1,20 @@
-﻿namespace Neeo.Api.Devices.Components;
+﻿using System;
+using System.Text.Json.Serialization;
 
-public interface IImageUrlComponent : IComponentWithAssociatedSensor
+namespace Neeo.Api.Devices.Components;
+
+public interface IImageUrlComponent : IComponent, IComponentWithAssociatedSensor
 {
+    string? ImageUri { get; }
+
     ImageSize Size { get; }
 }
 
-internal sealed class ImageUrlComponent : Component, IImageUrlComponent
-{
-    public ImageUrlComponent(string name, string? label, string pathPrefix, ImageSize size)
-        : base(ComponentType.ImageUrl, name, label, pathPrefix)
-    {
-        this.Size = size;
-        this.SensorName = this.GetAssociatedSensorName();
-    }
-
-    public string SensorName { get; }
-
-    public ImageSize Size { get; }
-}
+internal sealed record class ImageUrlComponent(
+    String Name,
+    String? Label,
+    String Path,
+    String? ImageUri,
+    ImageSize Size,
+    [property: JsonPropertyName("sensor")] string SensorName
+) : Component(ComponentType.ImageUrl, Name, Label, Path), IImageUrlComponent;
