@@ -28,15 +28,13 @@ internal sealed class DeviceController : ControllerBase
     }
 
     [HttpPost("/{adapterId}/register")]
-    public async Task<ActionResult<object>> Register(string adapterId, [FromBody] JsonElement credentials)
+    public async Task<ActionResult<object?>> Register(string adapterId, [FromBody] JsonElement credentials)
     {
         IDeviceAdapter adapter = await this._database.GetAdapterAsync(adapterId);
         ICapabilityHandler? handler = adapter.GetCapabilityHandler(ComponentType.Registration);
-        if (handler == null)
-        {
-            throw new();
-        }
-        return await handler.Controller.ExecuteAsync(adapter.AdapterName, credentials);
+        return handler == null 
+            ? throw new() 
+            : await handler.Controller.ExecuteAsync(adapter.AdapterName, credentials);
     }
 
     public record struct IsRegisteredResponse(bool Registered);

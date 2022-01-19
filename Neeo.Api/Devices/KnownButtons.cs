@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices;
 

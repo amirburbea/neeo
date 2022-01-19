@@ -3,6 +3,7 @@
 namespace Neeo.Api.Devices;
 
 using Discovery;
+using Neeo.Api.Utilities;
 
 /// <summary>
 /// The unique/special capabilities supported by the device.

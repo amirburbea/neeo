@@ -14,7 +14,7 @@ internal static class Validator
             return;
         }
         const int maxDelay = 60 * 1000;
-        if (value < 0 || value > maxDelay)
+        if (value is < 0 or > maxDelay)
         {
             throw new ValidationException($"{name} must be between 0 and {maxDelay}.");
         }
@@ -31,19 +31,12 @@ internal static class Validator
     [return: NotNullIfNotNull("text")]
     public static string? ValidateString(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerMemberName] string name = "")
     {
-        if (text == null && allowNull)
+        return text switch
         {
-            return null;
-        }
-        if (text is not { Length: int length })
-        {
-            throw new ValidationException($"{GetName()} is null.");
-        }
-        if (length < minLength || length > maxLength)
-        {
-            throw new ValidationException($"{GetName()} must be between {minLength} and {maxLength} characters long.");
-        }
-        return text;
+            null when !allowNull => throw new ValidationException($"{GetName()} is null."),
+            { Length: int length } when length < minLength || length > maxLength => throw new ValidationException($"{GetName()} must be between {minLength} and {maxLength} characters long."),
+            _ => text
+        };
 
         string GetName() => name.StartsWith("Set", StringComparison.Ordinal) ? name[3..] : name;
     }

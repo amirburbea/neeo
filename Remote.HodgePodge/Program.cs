@@ -7,15 +7,16 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Broadlink.RM;
 using Neeo.Api;
 using Neeo.Api.Devices;
-using Broadlink.RM;
-using Neeo.Api.Devices.Discovery;
 
 namespace Remote.HodgePodge;
 
 internal static class Program
 {
+    private static readonly Regex _ipAddressRegex = new(@"^\d+\.\d+\.\d+\.\d+$");
+
     private static async Task LearnCodes(RMDevice device)
     {
         string? fileName = Program.QueryFileName();
@@ -37,8 +38,6 @@ internal static class Program
         }
         File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
     }
-
-    private static readonly Regex _ipAddressRegex = new(@"^\d+\.\d+\.\d+\.\d+$");
 
     private static async Task Main()
     {
@@ -71,6 +70,7 @@ internal static class Program
                 .AddTextLabel("A", "Label A", true, async (id) => await Task.FromResult(id))
                 .RegisterFavoritesHandler((deviceId, favorite) => Task.CompletedTask)
                 .AddSlider("Slider Name", "Slider Label", 0, 100, null, async (_) => await Task.FromResult(5d), (_, __) => Task.CompletedTask)
+
                 //.EnableDiscovery(new("Header", "Description", false), (_) => Task.FromResult(Array.Empty<DiscoveryResult>()))
                 .AddButtonHandler((deviceId, button) =>
                 {

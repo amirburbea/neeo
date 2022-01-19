@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Neeo.Api;
+namespace Neeo.Api.Utilities;
 
 /// <summary>
 /// An attribute used to associate text with the decorated item.

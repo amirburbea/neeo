@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices.Discovery;
 

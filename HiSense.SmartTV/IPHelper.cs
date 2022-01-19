@@ -76,7 +76,7 @@ public class IPHelper
         // Get the space needed
         // We do that by requesting the table, but not giving any space at all.
         // The return value will tell us how much we actually need.
-        GetIpNetTable(IntPtr.Zero, ref spaceForNetTable, false);
+        _ =  GetIpNetTable(IntPtr.Zero, ref spaceForNetTable, false);
         // Allocate the space
         // We use a try-finally block to ensure release.
         IntPtr rawTable = IntPtr.Zero;
@@ -177,7 +177,7 @@ public class IPHelper
         if (!ip.IsIPv6Multicast)
         {
             byte highIP = ip.GetAddressBytes()[0];
-            if (highIP < 224 || highIP > 239)
+            if (highIP is < 224 or > 239)
             {
                 result = false;
             }
