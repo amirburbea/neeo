@@ -375,7 +375,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         string? label,
         double rangeLow,
         double rangeHigh,
-        string units,
+        string? units,
         DeviceValueGetter<double> getter,
         DeviceValueSetter<double> setter
     ) => this.AddSlider(name, label, rangeLow, rangeHigh, units, getter, setter);

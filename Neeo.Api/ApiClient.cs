@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -86,10 +87,14 @@ public interface IApiClient
 internal sealed class ApiClient : IApiClient, IDisposable
 {
     private readonly HttpClient _httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
-    private readonly ILogger<ApiClient> _logger;
+    private readonly ILogger<ApiClient>? _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(SdkEnvironment environment, ILogger<ApiClient> logger) => (this._uriPrefix, this._logger) = ($"http://{environment.BrainEndPoint}", logger);
+    public ApiClient(IPEndPoint endpoint, ILogger<ApiClient>? logger = default) => (this._uriPrefix, this._logger) = ($"http://{endpoint}", logger);
+
+    public ApiClient(SdkEnvironment environment, ILogger<ApiClient> logger) : this(environment.BrainEndPoint, logger)
+    {
+    }
 
     public void Dispose() => this._httpClient.Dispose();
 
@@ -120,8 +125,15 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, ByteArrayContent? body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
     {
         string uri = this._uriPrefix + path;
-        this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
-        TData data = await this._httpClient.FetchAsync<TData>(uri, method, body, cancellationToken).ConfigureAwait(false);
+        this._logger?.LogInformation("Making {method} request to {uri}...", method.Method, uri);
+        using HttpRequestMessage request = new(method, uri) { Content = body };
+        using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            throw new WebException($"Server returned {(int)response.StatusCode}:{response.StatusCode}.");
+        }
+        using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        TData data = (await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
         return transform(data);
     }
 }

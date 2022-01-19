@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -16,11 +15,10 @@ partial class Brain
         {
             throw new ArgumentException("Must be IPv4 address.", nameof(ipAddress));
         }
-        using HttpClient httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
-        string uri = $"http://{ipAddress}:{servicePort}{UrlPaths.SystemInformation}";
-        SystemInformation sysInfo = await httpClient.FetchAsync<SystemInformation>(uri, HttpMethod.Get, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return new(ipAddress, servicePort, sysInfo.HostName, sysInfo.HostName, sysInfo.FirmwareVersion, sysInfo.HardwareRegion);
+        using ApiClient client = new(new(ipAddress, servicePort));
+        (string firmwareVersion, string hostName, string hardwareRegion) = await client.GetAsync<SystemInformation>(UrlPaths.SystemInformation, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return new(ipAddress, servicePort, hostName, hostName, firmwareVersion, hardwareRegion);
     }
 
-    private record class SystemInformation(String FirmwareVersion, [property: JsonPropertyName("hostname")] String HostName, String HardwareRegion);
+    private sealed record class SystemInformation(String FirmwareVersion, [property: JsonPropertyName("hostname")] String HostName, String HardwareRegion);
 }
