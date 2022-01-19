@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -70,7 +71,11 @@ internal sealed class TextAttribute : Attribute
             Dictionary<T, string> toText = new();
             foreach (T value in Enum.GetValues<T>())
             {
-                string text = AttributeData.GetEnumAttributeData(value, (TextAttribute attribute) => attribute.Text) ?? value.ToString();
+                if (Enum.GetName(value) is not { } name)
+                {
+                    continue;
+                }
+                string text = typeof(T).GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetCustomAttribute<TextAttribute>()?.Text ?? name;
                 fromText.Add(text, value);
                 toText.Add(value, text);
             }
