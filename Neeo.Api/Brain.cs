@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
@@ -74,9 +75,9 @@ public sealed class Brain
     /// <param name="port">The port to listen on.</param>
     /// <param name="cancellationToken">Optional cancellation token.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public async Task StartServerAsync(IDeviceBuilder[] devices, string? name = default, IPAddress? hostIPAddress = null, int port = 9000, CancellationToken cancellationToken = default)
+    public async Task StartServerAsync(IReadOnlyCollection<IDeviceBuilder> devices, string? name = default, IPAddress? hostIPAddress = null, int port = 9000, CancellationToken cancellationToken = default)
     {
-        if (this._host is { })
+        if (this._host is not null)
         {
             throw new InvalidOperationException("Server is already running.");
         }

@@ -12,7 +12,7 @@ namespace Neeo.Api.Devices
     /// </summary>
     public interface IDeviceDatabase
     {
-        Task<IDeviceAdapter> GetAdapterAsync(string adapterName);
+        ValueTask<IDeviceAdapter> GetAdapterAsync(string adapterName);
 
         IDeviceModel GetDevice(int id);
 
@@ -30,11 +30,12 @@ namespace Neeo.Api.Devices
         private readonly HashSet<string> _initializedAdapters = new();
         private readonly ILogger<IDeviceDatabase> _logger;
 
-        public DeviceDatabase(IReadOnlyCollection<IDeviceAdapter> adapters, ILogger<IDeviceDatabase> logger)
+        public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> deviceBuilders, IDeviceCompiler deviceCompiler, ILogger<IDeviceDatabase> logger)
         {
             this._logger = logger;
-            foreach (IDeviceAdapter adapter in adapters)
+            foreach (IDeviceBuilder deviceBuilder in deviceBuilders)
             {
+                IDeviceAdapter adapter = deviceCompiler.Compile(deviceBuilder);
                 this._adapters.Add(adapter.AdapterName, adapter);
                 this._devices.Add(new(this._devices.Count, adapter));
             }
@@ -53,7 +54,7 @@ namespace Neeo.Api.Devices
             });
         }
 
-        public async Task<IDeviceAdapter> GetAdapterAsync(string adapterName)
+        public async ValueTask<IDeviceAdapter> GetAdapterAsync(string adapterName)
         {
             if (adapterName == null || !this._adapters.TryGetValue(adapterName, out IDeviceAdapter? adapter))
             {
@@ -75,9 +76,9 @@ namespace Neeo.Api.Devices
             ? Array.Empty<ISearchItem<IDeviceModel>>()
             : this._deviceIndex.Search(this._devices, query).Take(OptionConstants.MaxSearchResults);
 
-        private async Task InitializeAsync(IDeviceAdapter adapter)
+        private async ValueTask InitializeAsync(IDeviceAdapter adapter)
         {
-            if (this._initializedAdapters.Contains(adapter.AdapterName))
+            if (this._initializedAdapters.Contains(adapter.AdapterName) || adapter.Initializer is null)
             {
                 return;
             }
@@ -89,23 +90,16 @@ namespace Neeo.Api.Devices
             try
             {
                 this._logger.LogInformation("Initializing device: {name}", adapter.AdapterName);
-                if (adapter.Initializer?.Invoke() is { } initializationTask)
-                {
-                    this._initializationTasks.Add(adapter.AdapterName, initializationTask);
-                    try
-                    {
-                        await initializationTask.ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        this._initializationTasks.Remove(adapter.AdapterName);
-                    }
-                }
-                this._initializedAdapters.Add(adapter.AdapterName);
-            }
+                this._initializationTasks.Add(adapter.AdapterName, task = adapter.Initializer());
+                await task.ConfigureAwait(false);
+            } 
             catch (Exception e)
             {
                 this._logger.LogError("Initializing device failed: {message}", e.Message);
+            }
+            finally
+            {
+                this._initializationTasks.Remove(adapter.AdapterName);
             }
         }
 

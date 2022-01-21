@@ -25,7 +25,7 @@ namespace Neeo.Api.Rest;
 /// </summary>
 internal static class Server
 {
-    public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress? hostIPAddress, int port, CancellationToken cancellationToken)
+    public static async Task<IHost> StartAsync(Brain brain, string name, IReadOnlyCollection<IDeviceBuilder> devices, IPAddress? hostIPAddress, int port, CancellationToken cancellationToken)
     {
         string sdkAdapterName = $"src-{UniqueNameGenerator.Generate(name)}";
         IHost host = Server.CreateHostBuilder(
@@ -58,16 +58,16 @@ internal static class Server
 
     public static async Task StopAsync(IHost host, CancellationToken cancellationToken)
     {
-        try
+        using (host)
         {
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
-            SdkEnvironment environment = host.Services.GetRequiredService<SdkEnvironment>();
             IApiClient client = host.Services.GetRequiredService<IApiClient>();
+            (string sdkAdapterName, Brain brain) = host.Services.GetRequiredService<ISdkEnvironment>();
             try
             {
-                if (await client.UnregisterServerAsync(environment.SdkAdapterName, cancellationToken).ConfigureAwait(false))
+                if (await client.UnregisterServerAsync(sdkAdapterName, cancellationToken).ConfigureAwait(false))
                 {
-                    logger.LogInformation("Server unregistered from {brain}.", environment.Brain.HostName);
+                    logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
                 }
             }
             catch (Exception e)
@@ -76,13 +76,9 @@ internal static class Server
             }
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
-        finally
-        {
-            host.Dispose();
-        }
     }
 
-    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IDeviceBuilder[] devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder()
+    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IReadOnlyCollection<IDeviceBuilder> devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder()
         .ConfigureWebHostDefaults(builder =>
         {
             builder
@@ -104,15 +100,16 @@ internal static class Server
                 .ConfigureServices((context, services) =>
                 {
                     services
-                        .AddSingleton(new SdkEnvironment(sdkAdapterName, brain))
+                        .AddSingleton(devices)
+                        .AddSingleton<ISdkEnvironment>(new SdkEnvironment(sdkAdapterName, brain))
                         .AddSingleton<IApiClient, ApiClient>()
+                        .AddSingleton<IDeviceCompiler,DeviceCompiler>()
                         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
                         .AddSingleton<INotificationService, NotificationService>()
                         .AddSingleton<INotificationMapping, NotificationMapping>()
                         .AddSingleton<IDeviceSubscriptions, DeviceSubscriptions>()
-                        .AddSingleton<IReadOnlyCollection<IDeviceAdapter>>(services => Array.ConvertAll(devices, device => device.BuildAdapter()))
+                        .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-                        .AddControllers(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .AddJsonOptions(options => options.JsonSerializerOptions.UpdateConfiguration())
                         .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AllowInternalsControllerFeatureProvider.Instance));
                 })
@@ -157,6 +154,9 @@ internal static class Server
         static (SuccessResult result) => result.Success,
         cancellationToken
     );
+
+
+    private sealed record class SdkEnvironment(string SdkAdapterName, Brain Brain) : ISdkEnvironment;
 
     private static class Constants
     {

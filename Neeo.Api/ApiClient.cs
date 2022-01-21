@@ -95,14 +95,14 @@ internal sealed class ApiClient : IApiClient, IDisposable
 
     public ApiClient(IPAddress brainIPAddress, int servicePort = 3000) => this._uriPrefix = $"http://{brainIPAddress}:{servicePort}";
 
-    public ApiClient(SdkEnvironment environment, ILogger<ApiClient> logger)
+    public ApiClient(ISdkEnvironment environment, ILogger<ApiClient> logger)
         : this(environment.Brain.IPAddress, environment.Brain.ServicePort) => this._logger = logger;
 
     public void Dispose() => this._httpClient.Dispose();
 
     public Task<JsonElement> GetAsync(string path, CancellationToken cancellationToken) => this.GetAsync<JsonElement>(path, cancellationToken);
 
-    public Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken) => this.GetAsync(path, (TData data) => data, cancellationToken);
+    public Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken) => this.GetAsync(path, static (TData data) => data, cancellationToken);
 
     public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken) => this.FetchAsync(
         path,
@@ -114,7 +114,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
 
     public Task<JsonElement> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) => this.PostAsync<TBody, JsonElement>(path, body, cancellationToken);
 
-    public Task<TData> PostAsync<TBody, TData>(string path, TBody body, CancellationToken cancellationToken) => this.PostAsync(path, body, (TData data) => data, cancellationToken);
+    public Task<TData> PostAsync<TBody, TData>(string path, TBody body, CancellationToken cancellationToken) => this.PostAsync(path, body, static (TData data) => data, cancellationToken);
 
     public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken)
     {
@@ -133,7 +133,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
         using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.OK)
         {
-            throw new WebException($"Server returned {(int)response.StatusCode}:{response.StatusCode}.");
+            throw new WebException($"Server returned status {(int)response.StatusCode}:{Enum.GetName(response.StatusCode)}.");
         }
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         TData data = (await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;

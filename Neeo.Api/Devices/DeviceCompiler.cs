@@ -3,15 +3,33 @@ using System.Collections.Generic;
 using System.Linq;
 using Neeo.Api.Devices.Components;
 using Neeo.Api.Devices.Controllers;
+using Neeo.Api.Notifications;
 using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices;
 
-public sealed class DeviceCompiler
+public interface IDeviceCompiler
 {
-    
+    IDeviceAdapter Compile(IDeviceBuilder device);
+}
 
-    internal DeviceAdapter BuildAdapter(IDeviceBuilder device)
+internal sealed class DeviceCompiler : IDeviceCompiler
+{
+    private readonly INotificationService _notificationService;
+
+    public DeviceCompiler(INotificationService notificationService)
+    {
+        this._notificationService = notificationService;
+    }
+
+    public DeviceAdapter Compile(IDeviceBuilder deviceBuilder)
+    {
+        return BuildAdapter(deviceBuilder);
+    }
+
+    IDeviceAdapter IDeviceCompiler.Compile(IDeviceBuilder device) => this.Compile(device);
+
+    private static DeviceAdapter BuildAdapter(IDeviceBuilder device)
     {
         if (device.ButtonHandler == null && device.Buttons.Any())
         {
@@ -26,7 +44,7 @@ public sealed class DeviceCompiler
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
         }
         List<DeviceCapability> deviceCapabilities = device.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
-        if (device.RegistrationProcessor != null)
+        if (device.RegistrationController != null)
         {
             deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);
         }
@@ -68,7 +86,7 @@ public sealed class DeviceCompiler
         }
         if (device.DiscoveryProcessor is not null)
         {
-           // AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(device.DiscoveryProcessor));
+            // AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(device.DiscoveryProcessor));
             if (device.RegistrationController is not null)
             {
                 AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), device.RegistrationController);

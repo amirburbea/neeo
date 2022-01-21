@@ -6,9 +6,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Neeo.Api.Notifications;
 
-internal interface INotificationService
+public interface INotificationService
 {
-    Task<bool> SendAsync(Notification message, CancellationToken cancellationToken = default);
+    Task<bool> SendAsync(Message message, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationService : INotificationService
@@ -21,6 +21,11 @@ internal sealed class NotificationService : INotificationService
     public NotificationService(IApiClient client, ILogger<INotificationService> logger)
     {
         (this._client, this._logger) = (client, logger);
+    }
+
+    public Task<bool> SendAsync(Message message, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(false);
     }
 
     public async Task<bool> SendAsync(Notification message, CancellationToken cancellationToken)
