@@ -10,3 +10,4 @@ public interface IDeviceSubscriptionCallbacks
 }
 
 internal sealed record class DeviceSubscriptionCallbacks(DeviceAction OnDeviceAdded, DeviceAction OnDeviceRemoved, DeviceListInitializer InitializeDeviceList) : IDeviceSubscriptionCallbacks;
+

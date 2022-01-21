@@ -90,13 +90,13 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private static readonly MediaTypeHeaderValue _jsonContentType = new("application/json");
 
     private readonly HttpClient _httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
-    private readonly ILogger<ApiClient>? _logger;
+    private readonly ILogger<ApiClient> _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(IPAddress brainIPAddress, int servicePort = 3000) => this._uriPrefix = $"http://{brainIPAddress}:{servicePort}";
-
-    public ApiClient(ISdkEnvironment environment, ILogger<ApiClient> logger)
-        : this(environment.Brain.IPAddress, environment.Brain.ServicePort) => this._logger = logger;
+    public ApiClient(
+        ISdkEnvironment environment,
+        ILogger<ApiClient> logger
+    ) => (this._uriPrefix, this._logger) = ($"http://{environment.BrainEndPoint}", logger);
 
     public void Dispose() => this._httpClient.Dispose();
 
@@ -128,7 +128,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, HttpContent? content, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
     {
         string uri = this._uriPrefix + path;
-        this._logger?.LogInformation("Making {method} request to {uri}...", method.Method, uri);
+        this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
         using HttpRequestMessage request = new(method, uri) { Content = content };
         using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.OK)

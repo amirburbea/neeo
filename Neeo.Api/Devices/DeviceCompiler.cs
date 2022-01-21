@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Neeo.Api.Devices.Components;
 using Neeo.Api.Devices.Controllers;
 using Neeo.Api.Notifications;
@@ -17,14 +18,31 @@ internal sealed class DeviceCompiler : IDeviceCompiler
 {
     private readonly INotificationService _notificationService;
 
-    public DeviceCompiler(INotificationService notificationService)
-    {
-        this._notificationService = notificationService;
-    }
+    public DeviceCompiler(INotificationService notificationService) => this._notificationService = notificationService;
 
-    public DeviceAdapter Compile(IDeviceBuilder deviceBuilder)
+    public DeviceAdapter Compile(IDeviceBuilder device)
     {
-        return BuildAdapter(deviceBuilder);
+        DeviceAdapter adapter = DeviceCompiler.BuildAdapter(device);
+        if (device.SubscriptionFunction is { } callback)
+        {
+            callback(
+                NotifyUpdate,
+                device.HasPowerStateSensor
+                    ? new PowerNotifications(uniqueDeviceId => NotifyPowerState(uniqueDeviceId, true), uniqueDeviceId => NotifyPowerState(uniqueDeviceId, false))
+                    : default
+            );
+
+            Task NotifyPowerState(string uniqueDeviceId, bool value) => this._notificationService.SendNotificationAsync(
+                new(uniqueDeviceId, Constants.PowerSensorName, value),
+                device.AdapterName
+            );
+
+            Task NotifyUpdate(NotificationMessage message) => this._notificationService.SendSensorNotificationAsync(
+                message,
+                device.AdapterName
+            );
+        }
+        return adapter;
     }
 
     IDeviceAdapter IDeviceCompiler.Compile(IDeviceBuilder device) => this.Compile(device);

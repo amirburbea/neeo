@@ -66,6 +66,6 @@ public delegate Task DeviceValueSetter<TValue>(string deviceId, TValue value)
 /// </remarks>
 public delegate Task FavoritesHandler(string deviceId, string favorite);
 
-public delegate void SubscriptionFunction(UpdateNotifier notifyUpdate, IPowerNotifications powerNotifications);
+public delegate void SubscriptionFunction(UpdateNotifier notifyUpdate, IPowerNotifications? powerNotifications);
 
-public delegate Task UpdateNotifier(Message message);
+public delegate Task UpdateNotifier(NotificationMessage message);

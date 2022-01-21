@@ -8,7 +8,9 @@ namespace Neeo.Api.Notifications;
 
 public interface INotificationService
 {
-    Task<bool> SendAsync(Message message, CancellationToken cancellationToken = default);
+    Task<bool> SendNotificationAsync(NotificationMessage message, string deviceAdapter, CancellationToken cancellationToken = default);
+
+    Task<bool> SendSensorNotificationAsync(NotificationMessage message, string deviceAdapter, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationService : INotificationService
@@ -16,16 +18,12 @@ internal sealed class NotificationService : INotificationService
     private readonly Dictionary<string, Notification> _cache = new();
     private readonly IApiClient _client;
     private readonly ILogger<INotificationService> _logger;
+    private readonly INotificationMapping _notificationMapping;
     private int _queueSize;
 
-    public NotificationService(IApiClient client, ILogger<INotificationService> logger)
+    public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<INotificationService> logger)
     {
-        (this._client, this._logger) = (client, logger);
-    }
-
-    public Task<bool> SendAsync(Message message, CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(false);
+        (this._client, this._notificationMapping, this._logger) = (client, notificationMapping, logger);
     }
 
     public async Task<bool> SendAsync(Notification message, CancellationToken cancellationToken)
@@ -50,7 +48,7 @@ internal sealed class NotificationService : INotificationService
         bool success;
         try
         {
-            success = await this._client.PostAsync(UrlPaths.Notifications, message, (SuccessResult result) => result.Success, cancellationToken).ConfigureAwait(false);
+            success = await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResult result) => result.Success, cancellationToken).ConfigureAwait(false);
             if (!success)
             {
                 this._logger.LogWarning("Failed to send notification - Brain rejected.");
@@ -72,6 +70,18 @@ internal sealed class NotificationService : INotificationService
         return success;
     }
 
+    public Task<bool> SendNotificationAsync(
+            NotificationMessage message,
+        string deviceId,
+        CancellationToken cancellationToken
+    ) => this.SendNotificationAsync(message, deviceId, default, cancellationToken);
+
+    public Task<bool> SendSensorNotificationAsync(
+        NotificationMessage message,
+        string deviceId,
+        CancellationToken cancellationToken
+    ) => this.SendNotificationAsync(message, deviceId, Constants.DeviceSensorUpdateKey, cancellationToken);
+
     private void DecreaseQueueSize()
     {
         if (this._queueSize != 0)
@@ -81,6 +91,12 @@ internal sealed class NotificationService : INotificationService
     }
 
     private bool IsDuplicate(Notification message) => this._cache.TryGetValue(message.Type, out Notification other) && other == message;
+
+    private Task<bool> SendNotificationAsync(NotificationMessage message, string deviceAdapter, string? overrideKey, CancellationToken cancellationToken)
+    {
+        this._logger.LogInformation("{method}:{message}", nameof(this.SendNotificationAsync), message);
+        return Task.FromResult(false);
+    }
 
     private void UpdateCache(Notification message)
     {
@@ -94,6 +110,7 @@ internal sealed class NotificationService : INotificationService
 
     private static class Constants
     {
+        public const string DeviceSensorUpdateKey = "DEVICE_SENSOR_UPDATE";
         public const int MaxCachedEntries = 50;
         public const int MaxQueueSize = 20;
     }

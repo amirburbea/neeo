@@ -9,4 +9,7 @@ public interface ICapabilityHandler
     IController Controller { get; }
 }
 
-internal sealed record class CapabilityHandler(ComponentType ComponentType, IController Controller) : ICapabilityHandler;
+internal sealed record class CapabilityHandler(
+    ComponentType ComponentType, 
+    IController Controller
+) : ICapabilityHandler;

@@ -200,7 +200,7 @@ public interface IDeviceBuilder
     /// <summary>
     /// Specify a set of callbacks which allow tracking which devices are currently in use on the NEEO Brain.
     /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
-    /// resource and/or remove credentials when the last device is removed.
+    /// resources and/or remove credentials when the last device is removed.
     /// </summary>
     /// <param name="onDeviceAdded"></param>
     /// <param name="onDeviceRemoved"></param>

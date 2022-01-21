@@ -31,9 +31,8 @@ internal static class Server
         IHost host = Server.CreateHostBuilder(
             brain ?? throw new ArgumentNullException(nameof(brain)),
             sdkAdapterName,
-            devices ?? throw new ArgumentNullException(nameof(devices)),
-            hostIPAddress ??= await Server.GetFallbackHostIPAddress(brain.IPAddress, cancellationToken),
-            port
+            new(hostIPAddress ??= await Server.GetFallbackHostIPAddress(brain.IPAddress, cancellationToken).ConfigureAwait(false), port),
+            devices ?? throw new ArgumentNullException(nameof(devices))
         ).Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
         ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
@@ -44,7 +43,7 @@ internal static class Server
             {
                 if (await client.RegisterServerAsync(sdkAdapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false))
                 {
-                    logger.LogInformation("Server http://{hostIP}:{port} ({adapterName}) registered on {brainHost}.local ({brainIP}).", hostIPAddress, port, sdkAdapterName, brain.HostName, brain.IPAddress);
+                    logger.LogInformation("Server {adapterName} registered on {brainHost} ({brainIP}).", sdkAdapterName, brain.HostName, brain.IPAddress);
                     return host;
                 }
             }
@@ -62,12 +61,12 @@ internal static class Server
         {
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
             IApiClient client = host.Services.GetRequiredService<IApiClient>();
-            (string sdkAdapterName, Brain brain) = host.Services.GetRequiredService<ISdkEnvironment>();
+            ISdkEnvironment environment = host.Services.GetRequiredService<ISdkEnvironment>();
             try
             {
-                if (await client.UnregisterServerAsync(sdkAdapterName, cancellationToken).ConfigureAwait(false))
+                if (await client.UnregisterServerAsync(environment.SdkAdapterName, cancellationToken).ConfigureAwait(false))
                 {
-                    logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
+                    logger.LogInformation("Server unregistered from {brain}.", environment.BrainHostName);
                 }
             }
             catch (Exception e)
@@ -78,14 +77,14 @@ internal static class Server
         }
     }
 
-    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IReadOnlyCollection<IDeviceBuilder> devices, IPAddress ipAddress, int port) => Host.CreateDefaultBuilder()
+    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IPEndPoint hostEndPoint, IReadOnlyCollection<IDeviceBuilder> devices) => Host.CreateDefaultBuilder()
         .ConfigureWebHostDefaults(builder =>
         {
             builder
                 .ConfigureKestrel((context, options) =>
                 {
                     options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
-                    options.Listen(ipAddress, port);
+                    options.Listen(hostEndPoint);
                 })
                 .ConfigureLogging((context, builder) =>
                 {
@@ -101,13 +100,19 @@ internal static class Server
                 {
                     services
                         .AddSingleton(devices)
-                        .AddSingleton<ISdkEnvironment>(new SdkEnvironment(sdkAdapterName, brain))
                         .AddSingleton<IApiClient, ApiClient>()
-                        .AddSingleton<IDeviceCompiler,DeviceCompiler>()
+                        .AddSingleton<IDeviceCompiler, DeviceCompiler>()
                         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-                        .AddSingleton<INotificationService, NotificationService>()
-                        .AddSingleton<INotificationMapping, NotificationMapping>()
                         .AddSingleton<IDeviceSubscriptions, DeviceSubscriptions>()
+                        .AddSingleton<INotificationMapping, NotificationMapping>()
+                        .AddSingleton<INotificationService, NotificationService>()
+                        .AddSingleton<ISdkEnvironment>(new SdkEnvironment(
+                            sdkAdapterName, 
+                            new(brain.IPAddress, brain.ServicePort),
+                            brain.HostName,
+                            hostEndPoint
+                        ));
+                    services
                         .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddJsonOptions(options => options.JsonSerializerOptions.UpdateConfiguration())
@@ -126,9 +131,7 @@ internal static class Server
                 });
         });
 
-
-
-    private static async Task<IPAddress> GetFallbackHostIPAddress(IPAddress brainIPAddress, CancellationToken cancellationToken)
+    private static async ValueTask<IPAddress> GetFallbackHostIPAddress(IPAddress brainIPAddress, CancellationToken cancellationToken)
     {
         if (brainIPAddress != IPAddress.Loopback)
         {
@@ -155,8 +158,12 @@ internal static class Server
         cancellationToken
     );
 
-
-    private sealed record class SdkEnvironment(string SdkAdapterName, Brain Brain) : ISdkEnvironment;
+    private sealed record class SdkEnvironment(
+        string SdkAdapterName, 
+        IPEndPoint BrainEndPoint,
+        string BrainHostName,
+        IPEndPoint HostEndPoint
+    ) : ISdkEnvironment;
 
     private static class Constants
     {

@@ -79,7 +79,7 @@ public static class BrainDiscovery
     {
         IService service = host.Services[Constants.ServiceName];
         IReadOnlyDictionary<string, string> properties = service.Properties[0];
-        return new(IPAddress.Parse(host.IPAddress), service.Port, properties["hon"], properties["rel"]);
+        return new(IPAddress.Parse(host.IPAddress), service.Port, $"{properties["hon"]}.local", properties["rel"]);
     }
 
     private static class Constants
