@@ -30,6 +30,8 @@ internal sealed class CovariantReadOnlyDictionary<TKey, TValue, TBase> : IReadOn
         }
     }
 
+    IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+
     public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TBase value)
     {
         if (this._dictionary.TryGetValue(key, out TValue? derived))
@@ -40,6 +42,4 @@ internal sealed class CovariantReadOnlyDictionary<TKey, TValue, TBase> : IReadOn
         value = default;
         return false;
     }
-
-    IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
 }

@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Neeo.Api.Devices.Controllers;
 using Neeo.Api.Devices.Discovery;
 using Neeo.Api.Json;
 using Neeo.Api.Utilities;
@@ -33,7 +34,7 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of buttons defined.
     /// </summary>
-    IReadOnlyCollection<IDeviceFeature> Buttons { get; }
+    IReadOnlyCollection<DeviceFeature> Buttons { get; }
 
     /// <summary>
     /// Gets the collection of special characteristics of the device.
@@ -70,7 +71,7 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of ImageUrl features defined for the device.
     /// </summary>
-    IReadOnlyCollection<IDeviceFeature> ImageUrls { get; }
+    IReadOnlyDictionary<DeviceFeature, IController> ImageUrls { get; }
 
     /// <summary>
     /// Device initializer callback.
@@ -101,14 +102,14 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of sensors defined for the device.
     /// </summary>
-    IReadOnlyCollection<IDeviceFeature> Sensors { get; }
+    IReadOnlyDictionary<DeviceFeature, IController> Sensors { get; }
 
     IDeviceSetup Setup { get; }
 
     /// <summary>
     /// Gets the collection of sliders defined for the device.
     /// </summary>
-    IReadOnlyCollection<IDeviceFeature> Sliders { get; }
+    IReadOnlyDictionary<DeviceFeature, IController> Sliders { get; }
 
     /// <summary>
     /// Gets an optional name to use when adding the device to a room
@@ -122,12 +123,12 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of switches defined for the device.
     /// </summary>
-    IReadOnlyCollection<IDeviceFeature> Switches { get; }
+    IReadOnlyDictionary<DeviceFeature, IController> Switches { get; }
 
     /// <summary>
     /// Gets the collection of text labels defined for the device.
     /// </summary>
-    IReadOnlyCollection<IDeviceFeature> TextLabels { get; }
+    IReadOnlyDictionary<DeviceFeature, IController> TextLabels { get; }
 
     /// <summary>
     /// Get timing related information (the delays NEEO should use when interacting with a device),
@@ -188,8 +189,6 @@ public interface IDeviceBuilder
     IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
     IDeviceBuilder AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter);
-
-    IDeviceAdapter BuildAdapter();
 
     /// <summary>
     /// Set timing related information (the delays NEEO should use when interacting with a device),
@@ -270,16 +269,27 @@ public interface IDeviceBuilder
     IDeviceBuilder SetSpecificName(string? specificName);
 }
 
-internal sealed partial class DeviceBuilder : IDeviceBuilder
+internal sealed class DeviceBuilder : IDeviceBuilder
 {
     private readonly List<string> _additionalSearchTokens = new();
     private readonly HashSet<DeviceCharacteristic> _characteristics = new();
+    private readonly IReadOnlyDictionary<DeviceFeature, IController> _imageUrlsReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IController> _sensorsReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IController> _slidersReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IController> _switchesReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IController> _textLabelsReadOnly;
+
 
     internal DeviceBuilder(string name, DeviceType type, string? prefix)
     {
         this.Type = type;
         Validator.ValidateString(this.Name = name, name: nameof(name));
         this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name, prefix)}";
+        this._imageUrlsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IController>(this.ImageUrls);
+        this._sensorsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, IValueController, IController>(this.Sensors);
+        this._slidersReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<double>, IController>(this.Sliders);
+        this._switchesReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<bool>, IController>(this.Switches);
+        this._textLabelsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IController>(this.TextLabels);
     }
 
     public string AdapterName { get; }
@@ -287,8 +297,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
     public IReadOnlyCollection<string> AdditionalSearchTokens => this._additionalSearchTokens;
 
     public ButtonHandler? ButtonHandler { get; private set; }
-
-    public Collection<DeviceFeature> Buttons { get; } = new();
 
     public IReadOnlyCollection<DeviceCharacteristic> Characteristics => this._characteristics;
 
@@ -300,11 +308,11 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     public FavoritesHandler? FavoritesHandler { get; private set; }
 
-    public bool HasPowerStateSensor => this.Sensors.Any(sensor => sensor.Type == ComponentType.Power);
+    public bool HasPowerStateSensor => this.Sensors.Keys.Any(sensor => sensor.Type == ComponentType.Power);
 
     public DeviceIconOverride? Icon { get; private set; }
 
-    public Collection<DeviceFeature> ImageUrls { get; } = new();
+    public Dictionary<DeviceFeature, ValueController<string>> ImageUrls { get; } = new();
 
     public DeviceInitializer? Initializer { get; private set; }
 
@@ -316,39 +324,41 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     public Func<JsonElement, Task>? RegistrationProcessor { get; private set; }
 
-    public Collection<DeviceFeature> Sensors { get; } = new();
+    public Dictionary<DeviceFeature, IValueController> Sensors { get; } = new();
 
     public DeviceSetup Setup { get; } = new DeviceSetup();
 
-    public Collection<DeviceFeature> Sliders { get; } = new();
+    public Dictionary<DeviceFeature, ValueController<double>> Sliders { get; } = new();
 
     public string? SpecificName { get; private set; }
 
     public SubscriptionFunction? SubscriptionFunction { get; private set; }
 
-    public Collection<DeviceFeature> Switches { get; } = new();
+    public Dictionary<DeviceFeature, ValueController<bool>> Switches { get; } = new();
 
-    public Collection<DeviceFeature> TextLabels { get; } = new();
+    public Dictionary<DeviceFeature, ValueController<string>> TextLabels { get; } = new();
 
     public DeviceTiming? Timing { get; private set; }
 
     public DeviceType Type { get; }
 
-    IReadOnlyCollection<IDeviceFeature> IDeviceBuilder.Buttons => this.Buttons;
+    public Collection<DeviceFeature> Buttons { get; } = new();
 
     IDeviceSubscriptionCallbacks? IDeviceBuilder.DeviceSubscriptionCallbacks => this.DeviceSubscriptionCallbacks;
 
-    IReadOnlyCollection<IDeviceFeature> IDeviceBuilder.ImageUrls => this.ImageUrls;
+    IReadOnlyCollection<DeviceFeature> IDeviceBuilder.Buttons => this.Buttons;
 
-    IReadOnlyCollection<IDeviceFeature> IDeviceBuilder.Sensors => this.Sensors;
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.ImageUrls => this._imageUrlsReadOnly;
+
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sensors => this._sensorsReadOnly;
 
     IDeviceSetup IDeviceBuilder.Setup => this.Setup;
 
-    IReadOnlyCollection<IDeviceFeature> IDeviceBuilder.Sliders => this.Sliders;
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sliders => this._slidersReadOnly;
 
-    IReadOnlyCollection<IDeviceFeature> IDeviceBuilder.Switches => this.Switches;
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Switches => this._switchesReadOnly;
 
-    IReadOnlyCollection<IDeviceFeature> IDeviceBuilder.TextLabels => this.TextLabels;
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.TextLabels => this._textLabelsReadOnly;
 
     IDeviceBuilder IDeviceBuilder.AddAdditionalSearchTokens(params string[] tokens) => this.AddAdditionalSearchTokens(tokens);
 
@@ -393,8 +403,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
        bool? isLabelVisible,
        DeviceValueGetter<string> getter
     ) => this.AddTextLabel(name, label, isLabelVisible, getter);
-
-    IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
 
     IDeviceBuilder IDeviceBuilder.DefineTiming(DeviceTiming timing) => this.DefineTiming(timing);
 
@@ -459,13 +467,13 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     private DeviceBuilder AddButton(string name, string? label = default)
     {
-        int index = this.Buttons.BinarySearchByValue(name, static feature => feature.Name, StringComparer.OrdinalIgnoreCase);
+        int index = this._buttons.BinarySearchByValue(name, static feature => feature.Name, StringComparer.OrdinalIgnoreCase);
         if (index >= 0)
         {
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
         DeviceFeature feature = new(ComponentType.Button, name, label);
-        this.Buttons.Insert(~index, feature);
+        this._buttons.Insert(~index, feature);
         return this;
     }
 
@@ -496,10 +504,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         {
             throw new InvalidOperationException($"Either {nameof(uri)} or {nameof(getter)} must be specified.");
         }
-        this.ImageUrls.Add(new(ComponentType.ImageUrl, name, label, uri: uri, size: size)
-        {
-            Controller = ComponentController.Create(getter ?? new((_) => Task.FromResult(uri!)))
-        });
+        this.ImageUrls.Add(new(ComponentType.ImageUrl, name, label, uri: uri, size: size), ComponentController.Create(getter ?? new((_) => Task.FromResult(uri!))));
         return this;
     }
 
@@ -559,7 +564,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    
+
 
     private DeviceBuilder DefineTiming(DeviceTiming timing)
     {

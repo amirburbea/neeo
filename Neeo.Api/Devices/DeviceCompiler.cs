@@ -6,96 +6,96 @@ using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices;
 
-internal partial class DeviceBuilder
+public sealed class DeviceCompiler
 {
-    private DeviceAdapter BuildAdapter()
+    private DeviceAdapter BuildAdapter(IDeviceBuilder device)
     {
-        if (this.ButtonHandler == null && this.Buttons.Any())
+        if (device.ButtonHandler == null && device.Buttons.Any())
         {
             throw new InvalidOperationException($"There are buttons defined but no handler was specified (by calling {nameof(IDeviceBuilder.AddButtonHandler)}.");
         }
-        if (this.Type.RequiresInput() && !this.Buttons.Any(button => button.Name.StartsWith(Constants.InputPrefix)))
+        if (device.Type.RequiresInput() && !device.Buttons.Any(button => button.Name.StartsWith(Constants.InputPrefix)))
         {
             throw new InvalidOperationException($"No input buttons defined - note that input button names must begin with \"{Constants.InputPrefix}\".");
         }
-        if (this._characteristics.Contains(DeviceCharacteristic.BridgeDevice) && this.Setup.RegistrationType is null)
+        if (device._characteristics.Contains(DeviceCharacteristic.BridgeDevice) && device.Setup.RegistrationType is null)
         {
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
         }
-        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
-        if (this.RegistrationProcessor != null)
+        List<DeviceCapability> deviceCapabilities = device.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
+        if (device.RegistrationProcessor != null)
         {
             deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);
         }
-        if (this.FavoritesHandler != null)
+        if (device.FavoritesHandler != null)
         {
             deviceCapabilities.Add(DeviceCapability.CustomFavoriteHandler);
         }
-        string pathPrefix = $"/device/{this.AdapterName}/";
+        string pathPrefix = $"/device/{device.AdapterName}/";
         HashSet<string> paths = new();
         List<Component> capabilities = new();
         Dictionary<string, CapabilityHandler> handlers = new();
-        foreach (DeviceFeature feature in this.Buttons)
+        foreach (DeviceFeature feature in device.Buttons)
         {
-            AddCapability(BuildButton(pathPrefix, feature), ComponentController.Create(this.ButtonHandler!, feature.Name));
+            AddCapability(BuildButton(pathPrefix, feature), ComponentController.Create(device.ButtonHandler!, feature.Name));
         }
-        foreach (DeviceFeature feature in this.Sliders)
+        foreach (DeviceFeature feature in device.Sliders)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { SensorType = SensorTypes.Range }), feature.Controller);
             AddCapability(BuildSlider(pathPrefix, feature), feature.Controller);
         }
-        foreach (DeviceFeature feature in this.Switches)
+        foreach (DeviceFeature feature in device.Switches)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Binary }), feature.Controller);
             AddCapability(BuildSwitch(pathPrefix, feature), feature.Controller);
         }
-        foreach (DeviceFeature feature in this.TextLabels)
+        foreach (DeviceFeature feature in device.TextLabels)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), feature.Controller);
             AddCapability(BuildTextLabel(pathPrefix, feature), feature.Controller);
         }
-        foreach (DeviceFeature feature in this.ImageUrls)
+        foreach (DeviceFeature feature in device.ImageUrls)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), feature.Controller);
             AddCapability(BuildImageUrl(pathPrefix, feature), feature.Controller);
         }
-        foreach (DeviceFeature feature in this.Sensors)
+        foreach (DeviceFeature feature in device.Sensors)
         {
             AddCapability(feature.SensorType == SensorTypes.Power ? BuildPowerSensor(pathPrefix, feature) : BuildSensor(pathPrefix, feature), feature.Controller);
         }
-        if (this.DiscoveryProcessor is not null)
+        if (device.DiscoveryProcessor is not null)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(this.DiscoveryProcessor));
-            if (this.RegistrationProcessor is not null)
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(device.DiscoveryProcessor));
+            if (device.RegistrationProcessor is not null)
             {
-                //AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), ComponentController.Create(this.QueryIsRegistered, this.RegistrationProcessor));
+                //AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), ComponentController.Create(device.QueryIsRegistered, device.RegistrationProcessor));
             }
         }
-        else if (!this.Characteristics.Contains(DeviceCharacteristic.DynamicDevice) && deviceCapabilities.FindIndex(static capability => capability.RequiresDiscovery()) is int index and not -1)
+        else if (!device.Characteristics.Contains(DeviceCharacteristic.DynamicDevice) && deviceCapabilities.FindIndex(static capability => capability.RequiresDiscovery()) is int index and not -1)
         {
             throw new InvalidOperationException($"Discovery required for {deviceCapabilities[index]}.");
         }
-        if (this.FavoritesHandler is not null)
+        if (device.FavoritesHandler is not null)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), ComponentController.Create(this.FavoritesHandler));
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), ComponentController.Create(device.FavoritesHandler));
         }
-        if (this.DeviceSubscriptionCallbacks is not null)
+        if (device.DeviceSubscriptionCallbacks is not null)
         {
-            //AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), ComponentController.Create(this.DeviceSubscriptionCallbacks));
+            //AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), ComponentController.Create(device.DeviceSubscriptionCallbacks));
         }
         return new(
-            this.AdapterName,
-            this.Type,
-            this.Manufacturer,
-            this.DriverVersion,
-            this.Timing,
+            device.AdapterName,
+            device.Type,
+            device.Manufacturer,
+            device.DriverVersion,
+            device.Timing,
             deviceCapabilities,
-            this.Setup,
-            this.Initializer,
-            this.Name,
-            this.AdditionalSearchTokens,
-            this.SpecificName,
-            this.Icon,
+            device.Setup,
+            device.Initializer,
+            device.Name,
+            device.AdditionalSearchTokens,
+            device.SpecificName,
+            device.Icon,
             capabilities,
             new CovariantReadOnlyDictionary<string, CapabilityHandler, ICapabilityHandler>(handlers)
         );
@@ -176,7 +176,7 @@ internal partial class DeviceBuilder
             string name = Uri.EscapeDataString(feature.Name);
             string path = pathPrefix + name;
             string label = feature.Label is { } text ? Uri.EscapeDataString(text) : name;
-            return new(name, label, path, new[] { feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d }, feature.Unit!, GetSensorName(name));
+            return new(name, label, path, new(new[] { feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d }, feature.Unit!, GetSensorName(name)));
         }
 
         static SwitchComponent BuildSwitch(string pathPrefix, DeviceFeature feature)
