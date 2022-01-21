@@ -180,7 +180,7 @@ public interface IDeviceBuilder
 
     IDeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic);
 
-    IDeviceBuilder AddImageUrl(string name, string? label, string? uri, ImageSize size, DeviceValueGetter<string>? getter = default);
+    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, string? uri = default, DeviceValueGetter<string>? getter = default);
 
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
@@ -279,7 +279,6 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private readonly IReadOnlyDictionary<DeviceFeature, IController> _switchesReadOnly;
     private readonly IReadOnlyDictionary<DeviceFeature, IController> _textLabelsReadOnly;
 
-
     internal DeviceBuilder(string name, DeviceType type, string? prefix)
     {
         this.Type = type;
@@ -298,22 +297,26 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public ButtonHandler? ButtonHandler { get; private set; }
 
+    public Collection<DeviceFeature> Buttons { get; } = new();
+    IReadOnlyCollection<DeviceFeature> IDeviceBuilder.Buttons => this.Buttons;
     public IReadOnlyCollection<DeviceCharacteristic> Characteristics => this._characteristics;
 
     public DeviceSubscriptionCallbacks? DeviceSubscriptionCallbacks { get; private set; }
 
+    IDeviceSubscriptionCallbacks? IDeviceBuilder.DeviceSubscriptionCallbacks => this.DeviceSubscriptionCallbacks;
     public DiscoveryProcessor? DiscoveryProcessor { get; private set; }
 
     public uint? DriverVersion { get; private set; }
 
     public FavoritesHandler? FavoritesHandler { get; private set; }
 
-    public bool HasPowerStateSensor => this.Sensors.Keys.Any(sensor => sensor.Type == ComponentType.Power);
+    public bool HasPowerStateSensor { get; private set; }
 
     public DeviceIconOverride? Icon { get; private set; }
 
     public Dictionary<DeviceFeature, ValueController<string>> ImageUrls { get; } = new();
 
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.ImageUrls => this._imageUrlsReadOnly;
     public DeviceInitializer? Initializer { get; private set; }
 
     public string Manufacturer { get; private set; } = "NEEO";
@@ -326,39 +329,26 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public Dictionary<DeviceFeature, IValueController> Sensors { get; } = new();
 
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sensors => this._sensorsReadOnly;
     public DeviceSetup Setup { get; } = new DeviceSetup();
 
+    IDeviceSetup IDeviceBuilder.Setup => this.Setup;
     public Dictionary<DeviceFeature, ValueController<double>> Sliders { get; } = new();
 
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sliders => this._slidersReadOnly;
     public string? SpecificName { get; private set; }
 
     public SubscriptionFunction? SubscriptionFunction { get; private set; }
 
     public Dictionary<DeviceFeature, ValueController<bool>> Switches { get; } = new();
 
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Switches => this._switchesReadOnly;
     public Dictionary<DeviceFeature, ValueController<string>> TextLabels { get; } = new();
 
+    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.TextLabels => this._textLabelsReadOnly;
     public DeviceTiming? Timing { get; private set; }
 
     public DeviceType Type { get; }
-
-    public Collection<DeviceFeature> Buttons { get; } = new();
-
-    IDeviceSubscriptionCallbacks? IDeviceBuilder.DeviceSubscriptionCallbacks => this.DeviceSubscriptionCallbacks;
-
-    IReadOnlyCollection<DeviceFeature> IDeviceBuilder.Buttons => this.Buttons;
-
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.ImageUrls => this._imageUrlsReadOnly;
-
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sensors => this._sensorsReadOnly;
-
-    IDeviceSetup IDeviceBuilder.Setup => this.Setup;
-
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sliders => this._slidersReadOnly;
-
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Switches => this._switchesReadOnly;
-
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.TextLabels => this._textLabelsReadOnly;
 
     IDeviceBuilder IDeviceBuilder.AddAdditionalSearchTokens(params string[] tokens) => this.AddAdditionalSearchTokens(tokens);
 
@@ -373,10 +363,10 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     IDeviceBuilder IDeviceBuilder.AddImageUrl(
         string name,
         string? label,
-        string? uri,
         ImageSize size,
+        string? uri,
         DeviceValueGetter<string>? getter
-    ) => this.AddImageUrl(name, label, uri, size, getter);
+    ) => this.AddImageUrl(name, label, size, uri, getter);
 
     IDeviceBuilder IDeviceBuilder.AddPowerStateSensor(DeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor);
 
@@ -467,13 +457,15 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private DeviceBuilder AddButton(string name, string? label = default)
     {
-        int index = this._buttons.BinarySearchByValue(name, static feature => feature.Name, StringComparer.OrdinalIgnoreCase);
+        Validator.ValidateString(name);
+        Validator.ValidateString(label, allowNull: true);
+        int index = this.Buttons.BinarySearchByValue(name, static feature => feature.Name, StringComparer.OrdinalIgnoreCase);
         if (index >= 0)
         {
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
         DeviceFeature feature = new(ComponentType.Button, name, label);
-        this._buttons.Insert(~index, feature);
+        this.Buttons.Insert(~index, feature);
         return this;
     }
 
@@ -498,13 +490,16 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddImageUrl(string name, string? label, string? uri, ImageSize size, DeviceValueGetter<string>? getter)
+    private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, string? uri, DeviceValueGetter<string>? getter)
     {
         if (uri == null && getter == null)
         {
             throw new InvalidOperationException($"Either {nameof(uri)} or {nameof(getter)} must be specified.");
         }
-        this.ImageUrls.Add(new(ComponentType.ImageUrl, name, label, uri: uri, size: size), ComponentController.Create(getter ?? new((_) => Task.FromResult(uri!))));
+        this.ImageUrls.Add(
+            new(ComponentType.ImageUrl, name, label, Uri: uri, Size: size),
+            new(getter ?? new((_) => Task.FromResult(uri!)))
+        );
         return this;
     }
 
@@ -514,10 +509,10 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new InvalidOperationException("PowerStateSensor already added.");
         }
-        this.Sensors.Add(new(ComponentType.Power, Constants.PowerSensorName, Constants.PowerSensorLabel, sensorType: SensorTypes.Power)
-        {
-            Controller = ComponentController.Create(getter ?? throw new ArgumentNullException(nameof(getter)))
-        });
+        this.Sensors.Add(
+            new(ComponentType.Power, Constants.PowerSensorName, Constants.PowerSensorLabel, SensorType: SensorTypes.Power),
+            ValueController.Create(getter)
+        );
         return this;
     }
 
@@ -527,44 +522,39 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
         }
-        this.Sensors.Add(new(ComponentType.Sensor, name, label, rangeLow: rangeLow, rangeHigh: rangeHigh, unit: units)
-        {
-            Controller = ComponentController.Create(getter ?? throw new ArgumentNullException(nameof(getter)))
-        });
+        this.Sensors.Add(
+            new(ComponentType.Sensor, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units),
+            ValueController.Create(getter)
+        );
         return this;
     }
 
     private DeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string? units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
     {
-        this.Sliders.Add(new(ComponentType.Slider, name, label, rangeLow: rangeLow, rangeHigh: rangeHigh, unit: units ?? "%", sensorType: SensorTypes.Range)
-        {
-            Controller = ComponentController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
-        });
+        this.Sliders.Add(
+            new(ComponentType.Slider, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units ?? "%", SensorType: SensorTypes.Range),
+            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+        );
         return this;
     }
 
     private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
     {
-        this.Switches.Add(new(ComponentType.Switch, name, label)
-        {
-            Controller = ComponentController.Create(
-                getter ?? throw new ArgumentNullException(nameof(getter)),
-                setter ?? throw new ArgumentNullException(nameof(setter))
-            )
-        });
+        this.Switches.Add(
+            new(ComponentType.Switch, name, label),
+            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+        );
         return this;
     }
 
     private DeviceBuilder AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter)
     {
-        this.TextLabels.Add(new(ComponentType.TextLabel, name, label, isLabelVisible: isLabelVisible)
-        {
-            Controller = ComponentController.Create(getter ?? throw new ArgumentNullException(nameof(getter)))
-        });
+        this.TextLabels.Add(
+            new(ComponentType.TextLabel, name, label, IsLabelVisible: isLabelVisible),
+            ValueController.Create(getter)
+        );
         return this;
     }
-
-
 
     private DeviceBuilder DefineTiming(DeviceTiming timing)
     {
@@ -679,13 +669,6 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     {
         Validator.ValidateString(this.SpecificName = specificName, allowNull: true);
         return this;
-    }
-
-    private static class Constants
-    {
-        public const string InputPrefix = "INPUT";
-        public const string PowerSensorLabel = "Powerstate";
-        public const string PowerSensorName = "powerstate";
     }
 
     private sealed record class SecurityCodeContainer(String SecurityCode);

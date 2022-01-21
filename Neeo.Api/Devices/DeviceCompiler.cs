@@ -2,13 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using Neeo.Api.Devices.Components;
+using Neeo.Api.Devices.Controllers;
 using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices;
 
 public sealed class DeviceCompiler
 {
-    private DeviceAdapter BuildAdapter(IDeviceBuilder device)
+    
+
+    internal DeviceAdapter BuildAdapter(IDeviceBuilder device)
     {
         if (device.ButtonHandler == null && device.Buttons.Any())
         {
@@ -18,7 +21,7 @@ public sealed class DeviceCompiler
         {
             throw new InvalidOperationException($"No input buttons defined - note that input button names must begin with \"{Constants.InputPrefix}\".");
         }
-        if (device._characteristics.Contains(DeviceCharacteristic.BridgeDevice) && device.Setup.RegistrationType is null)
+        if (device.Characteristics.Contains(DeviceCharacteristic.BridgeDevice) && device.Setup.RegistrationType is null)
         {
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
         }
@@ -37,35 +40,35 @@ public sealed class DeviceCompiler
         Dictionary<string, CapabilityHandler> handlers = new();
         foreach (DeviceFeature feature in device.Buttons)
         {
-            AddCapability(BuildButton(pathPrefix, feature), ComponentController.Create(device.ButtonHandler!, feature.Name));
+            AddCapability(BuildButton(pathPrefix, feature), new ButtonController(device.ButtonHandler!, feature.Name));
         }
-        foreach (DeviceFeature feature in device.Sliders)
+        foreach ((DeviceFeature feature, IController controller) in device.Sliders)
         {
-            AddCapability(BuildSensor(pathPrefix, feature with { SensorType = SensorTypes.Range }), feature.Controller);
-            AddCapability(BuildSlider(pathPrefix, feature), feature.Controller);
+            AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Range }), controller);
+            AddCapability(BuildSlider(pathPrefix, feature), controller);
         }
-        foreach (DeviceFeature feature in device.Switches)
+        foreach ((DeviceFeature feature, IController controller) in device.Switches)
         {
-            AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Binary }), feature.Controller);
-            AddCapability(BuildSwitch(pathPrefix, feature), feature.Controller);
+            AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Binary }), controller);
+            AddCapability(BuildSwitch(pathPrefix, feature), controller);
         }
-        foreach (DeviceFeature feature in device.TextLabels)
+        foreach ((DeviceFeature feature, IController controller) in device.TextLabels)
         {
-            AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), feature.Controller);
-            AddCapability(BuildTextLabel(pathPrefix, feature), feature.Controller);
+            AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), controller);
+            AddCapability(BuildTextLabel(pathPrefix, feature), controller);
         }
-        foreach (DeviceFeature feature in device.ImageUrls)
+        foreach ((DeviceFeature feature, IController controller) in device.ImageUrls)
         {
-            AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), feature.Controller);
-            AddCapability(BuildImageUrl(pathPrefix, feature), feature.Controller);
+            AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), controller);
+            AddCapability(BuildImageUrl(pathPrefix, feature), controller);
         }
-        foreach (DeviceFeature feature in device.Sensors)
+        foreach ((DeviceFeature feature, IController controller) in device.Sensors)
         {
-            AddCapability(feature.SensorType == SensorTypes.Power ? BuildPowerSensor(pathPrefix, feature) : BuildSensor(pathPrefix, feature), feature.Controller);
+            AddCapability(feature.SensorType == SensorTypes.Power ? BuildPowerSensor(pathPrefix, feature) : BuildSensor(pathPrefix, feature), controller);
         }
         if (device.DiscoveryProcessor is not null)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(device.DiscoveryProcessor));
+           // AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(device.DiscoveryProcessor));
             if (device.RegistrationProcessor is not null)
             {
                 //AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), ComponentController.Create(device.QueryIsRegistered, device.RegistrationProcessor));
@@ -77,7 +80,7 @@ public sealed class DeviceCompiler
         }
         if (device.FavoritesHandler is not null)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), ComponentController.Create(device.FavoritesHandler));
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), new FavoritesController(device.FavoritesHandler));
         }
         if (device.DeviceSubscriptionCallbacks is not null)
         {
@@ -100,13 +103,13 @@ public sealed class DeviceCompiler
             new CovariantReadOnlyDictionary<string, CapabilityHandler, ICapabilityHandler>(handlers)
         );
 
-        void AddCapability(Component capability, IComponentController? controller)
+        void AddCapability(Component capability, IController controller)
         {
-            AddRouteHandler(capability, controller ?? throw new ArgumentNullException(nameof(controller)));
+            AddRouteHandler(capability, controller);
             capabilities.Add(capability);
         }
 
-        void AddRouteHandler(Component capability, IComponentController controller)
+        void AddRouteHandler(Component capability, IController controller)
         {
             handlers[Uri.UnescapeDataString(capability.Name)] = paths.Add(capability.Path)
                 ? new(capability.Type, controller)

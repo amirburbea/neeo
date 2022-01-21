@@ -1,10 +1,12 @@
-﻿namespace Neeo.Api.Devices;
+﻿using Neeo.Api.Devices.Controllers;
+
+namespace Neeo.Api.Devices;
 
 public interface ICapabilityHandler
 {
     ComponentType ComponentType { get; }
 
-    IComponentController Controller { get; }
+    IController Controller { get; }
 }
 
-internal sealed record class CapabilityHandler(ComponentType ComponentType, IComponentController Controller) : ICapabilityHandler;
+internal sealed record class CapabilityHandler(ComponentType ComponentType, IController Controller) : ICapabilityHandler;

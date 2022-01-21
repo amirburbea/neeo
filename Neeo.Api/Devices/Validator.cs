@@ -29,7 +29,7 @@ internal static class Validator
     }
 
     [return: NotNullIfNotNull("text")]
-    public static string? ValidateString(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerMemberName] string name = "")
+    public static string? ValidateString(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerArgumentExpression("text")] string name = "")
     {
         return text switch
         {
@@ -37,7 +37,5 @@ internal static class Validator
             { Length: int length } when length < minLength || length > maxLength => throw new ValidationException($"{GetName()} must be between {minLength} and {maxLength} characters long."),
             _ => text
         };
-
-        string GetName() => name.StartsWith("Set", StringComparison.Ordinal) ? name[3..] : name;
     }
 }

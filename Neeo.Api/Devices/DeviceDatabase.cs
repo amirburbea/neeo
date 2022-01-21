@@ -47,8 +47,8 @@ namespace Neeo.Api.Devices
                     nameof(IDeviceModel.Tokens),
                     nameof(IDeviceModel.Type),
                 },
-                Threshold = Constants.MatchFactor,
-                Delimiter = new[] { Constants.Delimiter },
+                Threshold = OptionConstants.MatchFactor,
+                Delimiter = new[] { OptionConstants.Delimiter },
                 Unique = true,
             });
         }
@@ -73,7 +73,7 @@ namespace Neeo.Api.Devices
 
         public IEnumerable<ISearchItem<IDeviceModel>> Search(string? query) => string.IsNullOrEmpty(query)
             ? Array.Empty<ISearchItem<IDeviceModel>>()
-            : this._deviceIndex.Search(this._devices, query).Take(Constants.MaxSearchResults);
+            : this._deviceIndex.Search(this._devices, query).Take(OptionConstants.MaxSearchResults);
 
         private async Task InitializeAsync(IDeviceAdapter adapter)
         {
@@ -109,7 +109,7 @@ namespace Neeo.Api.Devices
             }
         }
 
-        private static class Constants
+        private static class OptionConstants
         {
             public const char Delimiter = ' ';
             public const double MatchFactor = 0.5;
