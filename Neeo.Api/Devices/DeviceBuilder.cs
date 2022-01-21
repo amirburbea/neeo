@@ -89,15 +89,7 @@ public interface IDeviceBuilder
     /// </summary>
     string Name { get; }
 
-    /// <summary>
-    /// Gets a function used by the Brain to determine if registration is not required.
-    /// </summary>
-    QueryIsRegistered? QueryIsRegistered { get; }
-
-    /// <summary>
-    /// Gets a function used by the Brain to attempt registration of the device.
-    /// </summary>
-    Func<JsonElement, Task>? RegistrationProcessor { get; }
+    IRegistrationController? RegistrationController { get; }
 
     /// <summary>
     /// Gets the collection of sensors defined for the device.
@@ -298,12 +290,15 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     public ButtonHandler? ButtonHandler { get; private set; }
 
     public Collection<DeviceFeature> Buttons { get; } = new();
+
     IReadOnlyCollection<DeviceFeature> IDeviceBuilder.Buttons => this.Buttons;
+
     public IReadOnlyCollection<DeviceCharacteristic> Characteristics => this._characteristics;
 
     public DeviceSubscriptionCallbacks? DeviceSubscriptionCallbacks { get; private set; }
 
     IDeviceSubscriptionCallbacks? IDeviceBuilder.DeviceSubscriptionCallbacks => this.DeviceSubscriptionCallbacks;
+
     public DiscoveryProcessor? DiscoveryProcessor { get; private set; }
 
     public uint? DriverVersion { get; private set; }
@@ -317,25 +312,29 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     public Dictionary<DeviceFeature, ValueController<string>> ImageUrls { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.ImageUrls => this._imageUrlsReadOnly;
+
     public DeviceInitializer? Initializer { get; private set; }
 
     public string Manufacturer { get; private set; } = "NEEO";
 
     public string Name { get; }
 
-    public QueryIsRegistered? QueryIsRegistered { get; private set; }
+    IRegistrationController? IDeviceBuilder.RegistrationController => this.RegistrationController;
 
-    public Func<JsonElement, Task>? RegistrationProcessor { get; private set; }
+    public RegistrationController? RegistrationController { get; private set; }
 
     public Dictionary<DeviceFeature, IValueController> Sensors { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sensors => this._sensorsReadOnly;
+
     public DeviceSetup Setup { get; } = new DeviceSetup();
 
     IDeviceSetup IDeviceBuilder.Setup => this.Setup;
+
     public Dictionary<DeviceFeature, ValueController<double>> Sliders { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sliders => this._slidersReadOnly;
+
     public string? SpecificName { get; private set; }
 
     public SubscriptionFunction? SubscriptionFunction { get; private set; }
@@ -343,9 +342,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     public Dictionary<DeviceFeature, ValueController<bool>> Switches { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Switches => this._switchesReadOnly;
+
     public Dictionary<DeviceFeature, ValueController<string>> TextLabels { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.TextLabels => this._textLabelsReadOnly;
+
     public DeviceTiming? Timing { get; private set; }
 
     public DeviceType Type { get; }
@@ -408,12 +409,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         string description,
         QueryIsRegistered queryIsRegistered,
         CredentialsRegistrationProcessor processor
-    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration<Credentials>(
+    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
         headerText,
         description,
         RegistrationType.Credentials,
         queryIsRegistered,
-        processor.Invoke
+        (Credentials credentials) => processor(credentials)
     );
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
@@ -592,8 +593,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new InvalidOperationException("Registration is already defined.");
         }
         this.Setup.RegistrationType = type;
-        this.RegistrationProcessor = element => processor(element.Deserialize<TPayload>());
-        this.QueryIsRegistered = queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered));
+        this.RegistrationController = new(queryIsRegistered, element => processor(element.Deserialize<TPayload>()));
         Validator.ValidateString(this.Setup.RegistrationDescription = description, maxLength: 255, name: nameof(description));
         Validator.ValidateString(this.Setup.RegistrationHeaderText = headerText, maxLength: 255, name: nameof(headerText));
         return this;

@@ -33,8 +33,8 @@ internal static class Validator
     {
         return text switch
         {
-            null when !allowNull => throw new ValidationException($"{GetName()} is null."),
-            { Length: int length } when length < minLength || length > maxLength => throw new ValidationException($"{GetName()} must be between {minLength} and {maxLength} characters long."),
+            null when !allowNull => throw new ValidationException($"{name} is null."),
+            { Length: int length } when length < minLength || length > maxLength => throw new ValidationException($"{name} must be between {minLength} and {maxLength} characters long."),
             _ => text
         };
     }

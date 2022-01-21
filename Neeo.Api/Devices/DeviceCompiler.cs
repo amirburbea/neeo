@@ -69,9 +69,9 @@ public sealed class DeviceCompiler
         if (device.DiscoveryProcessor is not null)
         {
            // AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(device.DiscoveryProcessor));
-            if (device.RegistrationProcessor is not null)
+            if (device.RegistrationController is not null)
             {
-                //AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), ComponentController.Create(device.QueryIsRegistered, device.RegistrationProcessor));
+                AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), device.RegistrationController);
             }
         }
         else if (!device.Characteristics.Contains(DeviceCharacteristic.DynamicDevice) && deviceCapabilities.FindIndex(static capability => capability.RequiresDiscovery()) is int index and not -1)
