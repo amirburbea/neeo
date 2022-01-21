@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Neeo.Api.Notifications;
 
 namespace Neeo.Api.Devices;
 
@@ -65,6 +66,6 @@ public delegate Task DeviceValueSetter<TValue>(string deviceId, TValue value)
 /// </remarks>
 public delegate Task FavoritesHandler(string deviceId, string favorite);
 
-public delegate void SubscriptionFunction(UpdateCallback updateCallback, IPowerCallbacks powerCallbacs);
+public delegate void SubscriptionFunction(UpdateNotifier notifyUpdate, IPowerNotifications powerNotifications);
 
-public delegate Task UpdateCallback(Message message);
+public delegate Task UpdateNotifier(Message message);

@@ -166,8 +166,8 @@ internal partial class DeviceBuilder
                 label,
                 path,
                 sensorType is SensorTypes.Range
-                    ? new RangeSensor(feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d, feature.Unit)
-                    : new Sensor(sensorType)
+                    ? new RangeSensorDescriptor(feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d, feature.Unit)
+                    : new SensorDescriptor(sensorType)
             );
         }
 
@@ -176,7 +176,7 @@ internal partial class DeviceBuilder
             string name = Uri.EscapeDataString(feature.Name);
             string path = pathPrefix + name;
             string label = feature.Label is { } text ? Uri.EscapeDataString(text) : name;
-            return new(name, label, path, new Slider(new[] { feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d }, feature.Unit!, GetSensorName(name)));
+            return new(name, label, path, new[] { feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d }, feature.Unit!, GetSensorName(name));
         }
 
         static SwitchComponent BuildSwitch(string pathPrefix, DeviceFeature feature)
@@ -187,6 +187,6 @@ internal partial class DeviceBuilder
             return new(name, label, path, GetSensorName(name));
         }
 
-        static string GetSensorName(string name) => name.EndsWith(Sensor.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), Sensor.ComponentSuffix);
+        static string GetSensorName(string name) => name.EndsWith(SensorDescriptor.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorDescriptor.ComponentSuffix);
     }
 }

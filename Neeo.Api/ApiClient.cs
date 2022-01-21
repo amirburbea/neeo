@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -86,15 +87,16 @@ public interface IApiClient
 
 internal sealed class ApiClient : IApiClient, IDisposable
 {
+    private static readonly MediaTypeHeaderValue _jsonContentType = new("application/json");
+
     private readonly HttpClient _httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
     private readonly ILogger<ApiClient>? _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(IPEndPoint endpoint, ILogger<ApiClient>? logger = default) => (this._uriPrefix, this._logger) = ($"http://{endpoint}", logger);
+    public ApiClient(IPAddress brainIPAddress, int servicePort = 3000) => this._uriPrefix = $"http://{brainIPAddress}:{servicePort}";
 
-    public ApiClient(SdkEnvironment environment, ILogger<ApiClient> logger) : this(environment.BrainEndPoint, logger)
-    {
-    }
+    public ApiClient(SdkEnvironment environment, ILogger<ApiClient> logger)
+        : this(environment.Brain.IPAddress, environment.Brain.ServicePort) => this._logger = logger;
 
     public void Dispose() => this._httpClient.Dispose();
 
@@ -114,19 +116,20 @@ internal sealed class ApiClient : IApiClient, IDisposable
 
     public Task<TData> PostAsync<TBody, TData>(string path, TBody body, CancellationToken cancellationToken) => this.PostAsync(path, body, (TData data) => data, cancellationToken);
 
-    public Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken) => this.FetchAsync(
-        path,
-        HttpMethod.Post,
-        new(JsonSerializer.SerializeToUtf8Bytes(body, JsonSerialization.Options)) { Headers = { ContentType = new("application/json") } },
-        transform,
-        cancellationToken
-    );
+    public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken)
+    {
+        using MemoryStream stream = new();
+        await JsonSerializer.SerializeAsync(stream, body, JsonSerialization.Options, cancellationToken).ConfigureAwait(false);
+        stream.Seek(0L, SeekOrigin.Begin);
+        using StreamContent content = new(stream) { Headers = { ContentType = ApiClient._jsonContentType } };
+        return await this.FetchAsync(path, HttpMethod.Post, content, transform, cancellationToken).ConfigureAwait(false);
+    }
 
-    private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, ByteArrayContent? body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+    private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, HttpContent? content, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
     {
         string uri = this._uriPrefix + path;
         this._logger?.LogInformation("Making {method} request to {uri}...", method.Method, uri);
-        using HttpRequestMessage request = new(method, uri) { Content = body };
+        using HttpRequestMessage request = new(method, uri) { Content = content };
         using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.OK)
         {

@@ -8,12 +8,12 @@ namespace Neeo.Api.Notifications;
 
 internal interface INotificationService
 {
-    Task<bool> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default);
+    Task<bool> SendAsync(Notification message, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationService : INotificationService
 {
-    private readonly Dictionary<string, NotificationMessage> _cache = new();
+    private readonly Dictionary<string, Notification> _cache = new();
     private readonly IApiClient _client;
     private readonly ILogger<INotificationService> _logger;
     private int _queueSize;
@@ -23,7 +23,7 @@ internal sealed class NotificationService : INotificationService
         (this._client, this._logger) = (client, logger);
     }
 
-    public async Task<bool> SendAsync(NotificationMessage message, CancellationToken cancellationToken)
+    public async Task<bool> SendAsync(Notification message, CancellationToken cancellationToken)
     {
         if (message.Type == null)
         {
@@ -75,9 +75,9 @@ internal sealed class NotificationService : INotificationService
         }
     }
 
-    private bool IsDuplicate(NotificationMessage message) => this._cache.TryGetValue(message.Type, out NotificationMessage other) && other == message;
+    private bool IsDuplicate(Notification message) => this._cache.TryGetValue(message.Type, out Notification other) && other == message;
 
-    private void UpdateCache(NotificationMessage message)
+    private void UpdateCache(Notification message)
     {
         if (!this._cache.ContainsKey(message.Type) && this._cache.Count >= Constants.MaxCachedEntries)
         {

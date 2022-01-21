@@ -15,9 +15,9 @@ namespace Neeo.Api;
 /// <summary>
 /// Returns information about and contains methods for interacting with the NEEO Brain.
 /// </summary>
-public sealed partial class Brain
+public sealed class Brain
 {
-    private static readonly Regex _versionPrefixRegex = new(@"^(?<v>0.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+    private static readonly Regex _versionPrefixRegex = new(@"^0\.(?<v>\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
 
     private IHost? _host;
 
@@ -26,27 +26,20 @@ public sealed partial class Brain
     /// </summary>
     /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
     /// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
-    /// <param name="name">The name assigned to the NEEO Brain by the end user.</param>
     /// <param name="hostName">The host name of the NEEO Brain.</param>
     /// <param name="version">The firmware version of the NEEO Brain.</param>
-    /// <param name="region">The region set in the NEEO Brain firmware.<para/>Example: &quot;US&quot;.</param>
-    private Brain(IPAddress ipAddress, int servicePort, string name, string hostName, string version, string region)
+    public Brain(IPAddress ipAddress, int servicePort = 3000, string? hostName = default, string version = "0.50.0")
     {
-        (this.IPAddress, this.ServicePort, this.Name, this.HostName, this.Version, this.Region) = (
-            ipAddress ?? throw new ArgumentNullException(nameof(ipAddress)),
-            servicePort,
-            name ?? throw new ArgumentNullException(nameof(name)),
-            hostName ?? throw new ArgumentNullException(nameof(hostName)),
-            version ?? throw new ArgumentNullException(nameof(version)),
-            region ?? throw new ArgumentNullException(nameof(region))
-        );
+        if (ipAddress is not { AddressFamily: AddressFamily.InterNetwork })
+        {
+            throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress));
+        }
+        if (Brain._versionPrefixRegex.Match(version) is not { Success: true } match || int.Parse(match.Groups["v"].Value, CultureInfo.InvariantCulture) < 50)
+        {
+            throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
+        }
+        (this.IPAddress, this.ServicePort, this.HostName) = (ipAddress, servicePort, hostName ?? ipAddress.ToString());
     }
-
-    /// <summary>
-    /// Gets a value indicating if the Brain firmware version is sufficient for running the SDK.
-    /// The Brain must be running firmware <c>v0.50</c> or above.
-    /// </summary>
-    public bool HasCompatibleFirmware => double.Parse(Brain._versionPrefixRegex.Match(this.Version).Groups["v"].Value, CultureInfo.InvariantCulture) > 0.5;
 
     /// <summary>
     /// The host name of the NEEO Brain.
@@ -59,24 +52,9 @@ public sealed partial class Brain
     public IPAddress IPAddress { get; }
 
     /// <summary>
-    /// The name assigned to the NEEO Brain by the end user.
-    /// </summary>
-    public string Name { get; }
-
-    /// <summary>
-    /// The region set in the NEEO Brain firmware.<para/>Example: &quot;US&quot;.
-    /// </summary>
-    public string Region { get; }
-
-    /// <summary>
     /// The port on which the NEEO Brain API is running.
     /// </summary>
     public int ServicePort { get; }
-
-    /// <summary>
-    /// The firmware version of the NEEO Brain.
-    /// </summary>
-    public string Version { get; }
 
     /// <summary>
     /// Opens the default browser to the Brain WebUI.
@@ -98,13 +76,9 @@ public sealed partial class Brain
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     public async Task StartServerAsync(IDeviceBuilder[] devices, string? name = default, IPAddress? hostIPAddress = null, int port = 9000, CancellationToken cancellationToken = default)
     {
-        if (this._host != null)
+        if (this._host is { })
         {
             throw new InvalidOperationException("Server is already running.");
-        }
-        if (!this.HasCompatibleFirmware)
-        {
-            throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version.  It must be upgraded first.");
         }
         this._host = await Server.StartAsync(this, name ?? Dns.GetHostName(), devices, hostIPAddress, port, cancellationToken).ConfigureAwait(false);
     }

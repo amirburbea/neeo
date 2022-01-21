@@ -27,10 +27,10 @@ internal static class Server
 {
     public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress? hostIPAddress, int port, CancellationToken cancellationToken)
     {
-        string adapterName = $"src-{UniqueNameGenerator.Generate(name)}";
+        string sdkAdapterName = $"src-{UniqueNameGenerator.Generate(name)}";
         IHost host = Server.CreateHostBuilder(
             brain ?? throw new ArgumentNullException(nameof(brain)),
-            adapterName,
+            sdkAdapterName,
             devices ?? throw new ArgumentNullException(nameof(devices)),
             hostIPAddress ??= await Server.GetFallbackHostIPAddress(brain.IPAddress, cancellationToken),
             port
@@ -42,10 +42,9 @@ internal static class Server
         {
             try
             {
-                if (await client.RegisterServerAsync(adapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false))
+                if (await client.RegisterServerAsync(sdkAdapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false))
                 {
-                    SdkEnvironment environment = host.Services.GetRequiredService<SdkEnvironment>();
-                    logger.LogInformation("Server http://{hostIP}:{port} ({adapterName}) registered on {brainHost}.local ({brainIP}).", hostIPAddress, port, environment.SdkAdapterName, brain.HostName, brain.IPAddress);
+                    logger.LogInformation("Server http://{hostIP}:{port} ({adapterName}) registered on {brainHost}.local ({brainIP}).", hostIPAddress, port, sdkAdapterName, brain.HostName, brain.IPAddress);
                     return host;
                 }
             }
@@ -59,17 +58,16 @@ internal static class Server
 
     public static async Task StopAsync(IHost host, CancellationToken cancellationToken)
     {
-        using (host)
+        try
         {
             ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
-            Brain brain = host.Services.GetRequiredService<Brain>();
+            SdkEnvironment environment = host.Services.GetRequiredService<SdkEnvironment>();
             IApiClient client = host.Services.GetRequiredService<IApiClient>();
-            string name = host.Services.GetRequiredService<SdkEnvironment>().SdkAdapterName;
             try
             {
-                if (await client.UnregisterServerAsync(name, cancellationToken).ConfigureAwait(false))
+                if (await client.UnregisterServerAsync(environment.SdkAdapterName, cancellationToken).ConfigureAwait(false))
                 {
-                    logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
+                    logger.LogInformation("Server unregistered from {brain}.", environment.Brain.HostName);
                 }
             }
             catch (Exception e)
@@ -77,6 +75,10 @@ internal static class Server
                 logger.LogWarning("Failed to unregister with brain\n{content}", e.Message);
             }
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            host.Dispose();
         }
     }
 
@@ -102,8 +104,7 @@ internal static class Server
                 .ConfigureServices((context, services) =>
                 {
                     services
-                        .AddSingleton(brain)
-                        .AddSingleton(new SdkEnvironment(sdkAdapterName, new(brain.IPAddress,brain.ServicePort)))
+                        .AddSingleton(new SdkEnvironment(sdkAdapterName, brain))
                         .AddSingleton<IApiClient, ApiClient>()
                         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
                         .AddSingleton<INotificationService, NotificationService>()
@@ -146,14 +147,14 @@ internal static class Server
     private static Task<bool> RegisterServerAsync(this IApiClient client, string name, string baseUrl, CancellationToken cancellationToken) => client.PostAsync(
         UrlPaths.RegisterServer,
         new { Name = name, BaseUrl = baseUrl },
-        (SuccessResult result) => result.Success,
+        static (SuccessResult result) => result.Success,
         cancellationToken
     );
 
     private static Task<bool> UnregisterServerAsync(this IApiClient client, string name, CancellationToken cancellationToken) => client.PostAsync(
         UrlPaths.UnregisterServer,
         new { Name = name },
-        (SuccessResult result) => result.Success,
+        static (SuccessResult result) => result.Success,
         cancellationToken
     );
 

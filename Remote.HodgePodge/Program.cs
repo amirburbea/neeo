@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Broadlink.RM;
 using Neeo.Api;
 using Neeo.Api.Devices;
+using Neeo.Discovery;
 
 namespace Remote.HodgePodge;
 
@@ -46,13 +47,12 @@ internal static class Program
         Brain? brain;
         if (arg != null && _ipAddressRegex.IsMatch(arg))
         {
-            IPAddress address = IPAddress.Parse(arg.Trim());
-            brain = await Brain.CreateAsync(address);
+            brain = new(IPAddress.Parse(arg.Trim()));
         }
         else
         {
             Console.WriteLine("Discovering brain...");
-            brain = await Brain.DiscoverAsync();
+            brain = await BrainDiscovery.DiscoverAsync();
         }
         if (brain is null)
         {
