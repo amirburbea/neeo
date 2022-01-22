@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Api.Notifications;
 using Neeo.Api.Utilities.TokenSearch;
 
 namespace Neeo.Api.Devices
@@ -12,6 +13,8 @@ namespace Neeo.Api.Devices
     /// </summary>
     public interface IDeviceDatabase
     {
+        IReadOnlyCollection<IDeviceAdapter> Adapters { get; }
+
         ValueTask<IDeviceAdapter> GetAdapterAsync(string adapterName);
 
         IDeviceModel GetDeviceByAdapterName(string adapterName);
@@ -29,13 +32,23 @@ namespace Neeo.Api.Devices
         private readonly Dictionary<string, Task> _initializationTasks = new();
         private readonly HashSet<string> _initializedAdapters = new();
         private readonly ILogger<IDeviceDatabase> _logger;
+        private readonly INotificationService _notificationService;
 
-        public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> deviceBuilders, IDeviceCompiler deviceCompiler, ILogger<IDeviceDatabase> logger)
+        public DeviceDatabase(
+            IReadOnlyCollection<IDeviceBuilder> deviceBuilders,
+            INotificationService notificationService,
+            ILogger<IDeviceDatabase> logger
+        )
         {
+            this._notificationService = notificationService;
             this._logger = logger;
-            foreach (IDeviceBuilder deviceBuilder in deviceBuilders)
+            foreach (IDeviceBuilder builder in deviceBuilders)
             {
-                IDeviceAdapter adapter = deviceCompiler.Compile(deviceBuilder);
+                IDeviceAdapter adapter = DeviceAdapter.Build(builder);
+                if (builder.SubscriptionFunction is { } callback)
+                {
+                    this.BuildNotificationMethods(callback, builder.AdapterName, builder.HasPowerStateSensor);
+                }
                 this._adapters.Add(adapter.AdapterName, adapter);
                 this._devices.Add(new(this._devices.Count, adapter));
             }
@@ -52,6 +65,8 @@ namespace Neeo.Api.Devices
                 Delimiter = new[] { OptionConstants.Delimiter }
             });
         }
+
+        IReadOnlyCollection<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values;
 
         public async ValueTask<IDeviceAdapter> GetAdapterAsync(string adapterName)
         {
@@ -74,6 +89,21 @@ namespace Neeo.Api.Devices
         public IEnumerable<ISearchItem<IDeviceModel>> Search(string? query) => string.IsNullOrEmpty(query)
             ? Array.Empty<ISearchItem<IDeviceModel>>()
             : this._deviceIndex.Search(this._devices, query).Take(OptionConstants.MaxSearchResults);
+
+        private void BuildNotificationMethods(SubscriptionFunction callback, string deviceAdapterName, bool createPowerNotifications)
+        {
+            callback(
+                message => this._notificationService.SendSensorNotificationAsync(message, deviceAdapterName),
+                createPowerNotifications
+                    ? new PowerNotifications(uniqueDeviceId => NotifyPowerState(uniqueDeviceId, true), uniqueDeviceId => NotifyPowerState(uniqueDeviceId, false))
+                    : default
+            );
+
+            Task NotifyPowerState(string uniqueDeviceId, bool value) => this._notificationService.SendNotificationAsync(
+                new(uniqueDeviceId, Constants.PowerSensorName, value),
+                deviceAdapterName
+            );
+        }
 
         private async ValueTask InitializeAsync(IDeviceAdapter adapter)
         {

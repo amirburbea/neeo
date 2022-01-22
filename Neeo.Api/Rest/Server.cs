@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -26,9 +25,7 @@ namespace Neeo.Api.Rest;
 /// </summary>
 internal static class Server
 {
-    private static readonly Comparer<object> _stepComparer = Comparer<object>.Create(Server.CompareSteps);
-
-    public static async Task<IHost> StartAsync(Brain brain, string name, IReadOnlyCollection<IDeviceBuilder> devices, IPAddress? hostIPAddress, int port, CancellationToken cancellationToken)
+    public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress? hostIPAddress, int port, CancellationToken cancellationToken)
     {
         string sdkAdapterName = $"src-{UniqueNameGenerator.Generate(name)}";
         IHost host = Server.CreateHostBuilder(
@@ -38,7 +35,8 @@ internal static class Server
             devices ?? throw new ArgumentNullException(nameof(devices))
         ).Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
-        foreach (IStartupStep step in host.Services.GetServices<IStartupStep>().OrderBy(step => step, Server._stepComparer))
+        await host.Services.GetRequiredService<ServerRegistration>().RegisterAsync(cancellationToken).ConfigureAwait(false);
+        foreach (IStartupStep step in host.Services.GetServices<IStartupStep>())
         {
             await step.OnStartAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -49,24 +47,38 @@ internal static class Server
     {
         using (host)
         {
-            foreach (IShutdownStep step in host.Services.GetServices<IShutdownStep>().OrderByDescending(step => step, Server._stepComparer))
+            foreach (IShutdownStep step in host.Services.GetServices<IShutdownStep>())
             {
                 await step.OnShutdownAsync(cancellationToken).ConfigureAwait(false);
             }
+            await host.Services.GetRequiredService<ServerRegistration>().UnregisterAsync(cancellationToken).ConfigureAwait(false);
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private static int CompareSteps(object left, object right) => left != right
-        ? left is not ServerRegistration
-            ? right is not ServerRegistration
-                ? String.CompareOrdinal(left.ToString(), right.ToString())
-                : 1
-            : -1
-        : 0;
+    private static IServiceCollection AddStartupAndShutdownSteps(this IServiceCollection services)
+    {
+        foreach (Type type in Assembly.GetExecutingAssembly().GetTypes())
+        {
+            if (type.IsInterface || type.IsAbstract || type.IsGenericTypeDefinition)
+            {
+                continue;
+            }
+            if (typeof(IStartupStep).IsAssignableFrom(type))
+            {
+                services.AddSingleton(typeof(IStartupStep), type);
+            }
+            if (typeof(IShutdownStep).IsAssignableFrom(type))
+            {
+                services.AddSingleton(typeof(IShutdownStep), type);
+            }
+        }
+        return services;
+    }
 
-    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IPEndPoint hostEndPoint, IReadOnlyCollection<IDeviceBuilder> devices) => Host.CreateDefaultBuilder()
-        .ConfigureWebHostDefaults(builder =>
+    private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IPEndPoint hostEndPoint, IReadOnlyCollection<IDeviceBuilder> devices)
+    {
+        return Host.CreateDefaultBuilder().ConfigureWebHostDefaults(builder =>
         {
             builder
                 .ConfigureKestrel((context, options) =>
@@ -87,13 +99,11 @@ internal static class Server
                 .ConfigureServices((context, services) =>
                 {
                     services
-                        .AddSingleton<IStartupStep, ServerRegistration>()
-                        .AddSingleton<IShutdownStep, ServerRegistration>()
+                        .AddStartupAndShutdownSteps()
+                        .AddSingleton<ServerRegistration>()
                         .AddSingleton(devices)
                         .AddSingleton<IApiClient, ApiClient>()
-                        .AddSingleton<IDeviceCompiler, DeviceCompiler>()
                         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-                        .AddSingleton<IDeviceSubscriptions, DeviceSubscriptions>()
                         .AddSingleton<INotificationMapping, NotificationMapping>()
                         .AddSingleton<INotificationService, NotificationService>()
                         .AddSingleton<ISdkEnvironment>(new SdkEnvironment(
@@ -101,8 +111,7 @@ internal static class Server
                             new(brain.IPAddress, brain.ServicePort),
                             brain.HostName,
                             hostEndPoint
-                        ));
-                    services
+                         ))
                         .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddJsonOptions(options => options.JsonSerializerOptions.UpdateConfiguration())
@@ -120,6 +129,7 @@ internal static class Server
                         .UseEndpoints(endpoints => endpoints.MapControllers());
                 });
         });
+    }
 
     private static async ValueTask<IPAddress> GetFallbackHostIPAddress(IPAddress brainIPAddress, CancellationToken cancellationToken)
     {
@@ -166,7 +176,7 @@ internal static class Server
         protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
     }
 
-    private sealed class ServerRegistration : IStartupStep, IShutdownStep
+    private sealed class ServerRegistration
     {
         private readonly IApiClient _client;
         private readonly ISdkEnvironment _environment;
@@ -178,11 +188,7 @@ internal static class Server
             ILogger<ServerRegistration> logger
         ) => (this._environment, this._client, this._logger) = (environment, client, logger);
 
-        Task IShutdownStep.OnShutdownAsync(CancellationToken cancellationToken) => this.UnregisterAsync(cancellationToken);
-
-        Task IStartupStep.OnStartAsync(CancellationToken cancellationToken) => this.RegisterAsync(cancellationToken);
-
-        private Task RegisterAsync(CancellationToken cancellationToken = default)
+        public Task RegisterAsync(CancellationToken cancellationToken = default)
         {
             return RegisterAsync(Constants.MaxConnectionRetries);
 
@@ -213,7 +219,7 @@ internal static class Server
             }
         }
 
-        private async Task UnregisterAsync(CancellationToken cancellationToken = default)
+        public async Task UnregisterAsync(CancellationToken cancellationToken = default)
         {
             try
             {

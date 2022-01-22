@@ -201,23 +201,28 @@ internal static class Program
         Console.WriteLine($"Brain found! {brain.IPAddress}");
         try
         {
+            UpdateNotifier notifier = _ => Task.CompletedTask;
             IDeviceBuilder builder = Device.CreateDevice("Smart TV", DeviceType.TV)
                 .SetManufacturer("Amir")
                 .AddButton("INPUT HDMI1")
                 .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-                .AddTextLabel("A", "Label A", true, async (id) => await Task.FromResult(id))
+                .AddTextLabel("Label1", "Label1", true, async (id) => await Task.FromResult(id))
                 .AddButtonHandler((deviceId, button) =>
                 {
                     Console.WriteLine($"{deviceId}|{button}");
                     return Task.CompletedTask;
                 })
-                .RegisterSubscriptionFunction((x, y) =>
-                {
-                    Console.WriteLine("Sub");
-                });
+                .RegisterSubscriptionFunction((updateNotifier, _) => notifier = updateNotifier);
             Console.WriteLine("Starting server...");
             await brain.StartServerAsync(new[] { builder });
-            Console.WriteLine("Server started. Press any key to quit...   ");
+            //Console.WriteLine("Server started. Press any key to quit...   ");
+            Console.WriteLine("Server started. Press any key to update the label...   ");
+
+            Console.ReadKey(true);
+            await notifier(new("default", "Label1", "This is updated."));
+
+            Console.WriteLine("Label updated. Press any key to quit...   ");
+
             Console.ReadKey(true);
         }
         finally

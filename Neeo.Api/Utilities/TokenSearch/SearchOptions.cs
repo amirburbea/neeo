@@ -2,8 +2,8 @@
 
 namespace Neeo.Api.Utilities.TokenSearch;
 
-public sealed class SearchOptions<T>
-    where T : notnull,IComparable<T>
+internal sealed class SearchOptions<T>
+    where T : notnull, IComparable<T>
 {
     public char[]? Delimiter { get; set; }
 

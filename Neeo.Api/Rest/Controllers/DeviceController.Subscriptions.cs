@@ -1,35 +1,35 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Neeo.Api.Devices;
+using Neeo.Api.Devices.Controllers;
 
 namespace Neeo.Api.Rest.Controllers;
 
 internal partial class DeviceController
 {
-    [HttpGet("{adapter1}/subscribe/{deviceId}/{_}")]
+    [HttpGet("{adapter}/subscribe/{deviceId}/{_}")]
     public async Task<ActionResult<SuccessResult>> SubscribeAsync(
-        [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter, 
+        [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         string deviceId
     )
     {
-
-
-        return (SuccessResult)false;
+        if (adapter.GetCapabilityHandler(ComponentType.Subscription) is { Controller: ISubscriptionController controller })
+        {
+            await controller.SubscribeAsync(deviceId);
+        }
+        return new SuccessResult(true);
     }
 
-    [HttpGet("{adapterName}/unsubscribe/{deviceId}")]
+    [HttpGet("{adapter}/unsubscribe/{deviceId}")]
     public async Task<ActionResult<SuccessResult>> UnsubscribeAsync(
-        string adapterName, 
+        [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         string deviceId
     )
     {
-        return (SuccessResult)false;
+        if (adapter.GetCapabilityHandler(ComponentType.Subscription) is { Controller: ISubscriptionController controller })
+        {
+            await controller.SubscribeAsync(deviceId);
+        }
+        return new SuccessResult(true);
     }
-
-
-
-
-    
 }
-

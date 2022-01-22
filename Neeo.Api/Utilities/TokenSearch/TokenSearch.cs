@@ -32,7 +32,7 @@ internal sealed class TokenSearch<T>
         this._unique = options?.Unique ?? false;
     }
 
-    public IEnumerable<ISearchItem<T>> Search(IEnumerable<T> collection, string query)
+    public IEnumerable<SearchItem<T>> Search(IEnumerable<T> collection, string query)
     {
         string[] searchTokens = (query ?? throw new ArgumentNullException(nameof(query)))
             .Split(this._delimiter, StringSplitOptions.RemoveEmptyEntries)
