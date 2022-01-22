@@ -68,4 +68,4 @@ public delegate Task FavoritesHandler(string deviceId, string favorite);
 
 public delegate void SubscriptionFunction(UpdateNotifier notifyUpdate, IPowerNotifications? powerNotifications);
 
-public delegate Task UpdateNotifier(NotificationMessage message);
+public delegate Task UpdateNotifier(Notification message);

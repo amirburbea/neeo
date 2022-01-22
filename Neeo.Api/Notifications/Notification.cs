@@ -1,3 +1,11 @@
-﻿namespace Neeo.Api.Notifications;
+﻿using System;
 
-internal record struct Notification(string Type, object Data);
+namespace Neeo.Api.Notifications;
+
+/// <summary>
+/// Represents a notification to the Brain about a change in a component value for a device.
+/// </summary>
+/// <param name="UniqueDeviceId">The unique identifier of the device.</param>
+/// <param name="Component">The component where the value has changed.</param>
+/// <param name="Value">The updated value.</param>
+public record struct Notification(String UniqueDeviceId, string Component, object Value);

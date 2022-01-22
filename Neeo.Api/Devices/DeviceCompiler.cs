@@ -37,7 +37,7 @@ internal sealed class DeviceCompiler : IDeviceCompiler
                 device.AdapterName
             );
 
-            Task NotifyUpdate(NotificationMessage message) => this._notificationService.SendSensorNotificationAsync(
+            Task NotifyUpdate(Notification message) => this._notificationService.SendSensorNotificationAsync(
                 message,
                 device.AdapterName
             );

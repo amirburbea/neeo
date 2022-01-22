@@ -8,7 +8,7 @@ namespace Neeo.Api.Notifications;
 
 public interface INotificationMapping
 {
-    ValueTask<IReadOnlyCollection<string>> GetNotificationKeysAsync(string deviceAdapter, string uniqueDeviceId, string componentName, CancellationToken cancellationToken = default);
+    ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapter, string uniqueDeviceId, string componentName, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationMapping : INotificationMapping
@@ -25,14 +25,14 @@ internal sealed class NotificationMapping : INotificationMapping
         this._logger = logger;
     }
 
-    public async ValueTask<IReadOnlyCollection<string>> GetNotificationKeysAsync(string deviceAdapter, string uniqueDeviceId, string componentName, CancellationToken cancellationToken)
+    public async ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapter, string uniqueDeviceId, string componentName, CancellationToken cancellationToken)
     {
         (string, string) cacheKey = (deviceAdapter, uniqueDeviceId);
         if (!this._cache.TryGetValue(cacheKey, out Entry[]? entries))
         {
             this._cache[cacheKey] = entries = await this.FetchEntriesAsync(deviceAdapter, uniqueDeviceId, cancellationToken).ConfigureAwait(false);
         }
-        if (NotificationMapping.FindNotificationKeys(entries, componentName) is { Count: > 0 } keys)
+        if (NotificationMapping.FindNotificationKeys(entries, componentName) is { Length: > 0 } keys)
         {
             return keys;
         }
@@ -41,13 +41,13 @@ internal sealed class NotificationMapping : INotificationMapping
         return Array.Empty<string>();
     }
 
-    private static IReadOnlyCollection<string> FindNotificationKeys(Entry[] entries, string componentName)
+    private static string[] FindNotificationKeys(Entry[] entries, string componentName)
     {
-        return Find(entry => entry.Name == componentName) is { Count: > 0 } matches
+        return Find(entry => entry.Name == componentName) is { Length: > 0 } matches
             ? matches
             : Find(entry => entry.Label == componentName);
 
-        IReadOnlyCollection<string> Find(Predicate<Entry> predicate)
+        string[] Find(Predicate<Entry> predicate)
         {
             int index = Array.FindIndex(entries, predicate);
             if (index == -1)
