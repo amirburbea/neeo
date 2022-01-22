@@ -38,8 +38,8 @@ internal sealed class NotificationService : INotificationService
         CancellationToken cancellationToken
     ) => this.SendNotificationAsync(message, deviceId, true, cancellationToken);
 
-    private static (string, object) ExtractTypeAndData(Message message) => message.Data is SensorUpdate update
-        ? (update.SensorEventKey, update.SensorValue)
+    private static (string, object) ExtractTypeAndData(Message message) => message.Data is SensorData sensorData
+        ? (sensorData.SensorEventKey, sensorData.SensorValue)
         : (message.Type, message.Data);
 
     private void DecreaseQueueSize()
@@ -122,7 +122,7 @@ internal sealed class NotificationService : INotificationService
         };
 
         Message FormatNotification(string notificationKey) => isSensorNotification
-            ? new(Constants.DeviceSensorUpdateKey, new SensorUpdate(notificationKey, notification.Value))
+            ? new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, notification.Value))
             : new(notificationKey, notification.Value);
     }
 
@@ -146,5 +146,5 @@ internal sealed class NotificationService : INotificationService
 
     private record struct Message(string Type, object Data);
 
-    private record struct SensorUpdate(string SensorEventKey, object SensorValue);
+    private record struct SensorData(string SensorEventKey, object SensorValue);
 }
