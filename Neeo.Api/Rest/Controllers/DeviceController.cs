@@ -1,49 +1,35 @@
-﻿using System;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.Extensions.Logging;
 using Neeo.Api.Devices;
-using Neeo.Api.Devices.Controllers;
-using Neeo.Api.Devices.Discovery;
 
 namespace Neeo.Api.Rest.Controllers;
 
 [ApiController, Route("[controller]")]
-internal sealed class DeviceController : ControllerBase
+internal sealed partial class DeviceController : ControllerBase
 {
-    [HttpGet("/{adapter}/registered")]
-    public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync(
-        [ModelBinder(typeof(DeviceAdapterBinder))] IDeviceAdapter adapter
-    ) => adapter.GetCapabilityHandler(ComponentType.Registration) is not { Controller: IRegistrationController controller }
-            ? throw new NotSupportedException(nameof(this.QueryIsRegisteredAsync))
-            : await controller.QueryIsRegisteredAsync();
+    private readonly ILogger<DeviceController> _logger;
 
-    [HttpPost("/{adapter}/register")]
-    public async Task<ActionResult<SuccessResult>> RegisterAsync(
-        [ModelBinder(typeof(DeviceAdapterBinder))] IDeviceAdapter adapter,
-        [FromBody] JsonElement credentials
-    ) => adapter.GetCapabilityHandler(ComponentType.Registration) is not { Controller: IRegistrationController controller }
-            ? throw new NotSupportedException(nameof(this.RegisterAsync))
-            : await controller.RegisterAsync(credentials);
+    public DeviceController(ILogger<DeviceController> logger) => this._logger = logger;
 
-    private sealed class DeviceAdapterBinder : IModelBinder
+    private sealed class AdapterBinder : IModelBinder
     {
         private readonly IDeviceDatabase _database;
+        private ILogger<AdapterBinder> _logger;
 
-        public DeviceAdapterBinder(IDeviceDatabase database) => this._database = database;
+        public AdapterBinder(IDeviceDatabase database, ILogger<AdapterBinder> logger) => (this._database, this._logger) = (database, logger);
 
         public async Task BindModelAsync(ModelBindingContext bindingContext)
         {
-            if (bindingContext.ValueProvider.GetValue(bindingContext.ModelName).FirstValue is not string adapterName)
+            if (bindingContext.ValueProvider.GetValue(bindingContext.ModelName).FirstValue is not { } adapterName)
             {
-                bindingContext.Result = ModelBindingResult.Failed();
+                bindingContext.ModelState.AddModelError(nameof(IDeviceAdapter), "Check route parameter name.");
                 return;
             }
-            bindingContext.Result = ModelBindingResult.Success(
-                bindingContext.HttpContext.Items[typeof(IDeviceAdapter)] = await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false)
-            );
+            IDeviceAdapter adapter = await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false);
+            bindingContext.HttpContext.Items[nameof(IDeviceAdapter)] = adapter;
+            bindingContext.Result = ModelBindingResult.Success(adapter);
         }
     }
-
 }

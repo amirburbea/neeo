@@ -6,4 +6,5 @@ public enum ControllerType
     Favorites,
     Registration,
     Value,
+    Subscription,
 }

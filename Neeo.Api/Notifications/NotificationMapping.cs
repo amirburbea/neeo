@@ -8,31 +8,31 @@ namespace Neeo.Api.Notifications;
 
 public interface INotificationMapping
 {
-    ValueTask<IReadOnlyList<string>> GetNotificationKeysAsync(string deviceAdapter, string uniqueDeviceId, string componentName, CancellationToken cancellationToken = default);
+    ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string uniqueDeviceId, string componentName, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationMapping : INotificationMapping
 {
-    private readonly Dictionary<(string,string), Entry[]> _cache = new();
+    private readonly Dictionary<(string, string), Entry[]> _cache = new();
     private readonly IApiClient _client;
     private readonly ILogger<NotificationMapping> _logger;
-    private readonly string _pathPrefix;
+    private readonly string _sdkAdapterName;
 
     public NotificationMapping(ISdkEnvironment environment, IApiClient client, ILogger<NotificationMapping> logger)
     {
-        this._pathPrefix = string.Format(UrlPaths.NotificationKeyFormat, environment.SdkAdapterName);
+        this._sdkAdapterName = environment.SdkAdapterName;
         this._client = client;
         this._logger = logger;
     }
 
-    public async ValueTask<IReadOnlyList<string>> GetNotificationKeysAsync(string deviceAdapter, string uniqueDeviceId, string componentName, CancellationToken cancellationToken)
+    public async ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string uniqueDeviceId, string componentName, CancellationToken cancellationToken)
     {
-        (string, string) cacheKey = (deviceAdapter, uniqueDeviceId);
+        (string, string) cacheKey = (deviceAdapterName, uniqueDeviceId);
         if (!this._cache.TryGetValue(cacheKey, out Entry[]? entries))
         {
-            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(deviceAdapter, uniqueDeviceId, cancellationToken).ConfigureAwait(false);
+            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(deviceAdapterName, uniqueDeviceId, cancellationToken).ConfigureAwait(false);
         }
-        if (NotificationMapping.FindNotificationKeys(entries, componentName) is { Count: > 0 } keys)
+        if (NotificationMapping.FindNotificationKeys(entries, componentName) is { Length: > 0 } keys)
         {
             return keys;
         }
@@ -41,13 +41,13 @@ internal sealed class NotificationMapping : INotificationMapping
         return Array.Empty<string>();
     }
 
-    private static IReadOnlyList<string> FindNotificationKeys(Entry[] entries, string componentName)
+    private static string[] FindNotificationKeys(Entry[] entries, string componentName)
     {
-        return Find(entry => entry.Name == componentName) is { Count: > 0 } matches
+        return Find(entry => entry.Name == componentName) is { Length: > 0 } matches
             ? matches
             : Find(entry => entry.Label == componentName);
 
-        IReadOnlyList<string> Find(Predicate<Entry> predicate)
+        string[] Find(Predicate<Entry> predicate)
         {
             int index = Array.FindIndex(entries, predicate);
             if (index == -1)
@@ -67,13 +67,14 @@ internal sealed class NotificationMapping : INotificationMapping
                     list.Add(entry.EventKey);
                 }
             }
-            return list;
+            return list.ToArray();
         }
     }
 
-    private async Task<Entry[]> FetchEntriesAsync(string deviceAdapter, string uniqueDeviceId, CancellationToken cancellationToken)
+    private async Task<Entry[]> FetchEntriesAsync(string deviceAdapterName, string uniqueDeviceId, CancellationToken cancellationToken)
     {
-        Entry[] entries = await this._client.GetAsync<Entry[]>($"{this._pathPrefix}/{deviceAdapter}/{uniqueDeviceId}", cancellationToken).ConfigureAwait(false);
+        string path = string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, deviceAdapterName, uniqueDeviceId);
+        Entry[] entries = await this._client.GetAsync<Entry[]>(path, cancellationToken).ConfigureAwait(false);
         return Array.FindAll(entries, static entry => entry.EventKey is not null);
     }
 

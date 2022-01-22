@@ -19,4 +19,11 @@
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="Rest\Controllers\DeviceController.*.cs">
+			<DependentUpon>DeviceController.cs</DependentUpon>
+		</Compile>
+	</ItemGroup>
+	
 </Project>

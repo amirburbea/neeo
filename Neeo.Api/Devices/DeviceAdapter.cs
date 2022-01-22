@@ -10,13 +10,13 @@ public interface IDeviceAdapter
 
     IReadOnlyCollection<IComponent> Capabilities { get; }
 
+    IReadOnlyDictionary<string, ICapabilityHandler> CapabilityHandlers { get; }
+
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; }
 
     string DeviceName { get; }
 
     uint? DriverVersion { get; }
-
-    IReadOnlyDictionary<string, ICapabilityHandler> CapabilityHandlers { get; }
 
     DeviceIconOverride? Icon { get; }
 
@@ -36,7 +36,7 @@ public interface IDeviceAdapter
 
     ICapabilityHandler? GetCapabilityHandler(ComponentType type) => this.GetCapabilityHandler(TextAttribute.GetText(type));
 
-    ICapabilityHandler? GetCapabilityHandler(string name) => this.CapabilityHandlers.GetValueOrDefault(name);
+    ICapabilityHandler? GetCapabilityHandler(string name);
 }
 
 internal sealed class DeviceAdapter : IDeviceAdapter
@@ -100,4 +100,6 @@ internal sealed class DeviceAdapter : IDeviceAdapter
     public IReadOnlyCollection<string> Tokens { get; }
 
     public DeviceType Type { get; }
+
+    public ICapabilityHandler? GetCapabilityHandler(string name) => this.CapabilityHandlers.GetValueOrDefault(name);
 }

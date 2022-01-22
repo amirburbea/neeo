@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -25,57 +26,44 @@ namespace Neeo.Api.Rest;
 /// </summary>
 internal static class Server
 {
+    private static readonly Comparer<object> _stepComparer = Comparer<object>.Create(Server.CompareSteps);
+
     public static async Task<IHost> StartAsync(Brain brain, string name, IReadOnlyCollection<IDeviceBuilder> devices, IPAddress? hostIPAddress, int port, CancellationToken cancellationToken)
     {
         string sdkAdapterName = $"src-{UniqueNameGenerator.Generate(name)}";
         IHost host = Server.CreateHostBuilder(
             brain ?? throw new ArgumentNullException(nameof(brain)),
             sdkAdapterName,
-            new(hostIPAddress ??= await Server.GetFallbackHostIPAddress(brain.IPAddress, cancellationToken).ConfigureAwait(false), port),
+            new(hostIPAddress ?? await Server.GetFallbackHostIPAddress(brain.IPAddress, cancellationToken).ConfigureAwait(false), port),
             devices ?? throw new ArgumentNullException(nameof(devices))
         ).Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
-        ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
-        IApiClient client = host.Services.GetRequiredService<IApiClient>();
-        for (int i = 0; i < Constants.MaxConnectionRetries; i++)
+        foreach (IStartupStep step in host.Services.GetServices<IStartupStep>().OrderBy(step => step, Server._stepComparer))
         {
-            try
-            {
-                if (await client.RegisterServerAsync(sdkAdapterName, $"http://{hostIPAddress}:{port}", cancellationToken).ConfigureAwait(false))
-                {
-                    logger.LogInformation("Server {adapterName} registered on {brainHost} ({brainIP}).", sdkAdapterName, brain.HostName, brain.IPAddress);
-                    return host;
-                }
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning("Failed to register with brain {times} time(s).\n{content}", i, e.Message);
-            }
+            await step.OnStartAsync(cancellationToken).ConfigureAwait(false);
         }
-        throw new ApplicationException("Failed to register with brain.");
+        return host;
     }
 
     public static async Task StopAsync(IHost host, CancellationToken cancellationToken)
     {
         using (host)
         {
-            ILogger<Brain> logger = host.Services.GetRequiredService<ILogger<Brain>>();
-            IApiClient client = host.Services.GetRequiredService<IApiClient>();
-            ISdkEnvironment environment = host.Services.GetRequiredService<ISdkEnvironment>();
-            try
+            foreach (IShutdownStep step in host.Services.GetServices<IShutdownStep>().OrderByDescending(step => step, Server._stepComparer))
             {
-                if (await client.UnregisterServerAsync(environment.SdkAdapterName, cancellationToken).ConfigureAwait(false))
-                {
-                    logger.LogInformation("Server unregistered from {brain}.", environment.BrainHostName);
-                }
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning("Failed to unregister with brain\n{content}", e.Message);
+                await step.OnShutdownAsync(cancellationToken).ConfigureAwait(false);
             }
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
     }
+
+    private static int CompareSteps(object left, object right) => left != right
+        ? left is not ServerRegistration
+            ? right is not ServerRegistration
+                ? String.CompareOrdinal(left.ToString(), right.ToString())
+                : 1
+            : -1
+        : 0;
 
     private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IPEndPoint hostEndPoint, IReadOnlyCollection<IDeviceBuilder> devices) => Host.CreateDefaultBuilder()
         .ConfigureWebHostDefaults(builder =>
@@ -99,6 +87,8 @@ internal static class Server
                 .ConfigureServices((context, services) =>
                 {
                     services
+                        .AddSingleton<IStartupStep, ServerRegistration>()
+                        .AddSingleton<IShutdownStep, ServerRegistration>()
                         .AddSingleton(devices)
                         .AddSingleton<IApiClient, ApiClient>()
                         .AddSingleton<IDeviceCompiler, DeviceCompiler>()
@@ -107,7 +97,7 @@ internal static class Server
                         .AddSingleton<INotificationMapping, NotificationMapping>()
                         .AddSingleton<INotificationService, NotificationService>()
                         .AddSingleton<ISdkEnvironment>(new SdkEnvironment(
-                            sdkAdapterName, 
+                            sdkAdapterName,
                             new(brain.IPAddress, brain.ServicePort),
                             brain.HostName,
                             hostEndPoint
@@ -158,13 +148,6 @@ internal static class Server
         cancellationToken
     );
 
-    private sealed record class SdkEnvironment(
-        string SdkAdapterName, 
-        IPEndPoint BrainEndPoint,
-        string BrainHostName,
-        IPEndPoint HostEndPoint
-    ) : ISdkEnvironment;
-
     private static class Constants
     {
         public const int MaxConnectionRetries = 8;
@@ -182,4 +165,74 @@ internal static class Server
 
         protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
     }
+
+    private sealed class ServerRegistration : IStartupStep, IShutdownStep
+    {
+        private readonly IApiClient _client;
+        private readonly ISdkEnvironment _environment;
+        private readonly ILogger<ServerRegistration> _logger;
+
+        public ServerRegistration(
+            ISdkEnvironment environment,
+            IApiClient client,
+            ILogger<ServerRegistration> logger
+        ) => (this._environment, this._client, this._logger) = (environment, client, logger);
+
+        Task IShutdownStep.OnShutdownAsync(CancellationToken cancellationToken) => this.UnregisterAsync(cancellationToken);
+
+        Task IStartupStep.OnStartAsync(CancellationToken cancellationToken) => this.RegisterAsync(cancellationToken);
+
+        private Task RegisterAsync(CancellationToken cancellationToken = default)
+        {
+            return RegisterAsync(Constants.MaxConnectionRetries);
+
+            async Task RegisterAsync(int retryCount)
+            {
+                try
+                {
+                    if (await this._client.RegisterServerAsync(this._environment.SdkAdapterName, $"http://{this._environment.HostEndPoint}", cancellationToken).ConfigureAwait(false))
+                    {
+                        this._logger.LogInformation(
+                            "Server {adapterName} registered on {brainHost} ({brainIP}).",
+                            this._environment.SdkAdapterName,
+                            this._environment.BrainHostName,
+                            this._environment.BrainEndPoint.Address
+                        );
+                    }
+                }
+                catch (Exception) when (retryCount > 0)
+                {
+                    this._logger.LogWarning("Failed to register with brain. Will retry up to {times} more time(s).", retryCount);
+                    await RegisterAsync(retryCount - 1).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    this._logger.LogError(e, "Failed to register on the brain - giving up.");
+                    throw new ApplicationException("Failed to register with brain.", e);
+                }
+            }
+        }
+
+        private async Task UnregisterAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                if (await this._client.UnregisterServerAsync(this._environment.SdkAdapterName, cancellationToken).ConfigureAwait(false))
+                {
+                    this._logger.LogInformation("Server unregistered from {brain}.", this._environment.BrainHostName);
+                }
+            }
+            catch (Exception e)
+            {
+                this._logger.LogWarning("Failed to unregister with brain\n{content}", e.Message);
+            }
+        }
+    }
+
+    private sealed record class SdkEnvironment(
+        string SdkAdapterName,
+        IPEndPoint BrainEndPoint,
+        string BrainHostName,
+        IPEndPoint HostEndPoint
+    ) : ISdkEnvironment;
 }

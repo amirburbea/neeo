@@ -8,9 +8,9 @@ namespace Neeo.Api.Notifications;
 
 public interface INotificationService
 {
-    Task<bool> SendNotificationAsync(Notification notification, string deviceAdapter, CancellationToken cancellationToken = default);
+    Task<bool> SendNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken = default);
 
-    Task<bool> SendSensorNotificationAsync(Notification notification, string deviceAdapter, CancellationToken cancellationToken = default);
+    Task<bool> SendSensorNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationService : INotificationService
@@ -28,15 +28,15 @@ internal sealed class NotificationService : INotificationService
 
     public Task<bool> SendNotificationAsync(
         Notification message,
-        string deviceId,
+        string deviceAdapterName,
         CancellationToken cancellationToken
-    ) => this.SendNotificationAsync(message, deviceId, false, cancellationToken);
+    ) => this.SendNotificationAsync(message, deviceAdapterName, false, cancellationToken);
 
     public Task<bool> SendSensorNotificationAsync(
         Notification message,
-        string deviceId,
+        string deviceAdapterName,
         CancellationToken cancellationToken
-    ) => this.SendNotificationAsync(message, deviceId, true, cancellationToken);
+    ) => this.SendNotificationAsync(message, deviceAdapterName, true, cancellationToken);
 
     private static (string, object) ExtractTypeAndData(Message message) => message.Data is SensorData sensorData
         ? (sensorData.SensorEventKey, sensorData.SensorValue)
@@ -97,7 +97,7 @@ internal sealed class NotificationService : INotificationService
         }
     }
 
-    private async Task<bool> SendNotificationAsync(Notification notification, string deviceAdapter, bool isSensorNotification, CancellationToken cancellationToken)
+    private async Task<bool> SendNotificationAsync(Notification notification, string deviceAdapterName, bool isSensorNotification, CancellationToken cancellationToken)
     {
         if (notification.UniqueDeviceId is null || notification.Component is null || notification.Value is null)
         {
@@ -106,7 +106,7 @@ internal sealed class NotificationService : INotificationService
         }
         this._logger.LogInformation("Send notification:{message}", notification);
         string[] notificationKeys = await this._notificationMapping.GetNotificationKeysAsync(
-            deviceAdapter,
+            deviceAdapterName,
             notification.UniqueDeviceId,
             notification.Component,
             cancellationToken

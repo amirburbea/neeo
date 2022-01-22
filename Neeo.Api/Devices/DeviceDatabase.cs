@@ -14,9 +14,9 @@ namespace Neeo.Api.Devices
     {
         ValueTask<IDeviceAdapter> GetAdapterAsync(string adapterName);
 
-        IDeviceModel GetDevice(int id);
-
         IDeviceModel GetDeviceByAdapterName(string adapterName);
+
+        IDeviceModel GetDeviceById(int id);
 
         IEnumerable<ISearchItem<IDeviceModel>> Search(string? query);
     }
@@ -49,8 +49,7 @@ namespace Neeo.Api.Devices
                     nameof(IDeviceModel.Type),
                 },
                 Threshold = OptionConstants.MatchFactor,
-                Delimiter = new[] { OptionConstants.Delimiter },
-                Unique = true,
+                Delimiter = new[] { OptionConstants.Delimiter }
             });
         }
 
@@ -64,13 +63,13 @@ namespace Neeo.Api.Devices
             return adapter;
         }
 
-        public IDeviceModel GetDevice(int id) => id >= 0 && id < this._devices.Count
-            ? this._devices[id]
-            : throw new ArgumentException($"No matching device with id {id}.", nameof(id));
-
         public IDeviceModel GetDeviceByAdapterName(string name) => this._devices.FirstOrDefault(device => device.AdapterName == name) is { } device
             ? device
             : throw new ArgumentException($"No matching device with adapter name \"{name}\".", nameof(name));
+
+        public IDeviceModel GetDeviceById(int id) => id >= 0 && id < this._devices.Count
+            ? this._devices[id]
+            : throw new ArgumentException($"No matching device with id {id}.", nameof(id));
 
         public IEnumerable<ISearchItem<IDeviceModel>> Search(string? query) => string.IsNullOrEmpty(query)
             ? Array.Empty<ISearchItem<IDeviceModel>>()
@@ -92,7 +91,7 @@ namespace Neeo.Api.Devices
                 this._logger.LogInformation("Initializing device: {name}", adapter.AdapterName);
                 this._initializationTasks.Add(adapter.AdapterName, task = adapter.Initializer());
                 await task.ConfigureAwait(false);
-            } 
+            }
             catch (Exception e)
             {
                 this._logger.LogError("Initializing device failed: {message}", e.Message);

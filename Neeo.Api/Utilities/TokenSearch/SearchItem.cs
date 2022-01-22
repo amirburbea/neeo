@@ -25,13 +25,9 @@ public interface ISearchItem<T> : IComparable<ISearchItem<T>>
     }
 }
 
-public sealed class SearchItem<T> : ISearchItem<T>
+internal sealed record class SearchItem<T>(T Item) : ISearchItem<T>
     where T : notnull, IComparable<T>
 {
-    public SearchItem(T item) => this.Item = item;
-
-    public T Item { get; }
-
     public double MaxScore { get; set; }
 
     public double Score { get; set; }

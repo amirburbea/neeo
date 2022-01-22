@@ -10,7 +10,7 @@ namespace Neeo.Api.Utilities.TokenSearch;
 /// A class to search a collection of items by tokens and return ranked results.
 /// </summary>
 /// <typeparam name="T">The type </typeparam>
-public sealed class TokenSearch<T>
+internal sealed class TokenSearch<T>
     where T : notnull, IComparable<T>
 {
     internal static readonly Func<T, string, object?> GetItemValue = TokenSearch<T>.CreateGetItemValue();
@@ -97,7 +97,7 @@ public sealed class TokenSearch<T>
         return lambdaExpression.Compile();
     }
 
-    private static IEnumerable<ISearchItem<T>> Normalize(IEnumerable<SearchItem<T>> searchItems, int maxScore, double threshold, bool unique, string[]? searchProperties)
+    private static IEnumerable<SearchItem<T>> Normalize(IEnumerable<SearchItem<T>> searchItems, int maxScore, double threshold, bool unique, string[]? searchProperties)
     {
         double normalizedScore = 1d / maxScore;
         Predicate<string> accept = unique ? new HashSet<string>(StringComparer.OrdinalIgnoreCase).Add : _ => true;

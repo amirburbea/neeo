@@ -22,27 +22,32 @@ internal sealed class DeviceCompiler : IDeviceCompiler
 
     public DeviceAdapter Compile(IDeviceBuilder device)
     {
-        DeviceAdapter adapter = DeviceCompiler.BuildAdapter(device);
-        if (device.SubscriptionFunction is { } callback)
+        try
         {
-            callback(
-                NotifyUpdate,
-                device.HasPowerStateSensor
-                    ? new PowerNotifications(uniqueDeviceId => NotifyPowerState(uniqueDeviceId, true), uniqueDeviceId => NotifyPowerState(uniqueDeviceId, false))
-                    : default
-            );
-
-            Task NotifyPowerState(string uniqueDeviceId, bool value) => this._notificationService.SendNotificationAsync(
-                new(uniqueDeviceId, Constants.PowerSensorName, value),
-                device.AdapterName
-            );
-
-            Task NotifyUpdate(Notification message) => this._notificationService.SendSensorNotificationAsync(
-                message,
-                device.AdapterName
-            );
+            return DeviceCompiler.BuildAdapter(device);
         }
-        return adapter;
+        finally
+        {
+            if (device.SubscriptionFunction is { } callback)
+            {
+                this.BuildNotificationMethods(device.AdapterName, device.HasPowerStateSensor, callback);
+            }
+        }
+    }
+
+    private void BuildNotificationMethods(string deviceAdapterName, bool createPowerNotifications, SubscriptionFunction callback)
+    {
+        callback(
+            message => this._notificationService.SendSensorNotificationAsync(message, deviceAdapterName),
+            createPowerNotifications
+                ? new PowerNotifications(uniqueDeviceId => NotifyPowerState(uniqueDeviceId, true), uniqueDeviceId => NotifyPowerState(uniqueDeviceId, false))
+                : default
+        );
+
+        Task NotifyPowerState(string uniqueDeviceId, bool value) => this._notificationService.SendNotificationAsync(
+            new(uniqueDeviceId, Constants.PowerSensorName, value),
+            deviceAdapterName
+        );
     }
 
     IDeviceAdapter IDeviceCompiler.Compile(IDeviceBuilder device) => this.Compile(device);
@@ -118,9 +123,9 @@ internal sealed class DeviceCompiler : IDeviceCompiler
         {
             AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), new FavoritesController(device.FavoritesHandler));
         }
-        if (device.DeviceSubscriptionCallbacks is not null)
+        if (device.SubscriptionController is not null)
         {
-            //AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), ComponentController.Create(device.DeviceSubscriptionCallbacks));
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), device.SubscriptionController);
         }
         return new(
             device.AdapterName,

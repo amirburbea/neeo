@@ -17,12 +17,8 @@ internal sealed class DatabaseController : ControllerBase
     public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => new(this._database.GetDeviceByAdapterName(adapterName));
 
     [HttpGet("{deviceId}")]
-    public ActionResult<IDeviceModel> GetDevice(int deviceId) => new(this._database.GetDevice(deviceId));
+    public ActionResult<IDeviceModel> GetDeviceById(int deviceId) => new(this._database.GetDeviceById(deviceId));
 
     [HttpGet("search")]
-    public ActionResult<IEnumerable<ISearchItem<IDeviceModel>>> Search([FromQuery(Name = "q")] string? query = null)
-    {
-        var list = this._database.Search(query).ToList();
-        return list;
-    }
+    public ActionResult<IEnumerable<ISearchItem<IDeviceModel>>> Search([FromQuery(Name = "q")] string? query) => new(this._database.Search(query));
 }

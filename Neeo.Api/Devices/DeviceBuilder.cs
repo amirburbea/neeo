@@ -46,7 +46,7 @@ public interface IDeviceBuilder
     /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
     /// resource and/or remove credentials when the last device is removed.
     /// </summary>
-    IDeviceSubscriptionCallbacks? DeviceSubscriptionCallbacks { get; }
+    ISubscriptionController? SubscriptionController { get; }
 
     DiscoveryProcessor? DiscoveryProcessor { get; }
 
@@ -295,9 +295,9 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public IReadOnlyCollection<DeviceCharacteristic> Characteristics => this._characteristics;
 
-    public DeviceSubscriptionCallbacks? DeviceSubscriptionCallbacks { get; private set; }
+    public SubscriptionController? SubscriptionController { get; private set; }
 
-    IDeviceSubscriptionCallbacks? IDeviceBuilder.DeviceSubscriptionCallbacks => this.DeviceSubscriptionCallbacks;
+    ISubscriptionController? IDeviceBuilder.SubscriptionController => this.SubscriptionController;
 
     public DiscoveryProcessor? DiscoveryProcessor { get; private set; }
 
@@ -601,11 +601,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private DeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceAction onDeviceAdded, DeviceAction onDeviceRemoved, DeviceListInitializer initializeDeviceList)
     {
-        if (this.DeviceSubscriptionCallbacks != null)
+        if (this.SubscriptionController != null)
         {
-            throw new InvalidOperationException($"{nameof(this.DeviceSubscriptionCallbacks)} already defined.");
+            throw new InvalidOperationException($"{nameof(this.RegisterDeviceSubscriptionCallbacks)} was already called.");
         }
-        this.DeviceSubscriptionCallbacks = new(
+        this.SubscriptionController = new(
             onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded)),
             onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved)),
             initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList))
