@@ -8,25 +8,9 @@ using Zeroconf;
 
 namespace Neeo.Discovery;
 
-public interface IBrainDiscovery
-{
-    /// <summary>
-    /// Discovers all <see cref="Brain"/>s on the network.
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
-    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>s.</returns>
-    Task<Brain[]> DiscoverAllAsync(CancellationToken cancellationToken = default) => BrainDiscovery.DiscoverAllAsync(cancellationToken);
-
-    /// <summary>
-    /// Discovers the first <see cref="Brain"/> on the network matching the specified
-    /// <paramref name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the first <see cref="Brain"/> discovered.
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
-    /// <param name="predicate">Optional predicate that must be matched by the Brain (if not <c>null</c>).</param>
-    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
-    Task<Brain?> DiscoverAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default) => BrainDiscovery.DiscoverAsync(predicate, cancellationToken);
-}
-
+/// <summary>
+/// Contains methods for discovery of the NEEO Brain on the network.
+/// </summary>
 public static class BrainDiscovery
 {
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(5d);

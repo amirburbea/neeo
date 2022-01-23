@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Neeo.Api.Devices;
 using Neeo.Api.Devices.Controllers;
 
@@ -8,22 +9,85 @@ namespace Neeo.Api.Rest.Controllers;
 
 internal partial class DeviceController
 {
+    [HttpPost("{adapter}/{componentName}/{deviceId}")]
+    public async Task<ActionResult<object>> PerformActionAsync(
+        [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
+        [ModelBinder(typeof(ComponentNameBinder))] string componentName,
+        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId,
+        [FromBody] object value
+    )
+    {
+        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { Controller: IDirectoryController controller })
+        {
+            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
+            return this.NotFound();
+        }
+        return this.NotFound();
+    }
+
     [HttpGet("{adapter}/{componentName}/{deviceId}")]
     public async Task<ActionResult<object>> GetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
-        string deviceId
+        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId
     )
     {
-        if (this.HttpContext.Items[nameof(ICapabilityHandler)] is not ICapabilityHandler { ComponentType: var type, Controller: var controller })
+        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { Controller: var controller })
         {
+            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
+            return this.NotFound();
+        }
+        if (controller is IValueController valueController)
+        {
+            object value = await valueController.GetValueAsync(deviceId);
+            return new ValueResult(value);
+        }
+        if (controller is IButtonController buttonController)
+        {
+            await buttonController.TriggerAsync(deviceId);
+            return new SuccessResult();
+        }
+        return this.BadRequest();
+    }
+
+    [HttpPost("{adapter}/{componentName}/{deviceId}")]
+    public async Task<ActionResult<object>> GetValueAsync(
+        [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
+        [ModelBinder(typeof(ComponentNameBinder))] string componentName,
+        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId,
+        [FromBody] object value
+    )
+    {
+        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { ComponentType: var type, Controller: var controller })
+        {
+            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             throw new();
         }
-        return controller switch
+        switch (controller)
         {
-            IValueController valueController => await valueController.GetValueAsync(deviceId),
-            IButtonController buttonController => await buttonController.TriggerAsync(deviceId),
-            _ => throw new("Type " + type + " not expected.")
-        };
+            case IDirectoryController directoryController:
+                break;
+            case IFavoritesController favoritesController when value is string favorite:
+                await favoritesController.ExecuteAsync(deviceId, favorite);
+                return new SuccessResult();
+        }
+        return this.BadRequest();
+    }
+
+    [HttpGet("{adapter}/{componentName}/{deviceId}/{value}")]
+    public async Task<ActionResult<SuccessResult>> SetValueAsync(
+        [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
+        [ModelBinder(typeof(ComponentNameBinder))] string componentName,
+        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId,
+        string value
+    )
+    {
+        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { Controller: IValueController controller })
+        {
+            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
+            return this.NotFound();
+        }
+        await controller.SetValueAsync(deviceId, value);
+        return new SuccessResult();
     }
 }

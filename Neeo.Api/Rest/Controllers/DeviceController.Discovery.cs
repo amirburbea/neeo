@@ -1,20 +1,23 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Neeo.Api.Devices;
+using Neeo.Api.Devices.Controllers;
+using Neeo.Api.Devices.Discovery;
 
 namespace Neeo.Api.Rest.Controllers;
 
-partial class DeviceController
+internal partial class DeviceController
 {
-    [HttpGet("/{adapterName}/discover")]
-    public async Task DiscoverAsync(string adapterName)
+    [HttpGet("{adapter}/discover")]
+    public async Task<ActionResult<DiscoveryResult[]>> DiscoverAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter)
     {
-        //await this.ProcessAdapterName(adapterName);
-        //this.GetAdapter().GetCapabilityHandler(ComponentType.Discovery) is not { Controller: IDiscoveryController controller }
-
+        if (adapter.GetCapabilityHandler(ComponentType.Discovery) is not { Controller: IDiscoveryController controller })
+        {
+            throw new NotSupportedException();
+        }
+        this._logger.LogInformation("Beginning discovery for {adapter}.", adapter.AdapterName);
+        return await controller.DiscoverAsync();
     }
 }

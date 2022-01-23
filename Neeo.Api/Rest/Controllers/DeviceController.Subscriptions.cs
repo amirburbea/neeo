@@ -17,7 +17,7 @@ internal partial class DeviceController
         {
             await controller.SubscribeAsync(deviceId);
         }
-        return new SuccessResult(true);
+        return new SuccessResult();
     }
 
     [HttpGet("{adapter}/unsubscribe/{deviceId}")]
@@ -30,6 +30,6 @@ internal partial class DeviceController
         {
             await controller.SubscribeAsync(deviceId);
         }
-        return new SuccessResult(true);
+        return new SuccessResult();
     }
 }

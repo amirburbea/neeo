@@ -2,4 +2,4 @@
 
 namespace Neeo.Api.Devices.Discovery;
 
-public delegate Task<DiscoveryResult[]> DiscoveryProcessor(string? deviceId = default);
+public delegate Task<DiscoveryResult[]> DiscoveryProcessor(string deviceAdapterName);

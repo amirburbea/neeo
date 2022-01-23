@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ public interface INotificationMapping
 
 internal sealed class NotificationMapping : INotificationMapping
 {
-    private readonly Dictionary<(string, string), Entry[]> _cache = new();
+    private readonly Dictionary<(string, string), EntryCache> _cache = new();
     private readonly IApiClient _client;
     private readonly ILogger<NotificationMapping> _logger;
     private readonly string _sdkAdapterName;
@@ -28,47 +29,17 @@ internal sealed class NotificationMapping : INotificationMapping
     public async ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string uniqueDeviceId, string componentName, CancellationToken cancellationToken)
     {
         (string, string) cacheKey = (deviceAdapterName, uniqueDeviceId);
-        if (!this._cache.TryGetValue(cacheKey, out Entry[]? entries))
+        if (!this._cache.TryGetValue(cacheKey, out EntryCache? entries))
         {
-            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(deviceAdapterName, uniqueDeviceId, cancellationToken).ConfigureAwait(false);
+            this._cache[cacheKey] = entries = new(await this.FetchEntriesAsync(deviceAdapterName, uniqueDeviceId, cancellationToken).ConfigureAwait(false));
         }
-        if (NotificationMapping.FindNotificationKeys(entries, componentName) is { Length: > 0 } keys)
+        if (entries.GetNotificationKeys(componentName) is { Length: > 0 } keys)
         {
             return keys;
         }
         this._logger.LogInformation("Component {component} not found.", componentName);
         this._cache.Remove(cacheKey);
         return Array.Empty<string>();
-    }
-
-    private static string[] FindNotificationKeys(Entry[] entries, string componentName)
-    {
-        return Find(entry => entry.Name == componentName) is { Length: > 0 } matches
-            ? matches
-            : Find(entry => entry.Label == componentName);
-
-        string[] Find(Predicate<Entry> predicate)
-        {
-            int index = Array.FindIndex(entries, predicate);
-            if (index == -1)
-            {
-                return Array.Empty<string>();
-            }
-            if (index == 0 && entries.Length == 1)
-            {
-                return new[] { entries[0].EventKey };
-            }
-            List<string> list = new(entries.Length - index) { entries[index].EventKey };
-            for (; index < entries.Length; index++)
-            {
-                Entry entry = entries[index];
-                if (predicate(entry))
-                {
-                    list.Add(entry.EventKey);
-                }
-            }
-            return list.ToArray();
-        }
     }
 
     private async Task<Entry[]> FetchEntriesAsync(string deviceAdapterName, string uniqueDeviceId, CancellationToken cancellationToken)
@@ -79,4 +50,45 @@ internal sealed class NotificationMapping : INotificationMapping
     }
 
     private record struct Entry(string Name, string EventKey, string? Label);
+
+    private sealed record EntryCache
+    {
+        private readonly Entry[] _entries;
+        private readonly Dictionary<string, string[]> _cache = new();
+
+        public EntryCache(Entry[] entries) => this._entries = entries;
+
+        public string[] GetNotificationKeys(string componentName)
+        {
+            if (!this._cache.TryGetValue(componentName, out string[]? keys))
+            {
+                this._cache.Add(
+                    componentName, 
+                    keys = this.Find(entry => entry.Name == componentName) is { Length: > 0 } matches 
+                        ? matches 
+                        : this.Find(entry => entry.Label == componentName)
+                );
+            }
+            return keys;
+        }
+
+        private string[] Find(Predicate<Entry> predicate)
+        {
+            int index = Array.FindIndex(this._entries, predicate);
+            if (index == -1)
+            {
+                return Array.Empty<string>();
+            }
+            HashSet<string> keys = new() { this._entries[index++].EventKey };
+            for (; index < this._entries.Length; index++)
+            {
+                Entry entry = this._entries[index];
+                if (predicate(entry))
+                {
+                    keys.Add(entry.EventKey);
+                }
+            }
+            return keys.ToArray();
+        }
+    }
 }

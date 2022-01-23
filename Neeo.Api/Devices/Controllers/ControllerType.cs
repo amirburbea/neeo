@@ -3,8 +3,10 @@
 public enum ControllerType
 {
     Button,
+    Directory,
+    Discovery,
     Favorites,
     Registration,
-    Value,
     Subscription,
+    Value,
 }

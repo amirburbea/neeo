@@ -176,7 +176,15 @@ public interface IDeviceBuilder
 
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
-    IDeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string? units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter);
+    IDeviceBuilder AddSlider(
+        string name,
+        string? label,
+        DeviceValueGetter<double> getter,
+        DeviceValueSetter<double> setter,
+        double rangeLow = 0,
+        double rangeHigh = 100,
+        string units = "%"
+    );
 
     IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
@@ -191,7 +199,7 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder DefineTiming(DeviceTiming timing);
 
-    IDeviceBuilder EnableDiscovery(string headerText, string description, bool enableDynamicDeviceBuilder, DiscoveryProcessor processor);
+    IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcessor processor, bool enableDynamicDeviceBuilder = false);
 
     IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);
 
@@ -374,12 +382,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     IDeviceBuilder IDeviceBuilder.AddSlider(
         string name,
         string? label,
+        DeviceValueGetter<double> getter,
+        DeviceValueSetter<double> setter,
         double rangeLow,
         double rangeHigh,
-        string? units,
-        DeviceValueGetter<double> getter,
-        DeviceValueSetter<double> setter
-    ) => this.AddSlider(name, label, rangeLow, rangeHigh, units, getter, setter);
+        string units
+    ) => this.AddSlider(name, label, getter, setter, rangeLow, rangeHigh, units);
 
     IDeviceBuilder IDeviceBuilder.AddSwitch(
         string name,
@@ -400,9 +408,9 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     IDeviceBuilder IDeviceBuilder.EnableDiscovery(
         string headerText,
         string description,
-        bool enableDynamicDeviceBuilder,
-        DiscoveryProcessor processor
-    ) => this.EnableDiscovery(headerText, description, enableDynamicDeviceBuilder, processor);
+        DiscoveryProcessor processor,
+        bool enableDynamicDeviceBuilder
+    ) => this.EnableDiscovery(headerText, description, processor, enableDynamicDeviceBuilder);
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
         string headerText,
@@ -425,7 +433,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
         headerText,
         description,
-        RegistrationType.Credentials,
+        RegistrationType.SecurityCode,
         queryIsRegistered,
         (SecurityCodeContainer container) => processor(container.SecurityCode)
     );
@@ -530,10 +538,10 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddSlider(string name, string? label, double rangeLow, double rangeHigh, string? units, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter)
+    private DeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow, double rangeHigh, string units)
     {
         this.Sliders.Add(
-            new(ComponentType.Slider, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units ?? "%", SensorType: SensorTypes.Range),
+            new(ComponentType.Slider, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units, SensorType: SensorTypes.Range),
             ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
         );
         return this;
@@ -571,7 +579,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder EnableDiscovery(string headerText, string description, bool enableDynamicDeviceBuilder, DiscoveryProcessor processor)
+    private DeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcessor processor, bool enableDynamicDeviceBuilder)
     {
         this.DiscoveryProcessor = processor ?? throw new ArgumentNullException(nameof(processor));
         this.Setup.Discovery = true;

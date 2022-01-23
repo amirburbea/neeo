@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Threading.Tasks;
 using Neeo.Api.Devices.Discovery;
+using Neeo.Api.Json;
 
 namespace Neeo.Api.Devices.Controllers;
 
@@ -9,9 +10,9 @@ public interface IRegistrationController : IController
 {
     ControllerType IController.Type => ControllerType.Registration;
 
-    Task<IsRegisteredResponse> QueryIsRegisteredAsync();
+    Task<bool> QueryIsRegisteredAsync();
 
-    Task<SuccessResult> RegisterAsync(JsonElement credentials);
+    Task RegisterAsync(JsonElement credentials);
 }
 
 internal sealed class RegistrationController : IRegistrationController
@@ -25,11 +26,7 @@ internal sealed class RegistrationController : IRegistrationController
         this._registrationProcess = registrationProcess;
     }
 
-    public async Task<IsRegisteredResponse> QueryIsRegisteredAsync() => await this._queryIsRegistered().ConfigureAwait(false);
+    public Task<bool> QueryIsRegisteredAsync() => this._queryIsRegistered();
 
-    public async Task<SuccessResult> RegisterAsync(JsonElement credentials)
-    {
-        await this._registrationProcess(credentials).ConfigureAwait(false);
-        return true;
-    }
+    public Task RegisterAsync(JsonElement credentials) => this._registrationProcess(credentials);
 }

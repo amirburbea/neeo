@@ -25,7 +25,14 @@ namespace Neeo.Api.Rest;
 /// </summary>
 internal static class Server
 {
-    public static async Task<IHost> StartAsync(Brain brain, string name, IDeviceBuilder[] devices, IPAddress? hostIPAddress, int port, CancellationToken cancellationToken)
+    public static async Task<IHost> StartAsync(
+        Brain brain,
+        string name,
+        IReadOnlyCollection<IDeviceBuilder> devices,
+        IPAddress? hostIPAddress,
+        int port,
+        CancellationToken cancellationToken = default
+    )
     {
         string sdkAdapterName = $"src-{UniqueNameGenerator.Generate(name)}";
         IHost host = Server.CreateHostBuilder(
@@ -43,7 +50,7 @@ internal static class Server
         return host;
     }
 
-    public static async Task StopAsync(IHost host, CancellationToken cancellationToken)
+    public static async Task StopAsync(IHost host, CancellationToken cancellationToken = default)
     {
         using (host)
         {
@@ -102,15 +109,16 @@ internal static class Server
                         .AddStartupAndShutdownSteps()
                         .AddSingleton<ServerRegistration>()
                         .AddSingleton(devices)
+                        .AddSingleton<PgpComponents>()
                         .AddSingleton<IApiClient, ApiClient>()
                         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
                         .AddSingleton<INotificationMapping, NotificationMapping>()
                         .AddSingleton<INotificationService, NotificationService>()
                         .AddSingleton<ISdkEnvironment>(new SdkEnvironment(
                             sdkAdapterName,
+                            hostEndPoint,
                             new(brain.IPAddress, brain.ServicePort),
-                            brain.HostName,
-                            hostEndPoint
+                            brain.HostName
                          ))
                         .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
@@ -133,15 +141,14 @@ internal static class Server
 
     private static async ValueTask<IPAddress> GetFallbackHostIPAddress(IPAddress brainIPAddress, CancellationToken cancellationToken)
     {
-        if (brainIPAddress != IPAddress.Loopback)
+        if (IPAddress.IsLoopback(brainIPAddress))
         {
-            IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-            if (Array.IndexOf(addresses, brainIPAddress) == -1 && Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is { } address)
-            {
-                return address;
-            }
+            return brainIPAddress;
         }
-        return IPAddress.Loopback;
+        IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
+        return Array.IndexOf(addresses, brainIPAddress) == -1 && Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is { } address
+            ? address
+            : IPAddress.Loopback;
     }
 
     private static Task<bool> RegisterServerAsync(this IApiClient client, string name, string baseUrl, CancellationToken cancellationToken) => client.PostAsync(
@@ -237,8 +244,8 @@ internal static class Server
 
     private sealed record class SdkEnvironment(
         string SdkAdapterName,
+        IPEndPoint HostEndPoint,
         IPEndPoint BrainEndPoint,
-        string BrainHostName,
-        IPEndPoint HostEndPoint
+        string BrainHostName
     ) : ISdkEnvironment;
 }

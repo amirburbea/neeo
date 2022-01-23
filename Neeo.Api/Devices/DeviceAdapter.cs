@@ -133,7 +133,7 @@ internal record DeviceAdapter(
         }
         if (device.DiscoveryProcessor is not null)
         {
-            // AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), ComponentController.Create(device.DiscoveryProcessor));
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), new DiscoveryController(device.AdapterName, device.DiscoveryProcessor));
             if (device.RegistrationController is not null)
             {
                 AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), device.RegistrationController);
