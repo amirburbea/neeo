@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Api.Devices;
+using Neeo.Api.Devices.Controllers;
 using Neeo.Api.Json;
 using Neeo.Api.Notifications;
 
@@ -93,12 +94,14 @@ internal static class Server
                         .AddSingleton(devices)
                         .AddSingleton(new SdkEnvironment(sdkAdapterName, hostEndPoint, new(brain.IPAddress, brain.ServicePort), brain.HostName))
                         .AddSingleton<PgpKeys>()
+                        .AddSingleton<DiscoveryControllerFactory>()
                         .AddSingleton<IApiClient, ApiClient>()
                         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
                         .AddSingleton<INotificationMapping, NotificationMapping>()
                         .AddSingleton<INotificationService, NotificationService>()
-                        .AddSingleton<DynamicDeviceHandlers>();
-                    
+                        .AddSingleton<IDynamicDevices, DynamicDevices>()
+                        .AddSingleton<IDynamicDeviceRegistrar, DynamicDevices>();
+
                 })
                 .Configure((context, builder) =>
                 {

@@ -63,7 +63,7 @@ internal record DeviceAdapter(
 
     public IController? GetCapabilityHandler(string name) => this.CapabilityHandlers.GetValueOrDefault(name);
 
-    public static DeviceAdapter Build(IDeviceBuilder device)
+    public static DeviceAdapter Build(IDeviceBuilder device, DiscoveryControllerFactory discoveryControllerFactory)
     {
         if (device.ButtonHandler == null && device.Buttons.Any())
         {
@@ -78,14 +78,6 @@ internal record DeviceAdapter(
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
         }
         List<DeviceCapability> deviceCapabilities = device.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
-        if (device.RegistrationController != null)
-        {
-            deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);
-        }
-        if (device.FavoritesHandler != null)
-        {
-            deviceCapabilities.Add(DeviceCapability.CustomFavoriteHandler);
-        }
         string pathPrefix = $"/device/{device.AdapterName}/";
         HashSet<string> paths = new();
         List<Component> capabilities = new();
@@ -94,49 +86,51 @@ internal record DeviceAdapter(
         {
             AddCapability(BuildButton(pathPrefix, feature), new ButtonController(device.ButtonHandler!, feature.Name));
         }
-        foreach ((DeviceFeature feature, IController controller) in device.Sliders)
+        foreach ((DeviceFeature feature, IValueController controller) in device.Sliders)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Range }), controller);
             AddCapability(BuildSlider(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IController controller) in device.Switches)
+        foreach ((DeviceFeature feature, IValueController controller) in device.Switches)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Binary }), controller);
             AddCapability(BuildSwitch(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IController controller) in device.TextLabels)
+        foreach ((DeviceFeature feature, IValueController controller) in device.TextLabels)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), controller);
             AddCapability(BuildTextLabel(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IController controller) in device.ImageUrls)
+        foreach ((DeviceFeature feature, IValueController controller) in device.ImageUrls)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), controller);
             AddCapability(BuildImageUrl(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IController controller) in device.Sensors)
+        foreach ((DeviceFeature feature, IValueController controller) in device.Sensors)
         {
             AddCapability(feature.SensorType == SensorTypes.Power ? BuildPowerSensor(pathPrefix, feature) : BuildSensor(pathPrefix, feature), controller);
         }
-        if (device.DiscoveryProcessor is not null)
+        if (device.DiscoveryProcess is { } discoveryProcess)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), new DiscoveryController(device.AdapterName, device.DiscoveryProcessor));
-            if (device.RegistrationController is not null)
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), discoveryControllerFactory.CreateController(discoveryProcess));
+            if (device.RegistrationController is { } registrationController)
             {
-                AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), device.RegistrationController);
+                deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);
+                AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), registrationController);
             }
         }
-        else if (!device.Characteristics.Contains(DeviceCharacteristic.DynamicDevice) && deviceCapabilities.FindIndex(static capability => capability.RequiresDiscovery()) is int index and not -1)
+        else if (!deviceCapabilities.Contains(DeviceCapability.DynamicDevice) && deviceCapabilities.FindIndex(RequiresDiscovery) is int index and > -1)
         {
             throw new InvalidOperationException($"Discovery required for {deviceCapabilities[index]}.");
         }
-        if (device.FavoritesHandler is not null)
+        if (device.FavoritesController is { } favoritesController)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), new FavoritesController(device.FavoritesHandler));
+            deviceCapabilities.Add(DeviceCapability.CustomFavoriteHandler);
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), favoritesController);
         }
-        if (device.SubscriptionController is not null)
+        if (device.SubscriptionController is { } subscriptionController)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), device.SubscriptionController);
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), subscriptionController);
         }
         return new(
             device.AdapterName,
@@ -243,5 +237,7 @@ internal record DeviceAdapter(
         }
 
         static string GetSensorName(string name) => name.EndsWith(SensorDescriptor.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorDescriptor.ComponentSuffix);
+
+        static bool RequiresDiscovery(DeviceCapability capability) => capability is DeviceCapability.BridgeDevice or DeviceCapability.AddAnotherDevice or DeviceCapability.RegisterUserAccount;
     }
 }

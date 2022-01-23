@@ -48,7 +48,7 @@ public interface IDeviceBuilder
     /// </summary>
     ISubscriptionController? SubscriptionController { get; }
 
-    DiscoveryProcessor? DiscoveryProcessor { get; }
+    DiscoveryProcess? DiscoveryProcess { get; }
 
     /// <summary>
     /// Version of the device driver.
@@ -56,7 +56,7 @@ public interface IDeviceBuilder
     /// </summary>
     uint? DriverVersion { get; }
 
-    FavoritesHandler? FavoritesHandler { get; }
+    IFavoritesController? FavoritesController { get; }
 
     /// <summary>
     /// Gets a value indicating if a power state sensor has been defined for the device.
@@ -71,7 +71,7 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of ImageUrl features defined for the device.
     /// </summary>
-    IReadOnlyDictionary<DeviceFeature, IController> ImageUrls { get; }
+    IReadOnlyDictionary<DeviceFeature, IValueController> ImageUrls { get; }
 
     /// <summary>
     /// Device initializer callback.
@@ -94,14 +94,14 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of sensors defined for the device.
     /// </summary>
-    IReadOnlyDictionary<DeviceFeature, IController> Sensors { get; }
+    IReadOnlyDictionary<DeviceFeature, IValueController> Sensors { get; }
 
     IDeviceSetup Setup { get; }
 
     /// <summary>
     /// Gets the collection of sliders defined for the device.
     /// </summary>
-    IReadOnlyDictionary<DeviceFeature, IController> Sliders { get; }
+    IReadOnlyDictionary<DeviceFeature, IValueController> Sliders { get; }
 
     /// <summary>
     /// Gets an optional name to use when adding the device to a room
@@ -115,12 +115,12 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of switches defined for the device.
     /// </summary>
-    IReadOnlyDictionary<DeviceFeature, IController> Switches { get; }
+    IReadOnlyDictionary<DeviceFeature, IValueController> Switches { get; }
 
     /// <summary>
     /// Gets the collection of text labels defined for the device.
     /// </summary>
-    IReadOnlyDictionary<DeviceFeature, IController> TextLabels { get; }
+    IReadOnlyDictionary<DeviceFeature, IValueController> TextLabels { get; }
 
     /// <summary>
     /// Get timing related information (the delays NEEO should use when interacting with a device),
@@ -199,7 +199,7 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder DefineTiming(DeviceTiming timing);
 
-    IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcessor processor, bool enableDynamicDeviceBuilder = false);
+    IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder = false);
 
     IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);
 
@@ -273,22 +273,20 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 {
     private readonly List<string> _additionalSearchTokens = new();
     private readonly HashSet<DeviceCharacteristic> _characteristics = new();
-    private readonly IReadOnlyDictionary<DeviceFeature, IController> _imageUrlsReadOnly;
-    private readonly IReadOnlyDictionary<DeviceFeature, IController> _sensorsReadOnly;
-    private readonly IReadOnlyDictionary<DeviceFeature, IController> _slidersReadOnly;
-    private readonly IReadOnlyDictionary<DeviceFeature, IController> _switchesReadOnly;
-    private readonly IReadOnlyDictionary<DeviceFeature, IController> _textLabelsReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _imageUrlsReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _slidersReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _switchesReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _textLabelsReadOnly;
 
     internal DeviceBuilder(string name, DeviceType type, string? prefix)
     {
         this.Type = type;
         Validator.ValidateString(this.Name = name, name: nameof(name));
         this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name, prefix)}";
-        this._imageUrlsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IController>(this.ImageUrls);
-        this._sensorsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, IValueController, IController>(this.Sensors);
-        this._slidersReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<double>, IController>(this.Sliders);
-        this._switchesReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<bool>, IController>(this.Switches);
-        this._textLabelsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IController>(this.TextLabels);
+        this._imageUrlsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IValueController>(this.ImageUrls);
+        this._slidersReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<double>, IValueController>(this.Sliders);
+        this._switchesReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<bool>, IValueController>(this.Switches);
+        this._textLabelsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IValueController>(this.TextLabels);
     }
 
     public string AdapterName { get; }
@@ -307,11 +305,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     ISubscriptionController? IDeviceBuilder.SubscriptionController => this.SubscriptionController;
 
-    public DiscoveryProcessor? DiscoveryProcessor { get; private set; }
+    public DiscoveryProcess? DiscoveryProcess { get; private set; }
 
     public uint? DriverVersion { get; private set; }
 
-    public FavoritesHandler? FavoritesHandler { get; private set; }
+    public FavoritesController? FavoritesController { get; private set; }
+
+    IFavoritesController? IDeviceBuilder.FavoritesController => this.FavoritesController;
 
     public bool HasPowerStateSensor { get; private set; }
 
@@ -319,7 +319,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public Dictionary<DeviceFeature, ValueController<string>> ImageUrls { get; } = new();
 
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.ImageUrls => this._imageUrlsReadOnly;
+    IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.ImageUrls => this._imageUrlsReadOnly;
 
     public DeviceInitializer? Initializer { get; private set; }
 
@@ -333,7 +333,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public Dictionary<DeviceFeature, IValueController> Sensors { get; } = new();
 
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sensors => this._sensorsReadOnly;
+    IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.Sensors => this.Sensors;
 
     public DeviceSetup Setup { get; } = new DeviceSetup();
 
@@ -341,7 +341,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public Dictionary<DeviceFeature, ValueController<double>> Sliders { get; } = new();
 
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Sliders => this._slidersReadOnly;
+    IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.Sliders => this._slidersReadOnly;
 
     public string? SpecificName { get; private set; }
 
@@ -349,11 +349,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public Dictionary<DeviceFeature, ValueController<bool>> Switches { get; } = new();
 
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.Switches => this._switchesReadOnly;
+    IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.Switches => this._switchesReadOnly;
 
     public Dictionary<DeviceFeature, ValueController<string>> TextLabels { get; } = new();
 
-    IReadOnlyDictionary<DeviceFeature, IController> IDeviceBuilder.TextLabels => this._textLabelsReadOnly;
+    IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.TextLabels => this._textLabelsReadOnly;
 
     public DeviceTiming? Timing { get; private set; }
 
@@ -408,9 +408,9 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     IDeviceBuilder IDeviceBuilder.EnableDiscovery(
         string headerText,
         string description,
-        DiscoveryProcessor processor,
+        DiscoveryProcess process,
         bool enableDynamicDeviceBuilder
-    ) => this.EnableDiscovery(headerText, description, processor, enableDynamicDeviceBuilder);
+    ) => this.EnableDiscovery(headerText, description, process, enableDynamicDeviceBuilder);
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
         string headerText,
@@ -520,7 +520,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         this.Sensors.Add(
             new(ComponentType.Power, Constants.PowerSensorName, Constants.PowerSensorLabel, SensorType: SensorTypes.Power),
-            ValueController.Create(getter)
+            new ValueController<bool>(getter)
         );
         return this;
     }
@@ -533,7 +533,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         this.Sensors.Add(
             new(ComponentType.Sensor, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units),
-            ValueController.Create(getter)
+            new ValueController<double>(getter)
         );
         return this;
     }
@@ -542,7 +542,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     {
         this.Sliders.Add(
             new(ComponentType.Slider, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units, SensorType: SensorTypes.Range),
-            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+            new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
         );
         return this;
     }
@@ -551,7 +551,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     {
         this.Switches.Add(
             new(ComponentType.Switch, name, label),
-            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+            new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
         );
         return this;
     }
@@ -560,7 +560,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     {
         this.TextLabels.Add(
             new(ComponentType.TextLabel, name, label, IsLabelVisible: isLabelVisible),
-            ValueController.Create(getter)
+            new(getter)
         );
         return this;
     }
@@ -579,12 +579,16 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcessor processor, bool enableDynamicDeviceBuilder)
+    private DeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder)
     {
-        this.DiscoveryProcessor = processor ?? throw new ArgumentNullException(nameof(processor));
-        this.Setup.Discovery = true;
+        if (this.Setup.Discovery is not null)
+        {
+            throw new InvalidOperationException("Discovery is already defined.");
+        }
         Validator.ValidateString(this.Setup.DiscoveryHeaderText = headerText, maxLength: 255, name: nameof(headerText));
         Validator.ValidateString(this.Setup.DiscoveryDescription = description, maxLength: 255, name: nameof(description));
+        this.DiscoveryProcess = process ?? throw new ArgumentNullException(nameof(process));
+        this.Setup.Discovery = true;
         this.Setup.EnableDynamicDeviceBuilder = enableDynamicDeviceBuilder;
         return this;
     }
@@ -623,7 +627,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private DeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler)
     {
-        if (this.FavoritesHandler != null)
+        if (this.FavoritesController != null)
         {
             throw new InvalidOperationException($"{nameof(FavoritesHandler)} already defined.");
         }
@@ -631,7 +635,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
         }
-        this.FavoritesHandler = handler ?? throw new ArgumentNullException(nameof(handler));
+        this.FavoritesController = new(handler ?? throw new ArgumentNullException(nameof(handler)));
         return this;
     }
 

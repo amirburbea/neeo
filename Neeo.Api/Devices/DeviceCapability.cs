@@ -1,9 +1,8 @@
 ﻿using System.Text.Json.Serialization;
+using Neeo.Api.Devices.Discovery;
+using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices;
-
-using Discovery;
-using Neeo.Api.Utilities;
 
 /// <summary>
 /// The unique/special capabilities supported by the device.
@@ -57,12 +56,4 @@ public enum DeviceCapability
     /// </summary>
     [Text("register-user-account")]
     RegisterUserAccount,
-}
-
-public static class DeviceCapabilities
-{
-    public static bool RequiresDiscovery(this DeviceCapability capability) => capability
-        is DeviceCapability.BridgeDevice
-        or DeviceCapability.AddAnotherDevice
-        or DeviceCapability.RegisterUserAccount;
 }

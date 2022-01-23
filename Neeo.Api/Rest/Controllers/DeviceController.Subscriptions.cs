@@ -10,9 +10,10 @@ internal partial class DeviceController
     [HttpGet("{adapter}/subscribe/{deviceId}/{_}")]
     public async Task<ActionResult<SuccessResult>> SubscribeAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
-        string deviceId
+        string deviceId // Note that this does NOT use the DeviceIdBinder.
     )
     {
+        using var _ = this._logger.BeginScope("Subscribe");
         if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
         {
             await controller.SubscribeAsync(deviceId);
@@ -23,9 +24,10 @@ internal partial class DeviceController
     [HttpGet("{adapter}/unsubscribe/{deviceId}")]
     public async Task<ActionResult<SuccessResult>> UnsubscribeAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
-        string deviceId
+        string deviceId // Note that this does NOT use the DeviceIdBinder.
     )
     {
+        using var _ = this._logger.BeginScope("Unsubscribe");
         if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
         {
             await controller.SubscribeAsync(deviceId);

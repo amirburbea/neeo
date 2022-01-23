@@ -12,12 +12,6 @@ public interface IValueController : IController
     Task SetValueAsync(string deviceId, string value);
 }
 
-internal static class ValueController
-{
-    public static ValueController<TValue> Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue>? setter = default)
-        where TValue : notnull, IConvertible => new(getter, setter);
-}
-
 internal sealed class ValueController<TValue> : IValueController
     where TValue : notnull, IConvertible
 {

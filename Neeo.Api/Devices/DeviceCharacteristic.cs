@@ -6,19 +6,20 @@
 public enum DeviceCharacteristic
 {
     /// <summary>
-    /// This characteristic is optionally specified for devices that uses discovery.
-    /// It gives the option to select &quot;Add another {name}.&quot;.
-    /// </summary>
-    AddAnotherDevice,
-
-    /// <summary>
     /// This characteristic is used when the device does not need to be powered on to be usable.
     /// </summary>
     /// <remarks>
     /// Drivers with this characteristic do not need to specify &quot;POWER ON&quot;/&quot;POWER OFF&quot;/&quot;POWER TOGGLE&quot;
     /// buttons and will not be identified as &quot;stupid&quot;.
     /// </remarks>
-    AlwaysOn,
+    AlwaysOn = 0,
+
+    /// <summary>
+    /// This characteristic is optionally specified for devices that uses discovery.
+    /// It gives the option to select &quot;Add another {name}.&quot;.
+    /// </summary>
+    /// <remarks>Devices specifying this characteristic must enable discovery via <see cref="IDeviceBuilder.EnableDiscovery"/>.</remarks>
+    AddAnotherDevice = 2,
 
     /// <summary>
     /// This characteristic is used after you add a hub/gateway device.
@@ -26,11 +27,11 @@ public enum DeviceCharacteristic
     /// <para />
     /// Example: Philips Hue - the discovered device (gateway) supports multiple devices (lamps).
     /// </summary>
-    BridgeDevice,
+    /// <remarks>Devices specifying this characteristic must enable discovery via <see cref="IDeviceBuilder.EnableDiscovery"/>.</remarks>
+    BridgeDevice = 3,
 
     /// <summary>
-    /// If <see cref="IDeviceSetup.EnableDynamicDeviceBuilder"/> is enabled, dynamically defined devices should
-    /// specify this characteristic.
+    /// If <see cref="IDeviceSetup.EnableDynamicDeviceBuilder"/> is enabled, dynamically defined devices should specify this characteristic.
     /// </summary>
-    DynamicDevice,
+    DynamicDevice = 4
 }

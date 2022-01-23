@@ -13,7 +13,7 @@ internal partial class DeviceController
     public async Task<ActionResult<object>> PerformActionAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
-        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId,
+        [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
         [FromBody] object value
     )
     {
@@ -22,6 +22,7 @@ internal partial class DeviceController
             this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();
         }
+        await Task.Delay(0);
         return this.NotFound();
     }
 
@@ -29,7 +30,7 @@ internal partial class DeviceController
     public async Task<ActionResult<object>> GetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
-        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId
+        [ModelBinder(typeof(DeviceIdBinder))] string deviceId
     )
     {
         if (this.HttpContext.GetItem<IController>() is not { } controller)
@@ -54,7 +55,7 @@ internal partial class DeviceController
     public async Task<ActionResult<object>> GetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
-        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId,
+        [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
         [FromBody] object value
     )
     {
@@ -78,7 +79,7 @@ internal partial class DeviceController
     public async Task<ActionResult<SuccessResult>> SetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
-        [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId,
+        [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
         string value
     )
     {
