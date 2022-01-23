@@ -13,7 +13,7 @@ internal partial class DeviceController
     [HttpGet("{adapter}/discover")]
     public async Task<ActionResult<DiscoveryResult[]>> DiscoverAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter)
     {
-        if (adapter.GetCapabilityHandler(ComponentType.Discovery) is not { Controller: IDiscoveryController controller })
+        if (adapter.GetCapabilityHandler(ComponentType.Discovery) is not IDiscoveryController controller)
         {
             throw new NotSupportedException();
         }

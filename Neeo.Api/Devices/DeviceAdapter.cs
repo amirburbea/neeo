@@ -13,7 +13,7 @@ public interface IDeviceAdapter
 
     IReadOnlyCollection<IComponent> Capabilities { get; }
 
-    IReadOnlyDictionary<string, ICapabilityHandler> CapabilityHandlers { get; }
+    IReadOnlyDictionary<string, IController> CapabilityHandlers { get; }
 
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; }
 
@@ -37,44 +37,31 @@ public interface IDeviceAdapter
 
     DeviceType Type { get; }
 
-    ICapabilityHandler? GetCapabilityHandler(ComponentType type) => this.GetCapabilityHandler(TextAttribute.GetText(type));
+    IController? GetCapabilityHandler(ComponentType type);
 
-    ICapabilityHandler? GetCapabilityHandler(string name);
+    IController? GetCapabilityHandler(string name);
 }
 
 internal record DeviceAdapter(
-
     string AdapterName,
-
     IReadOnlyCollection<IComponent> Capabilities,
-
-    IReadOnlyDictionary<string, ICapabilityHandler> CapabilityHandlers,
-
+    IReadOnlyDictionary<string, IController> CapabilityHandlers,
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities,
-
     string DeviceName,
-
     uint? DriverVersion,
-
     DeviceIconOverride? Icon,
-
     DeviceInitializer? Initializer,
-
     string Manufacturer,
-
     IDeviceSetup Setup,
-
     string? SpecificName,
-
     DeviceTiming Timing,
-
     IReadOnlyCollection<string> Tokens,
-
     DeviceType Type
-
 ) : IDeviceAdapter
 {
-    public ICapabilityHandler? GetCapabilityHandler(string name) => this.CapabilityHandlers.GetValueOrDefault(name);
+    public IController? GetCapabilityHandler(ComponentType type) => this.GetCapabilityHandler(TextAttribute.GetText(type));
+
+    public IController? GetCapabilityHandler(string name) => this.CapabilityHandlers.GetValueOrDefault(name);
 
     public static DeviceAdapter Build(IDeviceBuilder device)
     {
@@ -102,7 +89,7 @@ internal record DeviceAdapter(
         string pathPrefix = $"/device/{device.AdapterName}/";
         HashSet<string> paths = new();
         List<Component> capabilities = new();
-        Dictionary<string, CapabilityHandler> handlers = new();
+        Dictionary<string, IController> handlers = new();
         foreach (DeviceFeature feature in device.Buttons)
         {
             AddCapability(BuildButton(pathPrefix, feature), new ButtonController(device.ButtonHandler!, feature.Name));
@@ -154,7 +141,7 @@ internal record DeviceAdapter(
         return new(
             device.AdapterName,
             capabilities,
-            new CovariantReadOnlyDictionary<string, CapabilityHandler, ICapabilityHandler>(handlers),
+            handlers,
             deviceCapabilities,
             device.Name,
             device.DriverVersion,
@@ -177,7 +164,7 @@ internal record DeviceAdapter(
         void AddRouteHandler(Component capability, IController controller)
         {
             handlers[Uri.UnescapeDataString(capability.Name)] = paths.Add(capability.Path)
-                ? new(capability.Type, controller)
+                ? controller
                 : throw new InvalidOperationException($"Path {capability.Path} is not unique.");
         }
 

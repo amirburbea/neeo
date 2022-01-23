@@ -17,7 +17,7 @@ internal partial class DeviceController
         [FromBody] object value
     )
     {
-        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { Controller: IDirectoryController controller })
+        if (this.HttpContext.GetItem<IController>() is not IDirectoryController controller)
         {
             this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();
@@ -32,7 +32,7 @@ internal partial class DeviceController
         [ModelBinder(typeof(MaybeDynamicDeviceIdBinder))] string deviceId
     )
     {
-        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { Controller: var controller })
+        if (this.HttpContext.GetItem<IController>() is not { } controller)
         {
             this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();
@@ -58,7 +58,7 @@ internal partial class DeviceController
         [FromBody] object value
     )
     {
-        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { ComponentType: var type, Controller: var controller })
+        if (this.HttpContext.GetItem<IController>() is not { } controller )
         {
             this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             throw new();
@@ -82,7 +82,7 @@ internal partial class DeviceController
         string value
     )
     {
-        if (this.HttpContext.GetItem<ICapabilityHandler>() is not { Controller: IValueController controller })
+        if (this.HttpContext.GetItem<IController>() is not  IValueController controller )
         {
             this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();

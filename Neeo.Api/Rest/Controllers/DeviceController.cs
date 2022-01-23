@@ -1,8 +1,10 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using Neeo.Api.Devices;
+using Neeo.Api.Devices.Controllers;
 
 namespace Neeo.Api.Rest.Controllers;
 
@@ -10,11 +12,11 @@ namespace Neeo.Api.Rest.Controllers;
 internal sealed partial class DeviceController : ControllerBase
 {
     private readonly ILogger<DeviceController> _logger;
-    private readonly PgpComponents _pgpComponents;
+    private readonly PgpKeys _pgpKeys;
 
-    public DeviceController(PgpComponents pgp, ILogger<DeviceController> logger)
+    public DeviceController(PgpKeys pgpKeys, ILogger<DeviceController> logger)
     {
-        this._pgpComponents = pgp;
+        this._pgpKeys = pgpKeys;
         this._logger = logger;
     }
 
@@ -72,11 +74,30 @@ internal sealed partial class DeviceController : ControllerBase
         }
     }
 
-    private sealed class MaybeDynamicDeviceIdBinder
+    private sealed class MaybeDynamicDeviceIdBinder : IModelBinder
     {
+        private readonly ILogger<MaybeDynamicDeviceIdBinder> _logger;
 
+        public MaybeDynamicDeviceIdBinder(ILogger<MaybeDynamicDeviceIdBinder> logger) => this._logger = logger;
+
+        public Task BindModelAsync(ModelBindingContext bindingContext)
+        {
+            string deviceId = bindingContext.ValueProvider.GetValue(bindingContext.ModelName).FirstValue!;
+            if (bindingContext.HttpContext.GetItem<DynamicDevicePlaceholder>() is { ComponentName: string name })
+            {
+            }
+            bindingContext.Result = ModelBindingResult.Success(deviceId);
+            return Task.CompletedTask;
+
+
+
+        }
+
+        private static object? GetRouteItem(HttpContext httpContext)
+        {
+            return (object?)httpContext.GetItem<IController>() ?? httpContext.GetItem<DynamicDevicePlaceholder>();
+        }
     }
-    
-    
-    private record struct DynamicDevicePlaceholder(string ComponentName);
+
+    private sealed record DynamicDevicePlaceholder(string ComponentName);
 }

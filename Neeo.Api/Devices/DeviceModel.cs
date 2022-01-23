@@ -38,7 +38,7 @@ internal sealed class DeviceModel : IDeviceModel
     public DeviceModel(int id, IDeviceAdapter adapter)
     {
         (this.Id, this._adapter) = (id, adapter);
-        this.Device = new DeviceInfo(adapter.DeviceName, adapter.Tokens, adapter.SpecificName, adapter.Icon);
+        this.Device = new(adapter.DeviceName, adapter.Tokens, adapter.SpecificName, adapter.Icon);
         this.Tokens = string.Join(' ', adapter.Tokens);
     }
 
@@ -46,11 +46,13 @@ internal sealed class DeviceModel : IDeviceModel
 
     public IReadOnlyCollection<IComponent> Capabilities => this._adapter.Capabilities;
 
-    public IDeviceInfo Device { get; }
+    IDeviceInfo IDeviceModel.Device => this.Device;
+
+    public DeviceInfo Device { get; }
 
     public IReadOnlyCollection<DeviceCapability> DeviceCapabilities => this._adapter.DeviceCapabilities;
 
-    public uint DriverVersion => this._adapter.DriverVersion ?? 1;
+    public uint DriverVersion => this._adapter.DriverVersion ?? 0;
 
     public int Id { get; }
 

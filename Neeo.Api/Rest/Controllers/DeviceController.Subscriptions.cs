@@ -13,7 +13,7 @@ internal partial class DeviceController
         string deviceId
     )
     {
-        if (adapter.GetCapabilityHandler(ComponentType.Subscription) is { Controller: ISubscriptionController controller })
+        if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
         {
             await controller.SubscribeAsync(deviceId);
         }
@@ -26,7 +26,7 @@ internal partial class DeviceController
         string deviceId
     )
     {
-        if (adapter.GetCapabilityHandler(ComponentType.Subscription) is { Controller: ISubscriptionController controller })
+        if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
         {
             await controller.SubscribeAsync(deviceId);
         }

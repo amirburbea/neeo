@@ -65,7 +65,7 @@ internal static class Program
         try
         {
             List<IDeviceBuilder> devices = new();
-            foreach (var type in Assembly.GetExecutingAssembly().GetExportedTypes())
+            foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
             {
                 if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
                 {

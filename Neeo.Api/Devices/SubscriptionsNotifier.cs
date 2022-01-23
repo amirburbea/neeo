@@ -4,30 +4,29 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Api.Devices.Controllers;
-using Neeo.Api.Rest;
 
 namespace Neeo.Api.Devices;
 
-internal sealed class DeviceSubscriptionsStartupStep : IStartupStep
+internal sealed class SubscriptionsNotifier
 {
     private readonly IApiClient _client;
     private readonly IDeviceDatabase _database;
-    private readonly ILogger<DeviceSubscriptionsStartupStep> _logger;
+    private readonly ILogger<SubscriptionsNotifier> _logger;
     private readonly string _sdkAdapterName;
 
-    public DeviceSubscriptionsStartupStep(
+    public SubscriptionsNotifier(
         IApiClient client,
         IDeviceDatabase database,
-        ISdkEnvironment environment,
-        ILogger<DeviceSubscriptionsStartupStep> logger
+        SdkEnvironment environment,
+        ILogger<SubscriptionsNotifier> logger
     ) => (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.SdkAdapterName);
 
-    public Task OnStartAsync(CancellationToken cancellationToken)
+    public Task NotifySubscriptionsAsync(CancellationToken cancellationToken)
     {
         List<Task> tasks = new();
         foreach (IDeviceAdapter adapter in this._database.Adapters)
         {
-            if (adapter.GetCapabilityHandler(ComponentType.Subscription) is { Controller: ISubscriptionController controller })
+            if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
             {
                 tasks.Add(this.NotifySubscriptionsAsync(adapter, controller, cancellationToken));
             }

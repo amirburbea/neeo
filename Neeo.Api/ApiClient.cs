@@ -94,7 +94,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private readonly string _uriPrefix;
 
     public ApiClient(
-        ISdkEnvironment environment,
+        SdkEnvironment environment,
         ILogger<ApiClient> logger
     ) => (this._uriPrefix, this._logger) = ($"http://{environment.BrainEndPoint}", logger);
 

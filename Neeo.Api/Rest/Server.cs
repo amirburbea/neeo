@@ -43,10 +43,7 @@ internal static class Server
         ).Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
         await host.Services.GetRequiredService<ServerRegistration>().RegisterAsync(cancellationToken).ConfigureAwait(false);
-        foreach (IStartupStep step in host.Services.GetServices<IStartupStep>())
-        {
-            await step.OnStartAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await host.Services.GetRequiredService<SubscriptionsNotifier>().NotifySubscriptionsAsync(cancellationToken).ConfigureAwait(false);
         return host;
     }
 
@@ -54,33 +51,9 @@ internal static class Server
     {
         using (host)
         {
-            foreach (IShutdownStep step in host.Services.GetServices<IShutdownStep>())
-            {
-                await step.OnShutdownAsync(cancellationToken).ConfigureAwait(false);
-            }
             await host.Services.GetRequiredService<ServerRegistration>().UnregisterAsync(cancellationToken).ConfigureAwait(false);
             await host.StopAsync(cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private static IServiceCollection AddStartupAndShutdownSteps(this IServiceCollection services)
-    {
-        foreach (Type type in Assembly.GetExecutingAssembly().GetTypes())
-        {
-            if (type.IsInterface || type.IsAbstract || type.IsGenericTypeDefinition)
-            {
-                continue;
-            }
-            if (typeof(IStartupStep).IsAssignableFrom(type))
-            {
-                services.AddSingleton(typeof(IStartupStep), type);
-            }
-            if (typeof(IShutdownStep).IsAssignableFrom(type))
-            {
-                services.AddSingleton(typeof(IShutdownStep), type);
-            }
-        }
-        return services;
     }
 
     private static IHostBuilder CreateHostBuilder(Brain brain, string sdkAdapterName, IPEndPoint hostEndPoint, IReadOnlyCollection<IDeviceBuilder> devices)
@@ -105,25 +78,27 @@ internal static class Server
                 })
                 .ConfigureServices((context, services) =>
                 {
+                    // Controller configuration.
                     services
-                        .AddStartupAndShutdownSteps()
-                        .AddSingleton<ServerRegistration>()
-                        .AddSingleton(devices)
-                        .AddSingleton<PgpComponents>()
-                        .AddSingleton<IApiClient, ApiClient>()
-                        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-                        .AddSingleton<INotificationMapping, NotificationMapping>()
-                        .AddSingleton<INotificationService, NotificationService>()
-                        .AddSingleton<ISdkEnvironment>(new SdkEnvironment(
-                            sdkAdapterName,
-                            hostEndPoint,
-                            new(brain.IPAddress, brain.ServicePort),
-                            brain.HostName
-                         ))
                         .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
                         .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                         .AddJsonOptions(options => options.JsonSerializerOptions.UpdateConfiguration())
                         .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AllowInternalsControllerFeatureProvider.Instance));
+                    // Server startup tasks.
+                    services
+                        .AddSingleton<ServerRegistration>()
+                        .AddSingleton<SubscriptionsNotifier>();
+                    // Dependencies.
+                    services
+                        .AddSingleton(devices)
+                        .AddSingleton(new SdkEnvironment(sdkAdapterName, hostEndPoint, new(brain.IPAddress, brain.ServicePort), brain.HostName))
+                        .AddSingleton<PgpKeys>()
+                        .AddSingleton<IApiClient, ApiClient>()
+                        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
+                        .AddSingleton<INotificationMapping, NotificationMapping>()
+                        .AddSingleton<INotificationService, NotificationService>()
+                        .AddSingleton<DynamicDeviceHandlers>();
+                    
                 })
                 .Configure((context, builder) =>
                 {
@@ -186,11 +161,11 @@ internal static class Server
     private sealed class ServerRegistration
     {
         private readonly IApiClient _client;
-        private readonly ISdkEnvironment _environment;
+        private readonly SdkEnvironment _environment;
         private readonly ILogger<ServerRegistration> _logger;
 
         public ServerRegistration(
-            ISdkEnvironment environment,
+            SdkEnvironment environment,
             IApiClient client,
             ILogger<ServerRegistration> logger
         ) => (this._environment, this._client, this._logger) = (environment, client, logger);
@@ -241,11 +216,4 @@ internal static class Server
             }
         }
     }
-
-    private sealed record class SdkEnvironment(
-        string SdkAdapterName,
-        IPEndPoint HostEndPoint,
-        IPEndPoint BrainEndPoint,
-        string BrainHostName
-    ) : ISdkEnvironment;
 }

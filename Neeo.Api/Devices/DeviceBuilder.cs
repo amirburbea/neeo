@@ -236,8 +236,8 @@ public interface IDeviceBuilder
     /// Setting the version allows you to tell the Brain about changes to your devices components.
     /// If you for example add new buttons to a device, you can increase the version and this will let the Brain
     /// know to fetch the new components. You do not need to update the version if you do not change the components.
-    /// When adding a version to a device that was previously not versioned, start with 2. The Brain will assume it
-    /// was previously 1 and update.
+    /// When adding a version to a device that was previously not versioned, start with 1. The Brain will assume it
+    /// was previously 0 and update.
     /// </summary>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     /// <remarks>Note: The Brain will only add components, updating/removing components is not supported.</remarks>
@@ -247,7 +247,7 @@ public interface IDeviceBuilder
     /// Sets the device icon override.
     /// <para/>
     /// The icon for a device is generally derived from the device type.
-    /// NEEO supports two icon overrides (specifically &quot;sonos&quot; and &quot;neeo&quot;).
+    /// NEEO supports only two icon overrides (specifically &quot;sonos&quot; and &quot;neeo&quot;).
     /// </summary>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder SetIcon(DeviceIconOverride icon);
@@ -261,8 +261,8 @@ public interface IDeviceBuilder
     IDeviceBuilder SetManufacturer(string manufacturer);
 
     /// <summary>
-    /// Sets an optional name to use when adding the device to a room
-    /// (a name based on the type will be used by default, for example: 'Accessory').
+    /// Sets an optional name to use when adding the device to a room.
+    /// If not specified, a name based on the type will be used by default, for example: 'Accessory'.
     /// </summary>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     /// <remarks>Note: This does not apply to devices using discovery.</remarks>
