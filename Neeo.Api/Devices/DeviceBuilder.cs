@@ -110,7 +110,7 @@ public interface IDeviceBuilder
     /// <remarks>Note: This does not apply to devices using discovery.</remarks>
     string? SpecificName { get; }
 
-    SubscriptionFunction? SubscriptionFunction { get; }
+    DeviceNotifierCallback? NotifierCallback { get; }
 
     /// <summary>
     /// Gets the collection of switches defined for the device.
@@ -148,11 +148,11 @@ public interface IDeviceBuilder
     /// <summary>
     /// Add a group of buttons to the device.
     /// </summary>
-    /// <param name="group">The <see cref="ButtonGroup"/> to add.</param>
+    /// <param name="group">The <see cref="ButtonGroups"/> to add.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     /// <remarks>Note that adding buttons to the device requires defining a button handler via
     /// <see cref="AddButtonHandler"/>.</remarks>
-    IDeviceBuilder AddButtonGroup(ButtonGroup group) => this.AddButtons((KnownButtons)group);
+    IDeviceBuilder AddButtonGroups(ButtonGroups group) => this.AddButtons((KnownButtons)group);
 
     /// <summary>
     /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle button presses.
@@ -175,6 +175,15 @@ public interface IDeviceBuilder
     IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, string? uri = default, DeviceValueGetter<string>? getter = default);
 
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
+
+    IDeviceBuilder AddSensor(
+        string name, 
+        string? label,
+        DeviceValueGetter<double> getter,
+        double rangeLow = 0,
+        double rangeHigh = 100,
+        string units = "%"
+    );
 
     IDeviceBuilder AddSlider(
         string name,
@@ -230,7 +239,7 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder RegisterInitializer(DeviceInitializer initializer);
 
-    IDeviceBuilder RegisterSubscriptionFunction(SubscriptionFunction function);
+    IDeviceBuilder EnableNotifications(DeviceNotifierCallback callback);
 
     /// <summary>
     /// Setting the version allows you to tell the Brain about changes to your devices components.
@@ -262,7 +271,7 @@ public interface IDeviceBuilder
 
     /// <summary>
     /// Sets an optional name to use when adding the device to a room.
-    /// If not specified, a name based on the type will be used by default, for example: 'Accessory'.
+    /// If not specified, a name based on the type will be used by default, for example: "Accessory".
     /// </summary>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     /// <remarks>Note: This does not apply to devices using discovery.</remarks>
@@ -313,7 +322,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IFavoritesController? IDeviceBuilder.FavoritesController => this.FavoritesController;
 
-    public bool HasPowerStateSensor { get; private set; }
+    public bool HasPowerStateSensor => this.Sensors.Keys.Any(static component => component.Type == ComponentType.Power);
 
     public DeviceIconOverride? Icon { get; private set; }
 
@@ -345,7 +354,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public string? SpecificName { get; private set; }
 
-    public SubscriptionFunction? SubscriptionFunction { get; private set; }
+    public DeviceNotifierCallback? NotifierCallback { get; private set; }
 
     public Dictionary<DeviceFeature, ValueController<bool>> Switches { get; } = new();
 
@@ -359,7 +368,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public DeviceType Type { get; }
 
-    IDeviceBuilder IDeviceBuilder.AddAdditionalSearchTokens(params string[] tokens) => this.AddAdditionalSearchTokens(tokens);
+    IDeviceBuilder IDeviceBuilder.AddAdditionalSearchTokens(string[] tokens) => this.AddAdditionalSearchTokens(tokens);
 
     IDeviceBuilder IDeviceBuilder.AddButton(string name, string? label) => this.AddButton(name, label);
 
@@ -395,6 +404,15 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         DeviceValueGetter<bool> getter,
         DeviceValueSetter<bool> setter
     ) => this.AddSwitch(name, label, getter, setter);
+
+    IDeviceBuilder IDeviceBuilder.AddSensor(
+        string name,
+        string? label,
+        DeviceValueGetter<double> getter,
+        double rangeLow,
+        double rangeHigh,
+        string units
+    ) => this.AddSensor(name, label, getter, rangeLow, rangeHigh, units);
 
     IDeviceBuilder IDeviceBuilder.AddTextLabel(
        string name,
@@ -448,7 +466,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer) => this.RegisterInitializer(initializer);
 
-    IDeviceBuilder IDeviceBuilder.RegisterSubscriptionFunction(SubscriptionFunction function) => this.RegisterSubscriptionFunction(function);
+    IDeviceBuilder IDeviceBuilder.EnableNotifications(DeviceNotifierCallback callback) => this.EnableNotifications(callback);
 
     IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version) => this.SetDriverVersion(version);
 
@@ -525,7 +543,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddSensor(string name, string? label, double rangeLow, double rangeHigh, string? units, DeviceValueGetter<double> getter)
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string units)
     {
         if (name == Constants.PowerSensorName)
         {
@@ -605,7 +623,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new InvalidOperationException("Registration is already defined.");
         }
         this.Setup.RegistrationType = type;
-        this.RegistrationController = new(queryIsRegistered, element => processor(element.Deserialize<TPayload>()));
+        this.RegistrationController = new(queryIsRegistered, element => processor(element.Deserialize<TPayload>(JsonSerialization.Options)!));
         Validator.ValidateString(this.Setup.RegistrationDescription = description, maxLength: 255, name: nameof(description));
         Validator.ValidateString(this.Setup.RegistrationHeaderText = headerText, maxLength: 255, name: nameof(headerText));
         return this;
@@ -649,13 +667,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder RegisterSubscriptionFunction(SubscriptionFunction function)
+    private DeviceBuilder EnableNotifications(DeviceNotifierCallback callback)
     {
-        if (this.SubscriptionFunction != null)
+        if (this.NotifierCallback != null)
         {
-            throw new InvalidOperationException($"{nameof(SubscriptionFunction)} already defined.");
+            throw new InvalidOperationException($"{nameof(DeviceNotifierCallback)} already defined.");
         }
-        this.SubscriptionFunction = function;
+        this.NotifierCallback = callback;
         return this;
     }
 

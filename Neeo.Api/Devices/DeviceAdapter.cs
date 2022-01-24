@@ -7,6 +7,8 @@ using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices;
 
+using static KnownButtons;
+
 public interface IDeviceAdapter
 {
     string AdapterName { get; }
@@ -82,9 +84,14 @@ internal record DeviceAdapter(
         HashSet<string> paths = new();
         List<Component> capabilities = new();
         Dictionary<string, IController> handlers = new();
+        int digitCount = 0;
         foreach (DeviceFeature feature in device.Buttons)
         {
             AddCapability(BuildButton(pathPrefix, feature), new ButtonController(device.ButtonHandler!, feature.Name));
+            if (device.FavoritesController != null && KnownButton.GetKnownButton(feature.Name) is Digit0 or Digit1 or Digit2 or Digit3 or Digit4 or Digit5 or Digit6 or Digit7 or Digit8 or Digit9)
+            {
+                digitCount++;
+            }
         }
         foreach ((DeviceFeature feature, IValueController controller) in device.Sliders)
         {
@@ -125,6 +132,10 @@ internal record DeviceAdapter(
         }
         if (device.FavoritesController is { } favoritesController)
         {
+            if (digitCount != 10)
+            {
+                throw new InvalidOperationException("Can not enable favorites without the 10 digit buttons being added. It is highly recommended to call AddButtonGroup(ButtonGroup.NumberPad).");
+            }
             deviceCapabilities.Add(DeviceCapability.CustomFavoriteHandler);
             AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), favoritesController);
         }

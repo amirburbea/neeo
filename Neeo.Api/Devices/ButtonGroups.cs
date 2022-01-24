@@ -3,9 +3,9 @@
 using static KnownButtons;
 
 /// <summary>
-/// Groups of buttons which can be added via a single call to <see cref="IDeviceBuilder.AddButtonGroup"/>.
+/// Groups of buttons which can be added via a single call to <see cref="IDeviceBuilder.AddButtonGroups"/>.
 /// </summary>
-public enum ButtonGroup : ulong
+public enum ButtonGroups : ulong
 {
     /// <summary>
     /// &quot;CHANNEL DOWN&quot;, &quot;CHANNEL UP&quot;.

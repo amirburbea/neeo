@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace Neeo.Api.Json;
 
 /// <summary>
-/// Contains <see langword="static"/> methods and fields related to JSON serialization.
+/// Contains the <see langword="static"/> JSON serialization options to use with the NEEO Brain.
 /// </summary>
 public static class JsonSerialization
 {
@@ -14,22 +14,6 @@ public static class JsonSerialization
     /// An instance of <see cref="JsonSerializerOptions"/> suitable for interactions with the NEEO <see cref="Brain"/>.
     /// </summary>
     public static readonly JsonSerializerOptions Options = JsonSerialization.CreateJsonSerializerOptions();
-
-    /// <summary>
-    /// Parses the specified JSON <paramref name="element"/> into an instance of type <typeparamref name="T"/>.
-    /// </summary>
-    /// <typeparam name="T">The type of object to desrialize.</typeparam>
-    /// <param name="element">The JSON element to read.</param>
-    /// <returns>Deserialized representation of the JSON object.</returns>
-    public static T Deserialize<T>(this JsonElement element) => JsonSerializer.Deserialize<T>(element.GetSpan(), JsonSerialization.Options)!;
-
-    /// <summary>
-    /// Parses the specified JSON <paramref name="element"/> into an instance of the specified <paramref name="returnType"/>.
-    /// </summary>
-    /// <param name="element">The JSON element to read.</param>
-    /// <param name="returnType">The type of object to desrialize.</param>
-    /// <returns>Deserialized representation of the JSON object.</returns>
-    public static object Deserialize(this JsonElement element, Type returnType) => JsonSerializer.Deserialize(element.GetSpan(), returnType, JsonSerialization.Options)!;
 
     internal static void UpdateConfiguration(this JsonSerializerOptions options)
     {
@@ -42,15 +26,5 @@ public static class JsonSerialization
         JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
         options.UpdateConfiguration();
         return options;
-    }
-
-    private static ReadOnlySpan<byte> GetSpan(this JsonElement element)
-    {
-        ArrayBufferWriter<byte> bufferWriter = new();
-        using (Utf8JsonWriter writer = new(bufferWriter))
-        {
-            element.WriteTo(writer);
-        }
-        return bufferWriter.WrittenSpan;
     }
 }

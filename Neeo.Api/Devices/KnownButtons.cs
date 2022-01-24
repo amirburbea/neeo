@@ -381,7 +381,7 @@ public static class KnownButton
     /// </summary>
     /// <param name="name">The name of the button.</param>
     /// <returns><see cref="KnownButtons"/> value if found, otherwise <c>null</c>.</returns>
-    public static KnownButtons? TryGetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
+    public static KnownButtons? GetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
 
     private static IEnumerable<string> ExtractFlags(ulong value)
     {

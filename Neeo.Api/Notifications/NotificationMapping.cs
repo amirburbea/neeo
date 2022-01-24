@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -14,7 +15,7 @@ public interface INotificationMapping
 
 internal sealed class NotificationMapping : INotificationMapping
 {
-    private readonly Dictionary<(string, string), EntryCache> _cache = new();
+    private readonly ConcurrentDictionary<(string, string), EntryCache> _cache = new();
     private readonly IApiClient _client;
     private readonly ILogger<NotificationMapping> _logger;
     private readonly string _sdkAdapterName;
@@ -38,7 +39,7 @@ internal sealed class NotificationMapping : INotificationMapping
             return keys;
         }
         this._logger.LogInformation("Component {component} not found.", componentName);
-        this._cache.Remove(cacheKey);
+        this._cache.TryRemove(cacheKey, out _);
         return Array.Empty<string>();
     }
 

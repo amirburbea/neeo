@@ -13,7 +13,7 @@ namespace Neeo.Api.Devices;
 /// <param name="button">
 /// The name of the button being pressed.
 /// <para/>
-/// Note that <see cref="KnownButton.TryGetKnownButton"/> may be able to translate this into a <see cref="KnownButtons"/> enumerated value.
+/// Note that <see cref="KnownButton.GetKnownButton"/> may be able to translate this into a <see cref="KnownButtons"/> enumerated value.
 /// </param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
 public delegate Task ButtonHandler(string deviceId, string button);
@@ -66,6 +66,4 @@ public delegate Task DeviceValueSetter<TValue>(string deviceId, TValue value)
 /// </remarks>
 public delegate Task FavoritesHandler(string deviceId, string favorite);
 
-public delegate void SubscriptionFunction(UpdateNotifier notifyUpdate, IPowerNotifications? powerNotifications);
-
-public delegate Task UpdateNotifier(Notification message);
+public delegate void DeviceNotifierCallback(IDeviceNotifier notifier);

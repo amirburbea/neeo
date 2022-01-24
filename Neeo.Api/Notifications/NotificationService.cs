@@ -17,11 +17,11 @@ internal sealed class NotificationService : INotificationService
 {
     private readonly Dictionary<string, object> _cache = new();
     private readonly IApiClient _client;
-    private readonly ILogger<INotificationService> _logger;
+    private readonly ILogger<NotificationService> _logger;
     private readonly INotificationMapping _notificationMapping;
     private int _queueSize;
 
-    public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<INotificationService> logger)
+    public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<NotificationService> logger)
     {
         (this._client, this._notificationMapping, this._logger) = (client, notificationMapping, logger);
     }
@@ -77,14 +77,13 @@ internal sealed class NotificationService : INotificationService
         this._queueSize++;
         try
         {
-            bool success = await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResult result) => result.Success, cancellationToken).ConfigureAwait(false);
-            if (!success)
+            if (await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResult result) => result.Success, cancellationToken).ConfigureAwait(false))
             {
-                this._logger.LogWarning("Failed to send notification - Brain rejected.");
-                return false;
+                this.UpdateCache(message);
+                return true;
             }
-            this.UpdateCache(message);
-            return true;
+            this._logger.LogWarning("Failed to send notification - Brain rejected.");
+            return false;
         }
         catch (Exception e)
         {

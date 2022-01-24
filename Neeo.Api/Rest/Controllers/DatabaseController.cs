@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Neeo.Api.Devices;
 using Neeo.Api.Utilities.TokenSearch;
@@ -14,11 +13,15 @@ internal sealed class DatabaseController : ControllerBase
     public DatabaseController(IDeviceDatabase database) => this._database = database;
 
     [HttpGet("adapterdefinition/{adapterName}")]
-    public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => new(this._database.GetDeviceByAdapterName(adapterName));
+    public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => this._database.GetDeviceByAdapterName(adapterName) is { } device
+        ? this.Ok(device)
+        : this.NotFound();
 
     [HttpGet("{deviceId}")]
-    public ActionResult<IDeviceModel> GetDeviceById(int deviceId) => new(this._database.GetDeviceById(deviceId));
+    public ActionResult<IDeviceModel> GetDeviceById(int deviceId) => this._database.GetDeviceById(deviceId) is { } device
+        ? this.Ok(device)
+        : this.NotFound();
 
     [HttpGet("search")]
-    public ActionResult<IEnumerable<ISearchItem<IDeviceModel>>> Search([FromQuery(Name = "q")] string? query) => new(this._database.Search(query));
+    public ActionResult<ISearchItem<IDeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this.Ok(this._database.Search(query));
 }

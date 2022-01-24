@@ -1,9 +1,7 @@
-﻿using System;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Neeo.Api.Devices;
-
 
 internal static class Validator
 {

@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Neeo.Api.Devices;
 using Neeo.Api.Devices.Controllers;
 
@@ -7,17 +8,18 @@ namespace Neeo.Api.Rest.Controllers;
 
 internal partial class DeviceController
 {
-    [HttpGet("{adapter}/subscribe/{deviceId}/{_}")]
+    [HttpGet("{adapter}/subscribe/{deviceId}/{eventPrefix}")]
     public async Task<ActionResult<SuccessResult>> SubscribeAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
-        string deviceId // Note that this does NOT use the DeviceIdBinder.
+        string deviceId, // Note that this does NOT use the DeviceIdBinder.
+        string eventPrefix
     )
     {
-        using var _ = this._logger.BeginScope("Subscribe");
         if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
         {
             await controller.SubscribeAsync(deviceId);
         }
+        this._logger.LogInformation("Device added {adapter}:{deviceId} ({eventPrefix}).", adapter.AdapterName, deviceId, eventPrefix);
         return new SuccessResult();
     }
 
@@ -27,11 +29,11 @@ internal partial class DeviceController
         string deviceId // Note that this does NOT use the DeviceIdBinder.
     )
     {
-        using var _ = this._logger.BeginScope("Unsubscribe");
         if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
         {
             await controller.SubscribeAsync(deviceId);
         }
+        this._logger.LogInformation("Device removed {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
         return new SuccessResult();
     }
 }

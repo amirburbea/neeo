@@ -24,6 +24,12 @@ public static class WakeOnLan
             using UdpClient client = new();
             await client.SendAsync(magicPacket, length, new(IPAddress.Broadcast, 9)).ConfigureAwait(false);
         }
+        catch (Exception e)
+        {
+            if (e.InnerException == null)
+            {
+            }
+        }
         finally
         {
             ArrayPool<byte>.Shared.Return(magicPacket);
