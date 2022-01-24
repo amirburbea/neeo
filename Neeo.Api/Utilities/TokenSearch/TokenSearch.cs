@@ -13,14 +13,13 @@ namespace Neeo.Api.Utilities.TokenSearch;
 internal sealed class TokenSearch<T>
     where T : notnull, IComparable<T>
 {
-    internal static readonly Func<T, string, object?> GetItemValue = TokenSearch<T>.CreateGetItemValue();
+    public static readonly Func<T, string, object?> GetItemValue = TokenSearch<T>.CreateGetItemValue();
 
     private readonly char[] _delimiter;
     private readonly int _maxFilterTokenEntries;
     private readonly Func<T, bool>? _preProcessCheck;
     private readonly string[]? _searchProperties;
     private readonly double _threshold;
-    private readonly bool _unique;
 
     public TokenSearch(SearchOptions<T>? options = default)
     {
@@ -29,7 +28,6 @@ internal sealed class TokenSearch<T>
         this._threshold = options?.Threshold ?? 0.7;
         this._preProcessCheck = options?.PreProcessCheck;
         this._searchProperties = options?.SearchProperties is { Length: > 1 } ? options.SearchProperties : null;
-        this._unique = options?.Unique ?? false;
     }
 
     public IEnumerable<SearchItem<T>> Search(IEnumerable<T> collection, string query)
@@ -61,7 +59,7 @@ internal sealed class TokenSearch<T>
             maxScore = Math.Max(score, maxScore);
             list.Add(new(item) { Score = score });
         }
-        return TokenSearch<T>.Normalize(list, maxScore, this._threshold, this._unique, this._searchProperties).OrderBy(x => x);
+        return TokenSearch<T>.Normalize(list, maxScore, this._threshold, this._searchProperties).OrderBy(x => x);
     }
 
     /// <summary>
@@ -97,19 +95,19 @@ internal sealed class TokenSearch<T>
         return lambdaExpression.Compile();
     }
 
-    private static IEnumerable<SearchItem<T>> Normalize(IEnumerable<SearchItem<T>> searchItems, int maxScore, double threshold, bool unique, string[]? searchProperties)
+    private static IEnumerable<SearchItem<T>> Normalize(IEnumerable<SearchItem<T>> searchItems, int maxScore, double threshold, string[]? searchProperties)
     {
         double normalizedScore = 1d / maxScore;
-        Predicate<string> accept = unique ? new HashSet<string>(StringComparer.OrdinalIgnoreCase).Add : _ => true;
+        HashSet<string> hashSet = new(StringComparer.OrdinalIgnoreCase);
         foreach (SearchItem<T> item in searchItems)
         {
             item.Score = 1d - item.Score * normalizedScore;
             item.MaxScore = maxScore;
-            if (item.Score <= threshold && accept(searchProperties == null ? item.ToString() ?? string.Empty : string.Join(' ', searchProperties.Select(item.GetValue))))
+            if (item.Score <= threshold && hashSet.Add(searchProperties == null ? item.ToString() ?? string.Empty : string.Join(' ', searchProperties.Select(item.GetValue))))
             {
                 yield return item;
             }
-        }
+        }        
     }
 
     private static int Score(string text, IEnumerable<string> searchTokens) => searchTokens.Sum(token =>

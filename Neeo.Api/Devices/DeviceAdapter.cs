@@ -119,7 +119,7 @@ internal record DeviceAdapter(
         }
         if (device.DiscoveryProcess is { } discoveryProcess)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), discoveryControllerFactory.CreateController(discoveryProcess));
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), discoveryControllerFactory.CreateController(discoveryProcess, device.Setup.EnableDynamicDeviceBuilder ?? false));
             if (device.RegistrationController is { } registrationController)
             {
                 deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);

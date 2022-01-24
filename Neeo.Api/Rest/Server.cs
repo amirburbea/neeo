@@ -17,6 +17,7 @@ using Neeo.Api.Devices;
 using Neeo.Api.Devices.Controllers;
 using Neeo.Api.Json;
 using Neeo.Api.Notifications;
+using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Rest;
 

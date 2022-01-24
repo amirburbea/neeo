@@ -3,7 +3,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Neeo.Api;
+namespace Neeo.Api.Utilities;
 
 internal static class UniqueNameGenerator
 {

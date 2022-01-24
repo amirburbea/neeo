@@ -16,18 +16,21 @@ public interface IDiscoveryController : IController
 internal sealed class DiscoveryController : IDiscoveryController
 {
     private readonly DiscoveryControllerFactory _discoveryControllerFactory;
+    private readonly bool _enableDynamicDeviceBuilder;
     private readonly ILogger<DiscoveryController> _logger;
     private readonly DiscoveryProcess _process;
     private readonly IDynamicDeviceRegistrar _registrar;
 
     public DiscoveryController(
         DiscoveryProcess process,
+        bool enableDynamicDeviceBuilder,
         DiscoveryControllerFactory discoveryControllerFactory,
         IDynamicDeviceRegistrar registrar,
         ILogger<DiscoveryController> logger
     )
     {
         this._process = process;
+        this._enableDynamicDeviceBuilder = enableDynamicDeviceBuilder;
         this._discoveryControllerFactory = discoveryControllerFactory;
         this._registrar = registrar;
         this._logger = logger;
@@ -53,6 +56,15 @@ internal sealed class DiscoveryController : IDiscoveryController
             {
                 throw new InvalidOperationException("Names can not be null or blank.");
             }
+            if (device == null)
+            {
+                continue;
+            }
+            if (!this._enableDynamicDeviceBuilder)
+            {
+                throw new InvalidOperationException("EnableDynamicDeviceBuilder was not specified.");
+            }
+            builders.Add((id, device));
         }
         // Build and register any dynamic devices.
         foreach ((string deviceId, IDeviceBuilder? builder) in builders)
@@ -74,5 +86,8 @@ internal sealed class DiscoveryControllerFactory
         this._logger = logger;
     }
 
-    public DiscoveryController CreateController(DiscoveryProcess process) => new(process, this, this._registrar, this._logger);
+    public DiscoveryController CreateController(
+        DiscoveryProcess process,
+        bool enableDynamicDeviceBuilder
+    ) => new(process, enableDynamicDeviceBuilder, this, this._registrar, this._logger);
 }

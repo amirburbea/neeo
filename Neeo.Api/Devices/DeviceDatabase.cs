@@ -62,7 +62,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
                     nameof(IDeviceModel.Name),
                     nameof(IDeviceModel.Tokens),
                     nameof(IDeviceModel.Type),
-                },
+            },
             Threshold = OptionConstants.MatchFactor,
             Delimiter = new[] { OptionConstants.Delimiter }
         });
