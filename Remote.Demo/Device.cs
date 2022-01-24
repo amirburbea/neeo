@@ -1,13 +1,29 @@
 ﻿using System;
+using System.Security.Cryptography;
+using System.Windows.Threading;
 using Neeo.Api.Devices;
 
 namespace Remote.Demo;
 
 internal class Device : NotifierBase
 {
+    private readonly DispatcherTimer _dispatcherTimer;
     private bool _isMuted = false;
     private bool _isPoweredOn;
     private double _volume = 50;
+
+    public Device()
+    {
+        this._dispatcherTimer = new();
+        this._dispatcherTimer.Tick += this.DispatcherTimer_Tick;
+        this._dispatcherTimer.Interval = TimeSpan.FromSeconds(10d);
+        this._dispatcherTimer.IsEnabled = false;
+    }
+
+    private void DispatcherTimer_Tick(object? sender, EventArgs e)
+    {
+        this.OnPropertyChanged(nameof(this.ImageUri));
+    }
 
     public bool IsMuted
     {
@@ -24,8 +40,24 @@ internal class Device : NotifierBase
     public bool IsPoweredOn
     {
         get => this._isPoweredOn;
-        set => this.SetValue(ref this._isPoweredOn, value);
+        set
+        {
+            if (!this.SetValue(ref this._isPoweredOn, value))
+            {
+                return;
+            }
+            if (value)
+            {
+                this._dispatcherTimer.Start();
+            }
+            else
+            {
+                this._dispatcherTimer.Stop();
+            }
+        }
     }
+
+    public string ImageUri => "http://192.168.253.3:13579/snapshot.jpg?" + RandomNumberGenerator.GetInt32(100000000);
 
     public double Volume
     {

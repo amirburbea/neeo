@@ -14,6 +14,8 @@ internal class MainWindowViewModel : NotifierBase
     private readonly Dispatcher _dispatcher;
     private IDeviceNotifier? _deviceNotifier;
 
+    private bool _registered;
+
     public MainWindowViewModel(Brain brain)
     {
         this.Brain = brain;
@@ -27,12 +29,12 @@ internal class MainWindowViewModel : NotifierBase
     public async Task StartServerAsync()
     {
         await this.Brain.StartServerAsync(new[] { this.CreateDeviceBuilder() }, "WPF");
-        this.Device.PropertyChanged += this.ExampleDevice_PropertyChanged;
+        this.Device.PropertyChanged += this.Device_PropertyChanged;
     }
 
     public Task StopServerAsync()
     {
-        this.Device.PropertyChanged -= this.ExampleDevice_PropertyChanged;
+        this.Device.PropertyChanged -= this.Device_PropertyChanged;
         return this.Brain.StopServerAsync();
     }
 
@@ -40,7 +42,7 @@ internal class MainWindowViewModel : NotifierBase
         .AddAdditionalSearchTokens("WPF")
         .SetManufacturer("Amir")
         .SetIcon(DeviceIconOverride.Neeo)
-        .SetDriverVersion(4)
+        .SetDriverVersion(5)
         // Add button.
         .AddButton("INPUT HDMI1")
         .AddButton("INPUT HDMI2")
@@ -59,14 +61,16 @@ internal class MainWindowViewModel : NotifierBase
         .AddSlider("Volume", "Volume", this.GetVolumeAsync, this.SetVolumeAsync)
         .AddSwitch("IsMuted", "IsMuted", this.GetIsMutedAsync, this.SetIsMutedAsync)
         .AddTextLabel("Volume-Label", "Volume", true, this.GetVolumeLabelAsync)
+        .AddImageUrl("Small-Image", "small", ImageSize.Small, default, this.GetImageUriAsync)
+        .AddImageUrl("Large-Image", "large", ImageSize.Large, default, this.GetImageUriAsync)
         .RegisterFavoritesHandler(this.HandleFavoritesAsync)
         .AddPowerStateSensor(this.GetPowerStateAsync)
         .EnableNotifications(this.RegisterDeviceNotifier)
         .RegisterDeviceSubscriptionCallbacks(this.HandleDeviceAddedAsync, this.HandleDeviceRemovedAsync, this.InitializeDeviceListAsync);
 
-    private async void ExampleDevice_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private async void Device_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (this._deviceNotifier is not { } notifier)
+        if (!this._registered || this._deviceNotifier is not { } notifier)
         {
             return;
         }
@@ -74,20 +78,31 @@ internal class MainWindowViewModel : NotifierBase
         {
             case nameof(this.Device.IsPoweredOn):
                 await notifier.SendPowerNotificationAsync("default", this.Device.IsPoweredOn);
-                return;
+                break;
             case nameof(this.Device.Volume):
                 await Task.WhenAll(
                     notifier.SendNotificationAsync(new("default", "Volume", this.Device.Volume)),
                     notifier.SendNotificationAsync(new("default", "Volume-Label", this.Device.Volume.ToString()))
                 );
-                return;
+                break;
             case nameof(this.Device.IsMuted):
                 await Task.WhenAll(
                     notifier.SendNotificationAsync(new("default", "IsMuted", BooleanBoxes.GetBox(this.Device.IsMuted))),
                     notifier.SendNotificationAsync(new("default", "Volume-Label", this.Device.IsMuted ? "Muted" : this.Device.Volume.ToString()))
                 );
-                return;
+                break;
+            case nameof(this.Device.ImageUri):
+                await Task.WhenAll(
+                    notifier.SendNotificationAsync(new("default", "Small-Image", this.Device.ImageUri)),
+                    notifier.SendNotificationAsync(new("default", "Large-Image", this.Device.ImageUri))
+                );
+                break;
         }
+    }
+
+    private Task<string> GetImageUriAsync(string deviceId)
+    {
+        return Task.FromResult(this.Device.ImageUri);
     }
 
     private Task<bool> GetIsMutedAsync(string deviceId) => Task.FromResult(this.Device.IsMuted);
@@ -104,9 +119,17 @@ internal class MainWindowViewModel : NotifierBase
         return Task.CompletedTask;
     }
 
-    private Task HandleDeviceAddedAsync(string deviceId) => Task.CompletedTask;
+    private Task HandleDeviceAddedAsync(string deviceId)
+    {
+        this._registered = true;
+        return Task.CompletedTask;
+    }
 
-    private Task HandleDeviceRemovedAsync(string deviceId) => Task.CompletedTask;
+    private Task HandleDeviceRemovedAsync(string deviceId)
+    {
+        this._registered = false;
+        return Task.CompletedTask;
+    }
 
     private Task HandleFavoritesAsync(string deviceId, string favorite)
     {
@@ -114,7 +137,11 @@ internal class MainWindowViewModel : NotifierBase
         return Task.CompletedTask;
     }
 
-    private Task InitializeDeviceListAsync(string[] deviceIds) => Task.CompletedTask;
+    private Task InitializeDeviceListAsync(string[] deviceIds)
+    {
+        this._registered = deviceIds.Length > 0;
+        return Task.CompletedTask;
+    }
 
     private void RegisterDeviceNotifier(IDeviceNotifier notifier) => this._deviceNotifier = notifier;
 

@@ -18,7 +18,7 @@ public delegate Task SecurityCodeRegistrationProcessor(string securityCode);
 public sealed record class Credentials([property: JsonPropertyName("username")] string UserName, string Password);
 
 /// <summary>
-/// Attempt to register a device adapter given a set of <paramref name="credentials" />.
+/// Attempt to register a device adapter given a set of <paramref name="credentials"/>.
 /// </summary>
 /// <param name="credentials"></param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
