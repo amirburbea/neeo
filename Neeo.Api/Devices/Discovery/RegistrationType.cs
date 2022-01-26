@@ -6,7 +6,7 @@ namespace Neeo.Api.Devices.Discovery;
 /// <summary>
 /// Registration types supported by NEEO.
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<RegistrationType>))]
+[JsonConverter(typeof(TextJsonConverter<RegistrationType>))]
 public enum RegistrationType
 {
     /// <summary>

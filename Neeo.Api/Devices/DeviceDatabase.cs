@@ -49,7 +49,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             IDeviceAdapter adapter = DeviceAdapter.Build(device, discoveryControllerFactory);
             if (device.NotifierCallback is { } callback)
             {
-                callback(new DeviceNotifier(device.AdapterName, device.HasPowerStateSensor, this._notificationService));
+                callback(new DeviceNotifier(this._notificationService,device.AdapterName, device.HasPowerStateSensor ));
             }
             this._adapters.Add(adapter.AdapterName, adapter);
             this._devices.Add(new(this._devices.Count, adapter));

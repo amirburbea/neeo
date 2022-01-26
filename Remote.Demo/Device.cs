@@ -7,23 +7,22 @@ namespace Remote.Demo;
 
 internal class Device : NotifierBase
 {
-    private readonly DispatcherTimer _dispatcherTimer;
+    private static readonly string[] _imageUris = new[]
+    {
+        "https://neeo-sdk.neeo.io/kitten.jpg",
+        "https://neeo-sdk.neeo.io/puppy.jpg",
+        "https://neeo-sdk.neeo.io/folder.jpg",
+        "https://neeo-sdk.neeo.io/file.jpg",
+    };
+
+    private string? _imageUri;
     private bool _isMuted = false;
     private bool _isPoweredOn;
     private double _volume = 50;
 
-    public Device()
-    {
-        this._dispatcherTimer = new();
-        this._dispatcherTimer.Tick += this.DispatcherTimer_Tick;
-        this._dispatcherTimer.Interval = TimeSpan.FromSeconds(10d);
-        this._dispatcherTimer.IsEnabled = false;
-    }
+    
 
-    private void DispatcherTimer_Tick(object? sender, EventArgs e)
-    {
-        this.OnPropertyChanged(nameof(this.ImageUri));
-    }
+    public string ImageUri => this._imageUri ??= "https://neeo-sdk.neeo.io/puppy.jpg";
 
     public bool IsMuted
     {
@@ -40,24 +39,8 @@ internal class Device : NotifierBase
     public bool IsPoweredOn
     {
         get => this._isPoweredOn;
-        set
-        {
-            if (!this.SetValue(ref this._isPoweredOn, value))
-            {
-                return;
-            }
-            if (value)
-            {
-                this._dispatcherTimer.Start();
-            }
-            else
-            {
-                this._dispatcherTimer.Stop();
-            }
-        }
+        set => this.SetValue(ref this._isPoweredOn, value);
     }
-
-    public string ImageUri => "http://192.168.253.3:13579/snapshot.jpg?" + RandomNumberGenerator.GetInt32(100000000);
 
     public double Volume
     {

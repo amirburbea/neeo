@@ -7,7 +7,7 @@ namespace Neeo.Api.Devices;
 /// The icon for a device is generally derived from the device type.
 /// NEEO supports two icon overrides (specifically &quot;sonos&quot; and &quot;neeo&quot;).
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceIconOverride>))]
+[JsonConverter(typeof(TextJsonConverter<DeviceIconOverride>))]
 public enum DeviceIconOverride
 {
     /// <summary>

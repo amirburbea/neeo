@@ -3,7 +3,7 @@ using Neeo.Api.Utilities;
 
 namespace Neeo.Api.Devices;
 
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<DirectoryRole>))]
+[JsonConverter(typeof(TextJsonConverter<DirectoryRole>))]
 public enum DirectoryRole
 {
     [Text("ROOT")]

@@ -22,12 +22,11 @@ internal partial class DeviceController
             this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();
         }
-        if (controller is IValueController valueController)
+        else if (controller is IValueController valueController)
         {
-            object value = await valueController.GetValueAsync(deviceId);
-            return this.Ok(new ValueResult(value));
+            return this.Ok(new ValueResult(await valueController.GetValueAsync(deviceId)));
         }
-        if (controller is IButtonController buttonController)
+        else if (controller is IButtonController buttonController)
         {
             await buttonController.TriggerAsync(deviceId);
             return this.Ok(new SuccessResult());

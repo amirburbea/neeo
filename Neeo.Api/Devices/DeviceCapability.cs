@@ -7,7 +7,7 @@ namespace Neeo.Api.Devices;
 /// <summary>
 /// The unique/special capabilities supported by the device.
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceCapability>))]
+[JsonConverter(typeof(TextJsonConverter<DeviceCapability>))]
 public enum DeviceCapability
 {
     /// <summary>

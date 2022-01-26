@@ -6,7 +6,7 @@ namespace Neeo.Api.Devices;
 /// <summary>
 /// Device Types.
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<DeviceType>))]
+[JsonConverter(typeof(TextJsonConverter<DeviceType>))]
 public enum DeviceType
 {
     /// <summary>

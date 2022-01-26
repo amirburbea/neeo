@@ -1,12 +1,23 @@
-﻿namespace Neeo.Api;
+﻿using System.Text.Json.Serialization;
+
+namespace Neeo.Api;
 
 /// <summary>
 /// A structure indicating success - used as a standard return type for NEEO Brain APIs.
 /// </summary>
-public sealed record SuccessResult
+public readonly struct SuccessResult
 {
+    ///// <summary>
+    ///// Creates a new <see cref="SuccessResult"/> with a success value of <see langword="true" />.
+    ///// </summary>
+    public SuccessResult() => this.Success = true;
+
     /// <summary>
-    /// Gets or sets a value indicating if the API call was successful.
+    /// Creates a new <see cref="SuccessResult"/> with the specified success value.
     /// </summary>
-    public bool Success { get; init; } = true;
+    /// <param name="success">The success value.</param>
+    [JsonConstructor]
+    public SuccessResult(bool success) => this.Success = success;
+
+    public bool Success { get; }
 }

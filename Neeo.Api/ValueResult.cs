@@ -1,7 +1,14 @@
-﻿namespace Neeo.Api;
+﻿using System.Text.Json.Serialization;
+
+namespace Neeo.Api;
 
 /// <summary>
 /// A structure containing a single value to return to the NEEO Brain.
 /// </summary>
-/// <param name="Value">The value to return to the NEEO Brain.</param>
-public record struct ValueResult(object? Value);
+public readonly struct ValueResult
+{
+    [JsonConstructor]
+    public ValueResult(object value) => this.Value = value;
+
+    public object? Value { get; }
+}

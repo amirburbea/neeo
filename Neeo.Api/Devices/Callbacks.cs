@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Neeo.Api.Notifications;
 
 namespace Neeo.Api.Devices;
 
@@ -18,8 +17,6 @@ namespace Neeo.Api.Devices;
 /// <returns><see cref="Task"/> to indicate completion.</returns>
 public delegate Task ButtonHandler(string deviceId, string button);
 
-public delegate Task DeviceAction(string deviceId);
-
 /// <summary>
 /// A callback to be invoked to initialize the device adapter before making it available to the NEEO Brain.
 /// </summary>
@@ -33,6 +30,19 @@ public delegate Task DeviceInitializer();
 /// <param name="deviceIds">Array of deviceId string for all devices of this type currently on the Brain.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
 public delegate Task DeviceListInitializer(string[] deviceIds);
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="notifier"></param>
+public delegate void DeviceNotifierCallback(IDeviceNotifier notifier);
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="deviceId"></param>
+/// <returns></returns>
+public delegate Task DeviceSubscriptionAction(string deviceId);
 
 /// <summary>
 /// Callback invoked by the NEEO Brain to asynchronously get a value from a device.
@@ -65,5 +75,3 @@ public delegate Task DeviceValueSetter<TValue>(string deviceId, TValue value)
 /// followed by &quot;DIGIT 2&quot;), the handler is invoked with a single value of &quot;42&quot;.
 /// </remarks>
 public delegate Task FavoritesHandler(string deviceId, string favorite);
-
-public delegate void DeviceNotifierCallback(IDeviceNotifier notifier);

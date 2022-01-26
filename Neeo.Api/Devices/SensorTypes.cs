@@ -6,7 +6,7 @@ namespace Neeo.Api.Devices;
 /// <summary>
 /// An enumeration of the types of sensors available in NEEO.
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<SensorTypes>))]
+[JsonConverter(typeof(TextJsonConverter<SensorTypes>))]
 public enum SensorTypes
 {
     /// <summary>

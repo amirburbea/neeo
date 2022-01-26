@@ -6,7 +6,7 @@ namespace Neeo.Api.Devices;
 /// <summary>
 /// An enumeration of NEEO component types.
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<ComponentType>))]
+[JsonConverter(typeof(TextJsonConverter<ComponentType>))]
 public enum ComponentType
 {
     [Text("button")]

@@ -7,7 +7,7 @@ namespace Neeo.Api.Devices;
 /// Image size in the UI.
 /// The small image has the size of a button while the large image is a square image using the full width of the client.
 /// </summary>
-[JsonConverter(typeof(TextAttribute.EnumJsonConverter<ImageSize>))]
+[JsonConverter(typeof(TextJsonConverter<ImageSize>))]
 public enum ImageSize
 {
     /// <summary>

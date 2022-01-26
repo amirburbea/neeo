@@ -15,16 +15,15 @@ public interface ISubscriptionController : IController
 
 internal sealed record class SubscriptionController : ISubscriptionController
 {
-    private readonly DeviceAction _onDeviceAdded;
-    private readonly DeviceAction _onDeviceRemoved;
+    private readonly DeviceSubscriptionAction _onDeviceAdded;
+    private readonly DeviceSubscriptionAction _onDeviceRemoved;
     private readonly DeviceListInitializer _deviceListInitializer;
 
-    public SubscriptionController(DeviceAction onDeviceAdded, DeviceAction onDeviceRemoved, DeviceListInitializer deviceListInitializer)
-    {
-        this._onDeviceAdded = onDeviceAdded;
-        this._onDeviceRemoved = onDeviceRemoved;
-        this._deviceListInitializer = deviceListInitializer;
-    }
+    public SubscriptionController(
+        DeviceSubscriptionAction onDeviceAdded,
+        DeviceSubscriptionAction onDeviceRemoved,
+        DeviceListInitializer deviceListInitializer
+    ) => (this._onDeviceAdded, this._onDeviceRemoved, this._deviceListInitializer) = (onDeviceAdded, onDeviceRemoved, deviceListInitializer);
 
     public Task InitializeDeviceList(string[] deviceIds) => this._deviceListInitializer(deviceIds);
 

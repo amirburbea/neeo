@@ -19,7 +19,7 @@ internal sealed class SubscriptionsNotifier
         IDeviceDatabase database,
         SdkEnvironment environment,
         ILogger<SubscriptionsNotifier> logger
-    ) => (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.SdkAdapterName);
+    ) => (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.AdapterName);
 
     public Task NotifySubscriptionsAsync(CancellationToken cancellationToken)
     {

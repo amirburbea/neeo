@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using Neeo.Api;
@@ -77,24 +78,24 @@ internal class MainWindowViewModel : NotifierBase
         switch (e.PropertyName)
         {
             case nameof(this.Device.IsPoweredOn):
-                await notifier.SendPowerNotificationAsync("default", this.Device.IsPoweredOn);
+                await notifier.SendPowerNotificationAsync(this.Device.IsPoweredOn);
                 break;
             case nameof(this.Device.Volume):
                 await Task.WhenAll(
-                    notifier.SendNotificationAsync(new("default", "Volume", this.Device.Volume)),
-                    notifier.SendNotificationAsync(new("default", "Volume-Label", this.Device.Volume.ToString()))
+                    notifier.SendNotificationAsync("Volume", this.Device.Volume),
+                    notifier.SendNotificationAsync("Volume-Label", this.Device.Volume.ToString())
                 );
                 break;
             case nameof(this.Device.IsMuted):
                 await Task.WhenAll(
-                    notifier.SendNotificationAsync(new("default", "IsMuted", BooleanBoxes.GetBox(this.Device.IsMuted))),
-                    notifier.SendNotificationAsync(new("default", "Volume-Label", this.Device.IsMuted ? "Muted" : this.Device.Volume.ToString()))
+                    notifier.SendNotificationAsync("IsMuted", BooleanBoxes.GetBox(this.Device.IsMuted)),
+                    notifier.SendNotificationAsync("Volume-Label", this.Device.IsMuted ? "Muted" : this.Device.Volume.ToString())
                 );
                 break;
             case nameof(this.Device.ImageUri):
                 await Task.WhenAll(
-                    notifier.SendNotificationAsync(new("default", "Small-Image", this.Device.ImageUri)),
-                    notifier.SendNotificationAsync(new("default", "Large-Image", this.Device.ImageUri))
+                    notifier.SendNotificationAsync("Small-Image", this.Device.ImageUri),
+                    notifier.SendNotificationAsync("Large-Image", this.Device.ImageUri)
                 );
                 break;
         }

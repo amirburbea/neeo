@@ -223,7 +223,7 @@ public interface IDeviceBuilder
     /// <param name="onDeviceRemoved"></param>
     /// <param name="initializeDeviceList"></param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceAction onDeviceAdded, DeviceAction onDeviceRemoved, DeviceListInitializer initializeDeviceList);
+    IDeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceSubscriptionAction onDeviceAdded, DeviceSubscriptionAction onDeviceRemoved, DeviceListInitializer initializeDeviceList);
 
     /// <summary>
     /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
@@ -457,8 +457,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     );
 
     IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionCallbacks(
-        DeviceAction onDeviceAdded,
-        DeviceAction onDeviceRemoved,
+        DeviceSubscriptionAction onDeviceAdded,
+        DeviceSubscriptionAction onDeviceRemoved,
         DeviceListInitializer initializeDeviceList
     ) => this.RegisterDeviceSubscriptionCallbacks(onDeviceAdded, onDeviceRemoved, initializeDeviceList);
 
@@ -629,7 +629,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceAction onDeviceAdded, DeviceAction onDeviceRemoved, DeviceListInitializer initializeDeviceList)
+    private DeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceSubscriptionAction onDeviceAdded, DeviceSubscriptionAction onDeviceRemoved, DeviceListInitializer initializeDeviceList)
     {
         if (this.SubscriptionController != null)
         {
