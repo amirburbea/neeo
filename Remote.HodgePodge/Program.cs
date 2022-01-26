@@ -9,8 +9,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Broadlink.RM;
-using Neeo.Api;
-using Neeo.Api.Devices;
+using Neeo.Sdk;
+using Neeo.Sdk.Devices;
 using Neeo.Discovery;
 
 namespace Remote.HodgePodge;

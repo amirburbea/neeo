@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Neeo.Api.Devices;
+using Neeo.Sdk.Devices;
 
 namespace Remote.HodgePodge;
 

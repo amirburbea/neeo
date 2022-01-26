@@ -2,13 +2,13 @@
 using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows.Threading;
-using Neeo.Api;
-using Neeo.Api.Devices;
-using Neeo.Api.Utilities;
+using Neeo.Sdk;
+using Neeo.Sdk.Devices;
+using Neeo.Sdk.Utilities;
 
 namespace Remote.Demo;
 
-using static Neeo.Api.Devices.Device;
+using static Neeo.Sdk.Devices.Device;
 
 internal class MainWindowViewModel : NotifierBase
 {

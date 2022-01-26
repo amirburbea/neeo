@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Security.Cryptography;
 using System.Windows.Threading;
-using Neeo.Api.Devices;
+using Neeo.Sdk.Devices;
 
 namespace Remote.Demo;
 

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Neeo.Api.Devices;
-using Neeo.Api.Devices.Discovery;
+using Neeo.Sdk.Devices;
+using Neeo.Sdk.Devices.Discovery;
 
 namespace Remote.HodgePodge;
 

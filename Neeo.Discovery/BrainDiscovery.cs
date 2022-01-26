@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Neeo.Api;
+using Neeo.Sdk;
 using Zeroconf;
 
 namespace Neeo.Discovery;

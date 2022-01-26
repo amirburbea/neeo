@@ -16,7 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broadlink.RM\Broadlink.RM.csproj" />
-    <ProjectReference Include="..\Neeo.Api\Neeo.Api.csproj" />
+    <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
     <ProjectReference Include="..\Neeo.Discovery\Neeo.Discovery.csproj" />
   </ItemGroup>
 

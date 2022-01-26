@@ -10,7 +10,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Api", "Neeo.Api\Neeo.Api.csproj", "{E7AE10FA-82A6-4639-902C-BA165B783BE9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk", "Neeo.Sdk\Neeo.Sdk.csproj", "{E7AE10FA-82A6-4639-902C-BA165B783BE9}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Broadlink.RM", "Broadlink.RM\Broadlink.RM.csproj", "{4EB6E5A8-9ACF-4190-B127-08EDB399ADA2}"
 EndProject
