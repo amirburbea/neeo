@@ -46,7 +46,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         this._logger = logger;
         foreach (IDeviceBuilder device in deviceBuilders)
         {
-            IDeviceAdapter adapter = DeviceAdapter.Build(device, discoveryControllerFactory);
+            IDeviceAdapter adapter = ((DeviceBuilder)device).Build( discoveryControllerFactory);
             if (device.NotifierCallback is { } callback)
             {
                 callback(new DeviceNotifier(this._notificationService,device.AdapterName, device.HasPowerStateSensor ));

@@ -65,7 +65,7 @@ internal sealed class DiscoveryController : IDiscoveryController
         // Build and register any dynamic devices.
         foreach ((string deviceId, IDeviceBuilder? builder) in builders)
         {
-            this._registrar.RegisterDiscoveredDevice(deviceId, DeviceAdapter.Build(builder, this._discoveryControllerFactory));
+            this._registrar.RegisterDiscoveredDevice(deviceId, ((DeviceBuilder)builder).Build(this._discoveryControllerFactory));
         }
         return results;
     }
