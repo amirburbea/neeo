@@ -8,9 +8,9 @@ namespace Neeo.Sdk.Rest.Controllers;
 [ApiController, Route("[controller]")]
 internal sealed class SecureController : ControllerBase
 {
-    private readonly PgpKeys _pgpKeys;
+    private readonly IPgpKeys _pgpKeys;
 
-    public SecureController(PgpKeys pgpKeys) => this._pgpKeys = pgpKeys;
+    public SecureController(IPgpKeys pgpKeys) => this._pgpKeys = pgpKeys;
 
     [HttpGet("pubkey")]
     public ActionResult<PublicKeyResult> GetPublicKey()

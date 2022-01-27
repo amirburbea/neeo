@@ -20,7 +20,7 @@ internal sealed class NotificationMapping : INotificationMapping
     private readonly ILogger<NotificationMapping> _logger;
     private readonly string _sdkAdapterName;
 
-    public NotificationMapping(SdkEnvironment environment, IApiClient client, ILogger<NotificationMapping> logger)
+    public NotificationMapping(ISdkEnvironment environment, IApiClient client, ILogger<NotificationMapping> logger)
     {
         this._sdkAdapterName = environment.AdapterName;
         this._client = client;

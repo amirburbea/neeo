@@ -12,34 +12,25 @@ using Org.BouncyCastle.Security;
 
 namespace Neeo.Sdk.Rest;
 
-internal sealed class PgpKeys
+public interface IPgpKeys
 {
-    public PgpKeys()
+    PgpPrivateKey PrivateKey { get; }
+
+    PgpPublicKey PublicKey { get; }
+}
+
+internal sealed record PgpKeys(PgpPublicKey PublicKey, PgpPrivateKey PrivateKey) : IPgpKeys
+{
+    public static PgpKeys Create()
     {
+        byte[] randomBytes = RandomNumberGenerator.GetBytes(64);
+        char[] passphrase = Encoding.ASCII.GetChars(randomBytes);
         RsaKeyPairGenerator kpg = new();
         kpg.Init(new RsaKeyGenerationParameters(BigInteger.ValueOf(0x10001), new(), 768, 8));
         AsymmetricCipherKeyPair pair = kpg.GenerateKeyPair();
-        byte[] randomBytes = RandomNumberGenerator.GetBytes(64);
         SecureRandom random = new();
         random.SetSeed(randomBytes);
-        char[] passphrase = Encoding.ASCII.GetChars(randomBytes);
-        PgpSecretKey secretKey = new(
-            PgpSignature.DefaultCertification,
-            PublicKeyAlgorithmTag.RsaGeneral,
-            pair.Public,
-            pair.Private,
-            DateTime.Now,
-            Dns.GetHostName(),
-            SymmetricKeyAlgorithmTag.Aes256,
-            passphrase,
-            default,
-            default,
-            random
-        );
-        (this.PublicKey, this.PrivateKey) = (secretKey.PublicKey, secretKey.ExtractPrivateKey(passphrase));
+        PgpSecretKey secretKey = new(PgpSignature.DefaultCertification, PublicKeyAlgorithmTag.RsaGeneral, pair.Public, pair.Private, DateTime.Now, Dns.GetHostName(), SymmetricKeyAlgorithmTag.Aes256, passphrase, null, null, random);
+        return new(secretKey.PublicKey, secretKey.ExtractPrivateKey(passphrase));
     }
-
-    public PgpPrivateKey PrivateKey { get; }
-
-    public PgpPublicKey PublicKey { get; }
 }

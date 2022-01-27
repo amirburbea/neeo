@@ -25,6 +25,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Compile Update="Brain.*.cs">
+			<DependentUpon>Brain.cs</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
 		<Compile Update="Rest\Controllers\DeviceController.*.cs">
 			<DependentUpon>DeviceController.cs</DependentUpon>
 		</Compile>

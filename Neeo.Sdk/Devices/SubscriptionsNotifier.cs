@@ -2,12 +2,13 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices.Controllers;
 
 namespace Neeo.Sdk.Devices;
 
-internal sealed class SubscriptionsNotifier
+internal sealed class SubscriptionsNotifier : IHostedService
 {
     private readonly IApiClient _client;
     private readonly IDeviceDatabase _database;
@@ -17,11 +18,11 @@ internal sealed class SubscriptionsNotifier
     public SubscriptionsNotifier(
         IApiClient client,
         IDeviceDatabase database,
-        SdkEnvironment environment,
+        ISdkEnvironment environment,
         ILogger<SubscriptionsNotifier> logger
     ) => (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.AdapterName);
 
-    public Task NotifySubscriptionsAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         List<Task> tasks = new();
         foreach (IDeviceAdapter adapter in this._database.Adapters)
@@ -38,6 +39,8 @@ internal sealed class SubscriptionsNotifier
             _ => Task.WhenAll(tasks)
         };
     }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     private async Task NotifySubscriptionsAsync(IDeviceAdapter adapter, ISubscriptionController controller, CancellationToken cancellationToken)
     {

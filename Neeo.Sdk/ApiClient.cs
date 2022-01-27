@@ -93,10 +93,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private readonly ILogger<ApiClient> _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(
-        SdkEnvironment environment,
-        ILogger<ApiClient> logger
-    ) => (this._uriPrefix, this._logger) = ($"http://{environment.BrainEndPoint}", logger);
+    public ApiClient(ISdkEnvironment environment, ILogger<ApiClient> logger) => (this._uriPrefix, this._logger) = ($"http://{environment.BrainEndPoint}", logger);
 
     public void Dispose() => this._httpClient.Dispose();
 
@@ -136,7 +133,6 @@ internal sealed class ApiClient : IApiClient, IDisposable
             throw new WebException($"Server returned status {(int)response.StatusCode}:{Enum.GetName(response.StatusCode)}.");
         }
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        TData data = (await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
-        return transform(data);
+        return transform((await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!);
     }
 }
