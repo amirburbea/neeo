@@ -103,7 +103,7 @@ public partial class Brain
                 services
                     .AddSingleton<ISdkEnvironment>(environment)
                     .AddSingleton(devices)
-                    .AddSingleton(() => PgpKeys.Create())
+                    .AddSingleton<IPgpUtility,PgpUtility>()
                     .AddSingleton<DiscoveryControllerFactory>()
                     .AddSingleton<IApiClient, ApiClient>()
                     .AddSingleton<IDeviceDatabase, DeviceDatabase>()

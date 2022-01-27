@@ -31,22 +31,7 @@ public class DiscoveryExampleDeviceProvider : IDeviceProvider
             );
     }
 
-    private Task InitializeDeviceList(string[] deviceIds)
-    {
-        return Task.CompletedTask;
-    }
-
-    private Task OnDeviceRemoved(string deviceId)
-    {
-        return Task.CompletedTask;
-    }
-
-    private Task OnDeviceAdded(string deviceId)
-    {
-        return Task.CompletedTask;
-    }
-
-    private Task<DiscoveryResult[]> DiscoverDevices(string deviceAdapterName)
+    private Task<DiscoveryResult[]> DiscoverDevices(string? deviceId)
     {
         Console.WriteLine("Discovering devices");
         return Task.FromResult(new[]
@@ -62,19 +47,34 @@ public class DiscoveryExampleDeviceProvider : IDeviceProvider
         return Task.FromResult(text);
     }
 
+    private Task InitializeDeviceList(string[] deviceIds)
+    {
+        return Task.CompletedTask;
+    }
+
     private Task<bool> IsRegistered()
     {
         Console.WriteLine("Is Registered {0}", this._credentials != null);
         return Task.FromResult(this._credentials != null);
     }
 
-    private Task Register(Credentials credentials)
+    private Task OnDeviceAdded(string deviceId)
     {
-        if (credentials.Password != THE_ANSWER || credentials.UserName.Length==0)
-        {
-            throw new("This is fucked");
-        }
-        this._credentials=credentials;
         return Task.CompletedTask;
+    }
+
+    private Task OnDeviceRemoved(string deviceId)
+    {
+        return Task.CompletedTask;
+    }
+
+    private Task<RegistrationResult> Register(Credentials credentials)
+    {
+        if (credentials.Password != THE_ANSWER || credentials.UserName.Length == 0)
+        {
+            return Task.FromResult(RegistrationResult.Failed("This is fucked."));
+        }
+        this._credentials = credentials;
+        return Task.FromResult(RegistrationResult.Success);
     }
 }

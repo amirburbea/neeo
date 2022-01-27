@@ -12,12 +12,12 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal sealed partial class DeviceController : ControllerBase
 {
     private readonly ILogger<DeviceController> _logger;
-    private readonly PgpKeys _pgpKeys;
+    private readonly IPgpUtility _pgpUtility;
 
     public DeviceController(
-        PgpKeys pgpKeys,
+        IPgpUtility pgpUtility,
         ILogger<DeviceController> logger
-    ) => (this._pgpKeys, this._logger) = (pgpKeys, logger);
+    ) => (this._pgpUtility, this._logger) = (pgpUtility, logger);
 
     private sealed class AdapterBinder : ParameterBinderBase<IDeviceAdapter>
     {

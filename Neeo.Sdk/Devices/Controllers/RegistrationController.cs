@@ -11,20 +11,20 @@ public interface IRegistrationController : IController
 
     Task<bool> QueryIsRegisteredAsync();
 
-    Task RegisterAsync(JsonElement credentials);
+    Task<RegistrationResult> RegisterAsync(JsonElement credentials);
 }
 
 internal sealed class RegistrationController : IRegistrationController
 {
-    private readonly Func<JsonElement, Task> _processor;
+    private readonly Func<JsonElement, Task<RegistrationResult>> _processor;
     private readonly QueryIsRegistered _queryIsRegistered;
 
     public RegistrationController(
         QueryIsRegistered queryIsRegistered,
-        Func<JsonElement, Task> processor
+        Func<JsonElement, Task<RegistrationResult>> processor
     ) => (this._queryIsRegistered, this._processor) = (queryIsRegistered, processor);
 
     public Task<bool> QueryIsRegisteredAsync() => this._queryIsRegistered();
 
-    public Task RegisterAsync(JsonElement credentials) => this._processor(credentials);
+    public Task<RegistrationResult> RegisterAsync(JsonElement credentials) => this._processor(credentials);
 }

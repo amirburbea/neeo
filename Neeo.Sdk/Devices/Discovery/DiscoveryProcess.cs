@@ -2,7 +2,7 @@
 
 namespace Neeo.Sdk.Devices.Discovery;
 
-public delegate Task<DiscoveryResult[]> DiscoveryProcess(string? optionalDeviceId);
+public delegate Task<DiscoveryResult[]> DiscoveryProcess(string? optionalDeviceId = default);
 
 public record struct DiscoveryResult(
     string Id,

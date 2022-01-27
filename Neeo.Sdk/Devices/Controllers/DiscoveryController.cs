@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices.Discovery;
 
 namespace Neeo.Sdk.Devices.Controllers;

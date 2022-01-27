@@ -73,7 +73,7 @@ internal static class Program
                 }
             }
 
-            await brain.StartServerAsync(devices);
+            await brain.StartServerAsync(devices,port:9001);
             /*
              * bool switchValue = false;
     double sliderValue = 66d;

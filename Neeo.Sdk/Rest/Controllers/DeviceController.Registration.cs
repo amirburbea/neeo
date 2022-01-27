@@ -1,15 +1,8 @@
-using System;
-using System.IO;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Controllers;
-using Neeo.Sdk.Json;
-using Org.BouncyCastle.Bcpg;
-using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -34,29 +27,13 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Registering {adapter}...", adapter.AdapterName);
-        await controller.RegisterAsync(await this.DecryptElementAsync(payload.Data));
-        return new SuccessResult();
-    }
-
-    private async ValueTask<JsonElement> DecryptElementAsync(string text)
-    {
-        using MemoryStream inputStream = new(Encoding.ASCII.GetBytes(text));
-        using ArmoredInputStream armoredInputStream = new(inputStream);
-        PgpObjectFactory inputFactory = new(armoredInputStream);
-        PgpObject root = inputFactory.NextPgpObject();
-        const string invalidTextError = "Text was not in the expected format.";
-        if ((root as PgpEncryptedDataList ?? inputFactory.NextPgpObject()) is not PgpEncryptedDataList list || list[0] is not PgpPublicKeyEncryptedData data)
+        if (await controller.RegisterAsync(await this._pgpUtility.DeserializeEncryptedAsync(payload.Data)) is not { Error: { } error })
         {
-            throw new InvalidOperationException(invalidTextError);
+            return this.Ok(new SuccessResult());
         }
-        using Stream privateStream = data.GetDataStream(this._pgpKeys.PrivateKey);
-        PgpObjectFactory privateFactory = new(privateStream);
-        if (privateFactory.NextPgpObject() is not PgpLiteralData literal)
-        {
-            throw new InvalidOperationException(invalidTextError);
-        }
-        using Stream stream = literal.GetInputStream();
-        return await JsonSerializer.DeserializeAsync<JsonElement>(stream, JsonSerialization.Options);
+        ContentResult result = this.Content(error);
+        result.StatusCode = 500;
+        return result;
     }
 
     public record struct CredentialsPayload(string Data);
