@@ -11,7 +11,7 @@ namespace Neeo.Sdk.Devices;
 /// </summary>
 /// <remarks>
 /// Note: This enumeration supports bitwise (flagged) combinations for easily adding multiple buttons via a single
-/// call to <see cref="IDeviceBuilder.AddButtons(KnownButtons)"/>.
+/// call to <see cref="IDeviceBuilder.AddButtons"/>.
 /// </remarks>
 [Flags]
 public enum KnownButtons : ulong
@@ -20,337 +20,357 @@ public enum KnownButtons : ulong
     /// &quot;AMAZON&quot;
     /// </summary>
     [Text("AMAZON")]
-    Amazon = 1ul << 0,
+    Amazon = 1UL,
 
     /// <summary>
     /// &quot;BACK&quot;
     /// </summary>
     [Text("BACK")]
-    Back = 1ul << 1,
+    Back = Amazon << 1,
 
     /// <summary>
     /// &quot;CHANNEL DOWN&quot;
     /// </summary>
     [Text("CHANNEL DOWN")]
-    ChannelDown = 1ul << 2,
+    ChannelDown = Back << 1,
 
     /// <summary>
     /// &quot;CHANNEL UP&quot;
     /// </summary>
     [Text("CHANNEL UP")]
-    ChannelUp = 1ul << 3,
+    ChannelUp = ChannelDown << 1,
 
     /// <summary>
     /// &quot;CURSOR DOWN&quot;
     /// </summary>
     [Text("CURSOR DOWN")]
-    CursorDown = 1ul << 4,
+    CursorDown = ChannelUp << 1,
 
     /// <summary>
     /// &quot;CURSOR ENTER&quot;
     /// </summary>
     [Text("CURSOR ENTER")]
-    CursorEnter = 1ul << 5,
+    CursorEnter = CursorDown << 1,
 
     /// <summary>
     /// &quot;CURSOR LEFT&quot;
     /// </summary>
     [Text("CURSOR LEFT")]
-    CursorLeft = 1ul << 6,
+    CursorLeft = CursorEnter << 1,
 
     /// <summary>
     /// &quot;CURSOR RIGHT&quot;
     /// </summary>
     [Text("CURSOR RIGHT")]
-    CursorRight = 1ul << 7,
+    CursorRight = CursorLeft << 1,
 
     /// <summary>
     /// &quot;CURSOR UP&quot;
     /// </summary>
     [Text("CURSOR UP")]
-    CursorUp = 1ul << 8,
+    CursorUp = CursorRight << 1,
 
     /// <summary>
     /// &quot;DIGIT 0&quot;
     /// </summary>
     [Text("DIGIT 0")]
-    Digit0 = 1ul << 9,
+    Digit0 = CursorUp << 1,
 
     /// <summary>
     /// &quot;DIGIT 1&quot;
     /// </summary>
     [Text("DIGIT 1")]
-    Digit1 = 1ul << 10,
+    Digit1 = Digit0 << 1,
 
     /// <summary>
     /// &quot;DIGIT 2&quot;
     /// </summary>
     [Text("DIGIT 2")]
-    Digit2 = 1ul << 11,
+    Digit2 = Digit1 << 1,
 
     /// <summary>
     /// &quot;DIGIT 3&quot;
     /// </summary>
     [Text("DIGIT 3")]
-    Digit3 = 1ul << 12,
+    Digit3 = Digit2 << 1,
 
     /// <summary>
     /// &quot;DIGIT 4&quot;
     /// </summary>
     [Text("DIGIT 4")]
-    Digit4 = 1ul << 13,
+    Digit4 = Digit3 << 1,
 
     /// <summary>
     /// &quot;DIGIT 5&quot;
     /// </summary>
     [Text("DIGIT 5")]
-    Digit5 = 1ul << 14,
+    Digit5 = Digit4 << 1,
 
     /// <summary>
     /// &quot;DIGIT 6&quot;
     /// </summary>
     [Text("DIGIT 6")]
-    Digit6 = 1ul << 15,
+    Digit6 = Digit5 << 1,
 
     /// <summary>
     /// &quot;DIGIT 7&quot;
     /// </summary>
     [Text("DIGIT 7")]
-    Digit7 = 1ul << 16,
+    Digit7 = Digit6 << 1,
 
     /// <summary>
     /// &quot;DIGIT 8&quot;
     /// </summary>
     [Text("DIGIT 8")]
-    Digit8 = 1ul << 17,
+    Digit8 = Digit7 << 1,
 
     /// <summary>
     /// &quot;DIGIT 9&quot;
     /// </summary>
     [Text("DIGIT 9")]
-    Digit9 = 1ul << 18,
+    Digit9 = Digit8 << 1,
 
     /// <summary>
     /// &quot;DIGIT ENTER&quot;
     /// </summary>
     [Text("DIGIT ENTER")]
-    DigitEnter = 1ul << 19,
+    DigitEnter = Digit9 << 1,
 
     /// <summary>
     /// &quot;DIGIT SEPARATOR&quot;
     /// </summary>
     [Text("DIGIT SEPARATOR")]
-    DigitSeparator = 1ul << 20,
+    DigitSeparator = DigitEnter << 1,
 
     /// <summary>
     /// &quot;EXIT&quot;
     /// </summary>
     [Text("EXIT")]
-    Exit = 1ul << 21,
+    Exit = DigitSeparator << 1,
 
     /// <summary>
     /// &quot;FORWARD&quot;
     /// </summary>
     [Text("FORWARD")]
-    Forward = 1ul << 22,
+    Forward = Exit << 1,
 
     /// <summary>
     /// &quot;FUNCTION BLUE&quot;
     /// </summary>
     [Text("FUNCTION BLUE")]
-    FunctionBlue = 1ul << 23,
+    FunctionBlue = Forward << 1,
 
     /// <summary>
     /// &quot;FUNCTION GREEN&quot;
     /// </summary>
     [Text("FUNCTION GREEN")]
-    FunctionGreen = 1ul << 24,
+    FunctionGreen = FunctionBlue << 1,
 
     /// <summary>
     /// &quot;FUNCTION RED&quot;
     /// </summary>
     [Text("FUNCTION RED")]
-    FunctionRed = 1ul << 25,
+    FunctionRed = FunctionGreen << 1,
 
     /// <summary>
     /// &quot;FUNCTION YELLOW&quot;
     /// </summary>
     [Text("FUNCTION YELLOW")]
-    FunctionYellow = 1ul << 26,
+    FunctionYellow = FunctionRed << 1,
 
     /// <summary>
     /// &quot;GUIDE&quot;
     /// </summary>
     [Text("GUIDE")]
-    Guide = 1ul << 27,
+    Guide = FunctionYellow << 1,
 
     /// <summary>
     /// &quot;HOME&quot;
     /// </summary>
     [Text("HOME")]
-    Home = 1ul << 28,
+    Home = Guide << 1,
 
     /// <summary>
     /// &quot;INFO&quot;
     /// </summary>
     [Text("INFO")]
-    Info = 1ul << 29,
+    Info = Home << 1,
+
+    /// <summary>
+    /// &quot;INPUT HDMI1&quot;
+    /// </summary>
+    [Text("INPUT HDMI1")]
+    InputHdmi1 = Info << 1,
+
+    /// <summary>
+    /// &quot;INPUT HDMI2&quot;
+    /// </summary>
+    [Text("INPUT HDMI2")]
+    InputHdmi2 = InputHdmi1 << 1,
+
+    /// <summary>
+    /// &quot;INPUT HDMI3&quot;
+    /// </summary>
+    [Text("INPUT HDMI3")]
+    InputHdmi3 = InputHdmi2 << 1,
 
     /// <summary>
     /// &quot;INPUT TOGGLE&quot;
     /// </summary>
     [Text("INPUT TOGGLE")]
-    InputToggle = 1ul << 30,
+    InputToggle = InputHdmi3 << 1,
 
     /// <summary>
     /// &quot;LANGUAGE&quot;
     /// </summary>
     [Text("LANGUAGE")]
-    Language = 1ul << 31,
+    Language = InputToggle << 1,
 
     /// <summary>
     /// &quot;LIVE&quot;
     /// </summary>
     [Text("LIVE")]
-    Live = 1ul << 32,
+    Live = Language << 1,
 
     /// <summary>
     /// &quot;MENU&quot;
     /// </summary>
     [Text("MENU")]
-    Menu = 1ul << 33,
+    Menu = Live << 1,
 
     /// <summary>
     /// &quot;MUTE TOGGLE&quot;
     /// </summary>
     [Text("MUTE TOGGLE")]
-    MuteToggle = 1ul << 34,
+    MuteToggle = Menu << 1,
 
     /// <summary>
     /// &quot;MY RECORDINGS&quot;
     /// </summary>
     [Text("MY RECORDINGS")]
-    MyRecordings = 1ul << 35,
+    MyRecordings = MuteToggle << 1,
 
     /// <summary>
     /// &quot;NETFLIX&quot;
     /// </summary>
     [Text("NETFLIX")]
-    Netflix = 1ul << 36,
+    Netflix = MyRecordings << 1,
 
     /// <summary>
     /// &quot;NEXT&quot;
     /// </summary>
     [Text("NEXT")]
-    Next = 1ul << 37,
+    Next = Netflix << 1,
 
     /// <summary>
     /// &quot;PAUSE&quot;
     /// </summary>
     [Text("PAUSE")]
-    Pause = 1ul << 38,
+    Pause = Next << 1,
 
     /// <summary>
     /// &quot;PLAY&quot;
     /// </summary>
     [Text("PLAY")]
-    Play = 1ul << 39,
+    Play = Pause << 1,
 
     /// <summary>
     /// &quot;PLAY PAUSE TOGGLE&quot;
     /// </summary>
     [Text("PLAY PAUSE TOGGLE")]
-    PlayPauseToggle = 1ul << 40,
+    PlayPauseToggle = Play << 1,
 
     /// <summary>
     /// &quot;POWER OFF&quot;
     /// </summary>
     [Text("POWER OFF")]
-    PowerOff = 1ul << 41,
+    PowerOff = PlayPauseToggle << 1,
 
     /// <summary>
     /// &quot;POWER ON&quot;
     /// </summary>
     [Text("POWER ON")]
-    PowerOn = 1ul << 42,
+    PowerOn = PowerOff << 1,
 
     /// <summary>
     /// &quot;POWER TOGGLE&quot;
     /// </summary>
     [Text("POWER TOGGLE")]
-    PowerToggle = 1ul << 43,
+    PowerToggle = PowerOn << 1,
 
     /// <summary>
     /// &quot;PREVIOUS&quot;
     /// </summary>
     [Text("PREVIOUS")]
-    Previous = 1ul << 44,
+    Previous = PowerToggle << 1,
 
     /// <summary>
     /// &quot;RECORD&quot;
     /// </summary>
     [Text("RECORD")]
-    Record = 1ul << 45,
+    Record = Previous << 1,
 
     /// <summary>
     /// &quot;REVERSE&quot;
     /// </summary>
     [Text("REVERSE")]
-    Reverse = 1ul << 46,
+    Reverse = Record << 1,
 
     /// <summary>
     /// &quot;SKIP BACKWARD&quot;
     /// </summary>
     [Text("SKIP BACKWARD")]
-    SkipBackward = 1ul << 47,
+    SkipBackward = Reverse << 1,
 
     /// <summary>
     /// &quot;SKIP FORWARD&quot;
     /// </summary>
     [Text("SKIP FORWARD")]
-    SkipSForward = 1ul << 48,
+    SkipForward = SkipBackward << 1,
 
     /// <summary>
     /// &quot;SKIP SECONDS BACKWARD&quot;
     /// </summary>
     [Text("SKIP SECONDS BACKWARD")]
-    SkipSecondsBackward = 1ul << 49,
+    SkipSecondsBackward = SkipForward << 1,
 
     /// <summary>
     /// &quot;SKIP SECONDS FORWARD&quot;
     /// </summary>
     [Text("SKIP SECONDS FORWARD")]
-    SkipSecondsForward = 1ul << 50,
+    SkipSecondsForward = SkipSecondsBackward << 1,
 
     /// <summary>
     /// &quot;STOP&quot;
     /// </summary>
     [Text("STOP")]
-    Stop = 1ul << 51,
+    Stop = SkipSecondsForward << 1,
 
     /// <summary>
     /// &quot;SUBTITLE&quot;
     /// </summary>
     [Text("SUBTITLE")]
-    Subtitle = 1ul << 52,
+    Subtitle = Stop << 1,
 
     /// <summary>
     /// &quot;VOLUME DOWN&quot;
     /// </summary>
     [Text("VOLUME DOWN")]
-    VolumeDown = 1ul << 53,
+    VolumeDown = Subtitle << 1,
 
     /// <summary>
     /// &quot;VOLUME UP&quot;
     /// </summary>
     [Text("VOLUME UP")]
-    VolumeUp = 1ul << 54,
+    VolumeUp = VolumeDown << 1,
 
     /// <summary>
     /// &quot;YOU TUBE&quot;
     /// </summary>
     [Text("YOU TUBE")]
-    YouTube = 1ul << 55,
+    YouTube = VolumeUp << 1,
+
+    // NEXT = 1ul << 59,
 }
 
 /// <summary>
@@ -358,6 +378,13 @@ public enum KnownButtons : ulong
 /// </summary>
 public static class KnownButton
 {
+    /// <summary>
+    /// Attempts to get the associated <see cref="KnownButtons"/> value for a button name.
+    /// </summary>
+    /// <param name="name">The name of the button.</param>
+    /// <returns><see cref="KnownButtons"/> value if found, otherwise <c>null</c>.</returns>
+    public static KnownButtons? GetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
+
     /// <summary>
     /// Gets the button names in the specified combination of <paramref name="buttons"/>.
     /// </summary>
@@ -375,13 +402,6 @@ public static class KnownButton
             ? new[] { TextAttribute.GetText(buttons) }
             : KnownButton.ExtractFlags(value);
     }
-
-    /// <summary>
-    /// Attempts to get the associated <see cref="KnownButtons"/> value for a button name.
-    /// </summary>
-    /// <param name="name">The name of the button.</param>
-    /// <returns><see cref="KnownButtons"/> value if found, otherwise <c>null</c>.</returns>
-    public static KnownButtons? GetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
 
     private static IEnumerable<string> ExtractFlags(ulong value)
     {

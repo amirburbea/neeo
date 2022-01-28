@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Controllers;
@@ -35,7 +36,7 @@ public interface IDeviceBuilder
     /// <summary>
     /// Gets the collection of buttons defined.
     /// </summary>
-    IReadOnlyCollection<DeviceFeature> Buttons { get; }
+    IReadOnlyCollection<string> Buttons { get; }
 
     /// <summary>
     /// Gets the collection of special characteristics of the device.
@@ -178,7 +179,7 @@ public interface IDeviceBuilder
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
     IDeviceBuilder AddSensor(
-        string name, 
+        string name,
         string? label,
         DeviceValueGetter<double> getter,
         double rangeLow = 0,
@@ -281,12 +282,16 @@ public interface IDeviceBuilder
 
 internal sealed class DeviceBuilder : IDeviceBuilder
 {
+    private static readonly Regex _digitRegex = new(@"^DIGIT \d$", RegexOptions.Compiled);
+
     private readonly List<string> _additionalSearchTokens = new();
     private readonly HashSet<DeviceCharacteristic> _characteristics = new();
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _imageUrlsReadOnly;
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _slidersReadOnly;
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _switchesReadOnly;
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _textLabelsReadOnly;
+    private int _digitCount;
+    private bool _hasInput;
 
     internal DeviceBuilder(string name, DeviceType type, string? prefix)
     {
@@ -305,9 +310,9 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public ButtonHandler? ButtonHandler { get; private set; }
 
-    public Collection<DeviceFeature> Buttons { get; } = new();
+    public Dictionary<string, string?> Buttons { get; } = new();
 
-    IReadOnlyCollection<DeviceFeature> IDeviceBuilder.Buttons => this.Buttons;
+    IReadOnlyCollection<string> IDeviceBuilder.Buttons => this.Buttons.Keys;
 
     public IReadOnlyCollection<DeviceCharacteristic> Characteristics => this._characteristics;
 
@@ -322,6 +327,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     public FavoritesController? FavoritesController { get; private set; }
 
     IFavoritesController? IDeviceBuilder.FavoritesController => this.FavoritesController;
+
 
     public bool HasPowerStateSensor => this.Sensors.Keys.Any(static component => component.Type == ComponentType.Power);
 
@@ -485,15 +491,16 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private DeviceBuilder AddButton(string name, string? label = default)
     {
-        Validator.ValidateString(name);
-        Validator.ValidateString(label, allowNull: true);
-        int index = this.Buttons.BinarySearchByValue(name, static feature => feature.Name, StringComparer.OrdinalIgnoreCase);
-        if (index >= 0)
+        if (!this.Buttons.TryAdd(Validator.ValidateString(name), Validator.ValidateString(label, allowNull: true)))
         {
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
-        DeviceFeature feature = new(ComponentType.Button, name, label);
-        this.Buttons.Insert(~index, feature);
+        bool isInput = name.StartsWith(Constants.InputPrefix);
+        this._hasInput |= isInput;
+        if (!isInput && DeviceBuilder._digitRegex.IsMatch(name))
+        {
+            this._digitCount++;
+        }
         return this;
     }
 
@@ -539,7 +546,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         this.Sensors.Add(
             new(ComponentType.Power, Constants.PowerSensorName, Constants.PowerSensorLabel, SensorType: SensorTypes.Power),
-            new ValueController<bool>(getter)
+            ValueController.Create(getter)
         );
         return this;
     }
@@ -552,7 +559,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         this.Sensors.Add(
             new(ComponentType.Sensor, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units),
-            new ValueController<double>(getter)
+            ValueController.Create(getter)
         );
         return this;
     }
@@ -561,7 +568,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     {
         this.Sliders.Add(
             new(ComponentType.Slider, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units, SensorType: SensorTypes.Range),
-            new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
         );
         return this;
     }
@@ -570,7 +577,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     {
         this.Switches.Add(
             new(ComponentType.Switch, name, label),
-            new(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
+            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
         );
         return this;
     }
@@ -579,7 +586,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     {
         this.TextLabels.Add(
             new(ComponentType.TextLabel, name, label, IsLabelVisible: isLabelVisible),
-            new(getter)
+            ValueController.Create(getter)
         );
         return this;
     }
@@ -706,61 +713,55 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public DeviceAdapter Build(DiscoveryControllerFactory discoveryControllerFactory)
     {
-        var device = this;
-        if (device.ButtonHandler == null && device.Buttons.Any())
+        if (this.ButtonHandler == null && this.Buttons.Any())
         {
             throw new InvalidOperationException($"There are buttons defined but no handler was specified (by calling {nameof(IDeviceBuilder.AddButtonHandler)}.");
         }
-        if (device.Type.RequiresInput() && !device.Buttons.Any(button => button.Name.StartsWith(Constants.InputPrefix)))
+        if (this.Type.RequiresInput() && !this._hasInput)
         {
             throw new InvalidOperationException($"No input buttons defined - note that input button names must begin with \"{Constants.InputPrefix}\".");
         }
-        if (device.Characteristics.Contains(DeviceCharacteristic.BridgeDevice) && device.Setup.RegistrationType is null)
+        if (this.Characteristics.Contains(DeviceCharacteristic.BridgeDevice) && this.Setup.RegistrationType is null)
         {
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
         }
-        List<DeviceCapability> deviceCapabilities = device.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
-        string pathPrefix = $"/device/{device.AdapterName}/";
+        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
+        string pathPrefix = $"/device/{this.AdapterName}/";
         HashSet<string> paths = new();
         List<Component> capabilities = new();
         Dictionary<string, IController> handlers = new();
-        int digitCount = 0;
-        foreach (DeviceFeature feature in device.Buttons)
+        foreach ((string name, string? label) in this.Buttons)
         {
-            AddCapability(BuildButton(pathPrefix, feature), new ButtonController(device.ButtonHandler!, feature.Name));
-            if (device.FavoritesController != null && feature.Name.StartsWith("DIGIT "))
-            {
-                digitCount++;
-            }
+            AddCapability(BuildButton(pathPrefix, name, label), new ButtonController(this.ButtonHandler!, name));
         }
-        foreach ((DeviceFeature feature, IValueController controller) in device.Sliders)
+        foreach ((DeviceFeature feature, IValueController controller) in this.Sliders)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Range }), controller);
             AddCapability(BuildSlider(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IValueController controller) in device.Switches)
+        foreach ((DeviceFeature feature, IValueController controller) in this.Switches)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.Binary }), controller);
             AddCapability(BuildSwitch(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IValueController controller) in device.TextLabels)
+        foreach ((DeviceFeature feature, IValueController controller) in this.TextLabels)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), controller);
             AddCapability(BuildTextLabel(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IValueController controller) in device.ImageUrls)
+        foreach ((DeviceFeature feature, IValueController controller) in this.ImageUrls)
         {
             AddCapability(BuildSensor(pathPrefix, feature with { Type = ComponentType.Sensor, SensorType = SensorTypes.String }), controller);
             AddCapability(BuildImageUrl(pathPrefix, feature), controller);
         }
-        foreach ((DeviceFeature feature, IValueController controller) in device.Sensors)
+        foreach ((DeviceFeature feature, IValueController controller) in this.Sensors)
         {
             AddCapability(feature.SensorType == SensorTypes.Power ? BuildPowerSensor(pathPrefix, feature) : BuildSensor(pathPrefix, feature), controller);
         }
-        if (device.DiscoveryProcess is { } discoveryProcess)
+        if (this.DiscoveryProcess is { } discoveryProcess)
         {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), discoveryControllerFactory.CreateController(discoveryProcess, device.Setup.EnableDynamicDeviceBuilder ?? false));
-            if (device.RegistrationController is { } registrationController)
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), discoveryControllerFactory.CreateController(discoveryProcess, this.Setup.EnableDynamicDeviceBuilder ?? false));
+            if (this.RegistrationController is { } registrationController)
             {
                 deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);
                 AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), registrationController);
@@ -770,34 +771,34 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new InvalidOperationException($"Discovery required for {deviceCapabilities[index]}.");
         }
-        if (device.FavoritesController is { } favoritesController)
+        if (this.FavoritesController is { } favoritesController)
         {
-            if (digitCount != 10)
+            if (this._digitCount != 10)
             {
                 throw new InvalidOperationException("Can not enable favorites without the 10 digit buttons being added. It is highly recommended to call AddButtonGroup(ButtonGroup.NumberPad).");
             }
             deviceCapabilities.Add(DeviceCapability.CustomFavoriteHandler);
             AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), favoritesController);
         }
-        if (device.SubscriptionController is { } subscriptionController)
+        if (this.SubscriptionController is { } subscriptionController)
         {
             AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), subscriptionController);
         }
         return new(
-            device.AdapterName,
+            this.AdapterName,
             capabilities,
             handlers,
             deviceCapabilities,
-            device.Name,
-            device.DriverVersion,
-            device.Icon,
-            device.Initializer,
-            device.Manufacturer,
-            device.Setup,
-            device.SpecificName,
-            device.Timing ?? new(),
-            device.AdditionalSearchTokens,
-            device.Type
+            this.Name,
+            this.DriverVersion,
+            this.Icon,
+            this.Initializer,
+            this.Manufacturer,
+            this.Setup,
+            this.SpecificName,
+            this.Timing ?? new(),
+            this.AdditionalSearchTokens,
+            this.Type
         );
 
         void AddCapability(Component capability, IController controller)
@@ -813,12 +814,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
                 : throw new InvalidOperationException($"Path {capability.Path} is not unique.");
         }
 
-        static Component BuildButton(string pathPrefix, DeviceFeature feature)
+        static Component BuildButton(string pathPrefix, string name, string? label)
         {
-            string name = Uri.EscapeDataString(feature.Name);
-            string path = pathPrefix + name;
-            string label = feature.Label is { } text ? Uri.EscapeDataString(text) : name;
-            return new(ComponentType.Button, name, label, path);
+            string buttonName = Uri.EscapeDataString(name);
+            string path = pathPrefix + buttonName;
+            return new(ComponentType.Button, name, label is { } text ? Uri.EscapeDataString(text) : buttonName, path);
         }
 
         static Component BuildComponent(string pathPrefix, ComponentType type)

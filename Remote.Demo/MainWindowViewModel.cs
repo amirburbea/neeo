@@ -1,5 +1,4 @@
-﻿using System;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using Neeo.Sdk;
@@ -45,12 +44,11 @@ internal class MainWindowViewModel : NotifierBase
         .SetIcon(DeviceIconOverride.Neeo)
         .SetDriverVersion(5)
         // Add button.
-        .AddButton("INPUT HDMI1")
-        .AddButton("INPUT HDMI2")
+        .AddButton("MYBUTTONNAME", label: "My Button")
         // Add a known button via enumeration.
         .AddButtons(KnownButtons.Home)
         // Add multiple buttons at once via flagged enumeration.
-        .AddButtons(KnownButtons.Netflix | KnownButtons.Amazon)
+        .AddButtons(KnownButtons.InputHdmi1 | KnownButtons.Netflix | KnownButtons.Amazon)
         // Add a button group via enumeration.
         .AddButtonGroups(ButtonGroups.Power)
         .AddButtonGroups(ButtonGroups.NumberPad)

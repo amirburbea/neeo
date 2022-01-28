@@ -17,7 +17,8 @@ internal sealed class ProjectionCollection<T, TValue> : IReadOnlyCollection<TVal
 
     public ProjectionCollection(IReadOnlyCollection<T> collection, Func<T, TValue> projection)
     {
-        (this._collection, this._projection) = (collection ?? throw new ArgumentNullException(nameof(collection)), projection ?? throw new ArgumentNullException(nameof(projection)));
+        this._collection = collection ?? throw new ArgumentNullException(nameof(collection));
+        this._projection = projection ?? throw new ArgumentNullException(nameof(projection));
     }
 
     public int Count => this._collection.Count;
