@@ -23,10 +23,7 @@ public enum ComponentType
 
     [Text("imageurl")]
     ImageUrl,
-
-    [Text("power")]
-    Power,
-
+    
     [Text("register")]
     Registration,
 

@@ -10,16 +10,7 @@ public interface IRangeSensorDetails : ISensorDetails
     string Unit { get; }
 }
 
-internal sealed record class RangeSensorDetails : SensorDetails, IRangeSensorDetails
-{
-    public RangeSensorDetails(double low, double high, string? unit)
-        : base(SensorTypes.Range)
-    {
-        this.Range = new[] { low, high };
-        this.Unit = unit != null ? Uri.EscapeDataString(unit) : "%";
-    }
-
-    public IReadOnlyCollection<double> Range { get; init; }
-
-    public string Unit { get; init; }
-}
+internal sealed record class RangeSensorDetails(
+    IReadOnlyCollection<double> Range, 
+    string Unit
+) : SensorDetails(SensorTypes.Range), IRangeSensorDetails;
