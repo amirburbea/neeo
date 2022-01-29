@@ -3,16 +3,16 @@ using System.Collections.Generic;
 
 namespace Neeo.Sdk.Devices.Components;
 
-public interface IRangeSensorDescriptor : ISensorDescriptor
+public interface IRangeSensorDetails : ISensorDetails
 {
     IReadOnlyCollection<double> Range { get; }
 
     string Unit { get; }
 }
 
-internal sealed record class RangeSensorDescriptor : SensorDescriptor, IRangeSensorDescriptor
+internal sealed record class RangeSensorDetails : SensorDetails, IRangeSensorDetails
 {
-    public RangeSensorDescriptor(double low, double high, string? unit)
+    public RangeSensorDetails(double low, double high, string? unit)
         : base(SensorTypes.Range)
     {
         this.Range = new[] { low, high };

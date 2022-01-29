@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Neeo.Sdk.Devices.Components;
 
-public interface ISliderDescriptor
+public interface ISliderDetails
 {
     IReadOnlyCollection<double> Range { get; }
 
@@ -15,4 +15,4 @@ public interface ISliderDescriptor
     string Unit { get; }
 }
 
-internal sealed record class SliderDescriptor(IReadOnlyCollection<double> Range, string Unit, string SensorName) : ISliderDescriptor;
+internal sealed record class SliderDetails(IReadOnlyCollection<double> Range, string Unit, string SensorName) : ISliderDetails;

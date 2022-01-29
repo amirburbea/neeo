@@ -1,21 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Controllers;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;
 
-using static KnownButtons;
-
 public interface IDeviceAdapter
 {
     string AdapterName { get; }
 
-    IReadOnlyCollection<IComponent> Capabilities { get; }
-
     IReadOnlyDictionary<string, IController> CapabilityHandlers { get; }
+
+    IReadOnlyCollection<IComponent> Components { get; }
 
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; }
 
@@ -46,7 +43,7 @@ public interface IDeviceAdapter
 
 internal record DeviceAdapter(
     string AdapterName,
-    IReadOnlyCollection<IComponent> Capabilities,
+    IReadOnlyCollection<IComponent> Components,
     IReadOnlyDictionary<string, IController> CapabilityHandlers,
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities,
     string DeviceName,
@@ -64,6 +61,4 @@ internal record DeviceAdapter(
     public IController? GetCapabilityHandler(ComponentType type) => this.GetCapabilityHandler(TextAttribute.GetText(type));
 
     public IController? GetCapabilityHandler(string name) => this.CapabilityHandlers.GetValueOrDefault(name);
-
-    
 }

@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities.TokenSearch;
 
@@ -13,15 +12,15 @@ internal sealed class DatabaseController : ControllerBase
     public DatabaseController(IDeviceDatabase database) => this._database = database;
 
     [HttpGet("adapterdefinition/{adapterName}")]
-    public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => this._database.GetDeviceByAdapterName(adapterName) is { } device
-        ? this.Ok(device)
-        : this.NotFound();
+    public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => this._database.GetDeviceByAdapterName(adapterName) is not { } device
+        ? this.NotFound()
+        : this.Serialize(device);
 
     [HttpGet("{deviceId}")]
-    public ActionResult<IDeviceModel> GetDeviceById(int deviceId) => this._database.GetDeviceById(deviceId) is { } device
-        ? this.Ok(device)
-        : this.NotFound();
+    public ActionResult<IDeviceModel> GetDeviceById(int deviceId) => this._database.GetDeviceById(deviceId) is not { } device
+        ? this.NotFound()
+        : this.Serialize(device);
 
     [HttpGet("search")]
-    public ActionResult<ISearchItem<IDeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this.Ok(this._database.Search(query));
+    public ActionResult<ISearchItem<IDeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this.Serialize(this._database.Search(query));
 }

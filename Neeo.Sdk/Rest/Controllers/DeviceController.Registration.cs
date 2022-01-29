@@ -27,7 +27,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Registering {adapter}...", adapter.AdapterName);
-        if (await controller.RegisterAsync(await this._pgpUtility.DeserializeEncryptedAsync(payload.Data)) is not { Error: { } error })
+        if (await controller.RegisterAsync(await this._pgp.DeserializeEncryptedAsync(payload.Data)) is not { Error: { } error })
         {
             return this.Ok(new SuccessResult());
         }

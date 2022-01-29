@@ -14,7 +14,6 @@ public class DiscoveryExampleDeviceProvider : IDeviceProvider
     public IDeviceBuilder ProvideDevice()
     {
         return Device.CreateDevice("Security Code Example", DeviceType.Accessory)
-            .AddButton("ac",new string(' ',200))
             .SetManufacturer("NEEO")
             .AddAdditionalSearchTokens("SDK")
             .AddTextLabel("the-answer", "The answer is", true, GetLabelValue)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Neeo.Sdk.Devices.Components;
 
 namespace Neeo.Sdk.Devices;
@@ -8,7 +9,8 @@ public interface IDeviceModel : IComparable<IDeviceModel>
 {
     string AdapterName { get; }
 
-    IReadOnlyCollection<IComponent> Capabilities { get; }
+    [JsonPropertyName("capabilities")]
+    IReadOnlyCollection<IComponent> Components { get; }
 
     IDeviceInfo Device { get; }
 
@@ -44,7 +46,7 @@ internal sealed class DeviceModel : IDeviceModel
 
     public string AdapterName => this._adapter.AdapterName;
 
-    public IReadOnlyCollection<IComponent> Capabilities => this._adapter.Capabilities;
+    public IReadOnlyCollection<IComponent> Components => this._adapter.Components;
 
     IDeviceInfo IDeviceModel.Device => this.Device;
 

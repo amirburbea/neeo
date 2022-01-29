@@ -12,24 +12,33 @@ public interface IValueController : IController
     Task SetValueAsync(string deviceId, string value);
 }
 
-internal static class ValueController
+internal sealed class ValueController : IValueController
 {
-    public static ValueController<TValue> Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue>? setter = default)
-       where TValue : notnull, IConvertible => new(getter, setter);
-}
+    private readonly DeviceValueGetter<object> _getter;
+    private readonly DeviceValueSetter<string>? _setter;
 
-internal sealed class ValueController<TValue> : IValueController
-    where TValue : notnull, IConvertible
-{
-    private readonly DeviceValueGetter<TValue> _getter;
-    private readonly DeviceValueSetter<TValue>? _setter;
-
-    public ValueController(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue>? setter = default)
+    private ValueController(DeviceValueGetter<object> getter, DeviceValueSetter<string>? setter = default)
     {
-        (this._getter, this._setter) = (getter ?? throw new ArgumentNullException(nameof(getter)), setter);
+        (this._getter, this._setter) = (getter, setter);
     }
 
-    public async Task<object> GetValueAsync(string deviceId) => await this._getter(deviceId).ConfigureAwait(false);
+    public static ValueController Create<TValue>(DeviceValueGetter<TValue> getter)
+        where TValue : notnull => getter == null
+        ? throw new ArgumentNullException(nameof(getter)) 
+        : new(async deviceId => await getter(deviceId).ConfigureAwait(false));
 
-    public Task SetValueAsync(string deviceId, string value) => (this._setter ?? throw new NotSupportedException())(deviceId, (TValue)Convert.ChangeType(value, typeof(TValue)));
+    public static ValueController Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue> setter)
+        where TValue : notnull, IConvertible => (getter, setter) switch
+        {
+            (null, _) => throw new ArgumentNullException(nameof(getter)),
+            (_, null) => throw new ArgumentNullException(nameof(setter)),
+            _ => new(
+                async deviceId => await getter(deviceId).ConfigureAwait(false),
+                (deviceId, value) => setter(deviceId, (TValue)Convert.ChangeType(value, typeof(TValue)))
+            )
+        };
+
+    public Task<object> GetValueAsync(string deviceId) => this._getter(deviceId);
+
+    public Task SetValueAsync(string deviceId, string value) => (this._setter ?? throw new NotSupportedException())(deviceId, value);
 }

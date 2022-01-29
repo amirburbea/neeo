@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.ComponentModel;
+using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;
@@ -15,9 +16,7 @@ public enum SensorTypes
     [Text("binary")]
     Binary,
 
-    [Text("custom")]
-    Custom,
-
+    
     [Text("power")]
     Power,
 
@@ -26,4 +25,11 @@ public enum SensorTypes
 
     [Text("string")]
     String,
+
+
+    /// <summary>
+    /// Not recommended for use.
+    /// </summary>
+    [Text("custom"), EditorBrowsable(EditorBrowsableState.Never)]
+    Custom,
 }

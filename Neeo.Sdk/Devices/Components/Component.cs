@@ -29,4 +29,9 @@ public interface IComponent
     ComponentType Type { get; }
 }
 
-internal record class Component(ComponentType Type, string Name, string? Label, string Path) : IComponent;
+internal record class Component(
+    ComponentType Type, 
+    string Name, 
+    string? Label, 
+    string Path
+) : IComponent;

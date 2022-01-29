@@ -6,12 +6,12 @@ namespace Neeo.Sdk.Rest.Controllers;
 [ApiController, Route("[controller]")]
 internal sealed class SecureController : ControllerBase
 {
-    private readonly IPgpUtility _pgpKeys;
+    private readonly IPgpService _pgp;
 
-    public SecureController(IPgpUtility pgpKeys) => this._pgpKeys = pgpKeys;
+    public SecureController(IPgpService pgp) => this._pgp = pgp;
 
     [HttpGet("pubkey")]
-    public ActionResult<PublicKeyResult> GetPublicKey() => this.Ok(new PublicKeyResult(this._pgpKeys.ArmoredPublicKey));
+    public ActionResult<PublicKeyData> GetPublicKeyData() => this.Serialize(new PublicKeyData(this._pgp.ArmoredPublicKey));
 
-    public record struct PublicKeyResult([property: JsonPropertyName("publickey")] string PublicKey);
+    public record struct PublicKeyData([property: JsonPropertyName("publickey")] string ArmoredPublicKey);
 }

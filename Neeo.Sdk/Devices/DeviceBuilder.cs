@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -43,13 +42,6 @@ public interface IDeviceBuilder
     /// </summary>
     IReadOnlyCollection<DeviceCharacteristic> Characteristics { get; }
 
-    /// <summary>
-    /// Gets a set of callbacks which allow tracking which devices are currently in use on the NEEO Brain.
-    /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
-    /// resource and/or remove credentials when the last device is removed.
-    /// </summary>
-    ISubscriptionController? SubscriptionController { get; }
-
     DiscoveryProcess? DiscoveryProcess { get; }
 
     /// <summary>
@@ -91,6 +83,8 @@ public interface IDeviceBuilder
     /// </summary>
     string Name { get; }
 
+    DeviceNotifierCallback? NotifierCallback { get; }
+
     IRegistrationController? RegistrationController { get; }
 
     /// <summary>
@@ -112,7 +106,12 @@ public interface IDeviceBuilder
     /// <remarks>Note: This does not apply to devices using discovery.</remarks>
     string? SpecificName { get; }
 
-    DeviceNotifierCallback? NotifierCallback { get; }
+    /// <summary>
+    /// Gets a set of callbacks which allow tracking which devices are currently in use on the NEEO Brain.
+    /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
+    /// resource and/or remove credentials when the last device is removed.
+    /// </summary>
+    ISubscriptionController? SubscriptionController { get; }
 
     /// <summary>
     /// Gets the collection of switches defined for the device.
@@ -212,6 +211,8 @@ public interface IDeviceBuilder
 
     IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder = false);
 
+    IDeviceBuilder EnableNotifications(DeviceNotifierCallback callback);
+
     IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);
 
     IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, SecurityCodeRegistrationProcessor processor);
@@ -240,8 +241,6 @@ public interface IDeviceBuilder
     /// <param name="initializer">The device initializer callback.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder RegisterInitializer(DeviceInitializer initializer);
-
-    IDeviceBuilder EnableNotifications(DeviceNotifierCallback callback);
 
     /// <summary>
     /// Setting the version allows you to tell the Brain about changes to your devices components.
@@ -287,6 +286,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private readonly List<string> _additionalSearchTokens = new();
     private readonly HashSet<DeviceCharacteristic> _characteristics = new();
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _imageUrlsReadOnly;
+    private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _sensorsReadOnly;
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _slidersReadOnly;
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _switchesReadOnly;
     private readonly IReadOnlyDictionary<DeviceFeature, IValueController> _textLabelsReadOnly;
@@ -298,10 +298,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         this.Type = type;
         Validator.ValidateString(this.Name = name, name: nameof(name));
         this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name, prefix)}";
-        this._imageUrlsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IValueController>(this.ImageUrls);
-        this._slidersReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<double>, IValueController>(this.Sliders);
-        this._switchesReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<bool>, IValueController>(this.Switches);
-        this._textLabelsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController<string>, IValueController>(this.TextLabels);
+        this._imageUrlsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController, IValueController>(this.ImageUrls);
+        this._sensorsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController, IValueController>(this.Sensors);
+        this._slidersReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController, IValueController>(this.Sliders);
+        this._switchesReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController, IValueController>(this.Switches);
+        this._textLabelsReadOnly = new CovariantReadOnlyDictionary<DeviceFeature, ValueController, IValueController>(this.TextLabels);
     }
 
     public string AdapterName { get; }
@@ -316,10 +317,6 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public IReadOnlyCollection<DeviceCharacteristic> Characteristics => this._characteristics;
 
-    public SubscriptionController? SubscriptionController { get; private set; }
-
-    ISubscriptionController? IDeviceBuilder.SubscriptionController => this.SubscriptionController;
-
     public DiscoveryProcess? DiscoveryProcess { get; private set; }
 
     public uint? DriverVersion { get; private set; }
@@ -328,12 +325,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IFavoritesController? IDeviceBuilder.FavoritesController => this.FavoritesController;
 
-
     public bool HasPowerStateSensor => this.Sensors.Keys.Any(static component => component.Type == ComponentType.Power);
 
     public DeviceIconOverride? Icon { get; private set; }
 
-    public Dictionary<DeviceFeature, ValueController<string>> ImageUrls { get; } = new();
+    public Dictionary<DeviceFeature, ValueController> ImageUrls { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.ImageUrls => this._imageUrlsReadOnly;
 
@@ -343,31 +339,35 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public string Name { get; }
 
+    public DeviceNotifierCallback? NotifierCallback { get; private set; }
+
     IRegistrationController? IDeviceBuilder.RegistrationController => this.RegistrationController;
 
     public RegistrationController? RegistrationController { get; private set; }
 
-    public Dictionary<DeviceFeature, IValueController> Sensors { get; } = new();
+    public Dictionary<DeviceFeature, ValueController> Sensors { get; } = new();
 
-    IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.Sensors => this.Sensors;
+    IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.Sensors => this._sensorsReadOnly;
 
     public DeviceSetup Setup { get; } = new DeviceSetup();
 
     IDeviceSetup IDeviceBuilder.Setup => this.Setup;
 
-    public Dictionary<DeviceFeature, ValueController<double>> Sliders { get; } = new();
+    public Dictionary<DeviceFeature, ValueController> Sliders { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.Sliders => this._slidersReadOnly;
 
     public string? SpecificName { get; private set; }
 
-    public DeviceNotifierCallback? NotifierCallback { get; private set; }
+    public SubscriptionController? SubscriptionController { get; private set; }
 
-    public Dictionary<DeviceFeature, ValueController<bool>> Switches { get; } = new();
+    ISubscriptionController? IDeviceBuilder.SubscriptionController => this.SubscriptionController;
+
+    public Dictionary<DeviceFeature, ValueController> Switches { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.Switches => this._switchesReadOnly;
 
-    public Dictionary<DeviceFeature, ValueController<string>> TextLabels { get; } = new();
+    public Dictionary<DeviceFeature, ValueController> TextLabels { get; } = new();
 
     IReadOnlyDictionary<DeviceFeature, IValueController> IDeviceBuilder.TextLabels => this._textLabelsReadOnly;
 
@@ -395,8 +395,17 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.AddPowerStateSensor(DeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor);
 
-    IDeviceBuilder IDeviceBuilder.AddSlider(
+    IDeviceBuilder IDeviceBuilder.AddSensor(
         string name,
+        string? label,
+        DeviceValueGetter<double> getter,
+        double rangeLow,
+        double rangeHigh,
+        string units
+    ) => this.AddSensor(name, label, getter, rangeLow, rangeHigh, units);
+
+    IDeviceBuilder IDeviceBuilder.AddSlider(
+            string name,
         string? label,
         DeviceValueGetter<double> getter,
         DeviceValueSetter<double> setter,
@@ -412,304 +421,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         DeviceValueSetter<bool> setter
     ) => this.AddSwitch(name, label, getter, setter);
 
-    IDeviceBuilder IDeviceBuilder.AddSensor(
-        string name,
-        string? label,
-        DeviceValueGetter<double> getter,
-        double rangeLow,
-        double rangeHigh,
-        string units
-    ) => this.AddSensor(name, label, getter, rangeLow, rangeHigh, units);
-
     IDeviceBuilder IDeviceBuilder.AddTextLabel(
        string name,
        string? label,
        bool? isLabelVisible,
        DeviceValueGetter<string> getter
     ) => this.AddTextLabel(name, label, isLabelVisible, getter);
-
-    IDeviceBuilder IDeviceBuilder.DefineTiming(DeviceTiming timing) => this.DefineTiming(timing);
-
-    IDeviceBuilder IDeviceBuilder.EnableDiscovery(
-        string headerText,
-        string description,
-        DiscoveryProcess process,
-        bool enableDynamicDeviceBuilder
-    ) => this.EnableDiscovery(headerText, description, process, enableDynamicDeviceBuilder);
-
-    IDeviceBuilder IDeviceBuilder.EnableRegistration(
-        string headerText,
-        string description,
-        QueryIsRegistered queryIsRegistered,
-        CredentialsRegistrationProcessor processor
-    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
-        headerText,
-        description,
-        RegistrationType.Credentials,
-        queryIsRegistered,
-        (Credentials credentials) => processor(credentials)
-    );
-
-    IDeviceBuilder IDeviceBuilder.EnableRegistration(
-        string headerText,
-        string description,
-        QueryIsRegistered queryIsRegistered,
-        SecurityCodeRegistrationProcessor processor
-    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
-        headerText,
-        description,
-        RegistrationType.SecurityCode,
-        queryIsRegistered,
-        (SecurityCodeContainer container) => processor(container.SecurityCode)
-    );
-
-    IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionCallbacks(
-        DeviceSubscriptionAction onDeviceAdded,
-        DeviceSubscriptionAction onDeviceRemoved,
-        DeviceListInitializer initializeDeviceList
-    ) => this.RegisterDeviceSubscriptionCallbacks(onDeviceAdded, onDeviceRemoved, initializeDeviceList);
-
-    IDeviceBuilder IDeviceBuilder.RegisterFavoritesHandler(FavoritesHandler handler) => this.RegisterFavoritesHandler(handler);
-
-    IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer) => this.RegisterInitializer(initializer);
-
-    IDeviceBuilder IDeviceBuilder.EnableNotifications(DeviceNotifierCallback callback) => this.EnableNotifications(callback);
-
-    IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version) => this.SetDriverVersion(version);
-
-    IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIconOverride icon) => this.SetIcon(icon);
-
-    IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
-
-    IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
-
-    private DeviceBuilder AddAdditionalSearchTokens(string[] tokens)
-    {
-        this._additionalSearchTokens.AddRange(tokens);
-        return this;
-    }
-
-    private DeviceBuilder AddButton(string name, string? label = default)
-    {
-        if (!this.Buttons.TryAdd(Validator.ValidateString(name), Validator.ValidateString(label, allowNull: true)))
-        {
-            throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
-        }
-        bool isInput = name.StartsWith(Constants.InputPrefix);
-        this._hasInput |= isInput;
-        if (!isInput && DeviceBuilder._digitRegex.IsMatch(name))
-        {
-            this._digitCount++;
-        }
-        return this;
-    }
-
-    private DeviceBuilder AddButtonHandler(ButtonHandler handler)
-    {
-        if (this.ButtonHandler != null)
-        {
-            throw new InvalidOperationException("ButtonHandler already defined.");
-        }
-        this.ButtonHandler = handler ?? throw new ArgumentNullException(nameof(handler));
-        return this;
-    }
-
-    private DeviceBuilder AddButtons(KnownButtons buttons) => KnownButton.GetNames(buttons).Aggregate(
-        this,
-        static (builder, name) => builder.AddButton(name)
-    );
-
-    private DeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic)
-    {
-        this._characteristics.Add(characteristic);
-        return this;
-    }
-
-    private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, string? uri, DeviceValueGetter<string>? getter)
-    {
-        if (uri == null && getter == null)
-        {
-            throw new InvalidOperationException($"Either {nameof(uri)} or {nameof(getter)} must be specified.");
-        }
-        this.ImageUrls.Add(
-            new(ComponentType.ImageUrl, name, label, Uri: uri, Size: size),
-            new(getter ?? new((_) => Task.FromResult(uri!)))
-        );
-        return this;
-    }
-
-    private DeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> getter)
-    {
-        if (this.HasPowerStateSensor)
-        {
-            throw new InvalidOperationException("PowerStateSensor already added.");
-        }
-        this.Sensors.Add(
-            new(ComponentType.Power, Constants.PowerSensorName, Constants.PowerSensorLabel, SensorType: SensorTypes.Power),
-            ValueController.Create(getter)
-        );
-        return this;
-    }
-
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string units)
-    {
-        if (name == Constants.PowerSensorName)
-        {
-            throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
-        }
-        this.Sensors.Add(
-            new(ComponentType.Sensor, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units),
-            ValueController.Create(getter)
-        );
-        return this;
-    }
-
-    private DeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow, double rangeHigh, string units)
-    {
-        this.Sliders.Add(
-            new(ComponentType.Slider, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units, SensorType: SensorTypes.Range),
-            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
-        );
-        return this;
-    }
-
-    private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
-    {
-        this.Switches.Add(
-            new(ComponentType.Switch, name, label),
-            ValueController.Create(getter, setter ?? throw new ArgumentNullException(nameof(setter)))
-        );
-        return this;
-    }
-
-    private DeviceBuilder AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter)
-    {
-        this.TextLabels.Add(
-            new(ComponentType.TextLabel, name, label, IsLabelVisible: isLabelVisible),
-            ValueController.Create(getter)
-        );
-        return this;
-    }
-
-    private DeviceBuilder DefineTiming(DeviceTiming timing)
-    {
-        if (!this.Type.SupportsTiming())
-        {
-            throw new NotSupportedException($"Device type {this.Type} does not support timing.");
-        }
-        if (this.Timing.HasValue)
-        {
-            throw new InvalidOperationException("Timing is already defined.");
-        }
-        this.Timing = timing;
-        return this;
-    }
-
-    private DeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder)
-    {
-        if (this.Setup.Discovery is not null)
-        {
-            throw new InvalidOperationException("Discovery is already defined.");
-        }
-        Validator.ValidateString(this.Setup.DiscoveryHeaderText = headerText, maxLength: 255, name: nameof(headerText));
-        Validator.ValidateString(this.Setup.DiscoveryDescription = description, maxLength: 255, name: nameof(description));
-        this.DiscoveryProcess = process ?? throw new ArgumentNullException(nameof(process));
-        this.Setup.Discovery = true;
-        this.Setup.EnableDynamicDeviceBuilder = enableDynamicDeviceBuilder;
-        return this;
-    }
-
-    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
-        where TPayload : notnull
-    {
-        if (this.Setup.Discovery is null)
-        {
-            throw new InvalidOperationException($"Registration is only supported on devices with discovery. (Call {nameof(IDeviceBuilder.EnableDiscovery)} first).");
-        }
-        if (this.Setup.RegistrationType is not null)
-        {
-            throw new InvalidOperationException("Registration is already defined.");
-        }
-        this.Setup.RegistrationType = type;
-        this.RegistrationController = new(queryIsRegistered, element => processor(element.Deserialize<TPayload>(JsonSerialization.Options)!));
-        Validator.ValidateString(this.Setup.RegistrationDescription = description, maxLength: 255, name: nameof(description));
-        Validator.ValidateString(this.Setup.RegistrationHeaderText = headerText, maxLength: 255, name: nameof(headerText));
-        return this;
-    }
-
-    private DeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceSubscriptionAction onDeviceAdded, DeviceSubscriptionAction onDeviceRemoved, DeviceListInitializer initializeDeviceList)
-    {
-        if (this.SubscriptionController != null)
-        {
-            throw new InvalidOperationException($"{nameof(this.RegisterDeviceSubscriptionCallbacks)} was already called.");
-        }
-        this.SubscriptionController = new(
-            onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded)),
-            onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved)),
-            initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList))
-        );
-        return this;
-    }
-
-    private DeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler)
-    {
-        if (this.FavoritesController != null)
-        {
-            throw new InvalidOperationException($"{nameof(FavoritesHandler)} already defined.");
-        }
-        if (!this.Type.SupportsFavorites())
-        {
-            throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
-        }
-        this.FavoritesController = new(handler ?? throw new ArgumentNullException(nameof(handler)));
-        return this;
-    }
-
-    private DeviceBuilder RegisterInitializer(DeviceInitializer initializer)
-    {
-        if (this.Initializer != null)
-        {
-            throw new InvalidOperationException($"{nameof(DeviceInitializer)} already defined.");
-        }
-        this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
-        return this;
-    }
-
-    private DeviceBuilder EnableNotifications(DeviceNotifierCallback callback)
-    {
-        if (this.NotifierCallback != null)
-        {
-            throw new InvalidOperationException($"{nameof(DeviceNotifierCallback)} already defined.");
-        }
-        this.NotifierCallback = callback;
-        return this;
-    }
-
-    private DeviceBuilder SetDriverVersion(uint version)
-    {
-        this.DriverVersion = version;
-        return this;
-    }
-
-    private DeviceBuilder SetIcon(DeviceIconOverride icon)
-    {
-        this.Icon = icon;
-        return this;
-    }
-
-    private DeviceBuilder SetManufacturer(string manufacturer = "NEEO")
-    {
-        Validator.ValidateString(this.Manufacturer = manufacturer);
-        return this;
-    }
-
-    private DeviceBuilder SetSpecificName(string? specificName)
-    {
-        Validator.ValidateString(this.SpecificName = specificName, allowNull: true);
-        return this;
-    }
-
-    private sealed record class SecurityCodeContainer(String SecurityCode);
 
     public DeviceAdapter Build(DiscoveryControllerFactory discoveryControllerFactory)
     {
@@ -818,7 +535,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             string buttonName = Uri.EscapeDataString(name);
             string path = pathPrefix + buttonName;
-            return new(ComponentType.Button, name, label is { } text ? Uri.EscapeDataString(text) : buttonName, path);
+            return new(ComponentType.Button, buttonName, label is { } text ? Uri.EscapeDataString(text) : buttonName, path);
         }
 
         static Component BuildComponent(string pathPrefix, ComponentType type)
@@ -866,8 +583,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
                 label,
                 path,
                 sensorType is SensorTypes.Range
-                    ? new RangeSensorDescriptor(feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d, feature.Unit)
-                    : new SensorDescriptor(sensorType)
+                    ? new RangeSensorDetails(feature.RangeLow ?? 0d, feature.RangeHigh ?? 100d, feature.Unit)
+                    : new SensorDetails(sensorType)
             );
         }
 
@@ -887,8 +604,296 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             return new(name, label, path, GetSensorName(name));
         }
 
-        static string GetSensorName(string name) => name.EndsWith(SensorDescriptor.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorDescriptor.ComponentSuffix);
+        static string GetSensorName(string name) => name.EndsWith(SensorDetails.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorDetails.ComponentSuffix);
 
         static bool RequiresDiscovery(DeviceCapability capability) => capability is DeviceCapability.BridgeDevice or DeviceCapability.AddAnotherDevice or DeviceCapability.RegisterUserAccount;
     }
+
+    IDeviceBuilder IDeviceBuilder.DefineTiming(DeviceTiming timing) => this.DefineTiming(timing);
+
+    IDeviceBuilder IDeviceBuilder.EnableDiscovery(
+        string headerText,
+        string description,
+        DiscoveryProcess process,
+        bool enableDynamicDeviceBuilder
+    ) => this.EnableDiscovery(headerText, description, process, enableDynamicDeviceBuilder);
+
+    IDeviceBuilder IDeviceBuilder.EnableNotifications(DeviceNotifierCallback callback) => this.EnableNotifications(callback);
+
+    IDeviceBuilder IDeviceBuilder.EnableRegistration(
+            string headerText,
+        string description,
+        QueryIsRegistered queryIsRegistered,
+        CredentialsRegistrationProcessor processor
+    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
+        headerText,
+        description,
+        RegistrationType.Credentials,
+        queryIsRegistered,
+        (Credentials credentials) => processor(credentials)
+    );
+
+    IDeviceBuilder IDeviceBuilder.EnableRegistration(
+        string headerText,
+        string description,
+        QueryIsRegistered queryIsRegistered,
+        SecurityCodeRegistrationProcessor processor
+    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
+        headerText,
+        description,
+        RegistrationType.SecurityCode,
+        queryIsRegistered,
+        (SecurityCodeContainer container) => processor(container.SecurityCode)
+    );
+
+    IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionCallbacks(
+        DeviceSubscriptionAction onDeviceAdded,
+        DeviceSubscriptionAction onDeviceRemoved,
+        DeviceListInitializer initializeDeviceList
+    ) => this.RegisterDeviceSubscriptionCallbacks(onDeviceAdded, onDeviceRemoved, initializeDeviceList);
+
+    IDeviceBuilder IDeviceBuilder.RegisterFavoritesHandler(FavoritesHandler handler) => this.RegisterFavoritesHandler(handler);
+
+    IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer) => this.RegisterInitializer(initializer);
+
+    IDeviceBuilder IDeviceBuilder.SetDriverVersion(uint version) => this.SetDriverVersion(version);
+
+    IDeviceBuilder IDeviceBuilder.SetIcon(DeviceIconOverride icon) => this.SetIcon(icon);
+
+    IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
+
+    IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
+
+    private DeviceBuilder AddAdditionalSearchTokens(string[] tokens)
+    {
+        this._additionalSearchTokens.AddRange(tokens);
+        return this;
+    }
+
+    private DeviceBuilder AddButton(string name, string? label = default)
+    {
+        if (!this.Buttons.TryAdd(Validator.ValidateString(name), Validator.ValidateString(label, allowNull: true)))
+        {
+            throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
+        }
+        bool isInput = name.StartsWith(Constants.InputPrefix);
+        this._hasInput |= isInput;
+        if (!isInput && DeviceBuilder._digitRegex.IsMatch(name))
+        {
+            this._digitCount++;
+        }
+        return this;
+    }
+
+    private DeviceBuilder AddButtonHandler(ButtonHandler handler)
+    {
+        if (this.ButtonHandler != null)
+        {
+            throw new InvalidOperationException("ButtonHandler already defined.");
+        }
+        this.ButtonHandler = handler ?? throw new ArgumentNullException(nameof(handler));
+        return this;
+    }
+
+    private DeviceBuilder AddButtons(KnownButtons buttons) => KnownButton.GetNames(buttons).Aggregate(
+        this,
+        static (builder, name) => builder.AddButton(name)
+    );
+
+    private DeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic)
+    {
+        this._characteristics.Add(characteristic);
+        return this;
+    }
+
+    private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, string? uri, DeviceValueGetter<string>? getter)
+    {
+        if (uri == null && getter == null)
+        {
+            throw new InvalidOperationException($"Either {nameof(uri)} or {nameof(getter)} must be specified.");
+        }
+        this.ImageUrls.Add(
+            new(ComponentType.ImageUrl, name, label, Uri: uri, Size: size),
+            ValueController.Create(getter ?? new((_) => Task.FromResult(uri!)))
+        );
+        return this;
+    }
+
+    private DeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> getter)
+    {
+        if (this.HasPowerStateSensor)
+        {
+            throw new InvalidOperationException("PowerStateSensor already added.");
+        }
+        this.Sensors.Add(
+            new(ComponentType.Power, Constants.PowerSensorName, Constants.PowerSensorLabel, SensorType: SensorTypes.Power),
+            ValueController.Create(getter)
+        );
+        return this;
+    }
+
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter) => this;
+
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter) => this;
+
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string units)
+    {
+        if (name == Constants.PowerSensorName)
+        {
+            throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
+        }
+        this.Sensors.Add(
+            new(ComponentType.Sensor, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units),
+            ValueController.Create(getter)
+        );
+        return this;
+    }
+
+    private DeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow, double rangeHigh, string units)
+    {
+        this.Sliders.Add(
+            new(ComponentType.Slider, name, label, RangeLow: rangeLow, RangeHigh: rangeHigh, Unit: units, SensorType: SensorTypes.Range),
+            ValueController.Create(getter, setter)
+        );
+        return this;
+    }
+
+    private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
+    {
+        this.Switches.Add(
+            new(ComponentType.Switch, name, label),
+            ValueController.Create(getter, setter)
+        );
+        return this;
+    }
+
+    private DeviceBuilder AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter)
+    {
+        this.TextLabels.Add(
+            new(ComponentType.TextLabel, name, label, IsLabelVisible: isLabelVisible),
+            ValueController.Create(getter)
+        );
+        return this;
+    }
+
+    private DeviceBuilder DefineTiming(DeviceTiming timing)
+    {
+        if (!this.Type.SupportsTiming())
+        {
+            throw new NotSupportedException($"Device type {this.Type} does not support timing.");
+        }
+        if (this.Timing.HasValue)
+        {
+            throw new InvalidOperationException("Timing is already defined.");
+        }
+        this.Timing = timing;
+        return this;
+    }
+
+    private DeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder)
+    {
+        if (this.Setup.Discovery is not null)
+        {
+            throw new InvalidOperationException("Discovery is already defined.");
+        }
+        Validator.ValidateString(this.Setup.DiscoveryHeaderText = headerText, maxLength: 255, name: nameof(headerText));
+        Validator.ValidateString(this.Setup.DiscoveryDescription = description, maxLength: 255, name: nameof(description));
+        this.DiscoveryProcess = process ?? throw new ArgumentNullException(nameof(process));
+        this.Setup.Discovery = true;
+        this.Setup.EnableDynamicDeviceBuilder = enableDynamicDeviceBuilder;
+        return this;
+    }
+
+    private DeviceBuilder EnableNotifications(DeviceNotifierCallback callback)
+    {
+        if (this.NotifierCallback != null)
+        {
+            throw new InvalidOperationException($"{nameof(DeviceNotifierCallback)} already defined.");
+        }
+        this.NotifierCallback = callback;
+        return this;
+    }
+
+    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
+            where TPayload : notnull
+    {
+        if (this.Setup.Discovery is null)
+        {
+            throw new InvalidOperationException($"Registration is only supported on devices with discovery. (Call {nameof(IDeviceBuilder.EnableDiscovery)} first).");
+        }
+        if (this.Setup.RegistrationType is not null)
+        {
+            throw new InvalidOperationException("Registration is already defined.");
+        }
+        this.Setup.RegistrationType = type;
+        this.RegistrationController = new(queryIsRegistered, element => processor(element.Deserialize<TPayload>(JsonSerialization.Options)!));
+        Validator.ValidateString(this.Setup.RegistrationDescription = description, maxLength: 255, name: nameof(description));
+        Validator.ValidateString(this.Setup.RegistrationHeaderText = headerText, maxLength: 255, name: nameof(headerText));
+        return this;
+    }
+
+    private DeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceSubscriptionAction onDeviceAdded, DeviceSubscriptionAction onDeviceRemoved, DeviceListInitializer initializeDeviceList)
+    {
+        if (this.SubscriptionController != null)
+        {
+            throw new InvalidOperationException($"{nameof(this.RegisterDeviceSubscriptionCallbacks)} was already called.");
+        }
+        this.SubscriptionController = new(
+            onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded)),
+            onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved)),
+            initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList))
+        );
+        return this;
+    }
+
+    private DeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler)
+    {
+        if (this.FavoritesController != null)
+        {
+            throw new InvalidOperationException($"{nameof(FavoritesHandler)} already defined.");
+        }
+        if (!this.Type.SupportsFavorites())
+        {
+            throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
+        }
+        this.FavoritesController = new(handler ?? throw new ArgumentNullException(nameof(handler)));
+        return this;
+    }
+
+    private DeviceBuilder RegisterInitializer(DeviceInitializer initializer)
+    {
+        if (this.Initializer != null)
+        {
+            throw new InvalidOperationException($"{nameof(DeviceInitializer)} already defined.");
+        }
+        this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
+        return this;
+    }
+
+    private DeviceBuilder SetDriverVersion(uint version)
+    {
+        this.DriverVersion = version;
+        return this;
+    }
+
+    private DeviceBuilder SetIcon(DeviceIconOverride icon)
+    {
+        this.Icon = icon;
+        return this;
+    }
+
+    private DeviceBuilder SetManufacturer(string manufacturer = "NEEO")
+    {
+        Validator.ValidateString(this.Manufacturer = manufacturer);
+        return this;
+    }
+
+    private DeviceBuilder SetSpecificName(string? specificName)
+    {
+        Validator.ValidateString(this.SpecificName = specificName, allowNull: true);
+        return this;
+    }
+
+    private sealed record class SecurityCodeContainer(String SecurityCode);
 }
+

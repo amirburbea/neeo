@@ -43,23 +43,24 @@ internal static class Program
 
     private static async Task Main()
     {
-        var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
+        //var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
 
-        Brain? brain;
-        if (arg != null && _ipAddressRegex.IsMatch(arg))
-        {
-            brain = new(IPAddress.Parse(arg.Trim()));
-        }
-        else
-        {
-            Console.WriteLine("Discovering brain...");
-            brain = await BrainDiscovery.DiscoverAsync();
-        }
-        if (brain is null)
-        {
-            Console.Error.WriteLine("Brain not found.");
-            return;
-        }
+        //Brain? brain;
+        //if (arg != null && _ipAddressRegex.IsMatch(arg))
+        //{
+        //    brain = new(IPAddress.Parse(arg.Trim()));
+        //}
+        //else
+        //{
+        //    Console.WriteLine("Discovering brain...");
+        //}
+        //if (brain is null)
+        //{
+        //    Console.Error.WriteLine("Brain not found.");
+        //    return;
+        //}
+        Brain brain = await BrainDiscovery.DiscoverAsync()??new(IPAddress.Parse("192.168.253.143"));
+        
         Console.WriteLine($"Brain found! {brain.IPAddress}");
 
         try

@@ -1,5 +1,8 @@
-﻿namespace Neeo.Sdk.Devices;
+﻿using System;
 
+namespace Neeo.Sdk.Devices;
+
+[Obsolete]
 public record struct DeviceFeature(
     ComponentType Type,
     string Name,

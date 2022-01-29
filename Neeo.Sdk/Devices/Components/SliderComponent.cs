@@ -4,14 +4,14 @@ namespace Neeo.Sdk.Devices.Components;
 
 public interface ISliderComponent : IComponent
 {
-    ISliderDescriptor Slider { get; }
+    ISliderDetails Slider { get; }
 }
 
 internal sealed record class SliderComponent : Component, ISliderComponent
 {
-    public ISliderDescriptor Slider { get; }
+    public ISliderDetails Slider { get; }
 
-    public SliderComponent(string name, string? label, string path, SliderDescriptor slider)
+    public SliderComponent(string name, string? label, string path, SliderDetails slider)
         : base(ComponentType.Slider, name, label, path)
     {
         this.Slider = slider;
