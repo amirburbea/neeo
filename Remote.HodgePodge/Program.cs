@@ -59,22 +59,22 @@ internal static class Program
         //    Console.Error.WriteLine("Brain not found.");
         //    return;
         //}
-        Brain brain = await BrainDiscovery.DiscoverAsync()??new(IPAddress.Parse("192.168.253.143"));
-        
-        Console.WriteLine($"Brain found! {brain.IPAddress}");
+        Brain brain = await BrainDiscovery.DiscoverAsync() ?? new(IPAddress.Parse("192.168.253.143"));
 
+        Console.WriteLine($"Brain found! {brain.IPAddress}");
+        List<IDeviceBuilder> devices = new();
+        foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
+        {
+            if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
+            {
+                devices.Add(((IDeviceProvider)Activator.CreateInstance(type)!).ProvideDevice());
+            }
+        }
+        await using var sdkAdapter = await brain.StartServerAsync(devices, port: 9001).ConfigureAwait(false);
         try
         {
-            List<IDeviceBuilder> devices = new();
-            foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
-            {
-                if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
-                {
-                    devices.Add(((IDeviceProvider)Activator.CreateInstance(type)!).ProvideDevice());
-                }
-            }
 
-            await brain.StartServerAsync(devices,port:9001);
+
             /*
              * bool switchValue = false;
     double sliderValue = 66d;
@@ -106,7 +106,6 @@ internal static class Program
         finally
         {
             Console.WriteLine("Server stopping...   ");
-            await brain.StopServerAsync();
         }
         /*
         Task OnButtonPressed(string deviceId, string buttonName)

@@ -15,6 +15,7 @@ internal class MainWindowViewModel : NotifierBase
     private IDeviceNotifier? _deviceNotifier;
 
     private bool _registered;
+    private SdkAdapter _adapter;
 
     public MainWindowViewModel(Brain brain)
     {
@@ -28,14 +29,14 @@ internal class MainWindowViewModel : NotifierBase
 
     public async Task StartServerAsync()
     {
-        await this.Brain.StartServerAsync(new[] { this.CreateDeviceBuilder() }, "WPF");
+        this._adapter = await this.Brain.StartServerAsync(new[] { this.CreateDeviceBuilder() }, "WPF");
         this.Device.PropertyChanged += this.Device_PropertyChanged;
     }
 
-    public Task StopServerAsync()
+    public async Task StopServerAsync()
     {
         this.Device.PropertyChanged -= this.Device_PropertyChanged;
-        return this.Brain.StopServerAsync();
+        await this._adapter.DisposeAsync();
     }
 
     private IDeviceBuilder CreateDeviceBuilder() => CreateDevice("Example Device", DeviceType.TV)

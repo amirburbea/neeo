@@ -24,7 +24,6 @@ namespace Neeo.Sdk;
 
 public partial class Brain
 {
-    private IHost? _host;
 
     /// <summary>
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
@@ -39,7 +38,7 @@ public partial class Brain
     /// <param name="port">The port to listen on.</param>
     /// <param name="cancellationToken">Optional cancellation token.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public async Task StartServerAsync(IReadOnlyCollection<IDeviceBuilder> devices, string? name = default, IPAddress? hostIPAddress = null, ushort port = 9000, CancellationToken cancellationToken = default)
+    public async Task<SdkAdapter> StartServerAsync(IReadOnlyCollection<IDeviceBuilder> devices, string? name = default, IPAddress? hostIPAddress = null, ushort port = 9000, CancellationToken cancellationToken = default)
     {
         if (devices is not { Count: > 0 })
         {
@@ -49,10 +48,6 @@ public partial class Brain
         {
             throw new ArgumentException("Port can not be 0.", nameof(port));
         }
-        if (this._host != null)
-        {
-            throw new InvalidOperationException("Server is already running.");
-        }
         SdkEnvironment environment = new(
             $"src-{UniqueNameGenerator.Generate(name ?? Dns.GetHostName())}",
             this.ServiceEndPoint,
@@ -61,21 +56,7 @@ public partial class Brain
         );
         IHost host = Brain.CreateHostBuilder(environment, devices).Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
-        this._host = host;
-    }
-
-    /// <summary>
-    /// Asynchronously stops the SDK integration server and unregisters it from the Brain.
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
-    /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public async Task StopServerAsync(CancellationToken cancellationToken = default)
-    {
-        using IHost? host = Interlocked.Exchange(ref this._host, null);
-        if (host != null)
-        {
-            await host.StopAsync(cancellationToken).ConfigureAwait(false);
-        }
+        return new(environment, host);
     }
 
     private static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPEndPoint hostEndPoint) => builder
@@ -118,7 +99,7 @@ public partial class Brain
             }
         });
 
-    private static IHostBuilder CreateHostBuilder(SdkEnvironment environment, IReadOnlyCollection<IDeviceBuilder> devices) => Host.CreateDefaultBuilder()
+    private static IHostBuilder CreateHostBuilder(ISdkEnvironment environment, IReadOnlyCollection<IDeviceBuilder> devices) => Host.CreateDefaultBuilder()
         .ConfigureWebHostDefaults(builder => ConfigureWebHostDefaults(builder, environment.HostEndPoint))
         // Add startup tasks which needs to be run on startup but only after the web host has started.
         .ConfigureServices(services =>
@@ -126,7 +107,7 @@ public partial class Brain
             // Dependencies.
             services
                 .AddSingleton(devices)
-                .AddSingleton<ISdkEnvironment>(environment)
+                .AddSingleton(environment)
                 .AddSingleton<IApiClient, ApiClient>()
                 .AddSingleton<IDeviceDatabase, DeviceDatabase>()
                 .AddSingleton<IDynamicDevices, DynamicDevices>()
