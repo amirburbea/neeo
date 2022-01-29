@@ -114,8 +114,7 @@ public partial class Brain
                 .AddSingleton<IDynamicDeviceRegistrar, DynamicDevices>()
                 .AddSingleton<INotificationMapping, NotificationMapping>()
                 .AddSingleton<INotificationService, NotificationService>()
-                .AddSingleton<IPgpService, PgpService>()
-                .AddSingleton<DiscoveryControllerFactory>();
+                .AddSingleton<IPgpService, PgpService>();
 
             // Startup and shut down tasks.
             services

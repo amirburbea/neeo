@@ -1,13 +1,14 @@
-﻿using System.Threading.Tasks;
+﻿using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices.Discovery;
 
-public delegate Task<DiscoveryResult[]> DiscoveryProcess(string? optionalDeviceId = default);
+public delegate Task<DiscoveredDevice[]> DiscoveryProcess(string? optionalDeviceId = default);
 
-public record struct DiscoveryResult(
+public record struct DiscoveredDevice(
     string Id,
     string Name,
     bool? Reachable = default,
     string? Room = default,
-    IDeviceBuilder? Device = default
+    [property: JsonIgnore] IDeviceBuilder? DeviceBuilder = default
 );

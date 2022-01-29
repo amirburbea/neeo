@@ -27,7 +27,7 @@ internal sealed class SubscriptionsNotifier : IHostedService
         List<Task> tasks = new();
         foreach (IDeviceAdapter adapter in this._database.Adapters)
         {
-            if (adapter.GetCapabilityHandler(ComponentType.Subscription) is ISubscriptionController controller)
+            if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionController controller)
             {
                 tasks.Add(this.NotifySubscriptionsAsync(adapter, controller, cancellationToken));
             }

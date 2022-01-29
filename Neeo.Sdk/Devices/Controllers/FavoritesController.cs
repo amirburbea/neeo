@@ -2,11 +2,11 @@
 
 namespace Neeo.Sdk.Devices.Controllers;
 
-public interface IFavoritesController : IController
+public interface IFavoritesController : IFeature
 {
-    ControllerType IController.Type => ControllerType.Favorites;
+    FeatureType IFeature.Type => FeatureType.Favorites;
 
-    Task ExecuteAsync(string deviceId, string favorite);
+    Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite);
 }
 
 internal sealed class FavoritesController : IFavoritesController
@@ -15,5 +15,9 @@ internal sealed class FavoritesController : IFavoritesController
 
     public FavoritesController(FavoritesHandler favoritesHandler) => this._favoritesHandler = favoritesHandler;
 
-    public Task ExecuteAsync(string deviceId, string favorite) => this._favoritesHandler(deviceId, favorite);
+    public async Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite)
+    {
+        await this._favoritesHandler(deviceId, favorite).ConfigureAwait(false);
+        return new();
+    }
 }

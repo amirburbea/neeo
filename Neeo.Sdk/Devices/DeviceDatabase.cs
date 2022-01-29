@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Devices.Controllers;
 using Neeo.Sdk.Notifications;
 using Neeo.Sdk.Utilities.TokenSearch;
 
@@ -36,7 +35,6 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     private readonly INotificationService _notificationService;
 
     public DeviceDatabase(
-        DiscoveryControllerFactory discoveryControllerFactory,
         IReadOnlyCollection<IDeviceBuilder> deviceBuilders,
         INotificationService notificationService,
         ILogger<IDeviceDatabase> logger
@@ -46,10 +44,10 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         this._logger = logger;
         foreach (IDeviceBuilder device in deviceBuilders)
         {
-            IDeviceAdapter adapter = ((DeviceBuilder)device).Build( discoveryControllerFactory);
+            IDeviceAdapter adapter = device.Build();
             if (device.NotifierCallback is { } callback)
             {
-                callback(new DeviceNotifier(this._notificationService,device.AdapterName, device.HasPowerStateSensor ));
+                callback(new DeviceNotifier(this._notificationService, device.AdapterName, device.HasPowerStateSensor));
             }
             this._adapters.Add(adapter.AdapterName, adapter);
             this._devices.Add(new(this._devices.Count, adapter));

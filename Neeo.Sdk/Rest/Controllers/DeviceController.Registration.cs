@@ -11,25 +11,25 @@ internal partial class DeviceController
     [HttpGet("{adapter}/registered")]
     public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter)
     {
-        if (adapter.GetCapabilityHandler(ComponentType.Registration) is not IRegistrationController controller)
+        if (adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature controller)
         {
             return this.NotFound();
         }
         this._logger.LogInformation("Querying registration for {adapter}...", adapter.AdapterName);
-        return new IsRegisteredResponse(await controller.QueryIsRegisteredAsync());
+        return this.Ok(await controller.QueryIsRegisteredAsync());
     }
 
     [HttpPost("{adapter}/register")]
-    public async Task<ActionResult<SuccessResult>> RegisterAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter, [FromBody] CredentialsPayload payload)
+    public async Task<ActionResult<SuccessResponse>> RegisterAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter, [FromBody] CredentialsPayload payload)
     {
-        if (adapter.GetCapabilityHandler(ComponentType.Registration) is not IRegistrationController controller)
+        if (adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature controller)
         {
             return this.NotFound();
         }
         this._logger.LogInformation("Registering {adapter}...", adapter.AdapterName);
-        if (await controller.RegisterAsync(await this._pgp.DeserializeEncryptedAsync(payload.Data)) is not { Error: { } error })
+        if (await controller.RegisterAsync(await this._pgp.DeserializeEncryptedAsync<System.Text.Json.JsonElement>(payload.Data)) is not { Error: { } error })
         {
-            return this.Ok(new SuccessResult());
+            return this.Ok(new SuccessResponse());
         }
         ContentResult result = this.Content(error);
         result.StatusCode = 500;

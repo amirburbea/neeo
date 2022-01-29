@@ -31,12 +31,12 @@ public class DiscoveryExampleDeviceProvider : IDeviceProvider
             );
     }
 
-    private Task<DiscoveryResult[]> DiscoverDevices(string? deviceId)
+    private Task<DiscoveredDevice[]> DiscoverDevices(string? deviceId)
     {
         Console.WriteLine("Discovering devices");
         return Task.FromResult(new[]
         {
-            new DiscoveryResult(THE_ANSWER,"Security Code Device",true)
+            new DiscoveredDevice(THE_ANSWER,"Security Code Device",true)
         });
     }
 

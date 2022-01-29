@@ -11,10 +11,14 @@ namespace Neeo.Sdk.Rest.Controllers;
 [ApiController, Route("[controller]")]
 internal sealed partial class DeviceController : ControllerBase
 {
+    private readonly IDynamicDeviceRegistrar _dynamicDeviceRegistrar;
     private readonly ILogger<DeviceController> _logger;
     private readonly IPgpService _pgp;
 
-    public DeviceController(IPgpService pgp, ILogger<DeviceController> logger) => (this._pgp, this._logger) = (pgp, logger);
+    public DeviceController(IDynamicDeviceRegistrar dynamicDeviceRegistrar, IPgpService pgp, ILogger<DeviceController> logger)
+    {
+        (this._dynamicDeviceRegistrar, this._pgp, this._logger) = (dynamicDeviceRegistrar, pgp, logger);
+    }
 
     private sealed class AdapterBinder : ParameterBinderBase<IDeviceAdapter>
     {
@@ -37,7 +41,7 @@ internal sealed partial class DeviceController : ControllerBase
         private readonly IDynamicDevices _dynamicDevices;
 
         public ComponentNameBinder(IDynamicDevices dynamicDevices, ILogger<ComponentNameBinder> logger)
-            : base(logger, nameof(IController))
+            : base(logger, nameof(IFeature))
         {
             this._dynamicDevices = dynamicDevices;
         }
@@ -48,7 +52,7 @@ internal sealed partial class DeviceController : ControllerBase
             {
                 return Task.FromResult(Result.Failed("No adapter."));
             }
-            if (adapter.GetCapabilityHandler(componentName) is { } controller)
+            if (adapter.GetFeature(componentName) is { } controller)
             {
                 // Static device - set the controller in the request.
                 httpContext.SetItem(controller);
@@ -75,16 +79,16 @@ internal sealed partial class DeviceController : ControllerBase
             {
                 return Result.Failed("No adapter.");
             }
-            if (httpContext.GetItem<IController>() != null)
+            if (httpContext.GetItem<IFeature>() != null)
             {
                 // Static device.
                 return Result.Success(deviceId);
             }
-            if (!this._dynamicDevices.HasPlaceholder(httpContext))
+            if (!this._dynamicDevices.TryGetPlaceholder(httpContext, out object? placeholder))
             {
                 return Result.Failed("No dynamic device placeholder.");
             }
-            if (await this._dynamicDevices.StoreDiscoveryHandlerInRequestAsync(httpContext, deviceId).ConfigureAwait(false))
+            if (await this._dynamicDevices.StoreDiscoveryHandlerInRequestAsync(httpContext, deviceId, placeholder).ConfigureAwait(false))
             {
                 // Dynamic device was resolved and controller is now in the request.
                 return Result.Success(deviceId);

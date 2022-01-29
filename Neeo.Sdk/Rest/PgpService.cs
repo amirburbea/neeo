@@ -9,7 +9,7 @@ public interface IPgpService
 {
     string ArmoredPublicKey { get; }
 
-    ValueTask<JsonElement> DeserializeEncryptedAsync(string armoredJson);
+    ValueTask<T> DeserializeEncryptedAsync<T>(string armoredJson);
 }
 
 internal sealed class PgpService : IPgpService
@@ -24,5 +24,5 @@ internal sealed class PgpService : IPgpService
 
     public string ArmoredPublicKey { get; }
 
-    public ValueTask<JsonElement> DeserializeEncryptedAsync(string armoredJson) => PgpMethods.DeserializeEncryptedAsync<JsonElement>(armoredJson, this._privateKey);
+    public ValueTask<T> DeserializeEncryptedAsync<T>(string armoredJson) => PgpMethods.DeserializeEncryptedAsync<T>(armoredJson, this._privateKey);
 }

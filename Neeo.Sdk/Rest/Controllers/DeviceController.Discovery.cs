@@ -11,13 +11,24 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapter}/discover")]
-    public async Task<ActionResult<DiscoveryResult[]>> DiscoverAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter)
+    public async Task<ActionResult<DiscoveredDevice[]>> DiscoverAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter)
     {
-        if (adapter.GetCapabilityHandler(ComponentType.Discovery) is not IDiscoveryController controller)
+        if (adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature controller)
         {
             throw new NotSupportedException();
         }
         this._logger.LogInformation("Beginning discovery for {adapter}.", adapter.AdapterName);
-        return await controller.DiscoverAsync();
+        DiscoveredDevice[] devices =  await controller.DiscoverAsync();
+        if (controller.EnableDynamicDeviceBuilder && devices.Length > 1)
+        {
+            foreach (DiscoveredDevice device in devices)
+            {
+                if (device.DeviceBuilder is { } builder)
+                {
+                    this._dynamicDeviceRegistrar.RegisterDiscoveredDevice(device.Id, builder.Build());
+                }
+            }
+        }
+        return devices;
     }
 }

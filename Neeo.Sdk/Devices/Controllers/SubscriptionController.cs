@@ -2,9 +2,9 @@
 
 namespace Neeo.Sdk.Devices.Controllers;
 
-public interface ISubscriptionController : IController
+public interface ISubscriptionController : IFeature
 {
-    ControllerType IController.Type => ControllerType.Subscription;
+    FeatureType IFeature.Type => FeatureType.Subscription;
 
     Task InitializeDeviceList(string[] deviceIds);
 

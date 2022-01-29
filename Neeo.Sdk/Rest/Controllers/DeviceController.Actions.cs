@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -17,21 +19,17 @@ internal partial class DeviceController
         [ModelBinder(typeof(DeviceIdBinder))] string deviceId
     )
     {
-        if (this.HttpContext.GetItem<IController>() is not { } controller)
+        if (!this.TryGetFeature(adapter, componentName, out IFeature? feature))
         {
-            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();
         }
-        else if (controller is IValueController valueController)
+        this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
+        return feature.Type switch
         {
-            return this.Ok(new ValueResult(await valueController.GetValueAsync(deviceId)));
-        }
-        else if (controller is IButtonController buttonController)
-        {
-            await buttonController.TriggerAsync(deviceId);
-            return this.Ok(new SuccessResult());
-        }
-        return this.BadRequest();
+            FeatureType.Button => this.Ok(await ((IButtonFeature)feature).TriggerAsync(deviceId)), // SuccessResponse,
+            FeatureType.Value => this.Ok(await ((IValueFeature)feature).GetValueAsync(deviceId)), // ValueResponse
+            _ => this.BadRequest()
+        };
     }
 
     [HttpPost("{adapter}/{componentName}/{deviceId}")]
@@ -42,55 +40,65 @@ internal partial class DeviceController
         [FromBody] object value
     )
     {
-        if (this.HttpContext.GetItem<IController>() is not { } controller)
+        if (!this.TryGetFeature(adapter, componentName, out IFeature? feature))
         {
-            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
-            throw new();
+            return this.NotFound();
         }
-        switch (controller)
+        this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
+        return feature.Type switch
         {
-            case IDirectoryController directoryController:
-                break;
-            case IFavoritesController favoritesController when value is JsonElement favoriteData:
-                await favoritesController.ExecuteAsync(deviceId, favoriteData.Deserialize<FavoriteData>(JsonSerialization.Options).FavoriteId);
-                return this.Ok(new SuccessResult());
-        }
-        return this.BadRequest();
+            FeatureType.Favorites when value is JsonElement element => this.Ok(await ((IFavoritesController)feature).ExecuteAsync(deviceId, element.Deserialize<FavoriteData>().FavoriteId)),
+            FeatureType.Directory => throw new NotImplementedException(),
+            _ => this.BadRequest()
+        };
     }
 
     [HttpPost("{adapter}/{componentName}/{deviceId}/action")]
-    public async Task<ActionResult<object>> PerformActionAsync(
+    public async Task<ActionResult<SuccessResponse>> PerformActionAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
         [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
-        [FromBody] object value
+        [FromBody] ActionData action
     )
     {
-        if (this.HttpContext.GetItem<IController>() is not IDirectoryController controller)
+        if (!this.TryGetFeature(adapter, componentName, out IDirectoryFeature? feature))
         {
-            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();
         }
-        await Task.Delay(0);
-        return this.NotFound();
+        this._logger.LogInformation("Perform directory action {action} on {name}:{id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
+        return this.Ok(await feature.PerformActionAsync(deviceId, action.ActionIdentifier));
     }
 
     [HttpGet("{adapter}/{componentName}/{deviceId}/{value}")]
-    public async Task<ActionResult<SuccessResult>> SetValueAsync(
+    public async Task<ActionResult<SuccessResponse>> SetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
         [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
         string value
     )
     {
-        if (this.HttpContext.GetItem<IController>() is not IValueController controller)
+        if (!this.TryGetFeature(adapter, componentName, out IValueFeature? feature))
         {
-            this._logger.LogError("Can not perform action as the necessary capability or component not found.");
             return this.NotFound();
         }
-        await controller.SetValueAsync(deviceId, value);
-        return new SuccessResult();
+        this._logger.LogInformation("Set {component} value to {value} on {name}:{id}", componentName, value, adapter.DeviceName, deviceId);
+        return this.Ok(await feature.SetValueAsync(deviceId, value));
     }
+
+    private bool TryGetFeature<TFeature>(IDeviceAdapter adapter, string componentName, [NotNullWhen(true)] out TFeature? feature)
+        where TFeature : IFeature
+    {
+        if (this.HttpContext.GetItem<IFeature>() is not { } item)
+        {
+            this._logger.LogError("Can not perform action as the component ({component}) was not found on '{device}'.", componentName, adapter.DeviceName);
+            feature = default;
+            return false;
+        }
+        feature = (TFeature)item;
+        return true;
+    }
+
+    public record struct ActionData(string ActionIdentifier);
 
     private record struct FavoriteData(string FavoriteId);
 }

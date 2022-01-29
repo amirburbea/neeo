@@ -27,7 +27,7 @@ internal sealed class ServerRegistration : IHostedService
         {
             try
             {
-                if (!await this._client.PostAsync(UrlPaths.RegisterServer, body, static (SuccessResult result) => result.Success, cancellationToken).ConfigureAwait(false))
+                if (!await this._client.PostAsync(UrlPaths.RegisterServer, body, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
                 {
                     throw new ApplicationException("Failed to register on the brain - registration rejected.");
                 }
@@ -52,7 +52,7 @@ internal sealed class ServerRegistration : IHostedService
         try
         {
             (string adapterName, _, string brainHostName, _) = this._environment;
-            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = adapterName }, static (SuccessResult result) => result.Success, cancellationToken).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = adapterName }, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
             {
                 this._logger.LogInformation("Server unregistered from {brain}.", brainHostName);
             }

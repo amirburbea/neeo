@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Sdk.Devices.Controllers;
 
-public enum ControllerType
+public enum FeatureType
 {
     Button,
     Directory,

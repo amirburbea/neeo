@@ -5,19 +5,19 @@ namespace Neeo.Sdk;
 /// <summary>
 /// A structure indicating success - used as a standard return type for NEEO Brain APIs.
 /// </summary>
-public readonly struct SuccessResult
+public readonly struct SuccessResponse
 {
     /// <summary>
-    /// Creates a new <see cref="SuccessResult"/> with a success value of <see langword="true" />.
+    /// Creates a new <see cref="SuccessResponse"/> with a success value of <see langword="true" />.
     /// </summary>
-    public SuccessResult() => this.Success = true;
+    public SuccessResponse() => this.Success = true;
 
     /// <summary>
-    /// Creates a new <see cref="SuccessResult"/> with the specified success value.
+    /// Creates a new <see cref="SuccessResponse"/> with the specified success value.
     /// </summary>
     /// <param name="success">A value indicating if the API call was successful.</param>
     [JsonConstructor]
-    public SuccessResult(bool success) => this.Success = success;
+    public SuccessResponse(bool success) => this.Success = success;
 
     /// <summary>
     /// A value indicating if the API call was successful.

@@ -10,7 +10,7 @@ public interface IDeviceAdapter
 {
     string AdapterName { get; }
 
-    IReadOnlyDictionary<string, IController> CapabilityHandlers { get; }
+    IReadOnlyDictionary<string, IFeature> Features { get; }
 
     IReadOnlyCollection<IComponent> Components { get; }
 
@@ -36,15 +36,15 @@ public interface IDeviceAdapter
 
     DeviceType Type { get; }
 
-    IController? GetCapabilityHandler(ComponentType type);
+    IFeature? GetFeature(ComponentType type) => this.GetFeature(TextAttribute.GetText(type));
 
-    IController? GetCapabilityHandler(string name);
+    IFeature? GetFeature(string name) => this.Features.GetValueOrDefault(name);
 }
 
-internal record DeviceAdapter(
+internal sealed record class DeviceAdapter(
     string AdapterName,
     IReadOnlyCollection<IComponent> Components,
-    IReadOnlyDictionary<string, IController> CapabilityHandlers,
+    IReadOnlyDictionary<string, IFeature> Features,
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities,
     string DeviceName,
     uint? DriverVersion,
@@ -56,9 +56,4 @@ internal record DeviceAdapter(
     DeviceTiming Timing,
     IReadOnlyCollection<string> Tokens,
     DeviceType Type
-) : IDeviceAdapter
-{
-    public IController? GetCapabilityHandler(ComponentType type) => this.GetCapabilityHandler(TextAttribute.GetText(type));
-
-    public IController? GetCapabilityHandler(string name) => this.CapabilityHandlers.GetValueOrDefault(name);
-}
+) : IDeviceAdapter;

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -9,11 +10,11 @@ namespace Neeo.Sdk.Rest;
 
 public interface IDynamicDevices : IDynamicDeviceRegistrar
 {
-    bool HasPlaceholder(HttpContext context);
-
-    ValueTask<bool> StoreDiscoveryHandlerInRequestAsync(HttpContext context, string deviceId);
+    ValueTask<bool> StoreDiscoveryHandlerInRequestAsync(HttpContext context, string deviceId, object placeholder);
 
     void StorePlaceholderInRequest(HttpContext context, IDeviceAdapter adapter, string text);
+
+    bool TryGetPlaceholder(HttpContext context, [NotNullWhen(true)] out object? placeholder);
 }
 
 internal sealed class DynamicDevices : IDynamicDevices
@@ -23,9 +24,7 @@ internal sealed class DynamicDevices : IDynamicDevices
 
     public DynamicDevices(ILogger<DynamicDevices> logger) => this._logger = logger;
 
-    public bool HasPlaceholder(HttpContext context) => context.HasItem<DynamicPlaceholder>();
-
-    public void RegisterDiscoveredDevice(string deviceId, IDiscoveryController controller)
+    public void RegisterDiscoveredDevice(string deviceId, IDiscoveryFeature controller)
     {
     }
 
@@ -35,14 +34,14 @@ internal sealed class DynamicDevices : IDynamicDevices
         this._logger.LogInformation("Added device, currently registered {count} dynamic device.", this._discoveredDynamicDevices.Count);
     }
 
-    public async ValueTask<bool> StoreDiscoveryHandlerInRequestAsync(HttpContext httpContext, string deviceId)
+    public async ValueTask<bool> StoreDiscoveryHandlerInRequestAsync(HttpContext httpContext, string deviceId, object placeholder)
     {
-        (IDeviceAdapter adapter, string componentName) = httpContext.GetItem<DynamicPlaceholder>()!;
+        (IDeviceAdapter adapter, string componentName) = (DynamicPlaceholder)placeholder;
         if (TryStore())
         {
             return true;
         }
-        if (adapter.GetCapabilityHandler(ComponentType.Discovery) is not IDiscoveryController discoveryController)
+        if (adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature discoveryController)
         {
             this._logger.LogWarning("No discovery component found.");
             return false;
@@ -52,16 +51,18 @@ internal sealed class DynamicDevices : IDynamicDevices
 
         bool TryStore()
         {
-            if (!this._discoveredDynamicDevices.TryGetValue(deviceId, out IDeviceAdapter? adapter) || adapter.GetCapabilityHandler(componentName) is not { } controller)
+            if (!this._discoveredDynamicDevices.TryGetValue(deviceId, out IDeviceAdapter? adapter) || adapter.GetFeature(componentName) is not { } feature)
             {
                 return false;
             }
-            httpContext.SetItem(controller);
+            httpContext.SetItem(feature);
             return true;
         }
     }
 
     public void StorePlaceholderInRequest(HttpContext context, IDeviceAdapter adapter, string componentName) => context.SetItem(new DynamicPlaceholder(adapter, componentName));
 
-    private record DynamicPlaceholder(IDeviceAdapter Adapter, string ComponentName);
+    public bool TryGetPlaceholder(HttpContext context, [NotNullWhen(true)] out object? placeholder) => context.Items.TryGetValue(nameof(DynamicPlaceholder), out placeholder);
+
+    private sealed record class DynamicPlaceholder(IDeviceAdapter Adapter, string ComponentName);
 }

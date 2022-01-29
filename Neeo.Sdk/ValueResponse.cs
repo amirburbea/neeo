@@ -5,14 +5,14 @@ namespace Neeo.Sdk;
 /// <summary>
 /// A structure containing a single value to return to the NEEO Brain.
 /// </summary>
-public readonly struct ValueResult
+public readonly struct ValueResponse
 {
     /// <summary>
-    /// Creates a new <see cref="ValueResult"/> with the specified <paramref name="value"/>.
+    /// Creates a new <see cref="ValueResponse"/> with the specified <paramref name="value"/>.
     /// </summary>
     /// <param name="value">The value to return to the NEEO Brain.</param>
     [JsonConstructor]
-    public ValueResult(object value) => this.Value = value;
+    public ValueResponse(object value) => this.Value = value;
 
     /// <summary>
     /// Gets the value to return to the NEEO Brain.
