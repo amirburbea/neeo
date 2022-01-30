@@ -6,11 +6,7 @@ using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices.Lists;
 
-public interface IListBuilder
+internal class ListMetadata
 {
-}
 
-internal sealed class ListBuilder
-{
-    public ListMetadata Metadata { get; } = new();
 }

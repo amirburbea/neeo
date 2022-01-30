@@ -6,7 +6,7 @@ namespace Neeo.Sdk.Devices.Discovery;
 /// A callback invoked by the NEEO Brain to check whether registration has been previously
 /// performed successfully.
 /// <para />
-/// If the task results to <see langword="true"/> then the NEEO Brain will skip registration.
+/// If the task result is <see langword="true"/> then the NEEO Brain will skip registration.
 /// </summary>
-/// <returns>A boolean </returns>
+/// <returns><see cref="Task"/> to indicate completion.</returns>
 public delegate Task<bool> QueryIsRegistered();
