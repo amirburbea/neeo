@@ -1,8 +1,8 @@
 ﻿using System.Threading.Tasks;
 
-namespace Neeo.Sdk.Devices.Controllers;
+namespace Neeo.Sdk.Devices.Features;
 
-public interface ISubscriptionController : IFeature
+public interface ISubscriptionFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Subscription;
 
@@ -13,15 +13,15 @@ public interface ISubscriptionController : IFeature
     Task UnsubscribeAsync(string deviceId);
 }
 
-internal sealed record class SubscriptionController : ISubscriptionController
+internal sealed record class SubscriptionFeature : ISubscriptionFeature
 {
-    private readonly DeviceSubscriptionAction _onDeviceAdded;
-    private readonly DeviceSubscriptionAction _onDeviceRemoved;
+    private readonly DeviceSubscriptionHandler _onDeviceAdded;
+    private readonly DeviceSubscriptionHandler _onDeviceRemoved;
     private readonly DeviceListInitializer _deviceListInitializer;
 
-    public SubscriptionController(
-        DeviceSubscriptionAction onDeviceAdded,
-        DeviceSubscriptionAction onDeviceRemoved,
+    public SubscriptionFeature(
+        DeviceSubscriptionHandler onDeviceAdded,
+        DeviceSubscriptionHandler onDeviceRemoved,
         DeviceListInitializer deviceListInitializer
     ) => (this._onDeviceAdded, this._onDeviceRemoved, this._deviceListInitializer) = (onDeviceAdded, onDeviceRemoved, deviceListInitializer);
 

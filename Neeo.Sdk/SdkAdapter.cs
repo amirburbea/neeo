@@ -5,6 +5,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace Neeo.Sdk;
 
+/// <summary>
+/// 
+/// </summary>
 public sealed class SdkAdapter : IAsyncDisposable, IDisposable
 {
     private IHost? _host;

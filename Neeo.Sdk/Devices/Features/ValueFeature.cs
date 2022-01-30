@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace Neeo.Sdk.Devices.Controllers;
+namespace Neeo.Sdk.Devices.Features;
 
 public interface IValueFeature : IFeature
 {
@@ -12,22 +12,22 @@ public interface IValueFeature : IFeature
     Task<SuccessResponse> SetValueAsync(string deviceId, string value);
 }
 
-internal sealed class ValueController : IValueFeature
+internal sealed class ValueFeature : IValueFeature
 {
     private readonly DeviceValueGetter<ValueResponse> _getter;
     private readonly DeviceValueSetter<string>? _setter;
 
-    private ValueController(DeviceValueGetter<ValueResponse> getter, DeviceValueSetter<string>? setter = default)
+    private ValueFeature(DeviceValueGetter<ValueResponse> getter, DeviceValueSetter<string>? setter = default)
     {
         (this._getter, this._setter) = (getter, setter);
     }
 
-    public static ValueController Create<TValue>(DeviceValueGetter<TValue> getter)
+    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter)
         where TValue : notnull => getter == null
         ? throw new ArgumentNullException(nameof(getter)) 
         : new(async deviceId => new(await getter(deviceId).ConfigureAwait(false)));
 
-    public static ValueController Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue> setter)
+    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue> setter)
         where TValue : notnull, IConvertible => (getter, setter) switch
         {
             (null, _) => throw new ArgumentNullException(nameof(getter)),

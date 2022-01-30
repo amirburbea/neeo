@@ -15,6 +15,11 @@ public interface IDeviceDatabase
 {
     IReadOnlyCollection<IDeviceAdapter> Adapters { get; }
 
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="adapterName"></param>
+    /// <returns></returns>
     ValueTask<IDeviceAdapter> GetAdapterAsync(string adapterName);
 
     IDeviceModel? GetDeviceByAdapterName(string adapterName);
@@ -44,7 +49,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         this._logger = logger;
         foreach (IDeviceBuilder device in deviceBuilders)
         {
-            IDeviceAdapter adapter = device.Build();
+            IDeviceAdapter adapter = device.BuildAdapter();
             if (device.NotifierCallback is { } callback)
             {
                 callback(new DeviceNotifier(this._notificationService, device.AdapterName, device.HasPowerStateSensor));

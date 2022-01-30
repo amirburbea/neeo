@@ -2,25 +2,24 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Controllers;
+using Neeo.Sdk.Devices.Features;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
 internal partial class DeviceController
 {
-    [HttpGet("{adapter}/subscribe/{deviceId}/{eventPrefix}")]
+    [HttpGet("{adapter}/subscribe/{deviceId}/{_}")]
     public async Task<ActionResult<SuccessResponse>> SubscribeAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
-        string deviceId, // Note that this does NOT use the DeviceIdBinder.
-        string eventPrefix
+        string deviceId // Note that this does NOT use the DeviceIdBinder.
     )
     {
-        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionController controller)
+        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
-            await controller.SubscribeAsync(deviceId);
+            await feature.SubscribeAsync(deviceId);
         }
-        this._logger.LogInformation("Device added {adapter}:{deviceId} ({eventPrefix}).", adapter.AdapterName, deviceId, eventPrefix);
-        return new SuccessResponse();
+        this._logger.LogInformation("Device added {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
+        return this.Serialize(new SuccessResponse());
     }
 
     [HttpGet("{adapter}/unsubscribe/{deviceId}")]
@@ -29,11 +28,11 @@ internal partial class DeviceController
         string deviceId // Note that this does NOT use the DeviceIdBinder.
     )
     {
-        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionController controller)
+        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
-            await controller.SubscribeAsync(deviceId);
+            await feature.SubscribeAsync(deviceId);
         }
         this._logger.LogInformation("Device removed {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
-        return new SuccessResponse();
+        return this.Serialize(new SuccessResponse());
     }
 }

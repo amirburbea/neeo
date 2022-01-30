@@ -23,7 +23,7 @@ internal sealed class ServerRegistration : IHostedService
     {
         (string adapterName, IPEndPoint brainEndPoint, string brainHostName, IPEndPoint hostEndPoint) = this._environment;
         object body = new { Name = adapterName, BaseUrl = $"http://{hostEndPoint}" };
-        for (int i = 0; i <= Constants.MaxConnectionRetries; i++)
+        for (int i = 0; i <= Constants.MaxRetries; i++)
         {
             try
             {
@@ -34,7 +34,7 @@ internal sealed class ServerRegistration : IHostedService
                 this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainIP}).", adapterName, brainHostName, brainEndPoint.Address);
                 break;
             }
-            catch (Exception) when (i != Constants.MaxConnectionRetries)
+            catch (Exception) when (i != Constants.MaxRetries)
             {
                 this._logger.LogWarning("Failed to register with brain (on attempt #{attempt}). Retrying...", i + 1);
                 continue;
@@ -65,6 +65,6 @@ internal sealed class ServerRegistration : IHostedService
 
     private static class Constants
     {
-        public const int MaxConnectionRetries = 8;
+        public const int MaxRetries = 8;
     }
 }

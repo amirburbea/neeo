@@ -5,10 +5,10 @@ namespace Neeo.Sdk.Devices.Components;
 [JsonInterfaceSerializationConverter(typeof(ISensorDetails))]
 public interface ISensorDetails
 {
-    SensorTypes Type { get; }
+    SensorType Type { get; }
 }
 
-internal record class SensorDetails(SensorTypes Type) : ISensorDetails
+internal record class SensorDetails(SensorType Type) : ISensorDetails
 {
     public const string ComponentSuffix = "_SENSOR";
 }

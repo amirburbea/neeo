@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Devices.Controllers;
+using Neeo.Sdk.Devices.Features;
 
 namespace Neeo.Sdk.Devices;
 
@@ -27,9 +27,9 @@ internal sealed class SubscriptionsNotifier : IHostedService
         List<Task> tasks = new();
         foreach (IDeviceAdapter adapter in this._database.Adapters)
         {
-            if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionController controller)
+            if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
             {
-                tasks.Add(this.NotifySubscriptionsAsync(adapter, controller, cancellationToken));
+                tasks.Add(this.NotifySubscriptionsAsync(adapter.AdapterName, feature, cancellationToken));
             }
         }
         return tasks.Count switch
@@ -40,38 +40,44 @@ internal sealed class SubscriptionsNotifier : IHostedService
         };
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    Task IHostedService.StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task NotifySubscriptionsAsync(IDeviceAdapter adapter, ISubscriptionController controller, CancellationToken cancellationToken)
+    private async Task NotifySubscriptionsAsync(string adapterName, ISubscriptionFeature feature, CancellationToken cancellationToken)
     {
+        // Ensure device driver is initialized.
+        IDeviceAdapter adapter = await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false);
         this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
         string path = string.Format(UrlPaths.SubscriptionsFormat, this._sdkAdapterName, adapter.AdapterName);
-        string[] deviceIds = await FetchSubscriptionsAsync(Constants.RetryCount).ConfigureAwait(false);
-        await controller.InitializeDeviceList(deviceIds).ConfigureAwait(false);
+        TaskCompletionSource<string[]> taskCompletionSource = new();
+        await FetchSubscriptionsAsync().ConfigureAwait(false);
+        string[] deviceIds = await taskCompletionSource.Task.ConfigureAwait(false);
+        await feature.InitializeDeviceList(deviceIds).ConfigureAwait(false);
 
-        async Task<string[]> FetchSubscriptionsAsync(int retryCount)
+        async Task FetchSubscriptionsAsync()
         {
-            try
+            for (int i = 0; !cancellationToken.IsCancellationRequested && !taskCompletionSource.Task.IsCompleted && i <= Constants.MaxRetries; i++)
             {
-                return await this._client.GetAsync<string[]>(path, cancellationToken);
-            }
-            catch (Exception e) when (retryCount > 0)
-            {
-                this._logger.LogWarning("Failed to get subscriptions ({message}) - retrying in {seconds}s.", e.Message, Constants.RetryDelayMilliseconds / 1000d);
-                await Task.Delay(Constants.RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
-                return await FetchSubscriptionsAsync(retryCount - 1);
-            }
-            catch (Exception e)
-            {
-                this._logger.LogError(e, "Failed to get subscriptions.");
-                throw;
+                try
+                {
+                    taskCompletionSource.TrySetResult(await this._client.GetAsync<string[]>(path, cancellationToken).ConfigureAwait(false));
+                }
+                catch (Exception e) when (i == Constants.MaxRetries)
+                {
+                    this._logger.LogError(e, "Failed to get subscriptions.");
+                    taskCompletionSource.TrySetException(e);
+                }
+                catch (Exception e)
+                {
+                    this._logger.LogWarning("Failed to get subscriptions ({message}) - retrying in {seconds}s.", e.Message, Constants.RetryDelayMilliseconds / 1000d);
+                    await Task.Delay(Constants.RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
+                }
             }
         }
     }
 
     private static class Constants
     {
-        public const int RetryCount = 2;
+        public const int MaxRetries = 2;
         public const int RetryDelayMilliseconds = 2500;
     }
 }

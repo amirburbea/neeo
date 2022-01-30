@@ -4,7 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Controllers;
+using Neeo.Sdk.Devices.Features;
+using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -13,11 +14,11 @@ internal sealed partial class DeviceController : ControllerBase
 {
     private readonly IDynamicDeviceRegistrar _dynamicDeviceRegistrar;
     private readonly ILogger<DeviceController> _logger;
-    private readonly IPgpService _pgp;
+    private readonly PgpKeyPair _pgpKeys;
 
-    public DeviceController(IDynamicDeviceRegistrar dynamicDeviceRegistrar, IPgpService pgp, ILogger<DeviceController> logger)
+    public DeviceController(IDynamicDeviceRegistrar dynamicDeviceRegistrar, PgpKeyPair pgpKeys, ILogger<DeviceController> logger)
     {
-        (this._dynamicDeviceRegistrar, this._pgp, this._logger) = (dynamicDeviceRegistrar, pgp, logger);
+        (this._dynamicDeviceRegistrar, this._pgpKeys, this._logger) = (dynamicDeviceRegistrar, pgpKeys, logger);
     }
 
     private sealed class AdapterBinder : ParameterBinderBase<IDeviceAdapter>

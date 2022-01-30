@@ -1,9 +1,7 @@
-﻿using System.Text.Json;
-using System.Threading.Tasks;
-using Neeo.Sdk.Utilities;
+﻿using System.Threading.Tasks;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 
-namespace Neeo.Sdk.Rest;
+namespace Neeo.Sdk.Utilities;
 
 public interface IPgpService
 {

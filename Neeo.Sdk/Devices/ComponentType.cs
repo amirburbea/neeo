@@ -9,9 +9,15 @@ namespace Neeo.Sdk.Devices;
 [JsonConverter(typeof(TextJsonConverter<ComponentType>))]
 public enum ComponentType
 {
+    /// <summary>
+    /// A component for a standard button.
+    /// </summary>
     [Text("button")]
     Button = 0,
 
+    /// <summary>
+    /// A component for a device supporting discovery, such as over a network.
+    /// </summary>
     [Text("discover")]
     Discovery,
 
@@ -23,7 +29,7 @@ public enum ComponentType
 
     [Text("imageurl")]
     ImageUrl,
-    
+
     [Text("register")]
     Registration,
 

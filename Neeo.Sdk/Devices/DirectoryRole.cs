@@ -7,8 +7,8 @@ namespace Neeo.Sdk.Devices;
 public enum DirectoryRole
 {
     [Text("ROOT")]
-    Root = 0,
+    Root = 1,
 
     [Text("QUEUE")]
-    Queue
+    Queue = 2
 }

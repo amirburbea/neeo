@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Controllers;
+﻿namespace Neeo.Sdk.Devices.Features;
 
 public interface IFeature
 {

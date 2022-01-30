@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Neeo.Sdk.Devices.Components;
-using Neeo.Sdk.Devices.Controllers;
+using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;
@@ -26,7 +26,7 @@ public interface IDeviceAdapter
 
     string Manufacturer { get; }
 
-    IDeviceSetup Setup { get; }
+    DeviceSetup Setup { get; }
 
     string? SpecificName { get; }
 
@@ -51,7 +51,7 @@ internal sealed record class DeviceAdapter(
     DeviceIconOverride? Icon,
     DeviceInitializer? Initializer,
     string Manufacturer,
-    IDeviceSetup Setup,
+    DeviceSetup Setup,
     string? SpecificName,
     DeviceTiming Timing,
     IReadOnlyCollection<string> Tokens,

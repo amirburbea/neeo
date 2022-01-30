@@ -1,19 +1,20 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
-namespace Neeo.Sdk.Devices.Controllers;
+namespace Neeo.Sdk.Devices.Features;
 
-public interface IFavoritesController : IFeature
+public interface IFavoritesFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Favorites;
 
     Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite);
 }
 
-internal sealed class FavoritesController : IFavoritesController
+internal sealed class FavoritesFeature : IFavoritesFeature
 {
     private readonly FavoritesHandler _favoritesHandler;
 
-    public FavoritesController(FavoritesHandler favoritesHandler) => this._favoritesHandler = favoritesHandler;
+    public FavoritesFeature(FavoritesHandler favoritesHandler) => this._favoritesHandler = favoritesHandler??throw new ArgumentNullException(nameof(favoritesHandler));
 
     public async Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite)
     {

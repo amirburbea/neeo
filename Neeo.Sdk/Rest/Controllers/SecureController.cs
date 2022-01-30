@@ -1,17 +1,19 @@
 ﻿using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
+using Neeo.Sdk.Utilities;
+using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
 [ApiController, Route("[controller]")]
 internal sealed class SecureController : ControllerBase
 {
-    private readonly IPgpService _pgp;
+    private readonly PgpPublicKey _publicKey;
 
-    public SecureController(IPgpService pgp) => this._pgp = pgp;
+    public SecureController(PgpKeyPair pgpKeys) => this._publicKey = pgpKeys.PublicKey;
 
     [HttpGet("pubkey")]
-    public ActionResult<PublicKeyData> GetPublicKeyData() => this.Serialize(new PublicKeyData(this._pgp.ArmoredPublicKey));
+    public ActionResult<PublicKeyResponse> GetPublicKeyData() => this.Serialize(new PublicKeyResponse(PgpMethods.GetArmoredPublicKey(this._publicKey)));
 
-    public record struct PublicKeyData([property: JsonPropertyName("publickey")] string ArmoredPublicKey);
+    public record struct PublicKeyResponse([property: JsonPropertyName("publickey")] string ArmoredPublicKey);
 }

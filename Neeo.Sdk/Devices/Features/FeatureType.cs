@@ -1,5 +1,8 @@
-﻿namespace Neeo.Sdk.Devices.Controllers;
+﻿namespace Neeo.Sdk.Devices.Features;
 
+/// <summary>
+/// 
+/// </summary>
 public enum FeatureType
 {
     Button,

@@ -3,42 +3,25 @@ using Neeo.Sdk.Devices.Discovery;
 
 namespace Neeo.Sdk.Devices;
 
-public interface IDeviceSetup
+public sealed class DeviceSetup
 {
-    bool? Discovery { get; }
+    public bool? Discovery { get; internal set; }
 
     [JsonPropertyName("introtext")]
-    string? DiscoveryDescription { get; }
+    public string? DiscoveryDescription { get; internal set; }
 
     [JsonPropertyName("introheader")]
-    string? DiscoveryHeaderText { get; }
+    public string? DiscoveryHeaderText { get; internal set; }
 
-    bool? EnableDynamicDeviceBuilder { get; }
+    public bool? EnableDynamicDeviceBuilder { get; internal set; }
 
-    bool? Registration => this.RegistrationType.HasValue ? true : default(bool?);
+    public bool? Registration => this.RegistrationType.HasValue ? true : default(bool?);
 
     [JsonPropertyName("registrationText")]
-    string? RegistrationDescription { get; }
+    public string? RegistrationDescription { get; internal set; }
 
     [JsonPropertyName("registrationHeader")]
-    string? RegistrationHeaderText { get; }
+    public string? RegistrationHeaderText { get; internal set; }
 
-    RegistrationType? RegistrationType { get; }
-}
-
-internal sealed class DeviceSetup : IDeviceSetup
-{
-    public bool? Discovery { get; set; }
-
-    public string? DiscoveryDescription { get; set; }
-
-    public string? DiscoveryHeaderText { get; set; }
-
-    public bool? EnableDynamicDeviceBuilder { get; set; }
-
-    public string? RegistrationDescription { get; set; }
-
-    public string? RegistrationHeaderText { get; set; }
-
-    public RegistrationType? RegistrationType { get; set; }
+    public RegistrationType? RegistrationType { get; internal set; }
 }

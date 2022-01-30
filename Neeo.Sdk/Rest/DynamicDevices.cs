@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Controllers;
+using Neeo.Sdk.Devices.Features;
 
 namespace Neeo.Sdk.Rest;
 
@@ -24,10 +24,6 @@ internal sealed class DynamicDevices : IDynamicDevices
 
     public DynamicDevices(ILogger<DynamicDevices> logger) => this._logger = logger;
 
-    public void RegisterDiscoveredDevice(string deviceId, IDiscoveryFeature controller)
-    {
-    }
-
     public void RegisterDiscoveredDevice(string deviceId, IDeviceAdapter adapter)
     {
         this._discoveredDynamicDevices.Add(deviceId, adapter);
@@ -41,12 +37,12 @@ internal sealed class DynamicDevices : IDynamicDevices
         {
             return true;
         }
-        if (adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature discoveryController)
+        if (adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
             this._logger.LogWarning("No discovery component found.");
             return false;
         }
-        await discoveryController.DiscoverAsync(deviceId).ConfigureAwait(false);
+        await feature.DiscoverAsync(deviceId).ConfigureAwait(false);
         return TryStore();
 
         bool TryStore()

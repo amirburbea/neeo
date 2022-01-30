@@ -1,54 +1,15 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using Neeo.Sdk.Devices.Lists;
 
 namespace Neeo.Sdk.Devices;
 
-/// <summary>
-/// A callback which is invoked in response to buttons being pressed on the NEEO remote
-/// in order to allow the driver to respond accordingly.
-/// <para />
-/// </summary>
-/// <param name="deviceId">The id associated with the device.</param>
-/// <param name="button">
-/// The name of the button being pressed.
-/// <para/>
-/// Note that <see cref="KnownButton.GetKnownButton"/> may be able to translate this into a <see cref="KnownButtons"/> enumerated value.
-/// </param>
-/// <returns><see cref="Task"/> to indicate completion.</returns>
-public delegate Task ButtonHandler(string deviceId, string button);
 
-/// <summary>
-/// A callback to be invoked to initialize the device adapter before making it available to the NEEO Brain.
-/// </summary>
-/// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DeviceInitializer();
-
-/// <summary>
-/// Callback function used on startup once the SDK can reach the Brain, this is called on startup with the current
-/// subscriptions removing the need to save them in the driver.
-/// </summary>
-/// <param name="deviceIds">Array of deviceId string for all devices of this type currently on the Brain.</param>
-/// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DeviceListInitializer(string[] deviceIds);
-
-/// <summary>
-/// 
-/// </summary>
-/// <param name="notifier"></param>
-public delegate void DeviceNotifierCallback(IDeviceNotifier notifier);
-
-/// <summary>
-/// 
-/// </summary>
-/// <param name="deviceId"></param>
-/// <returns></returns>
-public delegate Task DeviceSubscriptionAction(string deviceId);
 
 /// <summary>
 /// Callback invoked by the NEEO Brain to asynchronously get a value from a device.
 /// </summary>
-/// <typeparam name="TValue"></typeparam>
-/// <param name="deviceId"></param>
+/// <typeparam name="TValue">The type of the value to get from the device.</typeparam>
+/// <param name="deviceId">The identifier of the device.</param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
 public delegate Task<TValue> DeviceValueGetter<TValue>(string deviceId)
     where TValue : notnull;

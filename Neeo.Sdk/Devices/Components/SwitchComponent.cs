@@ -2,6 +2,9 @@
 
 namespace Neeo.Sdk.Devices.Components;
 
+/// <summary>
+/// An interface for a switch component.
+/// </summary>
 public interface ISwitchComponent : IComponent, IComponentWithAssociatedSensor
 {
 }

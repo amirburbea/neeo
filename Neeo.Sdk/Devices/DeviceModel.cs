@@ -24,13 +24,15 @@ public interface IDeviceModel : IComparable<IDeviceModel>
 
     string Name { get; }
 
-    IDeviceSetup Setup { get; }
+    DeviceSetup Setup { get; }
 
     DeviceTiming Timing { get; }
 
     string Tokens { get; }
 
     DeviceType Type { get; }
+
+    int IComparable<IDeviceModel>.CompareTo(IDeviceModel? other) => StringComparer.OrdinalIgnoreCase.Compare(this.Name, other?.Name);
 }
 
 internal sealed class DeviceModel : IDeviceModel
@@ -62,7 +64,7 @@ internal sealed class DeviceModel : IDeviceModel
 
     public string Name => this._adapter.DeviceName;
 
-    public IDeviceSetup Setup => this._adapter.Setup;
+    public DeviceSetup Setup => this._adapter.Setup;
 
     public DeviceTiming Timing => this._adapter.Timing;
 
@@ -70,7 +72,5 @@ internal sealed class DeviceModel : IDeviceModel
 
     public DeviceType Type => this._adapter.Type;
 
-    int IComparable<IDeviceModel>.CompareTo(IDeviceModel? other) => StringComparer.OrdinalIgnoreCase.Compare(this.Name, other?.Name);
-
-    internal sealed record class DeviceInfo(string Name, IReadOnlyCollection<string> Tokens, string? SpecificName, DeviceIconOverride? Icon) : IDeviceInfo;
+    public record struct DeviceInfo(string Name, IReadOnlyCollection<string> Tokens, string? SpecificName, DeviceIconOverride? Icon) : IDeviceInfo;
 }

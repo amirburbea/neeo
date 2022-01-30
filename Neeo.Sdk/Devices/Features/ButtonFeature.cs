@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace Neeo.Sdk.Devices.Controllers;
+namespace Neeo.Sdk.Devices.Features;
 
 public interface IButtonFeature : IFeature
 {

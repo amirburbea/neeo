@@ -13,4 +13,4 @@ public interface IRangeSensorDetails : ISensorDetails
 internal sealed record class RangeSensorDetails(
     IReadOnlyCollection<double> Range, 
     string Unit
-) : SensorDetails(SensorTypes.Range), IRangeSensorDetails;
+) : SensorDetails(SensorType.Range), IRangeSensorDetails;

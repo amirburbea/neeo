@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Discovery;
 
-namespace Neeo.Sdk.Devices.Controllers;
+namespace Neeo.Sdk.Devices.Features;
 
 public interface IDiscoveryFeature : IFeature
 {
@@ -22,8 +22,7 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
 
     public DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder)
     {
-        this._process = process;
-        this.EnableDynamicDeviceBuilder = enableDynamicDeviceBuilder;
+        (this._process, this.EnableDynamicDeviceBuilder) = (process??throw new ArgumentNullException(nameof(process)), enableDynamicDeviceBuilder);
     }
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId)

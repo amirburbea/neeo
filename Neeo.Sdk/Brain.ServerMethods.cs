@@ -14,7 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Controllers;
 using Neeo.Sdk.Json;
 using Neeo.Sdk.Notifications;
 using Neeo.Sdk.Rest;
@@ -24,7 +23,6 @@ namespace Neeo.Sdk;
 
 public partial class Brain
 {
-
     /// <summary>
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
@@ -114,7 +112,7 @@ public partial class Brain
                 .AddSingleton<IDynamicDeviceRegistrar, DynamicDevices>()
                 .AddSingleton<INotificationMapping, NotificationMapping>()
                 .AddSingleton<INotificationService, NotificationService>()
-                .AddSingleton<IPgpService, PgpService>();
+                .AddSingleton(PgpMethods.CreatePgpKeys());
 
             // Startup and shut down tasks.
             services

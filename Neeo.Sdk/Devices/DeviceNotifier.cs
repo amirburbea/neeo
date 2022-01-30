@@ -19,22 +19,24 @@ public interface IDeviceNotifier
     bool SupportsPowerNotifications { get; }
 
     /// <summary>
-    /// 
+    /// Sends a notification to the NEEO Brain that the <paramref name="value"/> of a component
+    /// has changed on a device with the given <paramref name="uniqueDeviceId"/>.
     /// </summary>
-    /// <param name="componentName"></param>
-    /// <param name="value"></param>
-    /// <param name="uniqueDeviceId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
+    /// <param name="componentName">The name of the component on which to register the change.</param>
+    /// <param name="value">The updated value.</param>
+    /// <param name="uniqueDeviceId">The unique identifier of the device. Typically, this will be &quot;default&quot; for most (but not all) drivers.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns><see cref="Task"/> to indicate completion.</returns>
     Task SendNotificationAsync(string componentName, object value, string uniqueDeviceId = "default", CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 
+    /// Sends a notification to the NEEO Brain that the power state
+    /// has changed on a device with the given <paramref name="uniqueDeviceId"/>.
     /// </summary>
-    /// <param name="powerState"></param>
-    /// <param name="uniqueDeviceId"></param>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
+    /// <param name="powerState">The power state (where <see langword="true"/> indicates power on).</param>
+    /// <param name="uniqueDeviceId">The unique identifier of the device. Typically, this will be &quot;default&quot; for most (but not all) drivers.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns><see cref="Task"/> to indicate completion.</returns>
     Task SendPowerNotificationAsync(bool powerState, string uniqueDeviceId = "default", CancellationToken cancellationToken = default);
 }
 
@@ -44,10 +46,10 @@ internal sealed class DeviceNotifier : IDeviceNotifier
     private readonly INotificationService _notificationService;
 
     public DeviceNotifier(
-        INotificationService notificationService, 
-        string deviceAdapterName, 
+        INotificationService notificationService,
+        string deviceAdapterName,
         bool supportsPowerNotifications
-    ) =>  (this._notificationService, this._deviceAdapterName, this.SupportsPowerNotifications) = (notificationService, deviceAdapterName, supportsPowerNotifications);
+    ) => (this._notificationService, this._deviceAdapterName, this.SupportsPowerNotifications) = (notificationService, deviceAdapterName, supportsPowerNotifications);
 
     public bool SupportsPowerNotifications { get; }
 

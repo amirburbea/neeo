@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Discovery;
 
-namespace Neeo.Sdk.Devices.Controllers;
+namespace Neeo.Sdk.Devices.Features;
 
 public interface IRegistrationFeature : IFeature
 {

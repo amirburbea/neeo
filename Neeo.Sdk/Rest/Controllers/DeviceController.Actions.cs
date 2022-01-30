@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Controllers;
+using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Json;
 
 namespace Neeo.Sdk.Rest.Controllers;
@@ -26,8 +26,8 @@ internal partial class DeviceController
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature.Type switch
         {
-            FeatureType.Button => this.Ok(await ((IButtonFeature)feature).TriggerAsync(deviceId)), // SuccessResponse,
-            FeatureType.Value => this.Ok(await ((IValueFeature)feature).GetValueAsync(deviceId)), // ValueResponse
+            FeatureType.Button => this.Serialize(await ((IButtonFeature)feature).TriggerAsync(deviceId)), // SuccessResponse,
+            FeatureType.Value => this.Serialize(await ((IValueFeature)feature).GetValueAsync(deviceId)), // ValueResponse
             _ => this.BadRequest()
         };
     }
@@ -37,7 +37,7 @@ internal partial class DeviceController
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
         [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
-        [FromBody] object value
+        [FromBody] JsonElement parameters
     )
     {
         if (!this.TryGetFeature(adapter, componentName, out IFeature? feature))
@@ -47,8 +47,8 @@ internal partial class DeviceController
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature.Type switch
         {
-            FeatureType.Favorites when value is JsonElement element => this.Ok(await ((IFavoritesController)feature).ExecuteAsync(deviceId, element.Deserialize<FavoriteData>().FavoriteId)),
-            FeatureType.Directory => throw new NotImplementedException(),
+            FeatureType.Favorites => this.Serialize(await ((IFavoritesFeature)feature).ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
+            FeatureType.Directory => this.Serialize(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>())),
             _ => this.BadRequest()
         };
     }
@@ -66,7 +66,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Perform directory action {action} on {name}:{id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
-        return this.Ok(await feature.PerformActionAsync(deviceId, action.ActionIdentifier));
+        return this.Serialize(await feature.PerformActionAsync(deviceId, action.ActionIdentifier));
     }
 
     [HttpGet("{adapter}/{componentName}/{deviceId}/{value}")]
@@ -82,20 +82,20 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Set {component} value to {value} on {name}:{id}", componentName, value, adapter.DeviceName, deviceId);
-        return this.Ok(await feature.SetValueAsync(deviceId, value));
+        return this.Serialize(await feature.SetValueAsync(deviceId, value));
     }
 
     private bool TryGetFeature<TFeature>(IDeviceAdapter adapter, string componentName, [NotNullWhen(true)] out TFeature? feature)
         where TFeature : IFeature
     {
-        if (this.HttpContext.GetItem<IFeature>() is not { } item)
+        if (this.HttpContext.GetItem<IFeature>() is TFeature item)
         {
-            this._logger.LogError("Can not perform action as the component ({component}) was not found on '{device}'.", componentName, adapter.DeviceName);
-            feature = default;
-            return false;
+            feature = item;
+            return true;
         }
-        feature = (TFeature)item;
-        return true;
+        this._logger.LogError("Can not perform action as the component ({component}) was not found on '{device}'.", componentName, adapter.DeviceName);
+        feature = default;
+        return false;
     }
 
     public record struct ActionData(string ActionIdentifier);
