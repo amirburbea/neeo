@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -30,17 +32,13 @@ internal static class ControllerMethods
 
         public async Task WriteAsync(OutputFormatterWriteContext context)
         {
+            HttpContext httpContext = context.HttpContext;
             try
             {
-                if (context.ObjectType == typeof(Devices.Lists.IListBuilder))
-                {
-                    string text = JsonSerializer.Serialize(context.Object, context.ObjectType ?? typeof(object), JsonSerialization.Options);
-                }
-
-                await JsonSerializer.SerializeAsync(context.HttpContext.Response.Body, context.Object, context.ObjectType ?? typeof(object), JsonSerialization.Options, context.HttpContext.RequestAborted).ConfigureAwait(false);
-                await context.HttpContext.Response.Body.FlushAsync(context.HttpContext.RequestAborted).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(httpContext.Response.Body, context.Object, context.ObjectType ?? typeof(object), JsonSerialization.Options, httpContext.RequestAborted).ConfigureAwait(false);
+                await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (context.HttpContext.RequestAborted.IsCancellationRequested) { }
+            catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested) { }
         }
     }
 }

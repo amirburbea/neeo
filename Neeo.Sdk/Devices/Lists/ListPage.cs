@@ -2,14 +2,16 @@
 
 public sealed class ListPage
 {
-    internal ListPage(string? browseIdentifier, int limit, int offset)
+    private readonly IListBuilder _list;
+
+    internal ListPage(IListBuilder list, int limit, int offset)
     {
-        this.BrowseIdentifier = browseIdentifier;
+        this._list = list;
         this.Limit = limit;
         this.Offset = offset;
     }
 
-    public string? BrowseIdentifier { get; }
+    public string? BrowseIdentifier => this._list.BrowseIdentifier;
 
     public int Limit { get; }
 

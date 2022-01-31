@@ -14,37 +14,59 @@ public class FileBrowserDeviceProvider : IDeviceProvider
 {
     public IDeviceBuilder ProvideDevice()
     {
-        return Device.Create("Directory Browser", DeviceType.TV)
+        return Device.Create("HOLYSHIT.cs", DeviceType.TV)
             .AddAdditionalSearchTokens("WTF")
             .AddButtons(KnownButtons.InputHdmi1)
+            .SetSpecificName("HOLYSHIT.cs")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
             .AddButtonHandler((_, __) => Task.CompletedTask)
-            .AddDirectory("Files", "PC Files", identifier: default, role: default, populator: Browse, actionHandler: OnDirectoryAction);
+            .AddDirectory("BROWSE_DIRECTORY", "HOLYSHIT.cs", identifier: "Drive", role: DirectoryRole.Root, populator: Browse, actionHandler: OnDirectoryAction);
     }
 
     private Task Browse(string deviceId, IListBuilder builder)
     {
-        int offset = builder.Parameters.Offset??0;
+        string? browseIdentifier = builder.Parameters.BrowseIdentifier;
+
+
+
+
+
+        int offset = builder.Parameters.Offset ?? 0;
         int limit = builder.Parameters.Limit;
-        if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
+        if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier ))
         {
             builder.SetTitle("Drives").AddHeader(new("Drives"));
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
-                builder.AddEntry(new(drive.Name.TrimEnd('\\'), drive.Name.Replace('\\', '/')));
+                builder.AddEntry(new(drive.Name.TrimEnd('\\'), drive.Name.Replace('\\', '/').TrimEnd('/')));
             }
         }
         else
         {
-            string root = builder.Parameters.BrowseIdentifier;
-            builder.SetTitle(root);
+            string root = builder.Parameters.BrowseIdentifier + '/';
+            builder.SetTitle(root).AddHeader(new("Browse Folders"));
             if (offset == 0)
             {
-                builder.AddEntry(new("Close", null, "CLOSE", null, null, ListUIAction.Close));
-                builder.AddEntry(new("Go Back", null, "GOBACK", null, null, ListUIAction.GoBack));
+                builder.AddTileRow(new(new ListTile[]
+                {
+                    new ListTile("https://neeo-sdk.neeo.io/puppy.jpg", "puppy"),
+                    new ListTile("https://neeo-sdk.neeo.io/kitten.jpg", "kitten"),
+                })).AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"));
 
-                //builder
-                //    .AddEntry(new("CLOSE", null, null, null, null, uiAction: root.Length == 3 ? ListUIAction.Close : ListUIAction.GoBack));
+
+
+
+
+                builder.AddEntry(new("Reload the list!", null, "SOMETHING_RELOAD", null, null, ListUIAction.Reload));
+                builder.AddEntry(new("Go back to the root!", null, "SOMETHING_ROOT", null, null, ListUIAction.GoToRoot));
+                builder.AddEntry(new("Go back one step!", null, "SOMETHING_GOBACK", null, null, ListUIAction.GoBack));
+                builder.AddEntry(new("Close the list!", null, "SOMETHING_CLOSE", null, null, ListUIAction.Close));
+
+                builder.AddButtonRow(new(new ListButton[] {
+                    new ListButton("Not inverted","ABC"),
+                    new ListButton("Inverted","GOB",inverse:true, uiAction: ListUIAction.GoBack)
+
+                })); 
                 Console.WriteLine(JsonSerializer.Serialize(builder, JsonSerialization.Options));
             }
             try
@@ -59,14 +81,34 @@ public class FileBrowserDeviceProvider : IDeviceProvider
             catch (Exception e)
             {
                 builder.AddInfoItem(new("Error Occurred", e.Message, "CLOSE", "DON'T CARE"));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             }
         }
+
+
+
+
         return Task.CompletedTask;
     }
 
     private IEnumerable<ListEntry> GetEntries(string directory)
     {
-        foreach (string path in Directory.EnumerateFileSystemEntries(directory).Select(p => p.Replace('\\', '/')))
+        foreach (string path in Directory.EnumerateFileSystemEntries(directory).Select(p => p.Replace('\\', '/').TrimEnd('/')))
         {
             string title = Path.GetFileName(path);
             bool isDirectory = (File.GetAttributes(path) & FileAttributes.Directory) == FileAttributes.Directory;

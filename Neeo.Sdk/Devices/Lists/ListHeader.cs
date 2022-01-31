@@ -5,7 +5,7 @@ public sealed class ListHeader : ListItemBase
     public ListHeader(string title)
         : base(ListItemType.Header)
     {
-        this.Title = Validator.ValidateString(title, maxLength: 255);
+        this.Title = Validator.ValidateText(title, maxLength: 255);
     }
 
     /// <summary>

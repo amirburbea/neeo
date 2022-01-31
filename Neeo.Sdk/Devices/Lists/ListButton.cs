@@ -19,13 +19,17 @@ public enum ListButtonIcon
 
 public sealed class ListButton
 {
-    public ListButton(string title, string actionIdentifier, bool? inverse = default, ListButtonIcon? icon = default)
+    public ListButton(string title, string actionIdentifier, bool? inverse = default, ListButtonIcon? icon = default, ListUIAction? uiAction = default)
     {
-        this.Title = Validator.ValidateString(title, maxLength: 255);
+        this.Title = Validator.ValidateText(title, maxLength: 255);
         this.Icon = icon;
         this.Inverse = inverse;
         this.ActionIdentifier = actionIdentifier;
+        this.UIAction = uiAction;
     }
+
+    [JsonPropertyName("uiAction")]
+    public ListUIAction? UIAction { get; }
 
     public string ActionIdentifier { get; }
 

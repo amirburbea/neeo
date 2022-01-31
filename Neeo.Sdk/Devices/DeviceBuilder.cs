@@ -325,7 +325,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     internal DeviceBuilder(string name, DeviceType type, string? prefix)
     {
-        (this.Type, this.Name) = (type, Validator.ValidateString(name));
+        (this.Type, this.Name) = (type, Validator.ValidateText(name));
         this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name, prefix)}";
     }
 
@@ -543,8 +543,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private DeviceBuilder AddButton(string name, string? label = default)
     {
         ButtonConstruct definition = new(
-            Validator.ValidateString(name),
-            Validator.ValidateString(label, allowNull: true)
+            Validator.ValidateText(name),
+            Validator.ValidateText(label, allowNull: true)
         );
         if (!this.Buttons.TryAdd(name, definition))
         {
@@ -587,9 +587,9 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new InvalidOperationException($"Directory with role {role} already defined.");
         }
         DirectoryConstruct definition = new(
-           Validator.ValidateString(name),
-           Validator.ValidateString(label, allowNull: true),
-           Validator.ValidateString(identifier, allowNull: true),
+           Validator.ValidateText(name),
+           Validator.ValidateText(label, allowNull: true),
+           Validator.ValidateText(identifier, allowNull: true),
            role,
            new(populator ?? throw new ArgumentNullException(nameof(populator)), actionHandler ?? throw new ArgumentNullException(nameof(actionHandler)))
         );
@@ -603,8 +603,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, string? uri, DeviceValueGetter<string>? getter)
     {
         ImageUrlConstruct definition = new(
-            Validator.ValidateString(name),
-            Validator.ValidateString(label, allowNull: true),
+            Validator.ValidateText(name),
+            Validator.ValidateText(label, allowNull: true),
             ValueFeature.Create((getter, uri) switch
             {
                 (null, null) => throw new InvalidOperationException($"Either {nameof(uri)} or {nameof(getter)} must be specified."),
@@ -644,8 +644,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         SensorConstruct definition = new(
             type,
-            Validator.ValidateString(name),
-            Validator.ValidateString(label, allowNull: true),
+            Validator.ValidateText(name),
+            Validator.ValidateText(label, allowNull: true),
             controller
         );
         if (!this.Sensors.TryAdd(name, definition))
@@ -666,11 +666,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
         }
         RangeSensorConstruct definition = new(
-            Validator.ValidateString(name),
-            Validator.ValidateString(label, allowNull: true),
+            Validator.ValidateText(name),
+            Validator.ValidateText(label, allowNull: true),
             ValueFeature.Create(getter),
             Validator.ValidateRange(rangeLow, rangeHigh),
-            Validator.ValidateString(unit)
+            Validator.ValidateText(unit)
         );
         if (!this.Sensors.TryAdd(name, definition))
         {
@@ -682,11 +682,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private DeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow, double rangeHigh, string unit)
     {
         SliderConstruct definition = new(
-            Validator.ValidateString(name),
-            Validator.ValidateString(label, allowNull: true),
+            Validator.ValidateText(name),
+            Validator.ValidateText(label, allowNull: true),
             ValueFeature.Create(getter, setter),
             Validator.ValidateRange(rangeLow, rangeHigh),
-            Validator.ValidateString(unit)
+            Validator.ValidateText(unit)
         );
         if (!this.Sliders.TryAdd(name, definition))
         {
@@ -698,8 +698,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
     {
         SwitchConstruct definition = new(
-            Validator.ValidateString(name),
-            Validator.ValidateString(label, allowNull: true),
+            Validator.ValidateText(name),
+            Validator.ValidateText(label, allowNull: true),
             ValueFeature.Create(getter, setter)
         );
         if (!this.Switches.TryAdd(name, definition))
@@ -712,8 +712,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private DeviceBuilder AddTextLabel(string name, string? label, bool? isLabelVisible, DeviceValueGetter<string> getter)
     {
         TextLabelConstruct definition = new(
-            Validator.ValidateString(name),
-            Validator.ValidateString(label, allowNull: true),
+            Validator.ValidateText(name),
+            Validator.ValidateText(label, allowNull: true),
             ValueFeature.Create(getter),
             isLabelVisible
         );
@@ -945,8 +945,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new InvalidOperationException("Discovery is already defined.");
         }
-        this.Setup.DiscoveryHeaderText = Validator.ValidateString(headerText, maxLength: 255);
-        this.Setup.DiscoveryDescription = Validator.ValidateString(description, maxLength: 255);
+        this.Setup.DiscoveryHeaderText = Validator.ValidateText(headerText, maxLength: 255);
+        this.Setup.DiscoveryDescription = Validator.ValidateText(description, maxLength: 255);
         this.Setup.Discovery = true;
         this.Setup.EnableDynamicDeviceBuilder = enableDynamicDeviceBuilder;
         this.DiscoveryFeature = new DiscoveryFeature(process, enableDynamicDeviceBuilder);
@@ -974,8 +974,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new InvalidOperationException("Registration is already defined.");
         }
-        this.Setup.RegistrationHeaderText = Validator.ValidateString(headerText, maxLength: 255);
-        this.Setup.RegistrationDescription = Validator.ValidateString(description, maxLength: 255);
+        this.Setup.RegistrationHeaderText = Validator.ValidateText(headerText, maxLength: 255);
+        this.Setup.RegistrationDescription = Validator.ValidateText(description, maxLength: 255);
         this.Setup.RegistrationType = type;
         this.RegistrationFeature = new(queryIsRegistered, type, element => processor(element.Deserialize<TPayload>(JsonSerialization.Options)!));
         return this;
@@ -1033,13 +1033,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private DeviceBuilder SetManufacturer(string manufacturer)
     {
-        Validator.ValidateString(this.Manufacturer = manufacturer);
+        Validator.ValidateText(this.Manufacturer = manufacturer);
         return this;
     }
 
     private DeviceBuilder SetSpecificName(string? specificName)
     {
-        Validator.ValidateString(this.SpecificName = specificName, allowNull: true);
+        Validator.ValidateText(this.SpecificName = specificName, allowNull: true);
         return this;
     }
 

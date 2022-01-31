@@ -2,10 +2,11 @@
 
 public sealed class ListMetadata
 {
-    internal ListMetadata(int totalItems, int? totalMatchingItems, ListPage current, ListPage? previous, ListPage? next)
+    private readonly IListBuilder _list;
+
+    internal ListMetadata(IListBuilder list, ListPage current, ListPage? previous, ListPage? next)
     {
-        this.TotalItems = totalItems;
-        this.TotalMatchingItems = totalMatchingItems;
+        this._list = list;
         this.Current = current;
         this.Previous = previous;
         this.Next = next;
@@ -17,7 +18,7 @@ public sealed class ListMetadata
 
     public ListPage? Previous { get; }
 
-    public int TotalItems { get; }
+    public int TotalItems => this._list.Items.Count;
 
-    public int? TotalMatchingItems { get; }
+    public int? TotalMatchingItems => this._list.TotalMatchingItems;
 }
