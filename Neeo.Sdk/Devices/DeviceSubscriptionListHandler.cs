@@ -8,4 +8,4 @@ namespace Neeo.Sdk.Devices;
 /// </summary>
 /// <param name="deviceIds">Array of deviceId string for all devices of this type currently on the Brain.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DeviceListInitializer(string[] deviceIds);
+public delegate Task DeviceSubscriptionListHandler(string[] deviceIds);

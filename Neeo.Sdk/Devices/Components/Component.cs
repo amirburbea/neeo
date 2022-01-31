@@ -5,7 +5,7 @@ namespace Neeo.Sdk.Devices.Components;
 /// <summary>
 /// Interface for a device component.
 /// </summary>
-[JsonInterfaceSerializationConverter(typeof(IComponent))]
+[JsonDirectSerialization(typeof(IComponent))]
 public interface IComponent
 {
     /// <summary>

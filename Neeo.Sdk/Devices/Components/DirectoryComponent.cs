@@ -2,7 +2,7 @@
 
 public interface IDirectoryComponent : IComponent
 {
-    string Identifier { get; }
+    string? Identifier { get; }
 
     DirectoryRole? Role { get; }
 }
@@ -11,6 +11,6 @@ internal sealed record DirectoryComponent(
     string Name,
     string Label,
     string Path,
-    string Identifier,
+    string? Identifier,
     DirectoryRole? Role
 ) : Component(ComponentType.Directory, Name, Label, Path), IDirectoryComponent;

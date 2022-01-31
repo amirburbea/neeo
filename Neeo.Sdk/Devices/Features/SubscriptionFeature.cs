@@ -17,12 +17,12 @@ internal sealed record class SubscriptionFeature : ISubscriptionFeature
 {
     private readonly DeviceSubscriptionHandler _onDeviceAdded;
     private readonly DeviceSubscriptionHandler _onDeviceRemoved;
-    private readonly DeviceListInitializer _deviceListInitializer;
+    private readonly DeviceSubscriptionListHandler _deviceListInitializer;
 
     public SubscriptionFeature(
         DeviceSubscriptionHandler onDeviceAdded,
         DeviceSubscriptionHandler onDeviceRemoved,
-        DeviceListInitializer deviceListInitializer
+        DeviceSubscriptionListHandler deviceListInitializer
     ) => (this._onDeviceAdded, this._onDeviceRemoved, this._deviceListInitializer) = (onDeviceAdded, onDeviceRemoved, deviceListInitializer);
 
     public Task InitializeDeviceList(string[] deviceIds) => this._deviceListInitializer(deviceIds);

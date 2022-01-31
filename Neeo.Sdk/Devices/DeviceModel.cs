@@ -16,7 +16,7 @@ public interface IDeviceModel : IComparable<IDeviceModel>
 
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; }
 
-    uint DriverVersion { get; }
+    int DriverVersion { get; }
 
     int Id { get; }
 
@@ -56,7 +56,7 @@ internal sealed class DeviceModel : IDeviceModel
 
     public IReadOnlyCollection<DeviceCapability> DeviceCapabilities => this._adapter.DeviceCapabilities;
 
-    public uint DriverVersion => this._adapter.DriverVersion ?? 0;
+    public int DriverVersion => this._adapter.DriverVersion ?? 0;
 
     public int Id { get; }
 

@@ -2,7 +2,7 @@
 
 namespace Neeo.Sdk.Devices.Components;
 
-[JsonInterfaceSerializationConverter(typeof(IComponent))]
+[JsonDirectSerialization(typeof(IComponent))]
 public interface ISliderComponent : IComponent
 {
     ISliderDetails Slider { get; }

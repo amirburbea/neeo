@@ -14,8 +14,18 @@ internal static class Validator
         ? throw new ValidationException($"{name} must be less than or equal to {Constants.MaxDelay}.")
         : value;
 
+    public static int ValidateNotNegative(
+        int value,
+        [CallerArgumentExpression("value")] string name = ""
+    ) => value > 0 ? value : throw new ValidationException($"Value for {name} must not be negative.");
+
+    public static int? ValidateNotNegative(
+        int? value,
+        [CallerArgumentExpression("value")] string name = ""
+    ) => !value.HasValue ? null : Validator.ValidateNotNegative(value.Value, name);
+
     public static double[] ValidateRange(
-        double low,
+            double low,
         double high
     ) => double.IsNaN(low) || double.IsNaN(high) || double.IsInfinity(low) || double.IsInfinity(high) || low >= high
         ? throw new ValidationException("Range low must be less than range high and neither value can be infinity or NaN.")
@@ -35,16 +45,17 @@ internal static class Validator
         _ => text
     };
 
-    public sealed class ValidationException : Exception
-    {
-        internal ValidationException(string message)
-            : base(message)
-        {
-        }
-    }
 
     private static class Constants
     {
         public const int MaxDelay = 60 * 1000;
+    }
+}
+
+public sealed class ValidationException : Exception
+{
+    internal ValidationException(string message)
+        : base(message)
+    {
     }
 }

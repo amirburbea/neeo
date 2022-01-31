@@ -7,7 +7,7 @@ public interface IDirectoryFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Directory;
 
-    Task<IListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters);
+    Task<IListBuilder> BrowseAsync(string deviceId, ListParameters parameters);
 
     Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier);
 }
@@ -15,14 +15,19 @@ public interface IDirectoryFeature : IFeature
 internal sealed class DirectoryFeature : IDirectoryFeature
 {
     private readonly DirectoryActionHandler _actionHandler;
-    private readonly DeviceDirectoryBrowser _browser;
+    private readonly DeviceDirectoryPopulator _populator;
 
-    public DirectoryFeature(DeviceDirectoryBrowser browser, DirectoryActionHandler actionHandler)
+    public DirectoryFeature(DeviceDirectoryPopulator populator, DirectoryActionHandler actionHandler)
     {
-        (this._browser, this._actionHandler) = (browser, actionHandler);
+        (this._populator, this._actionHandler) = (populator, actionHandler);
     }
 
-    public Task<IListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters) => this._browser(deviceId, parameters);
+    public async Task<IListBuilder> BrowseAsync(string deviceId, ListParameters parameters)
+    {
+        ListBuilder builder = new(parameters);
+        await this._populator(deviceId, builder).ConfigureAwait(false);
+        return builder;
+    }
 
     public async Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier)
     {

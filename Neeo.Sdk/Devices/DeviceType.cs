@@ -100,3 +100,51 @@ public enum DeviceType
     Tuner,
 }
 
+/// <summary>
+/// Static extension methods for the <see cref="DeviceType"/> enumerated type.
+/// </summary>
+public static class DeviceTypes
+{
+    /// <summary>
+    /// Gets a value indicating if the specified device <paramref name="type"/> requires specifying at least one input command.
+    /// </summary>
+    /// <param name="type">The type of the device.</param>
+    /// <returns>Boolean value.</returns>
+    public static bool RequiresInput(this DeviceType type) => type 
+        is DeviceType.AVReceiver
+        or DeviceType.HdmiSwitch 
+        or DeviceType.Projector 
+        or DeviceType.SoundBar 
+        or DeviceType.TV;
+
+    /// <summary>
+    /// Gets a value indicating if the specified device <paramref name="type"/> supports favorites
+    /// (limited to <see cref="DeviceType.SetTopBox"/>, <see cref="DeviceType.Tuner"/> and <see cref="DeviceType.TV"/>).
+    /// </summary>
+    /// <param name="type">The type of the device.</param>
+    /// <returns>Boolean value.</returns>
+    public static bool SupportsFavorites(this DeviceType type) => type 
+        is DeviceType.SetTopBox 
+        or DeviceType.Tuner 
+        or DeviceType.TV;
+
+    /// <summary>
+    /// Gets a value indicating if the specified device <paramref name="type"/> supports the player widgets
+    /// (limited to <see cref="DeviceType.MediaPlayer"/>, <see cref="DeviceType.MusicPlayer"/>
+    /// and <see cref="DeviceType.VideoOnDemand"/>).
+    /// </summary>
+    /// <param name="type">The type of the device.</param>
+    /// <returns>Boolean value.</returns>
+    public static bool SupportsPlayerWidget(this DeviceType type) => type 
+        is DeviceType.MediaPlayer 
+        or DeviceType.MusicPlayer 
+        or DeviceType.VideoOnDemand;
+
+    /// <summary>
+    /// Gets a value indicating if the specified device <paramref name="type"/> supports timing -
+    /// the delays the NEEO Brain should use when interacting with the device.
+    /// </summary>
+    /// <param name="type">The type of the device.</param>
+    /// <returns>Boolean value.</returns>
+    public static bool SupportsTiming(this DeviceType type) => type is not DeviceType.Accessory and not DeviceType.Light;
+}

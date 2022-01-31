@@ -39,7 +39,7 @@ internal class MainWindowViewModel : NotifierBase
         await this._adapter.DisposeAsync();
     }
 
-    private IDeviceBuilder CreateDeviceBuilder() => CreateDevice("Example Device", DeviceType.TV)
+    private IDeviceBuilder CreateDeviceBuilder() => Create("Example Device", DeviceType.TV)
         .AddAdditionalSearchTokens("WPF")
         .SetManufacturer("Amir")
         .SetIcon(DeviceIconOverride.Neeo)

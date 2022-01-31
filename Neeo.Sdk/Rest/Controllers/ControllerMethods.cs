@@ -10,9 +10,9 @@ namespace Neeo.Sdk.Rest.Controllers;
 
 internal static class ControllerMethods
 {
-    public static ActionResult<TValue> Serialize<TValue>(this ControllerBase controller, [ActionResultObjectValue] TValue value)
+    public static OkObjectResult Serialize<TValue>(this ControllerBase controller, [ActionResultObjectValue] TValue value)
     {
-        ObjectResult result = controller.Ok(value);
+        OkObjectResult result = controller.Ok(value);
         result.DeclaredType = typeof(TValue);
         result.Formatters.Add(JsonOutputFormatter.Instance);
         return result;
@@ -32,6 +32,11 @@ internal static class ControllerMethods
         {
             try
             {
+                if (context.ObjectType == typeof(Devices.Lists.IListBuilder))
+                {
+                    string text = JsonSerializer.Serialize(context.Object, context.ObjectType ?? typeof(object), JsonSerialization.Options);
+                }
+
                 await JsonSerializer.SerializeAsync(context.HttpContext.Response.Body, context.Object, context.ObjectType ?? typeof(object), JsonSerialization.Options, context.HttpContext.RequestAborted).ConfigureAwait(false);
                 await context.HttpContext.Response.Body.FlushAsync(context.HttpContext.RequestAborted).ConfigureAwait(false);
             }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Devices.Lists;
 using Neeo.Sdk.Json;
 
 namespace Neeo.Sdk.Rest.Controllers;
@@ -33,7 +34,7 @@ internal partial class DeviceController
     }
 
     [HttpPost("{adapter}/{componentName}/{deviceId}")]
-    public async Task<ActionResult<object>> GetValueAsync(
+    public async Task<ActionResult> GetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
         [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
@@ -45,15 +46,26 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
+        //return feature.Type switch
+        //{
+        //    FeatureType.Favorites => this.Serialize(await ((IFavoritesFeature)feature).ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
+        //    FeatureType.Directory => this.Serialize(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<ListParameters>())),
+        //    _ => this.BadRequest()
+        //};
+        if (feature.Type == FeatureType.Directory)
+        {
+            System.Diagnostics.Debug.WriteLine(parameters.ToString());
+            return this.Serialize(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<ListParameters>()));
+        }
         return feature.Type switch
         {
             FeatureType.Favorites => this.Serialize(await ((IFavoritesFeature)feature).ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
-            FeatureType.Directory => this.Serialize(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>())),
+            FeatureType.Directory => this.Serialize(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<ListParameters>())),
             _ => this.BadRequest()
         };
     }
 
-    [HttpPost("{adapter}/{componentName}/{deviceId}/action")]
+        [HttpPost("{adapter}/{componentName}/{deviceId}/action")]
     public async Task<ActionResult<SuccessResponse>> PerformActionAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,

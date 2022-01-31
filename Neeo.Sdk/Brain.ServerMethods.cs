@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -141,6 +142,13 @@ public partial class Brain
     {
         public static readonly ControllerFeatureProvider Instance = new AssemblyControllerFeatureProvider();
 
-        protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
+        protected override bool IsController(TypeInfo info)
+        {
+            if (info.Assembly != this.GetType().Assembly && (info.Assembly.FullName?.Contains("Remote.Demo")??false))
+            {
+                Debugger.Break();
+            }
+            return info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
+        }
     }
 }

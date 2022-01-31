@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Text.Json.Serialization;
 using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Utilities;
@@ -10,15 +9,15 @@ public interface IDeviceAdapter
 {
     string AdapterName { get; }
 
-    IReadOnlyDictionary<string, IFeature> Features { get; }
-
     IReadOnlyCollection<IComponent> Components { get; }
 
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; }
 
     string DeviceName { get; }
 
-    uint? DriverVersion { get; }
+    int? DriverVersion { get; }
+
+    IReadOnlyDictionary<string, IFeature> Features { get; }
 
     DeviceIconOverride? Icon { get; }
 
@@ -47,7 +46,7 @@ internal sealed record class DeviceAdapter(
     IReadOnlyDictionary<string, IFeature> Features,
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities,
     string DeviceName,
-    uint? DriverVersion,
+    int? DriverVersion,
     DeviceIconOverride? Icon,
     DeviceInitializer? Initializer,
     string Manufacturer,

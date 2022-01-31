@@ -13,7 +13,7 @@ public class DiscoveryExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder ProvideDevice()
     {
-        return Device.CreateDevice("Security Code Example", DeviceType.Accessory)
+        return Device.Create("Security Code Example", DeviceType.Accessory)
             .SetManufacturer("NEEO")
             .AddAdditionalSearchTokens("SDK")
             .AddTextLabel("the-answer", "The answer is", true, GetLabelValue)

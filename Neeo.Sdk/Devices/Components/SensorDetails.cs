@@ -2,7 +2,7 @@
 
 namespace Neeo.Sdk.Devices.Components;
 
-[JsonInterfaceSerializationConverter(typeof(ISensorDetails))]
+[JsonDirectSerialization(typeof(ISensorDetails))]
 public interface ISensorDetails
 {
     SensorType Type { get; }
