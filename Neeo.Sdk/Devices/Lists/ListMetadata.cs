@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Sdk.Devices.Lists;
 
-public sealed class ListMetadata
+public readonly struct ListMetadata
 {
     private readonly IListBuilder _list;
 

@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Sdk.Devices.Lists;
 
-public sealed class ListPage
+public readonly struct ListPage
 {
     private readonly IListBuilder _list;
 

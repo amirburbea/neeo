@@ -19,7 +19,7 @@ internal partial class DeviceController
             await feature.SubscribeAsync(deviceId);
         }
         this._logger.LogInformation("Device added {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
-        return this.Serialize(new SuccessResponse());
+        return this.Serialize(new SuccessResponse(true));
     }
 
     [HttpGet("{adapter}/unsubscribe/{deviceId}")]
@@ -33,6 +33,6 @@ internal partial class DeviceController
             await feature.SubscribeAsync(deviceId);
         }
         this._logger.LogInformation("Device removed {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
-        return this.Serialize(new SuccessResponse());
+        return this.Serialize(new SuccessResponse(true));
     }
 }

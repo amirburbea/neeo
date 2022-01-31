@@ -40,14 +40,14 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     private readonly INotificationService _notificationService;
 
     public DeviceDatabase(
-        IReadOnlyCollection<IDeviceBuilder> deviceBuilders,
+        SdkConfiguration sdkConfiguration,
         INotificationService notificationService,
         ILogger<IDeviceDatabase> logger
     )
     {
         this._notificationService = notificationService;
         this._logger = logger;
-        foreach (IDeviceBuilder device in deviceBuilders)
+        foreach (IDeviceBuilder device in sdkConfiguration.Devices)
         {
             IDeviceAdapter adapter = device.BuildAdapter();
             if (device.NotifierCallback is { } callback)

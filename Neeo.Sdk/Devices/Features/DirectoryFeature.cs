@@ -32,6 +32,6 @@ internal sealed class DirectoryFeature : IDirectoryFeature
     public async Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier)
     {
         await this._actionHandler(deviceId, actionIdentifier).ConfigureAwait(false);
-        return new();
+        return true;
     }
 }

@@ -89,7 +89,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private readonly ILogger<ApiClient> _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(ISdkEnvironment environment, ILogger<ApiClient> logger) => (this._uriPrefix, this._logger) = ($"http://{environment.BrainEndPoint}", logger);
+    public ApiClient(ISdkEnvironment environment, ILogger<ApiClient> logger) => (this._uriPrefix, this._logger) = ($"http://{environment.Brain.ServiceEndPoint}", logger);
 
     public void Dispose() => this._httpClient.Dispose();
 

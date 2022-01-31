@@ -43,6 +43,6 @@ internal sealed class ValueFeature : IValueFeature
     public async Task<SuccessResponse> SetValueAsync(string deviceId, string value)
     {
         await (this._setter ?? throw new NotSupportedException())(deviceId, value).ConfigureAwait(false);
-        return new();
+        return true;
     }
 }

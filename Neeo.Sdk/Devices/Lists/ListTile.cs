@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 
@@ -11,7 +10,7 @@ public sealed class ListTile
     {
         this.ThumbnailUri = thumbnailUri;
         this.ActionIdentifier = actionIdentifier;
-        this.IsQueuable = isQueuable??false;
+        this.IsQueuable = isQueuable ?? false;
         this.UIAction = uiAction;
     }
 
@@ -32,15 +31,8 @@ public sealed class ListTile
 
 public sealed class ListTileRow : ListItemBase
 {
-    public ListTileRow(IReadOnlyCollection<ListTile> tiles)
-        : base(ListItemType.TileRow) => this.Tiles = tiles is { Count: >= 1 and <= Constants.MaxTilesPerRow }
-            ? tiles.ToArray() // Copy to prevent mutations.
-            : throw new ArgumentException($"Tiles must have between 1 and {Constants.MaxTilesPerRow} elements.", nameof(tiles));
-
-    public ListTileRow(params ListTile[] tiles)
-        : this((IReadOnlyCollection<ListTile>)tiles)
-    {
-    }
+    internal ListTileRow(IEnumerable<ListTile> tiles)
+        : base(ListItemType.TileRow) => this.Tiles = tiles.ToArray();
 
     public IReadOnlyCollection<ListTile> Tiles { get; }
 }

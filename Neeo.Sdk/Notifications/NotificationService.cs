@@ -77,7 +77,7 @@ internal sealed class NotificationService : INotificationService
         this._queueSize++;
         try
         {
-            if (await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResponse result) => result.Success, cancellationToken).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.Notifications, message, SuccessResponse.SuccessProjection, cancellationToken).ConfigureAwait(false))
             {
                 this.UpdateCache(message);
                 return true;

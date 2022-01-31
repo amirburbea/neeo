@@ -2,16 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Broadlink.RM;
-using Neeo.Sdk;
-using Neeo.Sdk.Devices;
-using Neeo.Discovery;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Remote.HodgePodge;
 
@@ -43,127 +41,139 @@ internal static class Program
 
     private static async Task Main()
     {
-        //var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
-
-        //Brain? brain;
-        //if (arg != null && _ipAddressRegex.IsMatch(arg))
-        //{
-        //    brain = new(IPAddress.Parse(arg.Trim()));
-        //}
-        //else
-        //{
-        //    Console.WriteLine("Discovering brain...");
-        //}
-        //if (brain is null)
-        //{
-        //    Console.Error.WriteLine("Brain not found.");
-        //    return;
-        //}
-        Brain brain = await BrainDiscovery.DiscoverAsync() ?? new(IPAddress.Parse("192.168.253.143"));
-
-        Console.WriteLine($"Brain found! {brain.IPAddress}");
-        List<IDeviceBuilder> devices = new();
-        foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
-        {
-            if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
+        using IHost host = new HostBuilder()   
+            .UseConsoleLifetime()         
+            .ConfigureServices(services =>
             {
-                devices.Add(((IDeviceProvider)Activator.CreateInstance(type)!).ProvideDevice());
-            }
-        }
-        await using var sdkAdapter = await brain.StartServerAsync(devices, port: 9001).ConfigureAwait(false);
-        try
-        {
-
-
-            /*
-             * bool switchValue = false;
-    double sliderValue = 66d;
-    UpdateNotifier notifier = _ => Task.CompletedTask;
-    const string switchName = "switch";
-    const string sliderName = "slider";
-            */
-
-            //IDeviceBuilder builder = Device.CreateDevice("Smart TV", DeviceType.TV)
-            //    .SetDriverVersion(2)
-            //    .SetManufacturer("Amir")
-            //    .AddButton("INPUT HDMI1")
-            //    .AddButtonGroup(ButtonGroup.NumberPad)
-            //    .AddButtonGroup(ButtonGroup.ControlPad)
-            //    .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-            //    .AddSwitch(switchName, "Switch", GetSwitchValue, SetSwitchValue)
-            //    .AddSlider(sliderName, "Slider", GetSliderValue, SetSliderValue)
-            //    .AddButtonHandler(OnButtonPressed)
-            //    .RegisterDeviceSubscriptionCallbacks(OnDeviceAdded, OnDeviceRemoved, InitializeDeviceList)
-            //    .RegisterSubscriptionFunction((updateNotifier, _) => notifier = updateNotifier);
-            //Console.WriteLine("Starting server...");
-            //await brain.StartServerAsync(new[] { builder });
-            //await Task.Delay(25000);
-            ////await notifier(new("default", switchName, true));
-
-            Console.WriteLine("Server started. Press any key to quit...");
-            Console.ReadKey(true);
-        }
-        finally
-        {
-            Console.WriteLine("Server stopping...   ");
-        }
-        /*
-        Task OnButtonPressed(string deviceId, string buttonName)
-        {
-            Console.WriteLine("Button: " + (KnownButton.TryGetKnownButton(buttonName) is KnownButtons button ? button : buttonName));
-            return Task.CompletedTask;
-        }
-
-        Task<bool> GetSwitchValue(string deviceId)
-        {
-            Console.WriteLine("Get Switch:" + switchValue);
-            return Task.FromResult(switchValue);
-        }
-
-        Task<double> GetSliderValue(string deviceId)
-        {
-            Console.WriteLine("Get Slider:" + sliderValue);
-            return Task.FromResult(sliderValue);
-        }
-
-        Task SetSwitchValue(string deviceId, bool value)
-        {
-            if (switchValue == value)
-            {
-                return Task.CompletedTask;
-            }
-            Console.WriteLine("Set Switch: {0}", switchValue = value);
-            return notifier(new(deviceId, switchName, value));
-        }
-
-        Task SetSliderValue(string deviceId, double value)
-        {
-            if (sliderValue == value)
-            {
-                return Task.CompletedTask;
-            }
-            Console.WriteLine("Set Switch: {0}", sliderValue = value);
-            return notifier(new(deviceId, sliderName, value));
-        }
-
-        Task OnDeviceAdded(string deviceId)
-        {
-            Console.WriteLine("Device added: " + deviceId);
-            return Task.CompletedTask;
-        }
-
-        Task OnDeviceRemoved(string deviceId)
-        {
-            Console.WriteLine("Device removed: " + deviceId);
-            return Task.CompletedTask;
-        }
-
-        Task InitializeDeviceList(string[] deviceIds)
-        {
-            Console.WriteLine("Init deviceList: " + string.Join(',', deviceIds));
-            return Task.CompletedTask;
-        }*/
+                foreach (var type in Assembly.GetExecutingAssembly().GetTypes().Where(type => type.IsAssignableTo(typeof(IExampleDeviceProvider)) && !type.IsInterface && !type.IsAbstract))
+                {
+                    services.AddSingleton(typeof(IExampleDeviceProvider), type);
+                }
+                services.AddHostedService<ExampleNeeoService>();
+            })
+            .Build();
+        await host.StartAsync();
+        await host.WaitForShutdownAsync();
     }
+    //var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
+
+    //Brain? brain;
+    //if (arg != null && _ipAddressRegex.IsMatch(arg))
+    //{
+    //    brain = new(IPAddress.Parse(arg.Trim()));
+    //}
+    //else
+    //{
+    //    Console.WriteLine("Discovering brain...");
+    //}
+    //if (brain is null)
+    //{
+    //    Console.Error.WriteLine("Brain not found.");
+    //    return;
+    //}
+    //    Brain brain = await BrainDiscovery.DiscoverAsync() ?? new(IPAddress.Parse("192.168.253.143"));
+
+    //    Console.WriteLine($"Brain found! {brain.IPAddress}");
+    //    List<IDeviceBuilder> devices = new();
+    //    foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
+    //    {
+    //        if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
+    //        {
+    //            devices.Add(((IDeviceProvider)Activator.CreateInstance(type)!).ProvideDevice());
+    //        }
+    //    }
+    //    await using var sdkAdapter = await brain.StartServerAsync(devices, port: 9001).ConfigureAwait(false);
+    //    try
+    //    {
+    //        /*
+    //         * bool switchValue = false;
+    //double sliderValue = 66d;
+    //UpdateNotifier notifier = _ => Task.CompletedTask;
+    //const string switchName = "switch";
+    //const string sliderName = "slider";
+    //        */
+
+    //        //IDeviceBuilder builder = Device.CreateDevice("Smart TV", DeviceType.TV)
+    //        //    .SetDriverVersion(2)
+    //        //    .SetManufacturer("Amir")
+    //        //    .AddButton("INPUT HDMI1")
+    //        //    .AddButtonGroup(ButtonGroup.NumberPad)
+    //        //    .AddButtonGroup(ButtonGroup.ControlPad)
+    //        //    .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
+    //        //    .AddSwitch(switchName, "Switch", GetSwitchValue, SetSwitchValue)
+    //        //    .AddSlider(sliderName, "Slider", GetSliderValue, SetSliderValue)
+    //        //    .AddButtonHandler(OnButtonPressed)
+    //        //    .RegisterDeviceSubscriptionCallbacks(OnDeviceAdded, OnDeviceRemoved, InitializeDeviceList)
+    //        //    .RegisterSubscriptionFunction((updateNotifier, _) => notifier = updateNotifier);
+    //        //Console.WriteLine("Starting server...");
+    //        //await brain.StartServerAsync(new[] { builder });
+    //        //await Task.Delay(25000);
+    //        ////await notifier(new("default", switchName, true));
+
+    //        Console.WriteLine("Server started. Press any key to quit...");
+    //        Console.ReadKey(true);
+    //    }
+    //    finally
+    //    {
+    //        Console.WriteLine("Server stopping...   ");
+    //    }
+    /*
+    Task OnButtonPressed(string deviceId, string buttonName)
+    {
+        Console.WriteLine("Button: " + (KnownButton.TryGetKnownButton(buttonName) is KnownButtons button ? button : buttonName));
+        return Task.CompletedTask;
+    }
+
+    Task<bool> GetSwitchValue(string deviceId)
+    {
+        Console.WriteLine("Get Switch:" + switchValue);
+        return Task.FromResult(switchValue);
+    }
+
+    Task<double> GetSliderValue(string deviceId)
+    {
+        Console.WriteLine("Get Slider:" + sliderValue);
+        return Task.FromResult(sliderValue);
+    }
+
+    Task SetSwitchValue(string deviceId, bool value)
+    {
+        if (switchValue == value)
+        {
+            return Task.CompletedTask;
+        }
+        Console.WriteLine("Set Switch: {0}", switchValue = value);
+        return notifier(new(deviceId, switchName, value));
+    }
+
+    Task SetSliderValue(string deviceId, double value)
+    {
+        if (sliderValue == value)
+        {
+            return Task.CompletedTask;
+        }
+        Console.WriteLine("Set Switch: {0}", sliderValue = value);
+        return notifier(new(deviceId, sliderName, value));
+    }
+
+    Task OnDeviceAdded(string deviceId)
+    {
+        Console.WriteLine("Device added: " + deviceId);
+        return Task.CompletedTask;
+    }
+
+    Task OnDeviceRemoved(string deviceId)
+    {
+        Console.WriteLine("Device removed: " + deviceId);
+        return Task.CompletedTask;
+    }
+
+    Task InitializeDeviceList(string[] deviceIds)
+    {
+        Console.WriteLine("Init deviceList: " + string.Join(',', deviceIds));
+        return Task.CompletedTask;
+    }*/
+
 
     private static async Task MainRM()
     {
@@ -228,4 +238,6 @@ internal static class Program
             await remote.WaitForAck();
         }
     }
+
+    
 }

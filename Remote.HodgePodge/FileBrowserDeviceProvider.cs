@@ -10,7 +10,7 @@ using Neeo.Sdk.Json;
 
 namespace Remote.HodgePodge;
 
-public class FileBrowserDeviceProvider : IDeviceProvider
+public class FileBrowserDeviceProvider : IExampleDeviceProvider
 {
     public IDeviceBuilder ProvideDevice()
     {
@@ -47,11 +47,10 @@ public class FileBrowserDeviceProvider : IDeviceProvider
             builder.SetTitle(root).AddHeader(new("Browse Folders"));
             if (offset == 0)
             {
-                builder.AddTileRow(new(new ListTile[]
-                {
+                builder.AddTileRow(                
                     new ListTile("https://neeo-sdk.neeo.io/puppy.jpg", "puppy"),
-                    new ListTile("https://neeo-sdk.neeo.io/kitten.jpg", "kitten"),
-                })).AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"));
+                    new ListTile("https://neeo-sdk.neeo.io/kitten.jpg", "kitten")
+                ).AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"));
 
 
 
@@ -67,7 +66,7 @@ public class FileBrowserDeviceProvider : IDeviceProvider
                     new ListButton("Inverted","GOB",inverse:true, uiAction: ListUIAction.GoBack)
 
                 })); 
-                Console.WriteLine(JsonSerializer.Serialize(builder, JsonSerialization.Options));
+               // Console.WriteLine(JsonSerializer.Serialize(builder, JsonSerialization.Options));
             }
             try
             {

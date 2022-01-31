@@ -32,7 +32,7 @@ internal partial class DeviceController
         this._logger.LogInformation("Registering {adapter}...", adapter.AdapterName);
         if (await feature.RegisterAsync(await PgpMethods.DeserializeEncryptedAsync<JsonElement>(payload.Data, this._pgpKeys.PrivateKey)) is not { Error: { } error })
         {
-            return this.Serialize(new SuccessResponse());
+            return this.Serialize(new SuccessResponse(true));
         }
         ContentResult result = this.Content(error);
         result.StatusCode = 500;

@@ -1,18 +1,27 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Neeo.Sdk.Devices;
+using Neeo.Sdk.Rest;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk;
 
 /// <summary>
 /// Returns information about and contains methods for interacting with the NEEO Brain.
 /// </summary>
-public sealed partial class Brain
+public sealed class Brain
 {
     private static readonly Regex _versionPrefixRegex = new(@"^0\.(?<v>\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+    private IHost? _host;
 
     /// <summary>
     /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
@@ -53,4 +62,54 @@ public sealed partial class Brain
     /// Opens the default browser to the Brain WebUI.
     /// </summary>
     public void OpenWebUI() => Process.Start(startInfo: new($"http://{this.IPAddress}:3200/eui") { UseShellExecute = true })!.Dispose();
+
+    /// <summary>
+    /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
+    /// </summary>
+    /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
+    /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
+    /// <param name="hostIPAddress">
+    /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
+    /// <para />
+    /// Note: If in development and the port is not , the server also listens on localhost at the specified <paramref name="port"/>.
+    /// </param>
+    /// <param name="port">The port to listen on.</param>
+    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <returns><see cref="Task"/> to indicate completion.</returns>
+    public async Task<ISdkEnvironment> StartServerAsync(IReadOnlyCollection<IDeviceBuilder> devices, string? name = default, IPAddress? hostIPAddress = null, ushort port = 0, CancellationToken cancellationToken = default)
+    {
+        if (devices is not { Count: > 0 })
+        {
+            throw new ArgumentException("At least one device is required.", nameof(devices));
+        }
+        if (this._host is not null)
+        {
+            throw new InvalidOperationException("Server is already running.");
+        }
+        this._host = await Server.StartSdkAsync(
+            new(this, devices, $"src-{UniqueNameGenerator.Generate(name ?? Dns.GetHostName())}"),
+            hostIPAddress ?? await this.GetFallbackHostIPAddress(cancellationToken).ConfigureAwait(false),
+            port,
+            cancellationToken
+        ).ConfigureAwait(false);
+        return this._host.Services.GetRequiredService<ISdkEnvironment>();
+    }
+
+    public async Task StopServerAsync(CancellationToken cancellationToken = default)
+    {
+        using IHost? host = Interlocked.Exchange(ref this._host, default);
+        await (host?.StopAsync(cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
+    }
+
+    private async ValueTask<IPAddress> GetFallbackHostIPAddress(CancellationToken cancellationToken)
+    {
+        if (IPAddress.IsLoopback(this.IPAddress))
+        {
+            return this.IPAddress;
+        }
+        IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
+        return Array.IndexOf(addresses, this.IPAddress) == -1 && Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is { } address
+            ? address
+            : IPAddress.Loopback;
+    }
 }

@@ -5,7 +5,7 @@ using Neeo.Sdk.Devices.Discovery;
 
 namespace Remote.HodgePodge;
 
-public class DiscoveryExampleDeviceProvider : IDeviceProvider
+public class DiscoveryExampleDeviceProvider : IExampleDeviceProvider
 {
     private const string THE_ANSWER = "42";
 

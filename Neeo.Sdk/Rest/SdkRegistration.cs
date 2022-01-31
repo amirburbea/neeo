@@ -1,37 +1,42 @@
 ﻿using System;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Neeo.Sdk.Rest;
 
-internal sealed class ServerRegistration : IHostedService
+internal sealed class SdkRegistration : IHostedService
 {
     private readonly IApiClient _client;
     private readonly ISdkEnvironment _environment;
-    private readonly ILogger<ServerRegistration> _logger;
+    private readonly ILogger<SdkRegistration> _logger;
+    private readonly IServer _server;
 
-    public ServerRegistration(
+    public SdkRegistration(
         IApiClient client,
+        IServer server,
         ISdkEnvironment environment,
-        ILogger<ServerRegistration> logger
-    ) => (this._client, this._environment, this._logger) = (client, environment, logger);
+        ILogger<SdkRegistration> logger
+    )
+    {
+        (this._client, this._environment, this._logger) = (client, environment, logger);
+        this._server = server;
+    }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        (string adapterName, IPEndPoint brainEndPoint, string brainHostName, IPEndPoint hostEndPoint) = this._environment;
-        object body = new { Name = adapterName, BaseUrl = $"http://{hostEndPoint}" };
+        (string adapterName, Brain brain, string hostAddress) = (this._environment.AdapterName, this._environment.Brain, this._environment.HostAddress);
         for (int i = 0; i <= Constants.MaxRetries; i++)
         {
             try
             {
-                if (!await this._client.PostAsync(UrlPaths.RegisterServer, body, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
+                if (!await this._client.PostAsync(UrlPaths.RegisterServer, new { Name = adapterName, BaseUrl = hostAddress }, SuccessResponse.SuccessProjection, cancellationToken).ConfigureAwait(false))
                 {
                     throw new ApplicationException("Failed to register on the brain - registration rejected.");
                 }
-                this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainIP}).", adapterName, brainHostName, brainEndPoint.Address);
+                this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainIP}).", adapterName, brain.HostName, brain.IPAddress);
                 break;
             }
             catch (Exception) when (i != Constants.MaxRetries)
@@ -51,10 +56,9 @@ internal sealed class ServerRegistration : IHostedService
     {
         try
         {
-            (string adapterName, _, string brainHostName, _) = this._environment;
-            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = adapterName }, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = this._environment.AdapterName }, SuccessResponse.SuccessProjection, cancellationToken).ConfigureAwait(false))
             {
-                this._logger.LogInformation("Server unregistered from {brain}.", brainHostName);
+                this._logger.LogInformation("Server unregistered from {brain}.", this._environment.Brain.HostName);
             }
         }
         catch (Exception e)

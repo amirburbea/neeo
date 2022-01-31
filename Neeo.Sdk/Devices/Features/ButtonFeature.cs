@@ -19,6 +19,6 @@ internal sealed class ButtonFeature : IButtonFeature
     public async Task<SuccessResponse> TriggerAsync(string deviceId)
     {
         await this._buttonHandler(deviceId, this._button).ConfigureAwait(false);
-        return new();
+        return true;
     }
 }
