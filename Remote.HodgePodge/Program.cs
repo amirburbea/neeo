@@ -1,157 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Security.Cryptography;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Broadlink.RM;
-using Neeo.Api;
-using Neeo.Api.Devices;
+using Neeo.Sdk;
+using Neeo.Sdk.Devices;
 using Neeo.Discovery;
-using Org.BouncyCastle.Bcpg;
-using Org.BouncyCastle.Bcpg.OpenPgp;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Generators;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Math;
-using Org.BouncyCastle.Security;
 
 namespace Remote.HodgePodge;
-
-//static class Program
-//{
-//    void Main()
-//    {
-//        String Password = "hello world!";
-//        String Identity = "Slim Shady";
-
-//        PgpKeyRingGenerator krgen = generateKeyRingGenerator(Identity, Password);
-
-//        // Generate public key ring, dump to file.
-//        PgpPublicKeyRing pkr = krgen.GeneratePublicKeyRing();
-//        BufferedStream pubout = new BufferedStream(new FileStream(@"c:\temp\dummy.pkr", System.IO.FileMode.Create));
-//        pkr.Encode(pubout);
-//        pubout.Close();
-
-//        // Generate private key, dump to file.
-//        PgpSecretKeyRing skr = krgen.GenerateSecretKeyRing();
-//        BufferedStream secout = new BufferedStream(new FileStream(@"c:\temp\dummy.skr", System.IO.FileMode.Create));
-//        skr.Encode(secout);
-//        secout.Close();
-
-//    }
-
-//    public static PgpKeyRingGenerator generateKeyRingGenerator(String identity, String password)
-//    {
-
-//        KeyRingParams keyRingParams = new KeyRingParams();
-//        keyRingParams.Password = password;
-//        keyRingParams.Identity = identity;
-//        keyRingParams.PrivateKeyEncryptionAlgorithm = SymmetricKeyAlgorithmTag.Aes128;
-//        keyRingParams.SymmetricAlgorithms = new SymmetricKeyAlgorithmTag[] {
-//            SymmetricKeyAlgorithmTag.Aes256,
-//            SymmetricKeyAlgorithmTag.Aes192,
-//            SymmetricKeyAlgorithmTag.Aes128
-//        };
-
-//        keyRingParams.HashAlgorithms = new HashAlgorithmTag[] {
-//            HashAlgorithmTag.Sha256,
-//            HashAlgorithmTag.Sha1,
-//            HashAlgorithmTag.Sha384,
-//            HashAlgorithmTag.Sha512,
-//            HashAlgorithmTag.Sha224,
-//        };
-
-//        IAsymmetricCipherKeyPairGenerator generator
-//            = GeneratorUtilities.GetKeyPairGenerator("RSA");
-//        generator.Init(keyRingParams.RsaParams);
-
-//        /* Create the master (signing-only) key. */
-//        PgpKeyPair masterKeyPair = new PgpKeyPair(
-//            PublicKeyAlgorithmTag.RsaSign,
-//            generator.GenerateKeyPair(),
-//            DateTime.UtcNow);
-//        Debug.WriteLine("Generated master key with ID "
-//            + masterKeyPair.KeyId.ToString("X"));
-
-//        PgpSignatureSubpacketGenerator masterSubpckGen
-//            = new PgpSignatureSubpacketGenerator();
-//        masterSubpckGen.SetKeyFlags(false, PgpKeyFlags.CanSign
-//            | PgpKeyFlags.CanCertify);
-//        masterSubpckGen.SetPreferredSymmetricAlgorithms(false,
-//            (from a in keyRingParams.SymmetricAlgorithms
-//             select (int)a).ToArray());
-//        masterSubpckGen.SetPreferredHashAlgorithms(false,
-//            (from a in keyRingParams.HashAlgorithms
-//             select (int)a).ToArray());
-
-//        /* Create a signing and encryption key for daily use. */
-//        PgpKeyPair encKeyPair = new PgpKeyPair(
-//            PublicKeyAlgorithmTag.RsaGeneral,
-//            generator.GenerateKeyPair(),
-//            DateTime.UtcNow);
-//        Debug.WriteLine("Generated encryption key with ID "
-//            + encKeyPair.KeyId.ToString("X"));
-
-//        PgpSignatureSubpacketGenerator encSubpckGen = new PgpSignatureSubpacketGenerator();
-//        encSubpckGen.SetKeyFlags(false, PgpKeyFlags.CanEncryptCommunications | PgpKeyFlags.CanEncryptStorage);
-
-//        masterSubpckGen.SetPreferredSymmetricAlgorithms(false,
-//            (from a in keyRingParams.SymmetricAlgorithms
-//             select (int)a).ToArray());
-//        masterSubpckGen.SetPreferredHashAlgorithms(false,
-//            (from a in keyRingParams.HashAlgorithms
-//             select (int)a).ToArray());
-
-//        /* Create the key ring. */
-//        PgpKeyRingGenerator keyRingGen = new PgpKeyRingGenerator(
-//            PgpSignature.DefaultCertification,
-//            masterKeyPair,
-//            keyRingParams.Identity,
-//            keyRingParams.PrivateKeyEncryptionAlgorithm.Value,
-//            keyRingParams.GetPassword(),
-//            true,
-//            masterSubpckGen.Generate(),
-//            null,
-//            new SecureRandom());
-
-//        /* Add encryption subkey. */
-//        keyRingGen.AddSubKey(encKeyPair, encSubpckGen.Generate(), null);
-
-//        return keyRingGen;
-
-//    }
-
-//    // Define other methods and classes here
-//    class KeyRingParams
-//    {
-
-//        public SymmetricKeyAlgorithmTag? PrivateKeyEncryptionAlgorithm { get; set; }
-//        public SymmetricKeyAlgorithmTag[] SymmetricAlgorithms { get; set; }
-//        public HashAlgorithmTag[] HashAlgorithms { get; set; }
-//        public RsaKeyGenerationParameters RsaParams { get; set; }
-//        public string Identity { get; set; }
-//        public string Password { get; set; }
-//        //= EncryptionAlgorithm.NULL;
-
-//        public char[] GetPassword()
-//        {
-//            return Password.ToCharArray();
-//        }
-
-//        public KeyRingParams()
-//        {
-//            //Org.BouncyCastle.Crypto.Tls.EncryptionAlgorithm
-//            RsaParams = new RsaKeyGenerationParameters(BigInteger.ValueOf(0x10001), new SecureRandom(), 2048, 12);
-//        }
-
-//    }
-//}
 
 internal static class Program
 {
@@ -181,55 +43,126 @@ internal static class Program
 
     private static async Task Main()
     {
-        var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
+        //var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
 
-        Brain? brain;
-        if (arg != null && _ipAddressRegex.IsMatch(arg))
-        {
-            brain = new(IPAddress.Parse(arg.Trim()));
-        }
-        else
-        {
-            Console.WriteLine("Discovering brain...");
-            brain = await BrainDiscovery.DiscoverAsync();
-        }
-        if (brain is null)
-        {
-            Console.Error.WriteLine("Brain not found.");
-            return;
-        }
+        //Brain? brain;
+        //if (arg != null && _ipAddressRegex.IsMatch(arg))
+        //{
+        //    brain = new(IPAddress.Parse(arg.Trim()));
+        //}
+        //else
+        //{
+        //    Console.WriteLine("Discovering brain...");
+        //}
+        //if (brain is null)
+        //{
+        //    Console.Error.WriteLine("Brain not found.");
+        //    return;
+        //}
+        Brain brain = await BrainDiscovery.DiscoverAsync() ?? new(IPAddress.Parse("192.168.253.143"));
+
         Console.WriteLine($"Brain found! {brain.IPAddress}");
+        List<IDeviceBuilder> devices = new();
+        foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
+        {
+            if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
+            {
+                devices.Add(((IDeviceProvider)Activator.CreateInstance(type)!).ProvideDevice());
+            }
+        }
+        await using var sdkAdapter = await brain.StartServerAsync(devices, port: 9001).ConfigureAwait(false);
         try
         {
-            UpdateNotifier notifier = _ => Task.CompletedTask;
-            IDeviceBuilder builder = Device.CreateDevice("Smart TV", DeviceType.TV)
-                .SetManufacturer("Amir")
-                .AddButton("INPUT HDMI1")
-                .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-                .AddTextLabel("Label1", "Label1", true, async (id) => await Task.FromResult(id))
-                .AddButtonHandler((deviceId, button) =>
-                {
-                    Console.WriteLine($"{deviceId}|{button}");
-                    return Task.CompletedTask;
-                })
-                .RegisterSubscriptionFunction((updateNotifier, _) => notifier = updateNotifier);
-            Console.WriteLine("Starting server...");
-            await brain.StartServerAsync(new[] { builder });
-            //Console.WriteLine("Server started. Press any key to quit...   ");
-            Console.WriteLine("Server started. Press any key to update the label...   ");
 
-            Console.ReadKey(true);
-            await notifier(new("default", "Label1", "This is updated."));
 
-            Console.WriteLine("Label updated. Press any key to quit...   ");
+            /*
+             * bool switchValue = false;
+    double sliderValue = 66d;
+    UpdateNotifier notifier = _ => Task.CompletedTask;
+    const string switchName = "switch";
+    const string sliderName = "slider";
+            */
 
+            //IDeviceBuilder builder = Device.CreateDevice("Smart TV", DeviceType.TV)
+            //    .SetDriverVersion(2)
+            //    .SetManufacturer("Amir")
+            //    .AddButton("INPUT HDMI1")
+            //    .AddButtonGroup(ButtonGroup.NumberPad)
+            //    .AddButtonGroup(ButtonGroup.ControlPad)
+            //    .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
+            //    .AddSwitch(switchName, "Switch", GetSwitchValue, SetSwitchValue)
+            //    .AddSlider(sliderName, "Slider", GetSliderValue, SetSliderValue)
+            //    .AddButtonHandler(OnButtonPressed)
+            //    .RegisterDeviceSubscriptionCallbacks(OnDeviceAdded, OnDeviceRemoved, InitializeDeviceList)
+            //    .RegisterSubscriptionFunction((updateNotifier, _) => notifier = updateNotifier);
+            //Console.WriteLine("Starting server...");
+            //await brain.StartServerAsync(new[] { builder });
+            //await Task.Delay(25000);
+            ////await notifier(new("default", switchName, true));
+
+            Console.WriteLine("Server started. Press any key to quit...");
             Console.ReadKey(true);
         }
         finally
         {
             Console.WriteLine("Server stopping...   ");
-            await brain.StopServerAsync();
         }
+        /*
+        Task OnButtonPressed(string deviceId, string buttonName)
+        {
+            Console.WriteLine("Button: " + (KnownButton.TryGetKnownButton(buttonName) is KnownButtons button ? button : buttonName));
+            return Task.CompletedTask;
+        }
+
+        Task<bool> GetSwitchValue(string deviceId)
+        {
+            Console.WriteLine("Get Switch:" + switchValue);
+            return Task.FromResult(switchValue);
+        }
+
+        Task<double> GetSliderValue(string deviceId)
+        {
+            Console.WriteLine("Get Slider:" + sliderValue);
+            return Task.FromResult(sliderValue);
+        }
+
+        Task SetSwitchValue(string deviceId, bool value)
+        {
+            if (switchValue == value)
+            {
+                return Task.CompletedTask;
+            }
+            Console.WriteLine("Set Switch: {0}", switchValue = value);
+            return notifier(new(deviceId, switchName, value));
+        }
+
+        Task SetSliderValue(string deviceId, double value)
+        {
+            if (sliderValue == value)
+            {
+                return Task.CompletedTask;
+            }
+            Console.WriteLine("Set Switch: {0}", sliderValue = value);
+            return notifier(new(deviceId, sliderName, value));
+        }
+
+        Task OnDeviceAdded(string deviceId)
+        {
+            Console.WriteLine("Device added: " + deviceId);
+            return Task.CompletedTask;
+        }
+
+        Task OnDeviceRemoved(string deviceId)
+        {
+            Console.WriteLine("Device removed: " + deviceId);
+            return Task.CompletedTask;
+        }
+
+        Task InitializeDeviceList(string[] deviceIds)
+        {
+            Console.WriteLine("Init deviceList: " + string.Join(',', deviceIds));
+            return Task.CompletedTask;
+        }*/
     }
 
     private static async Task MainRM()

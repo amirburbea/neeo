@@ -20,6 +20,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\Neeo.Api\Neeo.Api.csproj" />
+	  <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
 	</ItemGroup>
 </Project>

@@ -1,11 +1,9 @@
-﻿using System.Buffers;
-using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Net;
+﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using MQTTnet;
 using MQTTnet.Client;
+using MQTTnet.Client.Connecting;
 using MQTTnet.Client.Options;
 using MQTTnet.Exceptions;
 
@@ -13,18 +11,64 @@ namespace HiSense.SmartTV;
 
 public class HisenseTV
 {
-    public static async Task<HisenseTV> Discover()
+    private static readonly MqttFactory _mqttFactory = new();
+
+    public static async Task<IPAddress?> DiscoverAsync()
     {
-        static async IAsyncEnumerable<IPAddress> GetAddressesAsync()
+        using CancellationTokenSource cts = new();
+        TaskCompletionSource<IPAddress?> taskCompletionSource = new();
+        try
         {
-            foreach (var address in await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork).ConfigureAwait(false))
+            await Task.WhenAll(GetAddresses().Select(async address =>
             {
-                if (IPAddress.IsLoopback(address))
+                if (!await ConnectAsync(address, cts.Token).ConfigureAwait(false))
+                {
+                    return;
+                }
+                taskCompletionSource.TrySetResult(address);
+                cts.Cancel();
+            })).ConfigureAwait(false);
+            taskCompletionSource.TrySetResult(null);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        return await taskCompletionSource.Task.ConfigureAwait(false);
+
+        async Task<bool> ConnectAsync(IPAddress address, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (await TryPingAsync(address).ConfigureAwait(false))
+                {
+                    using IMqttClient client = HisenseTV._mqttFactory.CreateMqttClient();
+                    if (await client.ConnectAsync(HisenseTV.CreateClientOptions(address), cancellationToken).ConfigureAwait(false) is { ResultCode: MqttClientConnectResultCode.Success })
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch (MqttCommunicationException)
+            {
+                // Pinged a non Hisense TV.
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelled because we found a Hisense TV.
+            }
+            return false;
+        }
+
+        static IEnumerable<IPAddress> GetAddresses()
+        {
+            foreach (IPAddress address in Dns.GetHostAddresses(Dns.GetHostName(), AddressFamily.InterNetwork))
+            {
+                if (IPAddress.IsLoopback(address) || IPHelper.IsMulticast(address))
                 {
                     continue;
                 }
                 byte[] bytes = address.GetAddressBytes();
-                for (int i = 1; i < 255; i++)
+                for (byte i = 1; i < 255; i++)
                 {
                     if (i == bytes[3])
                     {
@@ -38,83 +82,38 @@ public class HisenseTV
             }
         }
 
-        static async Task<bool> TryPing(IPAddress address, CancellationToken cancellationToken)
+        async Task<bool> TryPingAsync(IPAddress address)
         {
             using Ping ping = new();
-            cancellationToken.Register(ping.SendAsyncCancel);
+            cts.Token.Register(ping.SendAsyncCancel);
             TaskCompletionSource<bool> taskSource = new();
-
-            static void OnPingCompleted(object? sender, PingCompletedEventArgs e)
-            {
-                if (e.UserState is TaskCompletionSource<bool> taskSource)
-                {
-                    taskSource.TrySetResult(e.Reply?.Status == IPStatus.Success);
-                }
-            }
-
             ping.PingCompleted += OnPingCompleted;
             ping.SendAsync(address, 15, taskSource);
             bool success = await taskSource.Task.ConfigureAwait(false);
             ping.PingCompleted -= OnPingCompleted;
             return success;
-        }
 
-
-        Stopwatch watch = Stopwatch.StartNew();
-        IPAddress? ipAddress = default;
-        using CancellationTokenSource source = new();
-        MqttFactory factory = new();
-        try
-        {
-            await Parallel.ForEachAsync(GetAddressesAsync(), new ParallelOptions { MaxDegreeOfParallelism = 48, CancellationToken = source.Token }, async (address, cancellationToken) =>
-             {
-                 if (!await TryPing(address, cancellationToken).ConfigureAwait(false))
-                 {
-                     return;
-                 }
-                 using var client = factory.CreateMqttClient();
-                 try
-                 {
-                     var result = await client.ConnectAsync(new MqttClientOptionsBuilder()
-                         .WithTcpServer(address.ToString(), 36669)
-                         .WithCredentials("hisenseservice", "multimqttservice")
-                         .WithTls(parameters: new() { UseTls = true, AllowUntrustedCertificates = true, IgnoreCertificateChainErrors = true, IgnoreCertificateRevocationErrors = true })
-                         .Build(),
-                         cancellationToken
-                     ).ConfigureAwait(false);
-                     ipAddress = address;
-                     source.Cancel();
-                 }
-                 catch (MqttCommunicationException)
-                 {
-                 }
-                 catch (OperationCanceledException)
-                 {
-                 }
-             });
+            static void OnPingCompleted(object? _, PingCompletedEventArgs e) => ((TaskCompletionSource<bool>)e.UserState!).TrySetResult(e.Reply?.Status == IPStatus.Success);
         }
-        catch (OperationCanceledException)
-        {
-        }
-
-        watch.Stop();
-        throw new($"[{ipAddress}]:{watch.Elapsed.TotalMilliseconds}");
     }
 
-
+    private static IMqttClientOptions CreateClientOptions(IPAddress ipAddress) => new MqttClientOptionsBuilder()
+        .WithTcpServer(ipAddress.ToString(), 36669)
+        .WithCredentials("hisenseservice", "multimqttservice")
+        .WithTls(parameters: new() { UseTls = true, AllowUntrustedCertificates = true, IgnoreCertificateChainErrors = true, IgnoreCertificateRevocationErrors = true })
+        .Build();
 }
 
 internal class Foo
 {
     private static async Task Main()
     {
-        var dict = IPHelper.GetAllDevicesOnLAN();
+        await WakeOnLan.WakeAsync("18:30:0C:C3:F4:C8");
+        //var dict = IPHelper.GetAllDevicesOnLAN();
 
-        //await HisenseTV.Discover();
+        var q = await HisenseTV.DiscoverAsync();
+        Console.WriteLine(q);
 
-        await WakeOnLan.WakeAsync("18:30:0c:c3:f4:c8");
-
-
-        
+        //
     }
 }

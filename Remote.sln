@@ -10,13 +10,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Api", "Neeo.Api\Neeo.Api.csproj", "{E7AE10FA-82A6-4639-902C-BA165B783BE9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk", "Neeo.Sdk\Neeo.Sdk.csproj", "{E7AE10FA-82A6-4639-902C-BA165B783BE9}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Broadlink.RM", "Broadlink.RM\Broadlink.RM.csproj", "{4EB6E5A8-9ACF-4190-B127-08EDB399ADA2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HiSense.SmartTV", "HiSense.SmartTV\HiSense.SmartTV.csproj", "{DA5F3757-AD2B-470C-91F0-97BE6207D0EC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neeo.Discovery", "Neeo.Discovery\Neeo.Discovery.csproj", "{3F0D2742-E7B3-402E-8276-00362774522D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Discovery", "Neeo.Discovery\Neeo.Discovery.csproj", "{3F0D2742-E7B3-402E-8276-00362774522D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
