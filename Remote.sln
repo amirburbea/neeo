@@ -18,8 +18,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HiSense.SmartTV", "HiSense.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Discovery", "Neeo.Discovery\Neeo.Discovery.csproj", "{3F0D2742-E7B3-402E-8276-00362774522D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.csproj", "{B1254D22-5CC1-42DB-BDB9-1DE1D24EF44F}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,10 +44,6 @@ Global
 		{3F0D2742-E7B3-402E-8276-00362774522D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3F0D2742-E7B3-402E-8276-00362774522D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3F0D2742-E7B3-402E-8276-00362774522D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B1254D22-5CC1-42DB-BDB9-1DE1D24EF44F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B1254D22-5CC1-42DB-BDB9-1DE1D24EF44F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B1254D22-5CC1-42DB-BDB9-1DE1D24EF44F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B1254D22-5CC1-42DB-BDB9-1DE1D24EF44F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
