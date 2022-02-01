@@ -1,17 +1,21 @@
 ﻿namespace Neeo.Sdk.Devices.Lists;
 
-public sealed class ListHeader : ListItemBase
+/// <summary>
+/// Represents a list header row.
+/// </summary>
+public sealed class ListHeader : IListItem
 {
-    public ListHeader(string title)
-        : base(ListItemType.Header)
-    {
-        this.Title = Validator.ValidateText(title, maxLength: 255);
-    }
+    internal ListHeader(string title) => this.Title = Validator.ValidateText(title, maxLength: 255);
 
     /// <summary>
     /// Tells the NEEO Brain that this is a Header.
     /// </summary>
     public bool IsHeader { get; } = true;
 
+    /// <summary>
+    /// The title for the list header.
+    /// </summary>
     public string Title { get; }
+
+    ListItemType IListItem.Type => ListItemType.Header;
 }

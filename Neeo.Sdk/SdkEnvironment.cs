@@ -32,13 +32,12 @@ internal sealed class SdkEnvironment : ISdkEnvironment
 
     public SdkEnvironment(SdkConfiguration sdkConfiguration, IServer server)
     {
-        this._sdkConfiguration = sdkConfiguration;
-        this._serverAddressesFeature = server.Features.Get<IServerAddressesFeature>()!;
+        (this._sdkConfiguration, this._serverAddressesFeature) = (sdkConfiguration, server.Features.Get<IServerAddressesFeature>()!);
     }
 
     public string AdapterName => this._sdkConfiguration.Name;
 
     public Brain Brain => this._sdkConfiguration.Brain;
 
-    public string HostAddress => this._serverAddressesFeature.Addresses.Single();
+    public string HostAddress => this._serverAddressesFeature.Addresses.First();
 }

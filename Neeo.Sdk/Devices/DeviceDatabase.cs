@@ -26,14 +26,14 @@ public interface IDeviceDatabase
 
     IDeviceModel? GetDeviceById(int id);
 
-    ISearchItem<IDeviceModel>[] Search(string? query);
+    SearchEntry<IDeviceModel>[] Search(string? query);
 }
 
 internal sealed class DeviceDatabase : IDeviceDatabase
 {
-    private readonly Dictionary<string, IDeviceAdapter> _adapters = new();
+    private readonly Dictionary<string, IDeviceAdapter> _adapters;
     private readonly TokenSearch<IDeviceModel> _deviceIndex;
-    private readonly List<DeviceModel> _devices = new();
+    private readonly List<DeviceModel> _devices;
     private readonly Dictionary<string, Task> _initializationTasks = new();
     private readonly HashSet<string> _initializedAdapters = new();
     private readonly ILogger<IDeviceDatabase> _logger;
@@ -47,6 +47,8 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     {
         this._notificationService = notificationService;
         this._logger = logger;
+        this._adapters = new(sdkConfiguration.Devices.Length);
+        this._devices = new(sdkConfiguration.Devices.Length);
         foreach (IDeviceBuilder device in sdkConfiguration.Devices)
         {
             IDeviceAdapter adapter = device.BuildAdapter();
@@ -57,18 +59,12 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             this._adapters.Add(adapter.AdapterName, adapter);
             this._devices.Add(new(this._devices.Count, adapter));
         }
-        this._deviceIndex = new(new()
-        {
-            SearchProperties = new[]
-            {
-                    nameof(IDeviceModel.Manufacturer),
-                    nameof(IDeviceModel.Name),
-                    nameof(IDeviceModel.Tokens),
-                    nameof(IDeviceModel.Type),
-            },
-            Threshold = OptionConstants.MatchFactor,
-            Delimiter = new[] { OptionConstants.Delimiter }
-        });
+        this._deviceIndex = new(
+            nameof(IDeviceModel.Manufacturer),
+            nameof(IDeviceModel.Name),
+            nameof(IDeviceModel.Tokens),
+            nameof(IDeviceModel.Type)
+        );
     }
 
     IReadOnlyCollection<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values;
@@ -89,8 +85,8 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         ? this._devices[id]
         : null;
 
-    public ISearchItem<IDeviceModel>[] Search(string? query) => string.IsNullOrEmpty(query)
-        ? Array.Empty<ISearchItem<IDeviceModel>>()
+    public SearchEntry<IDeviceModel>[] Search(string? query) => string.IsNullOrEmpty(query)
+        ? Array.Empty<SearchEntry<IDeviceModel>>()
         : this._deviceIndex.Search(this._devices, query).Take(OptionConstants.MaxSearchResults).ToArray();
 
     private async ValueTask InitializeAsync(IDeviceAdapter adapter)
@@ -122,8 +118,6 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     private static class OptionConstants
     {
-        public const char Delimiter = ' ';
-        public const double MatchFactor = 0.5;
         public const int MaxSearchResults = 10;
     }
 }

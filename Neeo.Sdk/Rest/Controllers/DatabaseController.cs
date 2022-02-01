@@ -22,5 +22,5 @@ internal sealed class DatabaseController : ControllerBase
         : this.Serialize(device);
 
     [HttpGet("search")]
-    public ActionResult<ISearchItem<IDeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this.Serialize(this._database.Search(query));
+    public ActionResult<SearchEntry<IDeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this.Serialize(this._database.Search(query));
 }

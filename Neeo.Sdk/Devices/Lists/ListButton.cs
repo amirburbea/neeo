@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
@@ -44,19 +42,4 @@ public sealed class ListButton
     public bool IsButton { get; } = true;
 
     public string Title { get; }
-}
-
-public sealed class ListButtonRow : ListItemBase
-{
-    public ListButtonRow(IReadOnlyCollection<ListButton> buttons)
-        : base(ListItemType.ButtonRow) => this.Buttons = buttons is { Count: >= 1 and <= Constants.MaxButtonsPerRow }
-            ? buttons.ToArray() // Copy to prevent mutations.
-            : throw new ArgumentException($"Buttons must have between 1 and {Constants.MaxButtonsPerRow} elements.", nameof(buttons));
-
-    public ListButtonRow(params ListButton[] buttons)
-        : this((IReadOnlyCollection<ListButton>)buttons)
-    {
-    }
-
-    public IReadOnlyCollection<ListButton> Buttons { get; }
 }

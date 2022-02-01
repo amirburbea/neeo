@@ -8,6 +8,7 @@ namespace Neeo.Sdk.Utilities.TokenSearch;
 
 /// <summary>
 /// A class to search a collection of items by tokens and return ranked results.
+/// Based on <a href="https://github.com/neophob/tokensearch.js">tokensearch.js</a>.
 /// </summary>
 /// <typeparam name="T">The type </typeparam>
 internal sealed class TokenSearch<T>
@@ -15,43 +16,28 @@ internal sealed class TokenSearch<T>
 {
     public static readonly Func<T, string, object?> GetItemValue = TokenSearch<T>.CreateGetItemValue();
 
-    private readonly char[] _delimiter;
-    private readonly int _maxFilterTokenEntries;
-    private readonly Func<T, bool>? _preProcessCheck;
     private readonly string[]? _searchProperties;
-    private readonly double _threshold;
 
-    public TokenSearch(SearchOptions<T>? options = default)
+    public TokenSearch(params string[] searchProperties)
     {
-        this._delimiter = options?.Delimiter ?? new[] { ' ', '_', '-' };
-        this._maxFilterTokenEntries = options?.MaxFilterTokenEntries ?? 5;
-        this._threshold = options?.Threshold ?? 0.7;
-        this._preProcessCheck = options?.PreProcessCheck;
-        this._searchProperties = options?.SearchProperties is { Length: > 1 } ? options.SearchProperties : null;
+        this._searchProperties = searchProperties is { Length: > 1 } ? searchProperties : null;
     }
 
-    public IEnumerable<SearchItem<T>> Search(IEnumerable<T> collection, string query)
+    public IEnumerable<SearchEntry<T>> Search(IEnumerable<T> collection, string query)
     {
         string[] searchTokens = (query ?? throw new ArgumentNullException(nameof(query)))
-            .Split(this._delimiter, StringSplitOptions.RemoveEmptyEntries)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Distinct()
-            .Take(this._maxFilterTokenEntries)
+            .Take(5)
             .ToArray();
-        List<SearchItem<T>> list = new();
+        List<SearchEntry<T>> list = new();
         int maxScore = 0;
         foreach (T item in collection ?? throw new ArgumentNullException(nameof(collection)))
         {
-            if (this._preProcessCheck != null && !this._preProcessCheck(item))
-            {
-                continue;
-            }
-            string[] dataTokens = this._searchProperties == null
-                ? new[] { item.ToString() ?? string.Empty }
-                : Array.ConvertAll(
-                    this._searchProperties,
-                    property => TokenSearch<T>.GetItemValue(item, property)?.ToString() ?? string.Empty
-                  );
-            int score = dataTokens.Sum(dataToken => TokenSearch<T>.Score(dataToken, searchTokens));
+            IEnumerable<string> dataTokens = this._searchProperties == null
+                  ? new[] { item.ToString() ?? string.Empty }
+                  : this._searchProperties.Select(property => TokenSearch<T>.GetItemValue(item, property)?.ToString() ?? string.Empty);
+            int score = dataTokens.Sum(dataToken => searchTokens.Sum(searchToken => TokenSearch<T>.Score(dataToken, searchToken)));
             if (score <= 0)
             {
                 continue;
@@ -59,19 +45,19 @@ internal sealed class TokenSearch<T>
             maxScore = Math.Max(score, maxScore);
             list.Add(new(item) { Score = score });
         }
-        return TokenSearch<T>.Normalize(list, maxScore, this._threshold, this._searchProperties).OrderBy(x => x);
+        return TokenSearch<T>.Normalize(list, maxScore, this._searchProperties).OrderBy(x => x);
     }
 
     /// <summary>
     /// Create a function such that when given an item and property name
-    /// returns the value of the property for the item.
+    /// returns the value of the property.
     /// </summary>
     /// <returns>The created function.</returns>
     private static Func<T, string, object?> CreateGetItemValue()
     {
         ParameterExpression itemParameter = Expression.Parameter(typeof(T));
         ParameterExpression nameParameter = Expression.Parameter(typeof(string));
-        Expression<Func<T, string, object?>> lambdaExpression = Expression.Lambda<Func<T, string, object?>>(
+        return Expression.Lambda<Func<T, string, object?>>(
             Expression.Switch(
                 nameParameter,
                 Expression.Default(typeof(object)),
@@ -91,37 +77,36 @@ internal sealed class TokenSearch<T>
             ),
             itemParameter,
             nameParameter
-        );
-        return lambdaExpression.Compile();
+        ).Compile();
     }
 
-    private static IEnumerable<SearchItem<T>> Normalize(IEnumerable<SearchItem<T>> searchItems, int maxScore, double threshold, string[]? searchProperties)
+    private static IEnumerable<SearchEntry<T>> Normalize(IEnumerable<SearchEntry<T>> entries, int maxScore, string[]? searchProperties)
     {
         double normalizedScore = 1d / maxScore;
         HashSet<string> hashSet = new(StringComparer.OrdinalIgnoreCase);
-        foreach (SearchItem<T> item in searchItems)
+        foreach (SearchEntry<T> entry in entries)
         {
-            item.Score = 1d - item.Score * normalizedScore;
-            item.MaxScore = maxScore;
-            if (item.Score <= threshold && hashSet.Add(searchProperties == null ? item.ToString() ?? string.Empty : string.Join(' ', searchProperties.Select(item.GetValue))))
+            entry.Score = 1d - entry.Score * normalizedScore;
+            entry.MaxScore = maxScore;
+            if (entry.Score <= 0.5 & hashSet.Add(searchProperties == null ? entry.Item.ToString() ?? string.Empty : string.Join(' ', searchProperties.Select(entry.GetValue))))
             {
-                yield return item;
+                yield return entry;
             }
-        }        
+        }
     }
 
-    private static int Score(string text, IEnumerable<string> searchTokens) => searchTokens.Sum(token =>
+    private static int Score(string text, string searchToken)
     {
-        int index = text.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+        int index = text.IndexOf(searchToken, StringComparison.OrdinalIgnoreCase);
         if (index == -1)
         {
             return 0;
         }
-        if (token.Length < 2)
+        if (searchToken.Length < 2)
         {
             return 1;
         }
-        if (text == token)
+        if (text == searchToken)
         {
             return 6;
         }
@@ -130,5 +115,5 @@ internal sealed class TokenSearch<T>
             return 2;
         }
         return 1;
-    });
+    }
 }

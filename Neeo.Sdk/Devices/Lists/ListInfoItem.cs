@@ -2,7 +2,7 @@
 
 namespace Neeo.Sdk.Devices.Lists;
 
-public sealed class ListInfoItem : ListItemBase
+public sealed class ListInfoItem : IListItem
 {
     public ListInfoItem(
         string title,
@@ -10,7 +10,7 @@ public sealed class ListInfoItem : ListItemBase
         string? affirmativeButtonText = default,
         string? negativeButtonText = default,
         string? actionIdentifier = default
-    ) : base(ListItemType.Info)
+    )
     {
         this.Title = title ?? throw new ArgumentNullException(nameof(text));
         this.Text = text ?? throw new ArgumentNullException(nameof(text));
@@ -33,4 +33,6 @@ public sealed class ListInfoItem : ListItemBase
     public string Text { get; }
 
     public string Title { get; }
+
+    ListItemType IListItem.Type => ListItemType.Info;
 }

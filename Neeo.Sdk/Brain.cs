@@ -18,7 +18,7 @@ namespace Neeo.Sdk;
 /// <summary>
 /// Returns information about and contains methods for interacting with the NEEO Brain.
 /// </summary>
-public sealed class Brain
+public sealed class Brain : IAsyncDisposable
 {
     private static readonly Regex _versionPrefixRegex = new(@"^0\.(?<v>\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
     private IHost? _host;
@@ -58,6 +58,8 @@ public sealed class Brain
     /// </summary>
     public IPEndPoint ServiceEndPoint { get; }
 
+    async ValueTask IAsyncDisposable.DisposeAsync() => await this.StopServerAsync().ConfigureAwait(false);
+
     /// <summary>
     /// Opens the default browser to the Brain WebUI.
     /// </summary>
@@ -71,14 +73,17 @@ public sealed class Brain
     /// <param name="hostIPAddress">
     /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
     /// <para />
-    /// Note: If in development and the port is not , the server also listens on localhost at the specified <paramref name="port"/>.
+    /// Note: If in development and the port is not 0, the server also listens on localhost at the specified <paramref name="port"/>.
     /// </param>
     /// <param name="port">The port to listen on.</param>
+    /// <param name="consoleLogging">
+    /// The integration server logs via debug in development. If specified as <see langword="true"/>, enables console logging (regardless of hosting environment).
+    /// </param>
     /// <param name="cancellationToken">Optional cancellation token.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public async Task<ISdkEnvironment> StartServerAsync(IReadOnlyCollection<IDeviceBuilder> devices, string? name = default, IPAddress? hostIPAddress = null, ushort port = 0, CancellationToken cancellationToken = default)
+    public async Task<ISdkEnvironment> StartServerAsync(IDeviceBuilder[] devices, string? name = default, IPAddress? hostIPAddress = null, ushort port = 0, bool consoleLogging = false, CancellationToken cancellationToken = default)
     {
-        if (devices is not { Count: > 0 })
+        if (devices is not { Length: > 0 })
         {
             throw new ArgumentException("At least one device is required.", nameof(devices));
         }
@@ -88,27 +93,34 @@ public sealed class Brain
         }
         this._host = await Server.StartSdkAsync(
             new(this, devices, $"src-{UniqueNameGenerator.Generate(name ?? Dns.GetHostName())}"),
-            hostIPAddress ?? await this.GetFallbackHostIPAddress(cancellationToken).ConfigureAwait(false),
+            hostIPAddress ?? await Brain.GetFallbackHostIPAddress(this.IPAddress, cancellationToken).ConfigureAwait(false),
             port,
+            consoleLogging,
             cancellationToken
         ).ConfigureAwait(false);
         return this._host.Services.GetRequiredService<ISdkEnvironment>();
     }
 
+    /// <summary>
+    /// Asynchronously stops the SDK integration server and unregisters it on the NEEO Brain.
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <returns><see cref="Task"/> to indicate completion.</returns>
     public async Task StopServerAsync(CancellationToken cancellationToken = default)
     {
         using IHost? host = Interlocked.Exchange(ref this._host, default);
         await (host?.StopAsync(cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
-    private async ValueTask<IPAddress> GetFallbackHostIPAddress(CancellationToken cancellationToken)
+    private static async ValueTask<IPAddress> GetFallbackHostIPAddress(IPAddress brainIPAddress, CancellationToken cancellationToken)
     {
-        if (IPAddress.IsLoopback(this.IPAddress))
+        if (IPAddress.IsLoopback(brainIPAddress))
         {
-            return this.IPAddress;
+            // If the Brain is running locally, we can just use localhost.
+            return brainIPAddress;
         }
         IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-        return Array.IndexOf(addresses, this.IPAddress) == -1 && Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is { } address
+        return Array.IndexOf(addresses, brainIPAddress) == -1 && Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is { } address
             ? address
             : IPAddress.Loopback;
     }

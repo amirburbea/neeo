@@ -110,7 +110,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
         return await this.FetchAsync(path, HttpMethod.Post, content, transform, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, HttpContent? content, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+    private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, HttpContent? content, Func<TData, TOutput> transform, CancellationToken cancellationToken)
     {
         string uri = this._uriPrefix + path;
         this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
@@ -118,7 +118,9 @@ internal sealed class ApiClient : IApiClient, IDisposable
         using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.OK)
         {
-            throw new WebException($"Server returned status {(int)response.StatusCode}:{Enum.GetName(response.StatusCode)}.");
+            using StreamReader reader = new(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false));
+            string text = await reader.ReadToEndAsync().ConfigureAwait(false);
+            throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${text}");
         }
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         return transform((await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!);

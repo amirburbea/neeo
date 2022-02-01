@@ -36,7 +36,7 @@ internal sealed class SdkRegistration : IHostedService
                 {
                     throw new ApplicationException("Failed to register on the brain - registration rejected.");
                 }
-                this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainIP}).", adapterName, brain.HostName, brain.IPAddress);
+                this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainAddress}).", adapterName, brain.HostName, brain.IPAddress);
                 break;
             }
             catch (Exception) when (i != Constants.MaxRetries)

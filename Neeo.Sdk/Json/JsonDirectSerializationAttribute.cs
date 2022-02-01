@@ -4,24 +4,20 @@ using System.Text.Json.Serialization;
 
 namespace Neeo.Sdk.Json;
 
+/// <summary>
+/// Specifies that objects of a specified base type should directly be serialized as their implemented types.
+/// </summary>
 internal sealed class JsonDirectSerializationAttribute : JsonConverterAttribute
 {
-    private readonly Type _interfaceType;
-    private readonly JsonConverter _converter;
-
-    public JsonDirectSerializationAttribute(Type interfaceType)
+    /// <summary>
+    /// Creates a new instance of the <see cref="JsonDirectSerializationAttribute" />.
+    /// </summary>
+    /// <param name="baseType">
+    /// A type for which to create a JSON converter, such that objects of this type should directly be serialized as their implemented types.
+    /// </param>
+    public JsonDirectSerializationAttribute(Type baseType)
+        : base(typeof(Converter<>).MakeGenericType(baseType))
     {
-        this._interfaceType = interfaceType;
-        this._converter = (JsonConverter)Activator.CreateInstance(typeof(Converter<>).MakeGenericType(interfaceType))!;
-    }
-
-    public override JsonConverter? CreateConverter(Type typeToConvert)
-    {
-        if (this._interfaceType == typeToConvert)
-        {
-            return this._converter;
-        }
-        return base.CreateConverter(typeToConvert);
     }
 
     private sealed class Converter<T> : JsonConverter<T>

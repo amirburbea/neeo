@@ -11,33 +11,32 @@ using Broadlink.RM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace Remote.HodgePodge;
+namespace Neeo.Sdk.Examples;
 
 internal static class Program
 {
-    private static readonly Regex _ipAddressRegex = new(@"^\d+\.\d+\.\d+\.\d+$");
 
-    private static async Task LearnCodes(RMDevice device)
-    {
-        string? fileName = Program.QueryFileName();
-        if (fileName == null)
-        {
-            return;
-        }
-        Dictionary<string, string> dictionary = new();
-        while (true)
-        {
-            if (Query("Command name?") is not string name)
-            {
-                break;
-            }
-            await device.BeginLearning();
-            await device.WaitForAck();
-            byte[] data = await device.WaitForData();
-            dictionary[name] = Convert.ToHexString(data);
-        }
-        File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
-    }
+    //private static async Task LearnCodes(RMDevice device)
+    //{
+    //    string? fileName = Program.QueryFileName();
+    //    if (fileName == null)
+    //    {
+    //        return;
+    //    }
+    //    Dictionary<string, string> dictionary = new();
+    //    while (true)
+    //    {
+    //        if (Query("Command name?") is not string name)
+    //        {
+    //            break;
+    //        }
+    //        await device.BeginLearning();
+    //        await device.WaitForAck();
+    //        byte[] data = await device.WaitForData();
+    //        dictionary[name] = Convert.ToHexString(data);
+    //    }
+    //    File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
+    //}
 
     private static async Task Main()
     {
@@ -49,7 +48,7 @@ internal static class Program
                 {
                     services.AddSingleton(typeof(IExampleDeviceProvider), type);
                 }
-                services.AddHostedService<ExampleNeeoService>();
+                services.AddHostedService<SdkService>();
             })
             .Build();
         await host.StartAsync();
@@ -175,69 +174,69 @@ internal static class Program
     }*/
 
 
-    private static async Task MainRM()
-    {
-        using RMDevice? remote = await RMDiscovery.DiscoverDeviceAsync();
-        if (remote is null)
-        {
-            return;
-        }
-        while (true)
-        {
-            Console.Write("Mode: (0 - Learn, 1 - Test, else quit): ");
-            switch (Console.ReadLine())
-            {
-                case "0":
-                    await LearnCodes(remote);
-                    break;
+    //private static async Task MainRM()
+    //{
+    //    using RMDevice? remote = await RMDiscovery.DiscoverDeviceAsync();
+    //    if (remote is null)
+    //    {
+    //        return;
+    //    }
+    //    while (true)
+    //    {
+    //        Console.Write("Mode: (0 - Learn, 1 - Test, else quit): ");
+    //        switch (Console.ReadLine())
+    //        {
+    //            case "0":
+    //                await LearnCodes(remote);
+    //                break;
 
-                case "1":
-                    await TestCodes(remote);
-                    break;
+    //            case "1":
+    //                await TestCodes(remote);
+    //                break;
 
-                default:
-                    return;
-            }
-        }
-    }
+    //            default:
+    //                return;
+    //        }
+    //    }
+    //}
 
-    private static string? Query(string prompt, string quitCommand = "Done")
-    {
-        Console.Write($"{prompt} ({quitCommand} to end) ");
-        return Console.ReadLine() is string text && !text.Equals(quitCommand, StringComparison.OrdinalIgnoreCase)
-            ? text
-            : null;
-    }
+    //private static string? Query(string prompt, string quitCommand = "Done")
+    //{
+    //    Console.Write($"{prompt} ({quitCommand} to end) ");
+    //    return Console.ReadLine() is string text && !text.Equals(quitCommand, StringComparison.OrdinalIgnoreCase)
+    //        ? text
+    //        : null;
+    //}
 
-    private static string? QueryFileName()
-    {
-        return Query("What is the device name?") is string name
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $"commands_{name}.json")
-            : null;
-    }
+    //private static string? QueryFileName()
+    //{
+    //    return Query("What is the device name?") is string name
+    //        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $"commands_{name}.json")
+    //        : null;
+    //}
 
-    private static async Task TestCodes(RMDevice remote)
-    {
-        if (QueryFileName() is not { } fileName)
-        {
-            return;
-        }
-        Dictionary<string, string> dictionary = new(JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(fileName, Encoding.UTF8))!, StringComparer.OrdinalIgnoreCase);
-        while (true)
-        {
-            if (Program.Query("Command name?") is not string name)
-            {
-                return;
-            }
-            if (!dictionary.TryGetValue(name, out string? text))
-            {
-                Console.Error.WriteLine($"Command {name} not found");
-                continue;
-            }
-            await remote.SendData(Convert.FromHexString(text));
-            await remote.WaitForAck();
-        }
-    }
+    //private static async Task TestCodes(RMDevice remote)
+    //{
+    //    if (QueryFileName() is not { } fileName)
+    //    {
+    //        return;
+    //    }
+    //    Dictionary<string, string> dictionary = new(JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(fileName, Encoding.UTF8))!, StringComparer.OrdinalIgnoreCase);
+    //    while (true)
+    //    {
+    //        if (Program.Query("Command name?") is not string name)
+    //        {
+    //            return;
+    //        }
+    //        if (!dictionary.TryGetValue(name, out string? text))
+    //        {
+    //            Console.Error.WriteLine($"Command {name} not found");
+    //            continue;
+    //        }
+    //        await remote.SendData(Convert.FromHexString(text));
+    //        await remote.WaitForAck();
+    //    }
+    //}
 
     
 }

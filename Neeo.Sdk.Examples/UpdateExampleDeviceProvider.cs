@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 
-namespace Remote.HodgePodge;
+namespace Neeo.Sdk.Examples;
 /*
 public class UpdateExampleDeviceProvider : IDeviceProvider
 {

@@ -1,28 +1,26 @@
-﻿using System.Text.Json.Serialization;
+﻿namespace Neeo.Sdk.Devices.Lists;
 
-namespace Neeo.Sdk.Devices.Lists;
-
-public sealed class ListEntry : ListItemBase
+public sealed class ListEntry : ClickableListItem, IListItem
 {
-    public ListEntry(string title, string? browseIdentifier = default, string? actionIdentifier = default, string? thumbnailUri = default, bool? isQueueable = default, ListUIAction? uiAction = default)
-        : base(ListItemType.Entry)
+    public ListEntry(string title, string? label = default, string? browseIdentifier = default, string? actionIdentifier = default, string? thumbnailUri = default, bool? isQueueable = default, ListUIAction? uiAction = default)
+        : base(actionIdentifier,  uiAction)
     {
         this.Title = title;
-        this.BrowseIdentifier = browseIdentifier;
-        this.ActionIdentifier = actionIdentifier;
-        this.UIAction = uiAction;
+        this.Label = label;
         this.ThumbnailUri = thumbnailUri;
-        this.IsQueueable = isQueueable??false;
+        this.IsQueueable = isQueueable;
+        this.BrowseIdentifier = browseIdentifier;
     }
-
-    public string? ActionIdentifier { get; }
 
     public string? BrowseIdentifier { get; }
 
+    public bool? IsQueueable { get; }
+
     public string? ThumbnailUri { get; }
-    public bool IsQueueable { get; }
+
     public string Title { get; }
 
-    [JsonPropertyName("uiAction")]
-    public ListUIAction? UIAction { get; }
+    public string? Label { get; }
+
+    ListItemType IListItem.Type => ListItemType.Entry;
 }

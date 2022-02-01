@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "Remote.HodgePodge": {
+    "Neeo.Sdk.Examples": {
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"

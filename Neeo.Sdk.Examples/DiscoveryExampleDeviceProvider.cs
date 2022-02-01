@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Discovery;
 
-namespace Remote.HodgePodge;
+namespace Neeo.Sdk.Examples;
 
 public class DiscoveryExampleDeviceProvider : IExampleDeviceProvider
 {
@@ -11,7 +11,7 @@ public class DiscoveryExampleDeviceProvider : IExampleDeviceProvider
 
     private Credentials? _credentials;
 
-    public IDeviceBuilder ProvideDevice()
+    public IDeviceBuilder Provide()
     {
         return Device.Create("Security Code Example", DeviceType.Accessory)
             .SetManufacturer("NEEO")

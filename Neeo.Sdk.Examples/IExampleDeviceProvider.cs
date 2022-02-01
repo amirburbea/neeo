@@ -1,8 +1,8 @@
 ﻿using Neeo.Sdk.Devices;
 
-namespace Remote.HodgePodge;
+namespace Neeo.Sdk.Examples;
 
 public interface IExampleDeviceProvider
 {
-    IDeviceBuilder ProvideDevice();
+    IDeviceBuilder Provide();
 }
