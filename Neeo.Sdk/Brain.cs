@@ -72,10 +72,8 @@ public sealed class Brain : IAsyncDisposable
     /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
     /// <param name="hostIPAddress">
     /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
-    /// <para />
-    /// Note: If in development and the port is not 0, the server also listens on localhost at the specified <paramref name="port"/>.
     /// </param>
-    /// <param name="port">The port to listen on.</param>
+    /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
     /// <param name="consoleLogging">
     /// The integration server logs via debug in development. If specified as <see langword="true"/>, enables console logging (regardless of hosting environment).
     /// </param>

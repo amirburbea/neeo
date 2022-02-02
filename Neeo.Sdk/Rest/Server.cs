@@ -52,10 +52,6 @@ internal static class Server
             options.AddServerHeader = false;
             options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
             options.Listen(hostAddress, port);
-            if (port != 0 && IPAddress.IsLoopback(hostAddress) && context.HostingEnvironment.IsDevelopment())
-            {
-                options.Listen(IPAddress.Loopback, port);
-            }
         })
         .ConfigureLogging((context, builder) =>
         {
