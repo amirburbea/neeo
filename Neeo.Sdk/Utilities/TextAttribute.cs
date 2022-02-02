@@ -8,7 +8,7 @@ namespace Neeo.Sdk.Utilities;
 /// An attribute used to associate text with an enumeration value.
 /// </summary>
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
-internal sealed class TextAttribute : Attribute
+public sealed class TextAttribute : Attribute
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="TextAttribute"/> with the specified <paramref name="text"/>.

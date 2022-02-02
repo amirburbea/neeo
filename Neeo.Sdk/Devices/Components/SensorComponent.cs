@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Neeo.Sdk.Devices.Components;
+﻿namespace Neeo.Sdk.Devices.Components;
 
 public interface ISensorComponent : IComponent
 {
@@ -8,11 +6,8 @@ public interface ISensorComponent : IComponent
 }
 
 internal sealed record class SensorComponent(
-    String Name,
-    String Label,
-    String Path,
-    SensorDetails Sensor
-) : Component(ComponentType.Sensor, Name, Label, Path), ISensorComponent
-{
-    ISensorDetails ISensorComponent.Sensor => this.Sensor;
-}
+    string Name,
+    string Label,
+    string Path,
+    ISensorDetails Sensor
+) : Component(ComponentType.Sensor, Name, Label, Path), ISensorComponent;

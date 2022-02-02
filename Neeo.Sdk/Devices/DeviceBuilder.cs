@@ -201,7 +201,7 @@ public interface IDeviceBuilder
         DeviceValueGetter<string>? getter = default
     );
 
-    IDeviceBuilder AddPlayerWidget(IPlayerWidgetCallbacks callbacks);
+    IDeviceBuilder AddPlayerWidget(IPlayerWidgetController controller);
 
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
@@ -435,7 +435,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         DeviceValueGetter<string>? getter
     ) => this.AddImageUrl(name, label, size, uri, getter);
 
-    IDeviceBuilder IDeviceBuilder.AddPlayerWidget(IPlayerWidgetCallbacks callbacks) => this.AddPlayerWidget(callbacks);
+    IDeviceBuilder IDeviceBuilder.AddPlayerWidget(IPlayerWidgetController controller) => this.AddPlayerWidget(controller);
 
     IDeviceBuilder IDeviceBuilder.AddPowerStateSensor(DeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor);
 
@@ -555,12 +555,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
-        bool isInput = name.StartsWith(Constants.InputPrefix);
-        this._hasInput |= isInput;
-        if (!isInput && DeviceBuilder._digitRegex.IsMatch(name))
-        {
-            this._digitCount++;
-        }
+        this._hasInput |= name.StartsWith(Constants.InputPrefix);
+        this._digitCount += DeviceBuilder._digitRegex.IsMatch(name) ? 1 : 0;
         return this;
     }
 
@@ -641,9 +637,9 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddPlayerWidget(IPlayerWidgetCallbacks callbacks)
+    private DeviceBuilder AddPlayerWidget(IPlayerWidgetController controller)
     {
-        if (this.Type.SupportsPlayerWidget())
+        if (!this.Type.SupportsPlayerWidget())
         {
             throw new InvalidOperationException($"{this.Type} does not support the player widget.");
         }
@@ -652,21 +648,22 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new InvalidOperationException("Player widget already defined.");
         }
         this._hasPlayerWidget = true;
-        if ((callbacks ?? throw new ArgumentNullException(nameof(callbacks))) is IQueueingPlayerWidgetCallbacks queueCallbacks)
+        if (controller.IsQueueSupported)
         {
-            this.AddDirectory("QUEUE_DIRECTORY", "QUEUE", DirectoryRole.Queue, queueCallbacks.PopulateQueueDirectoryAsync, queueCallbacks.HandleQueueDirectoryActionAsync);
+            this.AddDirectory("QUEUE_DIRECTORY", controller.QueueDirectoryLabel ?? "Queue", DirectoryRole.Queue, controller.PopulateQueueDirectoryAsync, controller.HandleQueueDirectoryActionAsync);
         }
         return this
            .AddButtonGroup(ButtonGroups.Volume)
            .AddButton(KnownButtons.Play | KnownButtons.PlayToggle | KnownButtons.Pause | KnownButtons.NextTrack | KnownButtons.PreviousTrack | KnownButtons.ShuffleToggle | KnownButtons.RepeatToggle | KnownButtons.ClearQueue)
-           .AddSlider("VOLUME", null, callbacks.GetVolumeAsync, callbacks.SetVolumeAsync, 0d, 100d, "%")
-           .AddDirectory("ROOT_DIRECTORY", "ROOT", DirectoryRole.Root, callbacks.PopulateRootDirectoryAsync, callbacks.HandleRootDirectoryActionAsync)
-           .AddSensor("COVER_ART_SENSOR", null, callbacks.GetCoverArtUriAsync)
-           .AddSensor("TITLE_SENSOR", null, callbacks.GetTitleAsync)
-           .AddSensor("DESCRIPTION_SENSOR", null, callbacks.GetDescriptionAsync)
-           .AddSwitch("PLAYING", null, callbacks.GetIsPlayingAsync, callbacks.SetIsPlayingAsync)
-           .AddSwitch("SHUFFLE", null, callbacks.GetShuffleAsync, callbacks.SetShuffleAsync)
-           .AddSwitch("REPEAT", null, callbacks.GetRepeatAsync, callbacks.SetRepeatAsync);
+           .AddSlider("VOLUME", null, controller.GetVolumeAsync, controller.SetVolumeAsync, 0d, 100d, "%")
+           .AddDirectory("ROOT_DIRECTORY", controller.RootDirectoryLabel ?? "Library", DirectoryRole.Root, controller.PopulateRootDirectoryAsync, controller.HandleRootDirectoryActionAsync)
+           .AddSensor("COVER_ART_SENSOR", null, controller.GetCoverArtUriAsync)
+           .AddSensor("TITLE_SENSOR", null, controller.GetTitleAsync)
+           .AddSensor("DESCRIPTION_SENSOR", null, controller.GetDescriptionAsync)
+           .AddSwitch("PLAYING", null, controller.GetIsPlayingAsync, controller.SetIsPlayingAsync)
+           .AddSwitch("MUTE", null, controller.GetIsMutedAsync, controller.SetIsMutedAsync)
+           .AddSwitch("SHUFFLE", null, controller.GetShuffleAsync, controller.SetShuffleAsync)
+           .AddSwitch("REPEAT", null, controller.GetRepeatAsync, controller.SetRepeatAsync);
     }
 
     private DeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> getter)
@@ -903,28 +900,28 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
         static DirectoryComponent BuildDirectory(string pathPrefix, DirectoryConstruct definition)
         {
-            (string featureName, string? label, DirectoryRole? role, _) = definition;
-            string name = Uri.EscapeDataString(featureName);
-            string path = pathPrefix + name;
+            (string name, string? label, DirectoryRole? role, _) = definition;
+            string directoryName = Uri.EscapeDataString(name);
+            string path = pathPrefix + directoryName;
             return new(
-                name,
-                label is { } text ? Uri.EscapeDataString(text) : name,
+                directoryName,
+                label is { } text ? Uri.EscapeDataString(text) : directoryName,
                 path,
                 role
             );
         }
 
-        static ImageUrlComponent BuildImageUrl(string pathPrefix, string featureName, string? label, ImageSize size, string? uri)
+        static ImageUrlComponent BuildImageUrl(string pathPrefix, string name, string? label, ImageSize size, string? uri)
         {
-            string name = Uri.EscapeDataString(featureName);
-            string path = pathPrefix + name;
+            string imageName = Uri.EscapeDataString(name);
+            string path = pathPrefix + imageName;
             return new(
-                name,
-                label is { } text ? Uri.EscapeDataString(text) : name,
+                imageName,
+                label is { } text ? Uri.EscapeDataString(text) : imageName,
                 path,
                 uri,
                 size,
-                GetSensorName(name)
+                GetSensorName(imageName)
             );
         }
 
@@ -939,32 +936,32 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             return component with { Name = legacyNoSuffixName, Path = pathPrefix + legacyNoSuffixName };
         }
 
-        static TextLabelComponent BuildTextLabel(string pathPrefix, string featureName, string? label, bool? isLabelVisible)
+        static TextLabelComponent BuildTextLabel(string pathPrefix, string name, string? label, bool? isLabelVisible)
         {
-            string name = Uri.EscapeDataString(featureName);
-            string path = pathPrefix + name;
-            return new(name, label is { } text ? Uri.EscapeDataString(text) : name, path, isLabelVisible, GetSensorName(name));
+            string textLabelName = Uri.EscapeDataString(name);
+            string path = pathPrefix + textLabelName;
+            return new(textLabelName, label is { } text ? Uri.EscapeDataString(text) : textLabelName, path, isLabelVisible, GetSensorName(textLabelName));
         }
 
-        static SensorComponent BuildSensor(string pathPrefix, string featureName, string? label, SensorDetails sensor)
+        static SensorComponent BuildSensor(string pathPrefix, string name, string? label, SensorDetails sensor)
         {
-            string name = GetSensorName(Uri.EscapeDataString(featureName));
-            string path = pathPrefix + name;
-            return new(name, Uri.EscapeDataString(label ?? name), path, sensor);
+            string sensorName = GetSensorName(Uri.EscapeDataString(name));
+            string path = pathPrefix + sensorName;
+            return new(sensorName, Uri.EscapeDataString(label ?? name), path, sensor);
         }
 
-        static SliderComponent BuildSlider(string pathPrefix, string featureName, string? label, IReadOnlyCollection<double> range, string unit)
+        static SliderComponent BuildSlider(string pathPrefix, string name, string? label, IReadOnlyCollection<double> range, string unit)
         {
-            string name = Uri.EscapeDataString(featureName);
-            string path = pathPrefix + name;
-            return new(name, label is { } text ? Uri.EscapeDataString(text) : name, path, new(range, unit, GetSensorName(name)));
+            string sliderName = Uri.EscapeDataString(name);
+            string path = pathPrefix + sliderName;
+            return new(sliderName, label is { } text ? Uri.EscapeDataString(text) : sliderName, path, new(range, Uri.EscapeDataString(unit), GetSensorName(sliderName)));
         }
 
-        static SwitchComponent BuildSwitch(string pathPrefix, string featureName, string? label)
+        static SwitchComponent BuildSwitch(string pathPrefix, string name, string? label)
         {
-            string name = Uri.EscapeDataString(featureName);
-            string path = pathPrefix + name;
-            return new(name, Uri.EscapeDataString(label ?? string.Empty), path, GetSensorName(name));
+            string switchName = Uri.EscapeDataString(name);
+            string path = pathPrefix + switchName;
+            return new(switchName, Uri.EscapeDataString(label ?? string.Empty), path, GetSensorName(switchName));
         }
 
         static string GetSensorName(string name) => name.EndsWith(SensorDetails.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorDetails.ComponentSuffix);

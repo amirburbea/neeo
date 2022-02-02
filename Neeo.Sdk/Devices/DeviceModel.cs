@@ -16,7 +16,7 @@ public interface IDeviceModel : IComparable<IDeviceModel>
 
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; }
 
-    int DriverVersion { get; }
+    int? DriverVersion { get; }
 
     DeviceIconOverride? Icon { get; }
 
@@ -58,7 +58,7 @@ internal sealed class DeviceModel : IDeviceModel
 
     public IReadOnlyCollection<DeviceCapability> DeviceCapabilities => this._adapter.DeviceCapabilities;
 
-    public int DriverVersion => this._adapter.DriverVersion ?? 0;
+    public int? DriverVersion => this._adapter.DriverVersion;
 
     public DeviceIconOverride? Icon => this._adapter.Icon;
 

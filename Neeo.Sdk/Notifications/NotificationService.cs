@@ -98,7 +98,7 @@ internal sealed class NotificationService : INotificationService
 
     private async Task<bool> SendNotificationAsync(Notification notification, string deviceAdapterName, bool isSensorNotification, CancellationToken cancellationToken)
     {
-        if (notification.UniqueDeviceId is null || notification.Component is null || notification.Value is null)
+        if (notification.DeviceId is null || notification.Component is null || notification.Value is null)
         {
             this._logger.LogWarning("Invalid notification:{message}.", notification);
             return false;
@@ -106,7 +106,7 @@ internal sealed class NotificationService : INotificationService
         this._logger.LogInformation("Send notification:{message}", notification);
         string[] notificationKeys = await this._notificationMapping.GetNotificationKeysAsync(
             deviceAdapterName,
-            notification.UniqueDeviceId,
+            notification.DeviceId,
             notification.Component,
             cancellationToken
         ).ConfigureAwait(false);

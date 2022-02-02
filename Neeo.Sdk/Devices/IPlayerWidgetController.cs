@@ -3,8 +3,14 @@ using Neeo.Sdk.Devices.Lists;
 
 namespace Neeo.Sdk.Devices;
 
-public interface IPlayerWidgetCallbacks
+public interface IPlayerWidgetController
 {
+    bool IsQueueSupported { get; }
+
+    string? QueueDirectoryLabel { get; }
+
+    string? RootDirectoryLabel { get; }
+
     Task<string> GetCoverArtUriAsync(string deviceId);
 
     Task<string> GetDescriptionAsync(string deviceId);
@@ -21,7 +27,11 @@ public interface IPlayerWidgetCallbacks
 
     Task<double> GetVolumeAsync(string deviceId);
 
+    Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier);
+
     Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier);
+
+    Task PopulateQueueDirectoryAsync(string deviceId, IListBuilder builder);
 
     Task PopulateRootDirectoryAsync(string deviceId, IListBuilder builder);
 

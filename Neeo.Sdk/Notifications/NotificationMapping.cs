@@ -10,7 +10,7 @@ namespace Neeo.Sdk.Notifications;
 
 public interface INotificationMapping
 {
-    ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string uniqueDeviceId, string componentName, CancellationToken cancellationToken = default);
+    ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string deviceId, string componentName, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationMapping : INotificationMapping
@@ -27,12 +27,12 @@ internal sealed class NotificationMapping : INotificationMapping
         this._logger = logger;
     }
 
-    public async ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string uniqueDeviceId, string componentName, CancellationToken cancellationToken)
+    public async ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string deviceId, string componentName, CancellationToken cancellationToken)
     {
-        (string, string) cacheKey = (deviceAdapterName, uniqueDeviceId);
+        (string, string) cacheKey = (deviceAdapterName, deviceId);
         if (!this._cache.TryGetValue(cacheKey, out EntryCache? entries))
         {
-            this._cache[cacheKey] = entries = new(await this.FetchEntriesAsync(deviceAdapterName, uniqueDeviceId, cancellationToken).ConfigureAwait(false));
+            this._cache[cacheKey] = entries = new(await this.FetchEntriesAsync(deviceAdapterName, deviceId, cancellationToken).ConfigureAwait(false));
         }
         if (entries.GetNotificationKeys(componentName) is { Length: > 0 } keys)
         {
@@ -43,9 +43,9 @@ internal sealed class NotificationMapping : INotificationMapping
         return Array.Empty<string>();
     }
 
-    private async Task<Entry[]> FetchEntriesAsync(string deviceAdapterName, string uniqueDeviceId, CancellationToken cancellationToken)
+    private async Task<Entry[]> FetchEntriesAsync(string deviceAdapterName, string deviceId, CancellationToken cancellationToken)
     {
-        string path = string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, deviceAdapterName, uniqueDeviceId);
+        string path = string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, deviceAdapterName, deviceId);
         Entry[] entries = await this._client.GetAsync<Entry[]>(path, cancellationToken).ConfigureAwait(false);
         return Array.FindAll(entries, static entry => entry.EventKey is not null);
     }

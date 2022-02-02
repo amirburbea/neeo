@@ -5,14 +5,14 @@ using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Examples.Devices;
 
-internal class ConsoleExampleDevice : IExampleDevice
+internal class SimpleTVExampleDevice : IExampleDevice
 {
-    private readonly ILogger<ConsoleExampleDevice> _logger;
+    private readonly ILogger<SimpleTVExampleDevice> _logger;
 
-    public ConsoleExampleDevice(ILogger<ConsoleExampleDevice> logger)
+    public SimpleTVExampleDevice(ILogger<SimpleTVExampleDevice> logger)
     {
         this._logger = logger;
-        const string deviceName = "Console Example Device";
+        const string deviceName = "Simple TV Example Device";
         this.Builder = Device.Create(deviceName, DeviceType.TV)
             .SetSpecificName(deviceName)
             .SetManufacturer("NEEO")

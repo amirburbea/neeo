@@ -8,7 +8,11 @@ public interface ISensorDetails
     SensorType Type { get; }
 }
 
-internal record class SensorDetails(SensorType Type) : ISensorDetails
+internal class SensorDetails : ISensorDetails
 {
     public const string ComponentSuffix = "_SENSOR";
+
+    public SensorDetails(SensorType type) => this.Type = type;
+
+    public SensorType Type { get; }
 }

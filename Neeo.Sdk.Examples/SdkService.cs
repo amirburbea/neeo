@@ -42,7 +42,7 @@ public sealed class SdkService : IHostedService
                 throw new();
             }
         }
-        this._environment = await brain.StartServerAsync(this._devices, "Example Service", consoleLogging: true, cancellationToken: cancellationToken).ConfigureAwait(false);
+        this._environment = await brain.StartServerAsync(this._devices, "Example Service", port:9000, consoleLogging: true, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
