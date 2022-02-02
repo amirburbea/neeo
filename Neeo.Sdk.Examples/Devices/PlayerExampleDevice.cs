@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
@@ -10,6 +10,8 @@ namespace Neeo.Sdk.Examples.Devices;
 
 public sealed class PlayerExampleDevice : IExampleDevice
 {
+    private static readonly Pet[] _pets = Enum.GetValues<Pet>();
+
     private readonly PlayerWidgetController _controller;
 
     public PlayerExampleDevice(ILogger<PlayerExampleDevice> logger)
@@ -18,18 +20,19 @@ public sealed class PlayerExampleDevice : IExampleDevice
         const string deviceName = "Player SDK Example";
         this.Builder = Device.Create(deviceName, DeviceType.MusicPlayer)
             .SetManufacturer("NEEO")
-            .AddAdditionalSearchTokens("SDK","player")
-            .RegisterInitializer(()=>Task.CompletedTask)
+            .AddAdditionalSearchTokens("SDK", "player")
+            .RegisterInitializer(() => Task.CompletedTask)
             .AddButtonGroup(ButtonGroups.Power)
             .AddButtonHandler(this._controller.HandleButtonAsync)
             .AddPlayerWidget(this._controller)
             .EnableNotifications(notifier => this._controller.Notifier = notifier);
     }
 
-    private enum Animal
+    private enum Pet
     {
         Kitten,
-        Puppy
+        Puppy,
+        Folder
     }
 
     private enum PlayerKey
@@ -56,16 +59,20 @@ public sealed class PlayerExampleDevice : IExampleDevice
         Title,
 
         [Text("DESCRIPTION_SENSOR")]
-        Description
+        Description,
     }
 
     public IDeviceBuilder Builder { get; }
 
-    private static string GetUri(Animal animal) => $"https://neeo-sdk.neeo.io/{Enum.GetName(animal)!.ToLower()}.jpg";
+    private static string GetCoverArt(Pet pet) => $"https://neeo-sdk.neeo.io/{pet.ToString().ToLower()}.jpg";
+
+    private static string GetDescription(Pet pet) => $"A song about my {pet.ToString().ToLower()}";
+
+    private static string GetTitle(Pet pet) => $"The {pet.ToString().ToLower()} song";
 
     private sealed class PlayerService
     {
-        private readonly Dictionary<string, object> _dictionary = new();
+        private readonly ConcurrentDictionary<string, object> _dictionary = new();
 
         public PlayerService()
         {
@@ -75,10 +82,12 @@ public sealed class PlayerExampleDevice : IExampleDevice
             this.SetValue(PlayerKey.Shuffle, BooleanBoxes.False);
             this.SetValue(PlayerKey.Repeat, BooleanBoxes.False);
             this.SetValue(PlayerKey.Volume, 50d);
-            this.SetValue(PlayerKey.CoverArt, GetUri(Animal.Kitten));
-            this.SetValue(PlayerKey.Title, "A Kitten");
-            this.SetValue(PlayerKey.Description, "This is the description...");
+            this.SetValue(PlayerKey.CoverArt, GetCoverArt(Pet.Kitten));
+            this.SetValue(PlayerKey.Title, GetTitle(Pet.Kitten));
+            this.SetValue(PlayerKey.Description, GetDescription(Pet.Kitten));
         }
+
+        public Pet Pet { get; set; } = Pet.Kitten;
 
         public TValue GetValue<TValue>(PlayerKey key) => (TValue)this._dictionary[TextAttribute.GetText(key)];
 
@@ -92,7 +101,7 @@ public sealed class PlayerExampleDevice : IExampleDevice
 
         public PlayerWidgetController(ILogger logger) => this._logger = logger;
 
-        bool IPlayerWidgetController.IsQueueSupported => true;
+        public bool IsQueueSupported => false;
 
         public IDeviceNotifier? Notifier { get; set; }
 
@@ -116,10 +125,17 @@ public sealed class PlayerExampleDevice : IExampleDevice
 
         public Task<double> GetVolumeAsync(string deviceId) => this.GetValueAsync<double>(PlayerKey.Volume, deviceId);
 
-        public Task HandleButtonAsync(string deviceId, string button)
+        public Task HandleButtonAsync(string deviceId, string button) => KnownButton.GetKnownButton(button) switch
         {
-            return Task.CompletedTask;
-        }
+            KnownButtons.Play => this.SetIsPlayingAsync(deviceId, true),
+            KnownButtons.PlayToggle => this.SetIsPlayingAsync(deviceId, !this._service.GetValue<bool>(PlayerKey.Playing)),
+            KnownButtons.Pause => this.SetIsPlayingAsync(deviceId, false),
+            KnownButtons.VolumeUp => this.SetVolumeAsync(deviceId, Math.Min(this._service.GetValue<double>(PlayerKey.Volume) + 5d, 100d)),
+            KnownButtons.VolumeDown => this.SetVolumeAsync(deviceId, Math.Max(this._service.GetValue<double>(PlayerKey.Volume) - 5d, 0d)),
+            KnownButtons.NextTrack => this.ChangeTrackAsync(deviceId, (Pet)(1 + (int)this._service.Pet)),
+            KnownButtons.PreviousTrack => this.ChangeTrackAsync(deviceId, (Pet)(1 + (int)this._service.Pet)),
+            _ => Task.CompletedTask,
+        };
 
         Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier)
         {
@@ -128,7 +144,7 @@ public sealed class PlayerExampleDevice : IExampleDevice
 
         public Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier)
         {
-            return Task.CompletedTask;
+            return Enum.TryParse(actionIdentifier, out Pet pet) ? this.ChangeTrackAsync(deviceId, pet) : Task.CompletedTask;
         }
 
         Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, IListBuilder builder)
@@ -138,6 +154,10 @@ public sealed class PlayerExampleDevice : IExampleDevice
 
         public Task PopulateRootDirectoryAsync(string deviceId, IListBuilder builder)
         {
+            foreach (Pet pet in PlayerExampleDevice._pets)
+            {
+                builder.AddEntry(new(GetTitle(pet), GetDescription(pet), null, Enum.GetName(pet), thumbnailUri: GetCoverArt(pet)));
+            }
             return Task.CompletedTask;
         }
 
@@ -151,19 +171,37 @@ public sealed class PlayerExampleDevice : IExampleDevice
 
         public Task SetVolumeAsync(string deviceId, double volume) => this.SetValueAsync(PlayerKey.Volume, deviceId, volume);
 
+        private Task ChangeTrackAsync(string deviceId, Pet pet)
+        {
+            return (int)pet switch
+            {
+                < 0 => this.ChangeTrackAsync(deviceId, _pets[^1]),
+                int value when value >= _pets.Length => this.ChangeTrackAsync(deviceId, 0),
+                _ => Task.WhenAll(
+                    Task.FromResult(this._service.Pet = pet),
+                    this.SetConverArtAsync(deviceId, GetCoverArt(pet)),
+                    this.SetTitleAsync(deviceId, GetTitle(pet)),
+                    this.SetDescriptionAsync(deviceId, GetDescription(pet))
+                )
+            };
+        }
+
         private Task<TValue> GetValueAsync<TValue>(PlayerKey key, string deviceId)
         {
-            this._logger.LogWarning("Getting component state {deviceId} {key}", deviceId, key);
+            this._logger.LogInformation("Getting component state {deviceId} {key}", deviceId, key);
             return Task.FromResult(this._service.GetValue<TValue>(key));
         }
 
+        private Task SetConverArtAsync(string deviceId, string coverArt) => this.SetValueAsync(PlayerKey.CoverArt, deviceId, coverArt);
+
+        private Task SetDescriptionAsync(string deviceId, string description) => this.SetValueAsync(PlayerKey.Description, deviceId, description);
+
+        private Task SetTitleAsync(string deviceId, string title) => this.SetValueAsync(PlayerKey.Title, deviceId, title);
+
         private async Task SetValueAsync(PlayerKey key, string deviceId, object value)
         {
-            this._logger.LogWarning("Setting component {deviceId} {key} to {value}", deviceId, key, value);
-            if (this.Notifier != null)
-            {
-                await this.Notifier.SendNotificationAsync(componentName: TextAttribute.GetText(key), value: value, deviceId: deviceId);
-            }
+            this._logger.LogInformation("Setting component {deviceId} {key} to {value}", deviceId, key, value);
+            await (this.Notifier?.SendNotificationAsync(componentName: TextAttribute.GetText(key), value: value, deviceId: deviceId) ?? Task.CompletedTask).ConfigureAwait(false);
             this._service.SetValue(key, value);
         }
     }
