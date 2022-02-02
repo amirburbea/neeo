@@ -1,10 +1,12 @@
 ﻿namespace Neeo.Sdk.Devices;
 
+using System;
 using static KnownButtons;
 
 /// <summary>
-/// Groups of buttons which can be added via a single call to <see cref="IDeviceBuilder.AddButtonGroups"/>.
+/// Groups of buttons which can be added via a single call to <see cref="IDeviceBuilder.AddButtonGroup"/>.
 /// </summary>
+[Flags]
 public enum ButtonGroups : ulong
 {
     /// <summary>
@@ -48,7 +50,7 @@ public enum ButtonGroups : ulong
     /// <summary>
     /// &quot;MY RECORDINGS&quot;, &quot;RECORD&quot;, &quot;LIVE&quot;.
     /// </summary>
-    Recording = MyRecordings | Record | Live,
+    //Recording = MyRecordings | Record | Live,
 
     /// <summary>
     /// &quot;PLAY&quot;, &quot;PAUSE&quot;, &quot;STOP&quot;.

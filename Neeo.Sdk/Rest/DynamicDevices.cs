@@ -12,7 +12,7 @@ public interface IDynamicDevices : IDynamicDeviceRegistrar
 {
     ValueTask<bool> StoreDiscoveryHandlerInRequestAsync(HttpContext context, string deviceId, object placeholder);
 
-    void StorePlaceholderInRequest(HttpContext context, IDeviceAdapter adapter, string text);
+    void StorePlaceholderInRequest(HttpContext context, string text);
 
     bool TryGetPlaceholder(HttpContext context, [NotNullWhen(true)] out object? placeholder);
 }
@@ -32,7 +32,8 @@ internal sealed class DynamicDevices : IDynamicDevices
 
     public async ValueTask<bool> StoreDiscoveryHandlerInRequestAsync(HttpContext httpContext, string deviceId, object placeholder)
     {
-        (IDeviceAdapter adapter, string componentName) = (DynamicPlaceholder)placeholder;
+        IDeviceAdapter adapter = httpContext.GetItem<IDeviceAdapter>()!;
+        string componentName = (string)placeholder;
         if (TryStore())
         {
             return true;
@@ -56,9 +57,9 @@ internal sealed class DynamicDevices : IDynamicDevices
         }
     }
 
-    public void StorePlaceholderInRequest(HttpContext context, IDeviceAdapter adapter, string componentName) => context.SetItem(new DynamicPlaceholder(adapter, componentName));
+    public void StorePlaceholderInRequest(HttpContext context, string text) => context.SetItem( text);
 
-    public bool TryGetPlaceholder(HttpContext context, [NotNullWhen(true)] out object? placeholder) => context.Items.TryGetValue(nameof(DynamicPlaceholder), out placeholder);
+    public bool TryGetPlaceholder(HttpContext context, [NotNullWhen(true)] out object? placeholder) => (placeholder = context.GetItem<string>()) is not null;
 
     private sealed record class DynamicPlaceholder(IDeviceAdapter Adapter, string ComponentName);
 }

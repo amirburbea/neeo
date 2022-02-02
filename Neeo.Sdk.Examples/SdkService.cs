@@ -6,8 +6,10 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Neeo.Discovery;
 using Neeo.Sdk.Devices;
+using Neeo.Sdk.Examples.Devices;
 
 namespace Neeo.Sdk.Examples;
 
@@ -16,11 +18,13 @@ public sealed class SdkService : IHostedService
     private static readonly Regex _ipAddressRegex = new(@"^\d+\.\d+\.\d+\.\d+$");
 
     private readonly IDeviceBuilder[] _devices;
+    private readonly ILogger<SdkService> _logger;
     private ISdkEnvironment? _environment;
 
-    public SdkService(IEnumerable<IExampleDeviceProvider> providers)
+    public SdkService(IEnumerable<IExampleDevice> examples, ILogger<SdkService> logger)
     {
-        this._devices = providers.Select(provider => provider.Provide()).ToArray();
+        this._devices = examples.Select(exampleDevice => exampleDevice.Builder).ToArray();
+        this._logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -30,9 +34,13 @@ public sealed class SdkService : IHostedService
         {
             brain = new(IPAddress.Parse(match.Value));
         }
-        else if ((brain = await BrainDiscovery.DiscoverAsync(cancellationToken: cancellationToken).ConfigureAwait(false)) is null)
+        else
         {
-            return;
+            this._logger.LogInformation("Discovering Brain...");
+            if ((brain = await BrainDiscovery.DiscoverAsync(cancellationToken: cancellationToken).ConfigureAwait(false)) is null)
+            {
+                throw new();
+            }
         }
         this._environment = await brain.StartServerAsync(this._devices, "Example Service", consoleLogging: true, cancellationToken: cancellationToken).ConfigureAwait(false);
     }

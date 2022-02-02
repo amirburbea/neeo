@@ -18,6 +18,8 @@ public interface IDeviceModel : IComparable<IDeviceModel>
 
     int DriverVersion { get; }
 
+    DeviceIconOverride? Icon { get; }
+
     int Id { get; }
 
     string Manufacturer { get; }
@@ -42,7 +44,7 @@ internal sealed class DeviceModel : IDeviceModel
     public DeviceModel(int id, IDeviceAdapter adapter)
     {
         (this.Id, this._adapter) = (id, adapter);
-        this.Device = new(adapter.DeviceName, adapter.Tokens, adapter.SpecificName, adapter.Icon);
+        this.Device = new(adapter);
         this.Tokens = string.Join(' ', adapter.Tokens);
     }
 
@@ -58,6 +60,8 @@ internal sealed class DeviceModel : IDeviceModel
 
     public int DriverVersion => this._adapter.DriverVersion ?? 0;
 
+    public DeviceIconOverride? Icon => this._adapter.Icon;
+
     public int Id { get; }
 
     public string Manufacturer => this._adapter.Manufacturer;
@@ -72,5 +76,5 @@ internal sealed class DeviceModel : IDeviceModel
 
     public DeviceType Type => this._adapter.Type;
 
-    public record struct DeviceInfo(string Name, IReadOnlyCollection<string> Tokens, string? SpecificName, DeviceIconOverride? Icon) : IDeviceInfo;
+    
 }

@@ -30,7 +30,7 @@ internal partial class DeviceController
     {
         if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
-            await feature.SubscribeAsync(deviceId);
+            await feature.UnsubscribeAsync(deviceId);
         }
         this._logger.LogInformation("Device removed {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
         return this.Serialize(new SuccessResponse(true));

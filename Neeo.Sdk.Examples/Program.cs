@@ -1,20 +1,39 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Broadlink.RM;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Neeo.Sdk.Examples.Devices;
+using Microsoft.Extensions.Logging;
 
 namespace Neeo.Sdk.Examples;
 
 internal static class Program
 {
+    private static void ConfigureServices(IServiceCollection services)
+    {
+        // Finds all device examples and registers them with
+        foreach (Type type in Assembly.GetExecutingAssembly().GetTypes())
+        {
+            if (type.IsAssignableTo(typeof(IExampleDevice)) && !type.IsInterface && !type.IsAbstract)
+            {
+                services.AddSingleton(typeof(IExampleDevice), type);
+            }
+        }
+        // A service for starting the SDK.
+        services.AddHostedService<SdkService>();
+    }
+
+    private static async Task Main()
+    {
+        using IHost host = new HostBuilder()
+            .UseConsoleLifetime() // Support stopping via CTRL+C.
+            .ConfigureLogging(builder => builder.ClearProviders().AddConsole())
+            .ConfigureServices(Program.ConfigureServices)
+            .Build();
+        await host.StartAsync();
+        await host.WaitForShutdownAsync();
+    }
 
     //private static async Task LearnCodes(RMDevice device)
     //{
@@ -38,22 +57,6 @@ internal static class Program
     //    File.WriteAllText(fileName, JsonSerializer.Serialize(dictionary), Encoding.UTF8);
     //}
 
-    private static async Task Main()
-    {
-        using IHost host = new HostBuilder()   
-            .UseConsoleLifetime()         
-            .ConfigureServices(services =>
-            {
-                foreach (var type in Assembly.GetExecutingAssembly().GetTypes().Where(type => type.IsAssignableTo(typeof(IExampleDeviceProvider)) && !type.IsInterface && !type.IsAbstract))
-                {
-                    services.AddSingleton(typeof(IExampleDeviceProvider), type);
-                }
-                services.AddHostedService<SdkService>();
-            })
-            .Build();
-        await host.StartAsync();
-        await host.WaitForShutdownAsync();
-    }
     //var arg = Environment.GetCommandLineArgs().LastOrDefault()?.Trim();
 
     //Brain? brain;
@@ -173,7 +176,6 @@ internal static class Program
         return Task.CompletedTask;
     }*/
 
-
     //private static async Task MainRM()
     //{
     //    using RMDevice? remote = await RMDiscovery.DiscoverDeviceAsync();
@@ -237,6 +239,4 @@ internal static class Program
     //        await remote.WaitForAck();
     //    }
     //}
-
-    
 }

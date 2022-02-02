@@ -44,7 +44,7 @@ public enum DeviceCapability
     DynamicDevice = DeviceCharacteristic.DynamicDevice,
 
     /// <summary>
-    /// The device has a custom favorites handler. (See <see cref="IDeviceBuilder.RegisterFavoritesHandler"/>).
+    /// The device has a custom favorites handler. (See <see cref="IDeviceBuilder.AddFavoriteHandler"/>).
     /// </summary>
     [Text("customFavoriteHandler")]
     CustomFavoriteHandler,

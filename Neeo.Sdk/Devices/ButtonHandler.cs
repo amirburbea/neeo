@@ -3,7 +3,7 @@
 namespace Neeo.Sdk.Devices;
 
 /// <summary>
-/// A callback which is invoked in response to buttons being pressed on the NEEO remote
+/// A callback which is invoked in response to a button being pressed on the NEEO remote
 /// in order to allow the driver to respond accordingly.
 /// <para />
 /// </summary>

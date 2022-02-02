@@ -152,13 +152,22 @@ public interface IDeviceBuilder
     IDeviceBuilder AddButton(string name, string? label = default);
 
     /// <summary>
+    /// Add a button (or bitwise combination of buttons) to the device.
+    /// </summary>
+    /// <param name="buttons">The button (or bitwise combination of buttons) to add.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    /// <remarks>Note that adding buttons to the device requires defining a button handler via
+    /// <see cref="AddButtonHandler"/>.</remarks>
+    IDeviceBuilder AddButton(KnownButtons buttons);
+
+    /// <summary>
     /// Add a group of buttons to the device.
     /// </summary>
     /// <param name="group">The <see cref="ButtonGroups"/> to add.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     /// <remarks>Note that adding buttons to the device requires defining a button handler via
     /// <see cref="AddButtonHandler"/>.</remarks>
-    IDeviceBuilder AddButtonGroups(ButtonGroups group) => this.AddButtons((KnownButtons)group);
+    IDeviceBuilder AddButtonGroup(ButtonGroups group);
 
     /// <summary>
     /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle button presses.
@@ -167,33 +176,32 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddButtonHandler(ButtonHandler handler);
 
-    /// <summary>
-    /// Add a button (or bitwise combination of buttons) to the device.
-    /// </summary>
-    /// <param name="buttons">The button (or bitwise combination of buttons) to add.</param>
-    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    /// <remarks>Note that adding buttons to the device requires defining a button handler via
-    /// <see cref="AddButtonHandler"/>.</remarks>
-    IDeviceBuilder AddButtons(KnownButtons buttons);
-
     IDeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic);
 
     IDeviceBuilder AddDirectory(
         string name,
         string? label,
-        string? identifier,
         DirectoryRole? role,
         DeviceDirectoryPopulator populator,
         DirectoryActionHandler actionHandler
     );
 
+    /// <summary>
+    /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
+    /// </summary>
+    /// <param name="handler">The favorites handler callback.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddFavoriteHandler(FavoriteHandler handler);
+
     IDeviceBuilder AddImageUrl(
-        string name,
+            string name,
         string? label,
         ImageSize size,
         string? uri = default,
         DeviceValueGetter<string>? getter = default
     );
+
+    IDeviceBuilder AddPlayerWidget(IPlayerWidgetCallbacks callbacks);
 
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
@@ -263,13 +271,6 @@ public interface IDeviceBuilder
     IDeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceSubscriptionHandler onDeviceAdded, DeviceSubscriptionHandler onDeviceRemoved, DeviceSubscriptionListHandler initializeDeviceList);
 
     /// <summary>
-    /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
-    /// </summary>
-    /// <param name="handler">The favorites handler callback.</param>
-    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler);
-
-    /// <summary>
     /// Sets a callback to be invoked to initialize the device before making it available to the NEEO Brain.
     /// </summary>
     /// <param name="initializer">The device initializer callback.</param>
@@ -321,6 +322,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private readonly HashSet<DeviceCharacteristic> _characteristics = new();
     private int _digitCount;
     private bool _hasInput;
+    private bool _hasPlayerWidget;
     private int _roles;
 
     internal DeviceBuilder(string name, DeviceType type, string? prefix)
@@ -407,28 +409,33 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.AddButton(string name, string? label) => this.AddButton(name, label);
 
-    IDeviceBuilder IDeviceBuilder.AddButtonHandler(ButtonHandler handler) => this.AddButtonHandler(handler);
+    IDeviceBuilder IDeviceBuilder.AddButton(KnownButtons button) => this.AddButton(button);
 
-    IDeviceBuilder IDeviceBuilder.AddButtons(KnownButtons button) => this.AddButtons(button);
+    IDeviceBuilder IDeviceBuilder.AddButtonGroup(ButtonGroups group) => this.AddButtonGroup(group);
+
+    IDeviceBuilder IDeviceBuilder.AddButtonHandler(ButtonHandler handler) => this.AddButtonHandler(handler);
 
     IDeviceBuilder IDeviceBuilder.AddCharacteristic(DeviceCharacteristic characteristic) => this.AddCharacteristic(characteristic);
 
     IDeviceBuilder IDeviceBuilder.AddDirectory(
         string name,
         string? label,
-        string? identifier,
         DirectoryRole? role,
         DeviceDirectoryPopulator populator,
         DirectoryActionHandler actionHandler
-    ) => this.AddDirectory(name, label, identifier, role, populator, actionHandler);
+    ) => this.AddDirectory(name, label, role, populator, actionHandler);
+
+    IDeviceBuilder IDeviceBuilder.AddFavoriteHandler(FavoriteHandler handler) => this.AddFavoriteHandler(handler);
 
     IDeviceBuilder IDeviceBuilder.AddImageUrl(
-                string name,
+            string name,
         string? label,
         ImageSize size,
         string? uri,
         DeviceValueGetter<string>? getter
     ) => this.AddImageUrl(name, label, size, uri, getter);
+
+    IDeviceBuilder IDeviceBuilder.AddPlayerWidget(IPlayerWidgetCallbacks callbacks) => this.AddPlayerWidget(callbacks);
 
     IDeviceBuilder IDeviceBuilder.AddPowerStateSensor(DeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor);
 
@@ -522,8 +529,6 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         DeviceSubscriptionListHandler initializeDeviceList
     ) => this.RegisterDeviceSubscriptionCallbacks(onDeviceAdded, onDeviceRemoved, initializeDeviceList);
 
-    IDeviceBuilder IDeviceBuilder.RegisterFavoritesHandler(FavoritesHandler handler) => this.RegisterFavoritesHandler(handler);
-
     IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer) => this.RegisterInitializer(initializer);
 
     IDeviceBuilder IDeviceBuilder.SetDriverVersion(int? version) => this.SetDriverVersion(version);
@@ -559,6 +564,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
+    private DeviceBuilder AddButton(KnownButtons buttons) => KnownButton.GetNames(buttons).Aggregate(
+        this,
+        static (builder, name) => builder.AddButton(name)
+    );
+
+    private DeviceBuilder AddButtonGroup(ButtonGroups group) => this.AddButton((KnownButtons)group);
+
     private DeviceBuilder AddButtonHandler(ButtonHandler handler)
     {
         if (this.ButtonHandler != null)
@@ -569,18 +581,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddButtons(KnownButtons buttons) => KnownButton.GetNames(buttons).Aggregate(
-        this,
-        static (builder, name) => builder.AddButton(name)
-    );
-
     private DeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic)
     {
         this._characteristics.Add(characteristic);
         return this;
     }
 
-    private DeviceBuilder AddDirectory(string name, string? label, string? identifier, DirectoryRole? role, DeviceDirectoryPopulator populator, DirectoryActionHandler actionHandler)
+    private DeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DeviceDirectoryPopulator populator, DirectoryActionHandler actionHandler)
     {
         if (role.HasValue && Interlocked.Exchange(ref this._roles, this._roles | (int)role.Value) == this._roles)
         {
@@ -589,7 +596,6 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         DirectoryConstruct definition = new(
            Validator.ValidateText(name),
            Validator.ValidateText(label, allowNull: true),
-           Validator.ValidateText(identifier, allowNull: true),
            role,
            new(populator ?? throw new ArgumentNullException(nameof(populator)), actionHandler ?? throw new ArgumentNullException(nameof(actionHandler)))
         );
@@ -597,6 +603,20 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
+        return this;
+    }
+
+    private DeviceBuilder AddFavoriteHandler(FavoriteHandler handler)
+    {
+        if (this.FavoritesFeature != null)
+        {
+            throw new InvalidOperationException($"{nameof(FavoriteHandler)} already defined.");
+        }
+        if (!this.Type.SupportsFavorites())
+        {
+            throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
+        }
+        this.FavoritesFeature = new(handler);
         return this;
     }
 
@@ -619,6 +639,34 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
         return this;
+    }
+
+    private DeviceBuilder AddPlayerWidget(IPlayerWidgetCallbacks callbacks)
+    {
+        if (this.Type.SupportsPlayerWidget())
+        {
+            throw new InvalidOperationException($"{this.Type} does not support the player widget.");
+        }
+        if (this._hasPlayerWidget)
+        {
+            throw new InvalidOperationException("Player widget already defined.");
+        }
+        this._hasPlayerWidget = true;
+        if ((callbacks ?? throw new ArgumentNullException(nameof(callbacks))) is IQueueingPlayerWidgetCallbacks queueCallbacks)
+        {
+            this.AddDirectory("QUEUE_DIRECTORY", "QUEUE", DirectoryRole.Queue, queueCallbacks.PopulateQueueDirectoryAsync, queueCallbacks.HandleQueueDirectoryActionAsync);
+        }
+        return this
+           .AddButtonGroup(ButtonGroups.Volume)
+           .AddButton(KnownButtons.Play | KnownButtons.PlayToggle | KnownButtons.Pause | KnownButtons.NextTrack | KnownButtons.PreviousTrack | KnownButtons.ShuffleToggle | KnownButtons.RepeatToggle | KnownButtons.ClearQueue)
+           .AddSlider("VOLUME", null, callbacks.GetVolumeAsync, callbacks.SetVolumeAsync, 0d, 100d, "%")
+           .AddDirectory("ROOT_DIRECTORY", "ROOT", DirectoryRole.Root, callbacks.PopulateRootDirectoryAsync, callbacks.HandleRootDirectoryActionAsync)
+           .AddSensor("COVER_ART_SENSOR", null, callbacks.GetCoverArtUriAsync)
+           .AddSensor("TITLE_SENSOR", null, callbacks.GetTitleAsync)
+           .AddSensor("DESCRIPTION_SENSOR", null, callbacks.GetDescriptionAsync)
+           .AddSwitch("PLAYING", null, callbacks.GetIsPlayingAsync, callbacks.SetIsPlayingAsync)
+           .AddSwitch("SHUFFLE", null, callbacks.GetShuffleAsync, callbacks.SetShuffleAsync)
+           .AddSwitch("REPEAT", null, callbacks.GetRepeatAsync, callbacks.SetRepeatAsync);
     }
 
     private DeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> getter)
@@ -855,14 +903,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
         static DirectoryComponent BuildDirectory(string pathPrefix, DirectoryConstruct definition)
         {
-            (string featureName, string? label, string? identifier, DirectoryRole? role, _) = definition;
+            (string featureName, string? label, DirectoryRole? role, _) = definition;
             string name = Uri.EscapeDataString(featureName);
             string path = pathPrefix + name;
             return new(
                 name,
                 label is { } text ? Uri.EscapeDataString(text) : name,
                 path,
-                identifier,
                 role
             );
         }
@@ -995,20 +1042,6 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder RegisterFavoritesHandler(FavoritesHandler handler)
-    {
-        if (this.FavoritesFeature != null)
-        {
-            throw new InvalidOperationException($"{nameof(FavoritesHandler)} already defined.");
-        }
-        if (!this.Type.SupportsFavorites())
-        {
-            throw new NotSupportedException($"Device type {this.Type} does not support favorites.");
-        }
-        this.FavoritesFeature = new(handler);
-        return this;
-    }
-
     private DeviceBuilder RegisterInitializer(DeviceInitializer initializer)
     {
         if (this.Initializer != null)
@@ -1049,7 +1082,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     public sealed record ButtonConstruct(string Name, string? Label) : Construct(Name, Label);
 
-    public sealed record DirectoryConstruct(string Name, string? Label, string? Identifier, DirectoryRole? Role, DirectoryFeature Feature) : Construct(Name, Label);
+    public sealed record DirectoryConstruct(string Name, string? Label, DirectoryRole? Role, DirectoryFeature Feature) : Construct(Name, Label);
 
     public sealed record ImageUrlConstruct(string Name, string? Label, ValueFeature Feature, ImageSize Size, String? Uri) : Construct(Name, Label);
 

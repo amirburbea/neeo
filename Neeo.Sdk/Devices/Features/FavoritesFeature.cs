@@ -12,13 +12,13 @@ public interface IFavoritesFeature : IFeature
 
 internal sealed class FavoritesFeature : IFavoritesFeature
 {
-    private readonly FavoritesHandler _favoritesHandler;
+    private readonly FavoriteHandler _handler;
 
-    public FavoritesFeature(FavoritesHandler favoritesHandler) => this._favoritesHandler = favoritesHandler??throw new ArgumentNullException(nameof(favoritesHandler));
+    public FavoritesFeature(FavoriteHandler handler) => this._handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
     public async Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite)
     {
-        await this._favoritesHandler(deviceId, favorite).ConfigureAwait(false);
+        await this._handler.Invoke(deviceId, favorite).ConfigureAwait(false);
         return true;
     }
 }

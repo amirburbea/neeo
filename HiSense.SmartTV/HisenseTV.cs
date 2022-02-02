@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Connecting;
@@ -11,21 +12,23 @@ namespace HiSense.SmartTV;
 
 public class HisenseTV
 {
+
+
     private static readonly MqttFactory _mqttFactory = new();
 
-    public static async Task<IPAddress?> DiscoverAsync()
+    public static async Task<IMqttClient?> DiscoverAsync()
     {
         using CancellationTokenSource cts = new();
-        TaskCompletionSource<IPAddress?> taskCompletionSource = new();
+        TaskCompletionSource<IMqttClient?> taskCompletionSource = new();
         try
         {
             await Task.WhenAll(GetAddresses().Select(async address =>
             {
-                if (!await ConnectAsync(address, cts.Token).ConfigureAwait(false))
+                if (await ConnectAsync(address, cts.Token).ConfigureAwait(false) is not { } client)
                 {
                     return;
                 }
-                taskCompletionSource.TrySetResult(address);
+                taskCompletionSource.TrySetResult(client);
                 cts.Cancel();
             })).ConfigureAwait(false);
             taskCompletionSource.TrySetResult(null);
@@ -35,28 +38,31 @@ public class HisenseTV
         }
         return await taskCompletionSource.Task.ConfigureAwait(false);
 
-        async Task<bool> ConnectAsync(IPAddress address, CancellationToken cancellationToken)
+        async Task<IMqttClient> ConnectAsync(IPAddress address, CancellationToken cancellationToken)
         {
+            IMqttClient? client = default;
             try
             {
                 if (await TryPingAsync(address).ConfigureAwait(false))
                 {
-                    using IMqttClient client = HisenseTV._mqttFactory.CreateMqttClient();
+                    client = HisenseTV._mqttFactory.CreateMqttClient();
                     if (await client.ConnectAsync(HisenseTV.CreateClientOptions(address), cancellationToken).ConfigureAwait(false) is { ResultCode: MqttClientConnectResultCode.Success })
                     {
-                        return true;
+                        return client;
                     }
                 }
             }
             catch (MqttCommunicationException)
             {
-                // Pinged a non Hisense TV.
+                // Pinged something but not a Hisense TV.
+                client?.Dispose();
             }
             catch (OperationCanceledException)
             {
                 // Cancelled because we found a Hisense TV.
+                client?.Dispose();
             }
-            return false;
+            return default;
         }
 
         static IEnumerable<IPAddress> GetAddresses()
@@ -97,6 +103,8 @@ public class HisenseTV
         }
     }
 
+
+
     private static IMqttClientOptions CreateClientOptions(IPAddress ipAddress) => new MqttClientOptionsBuilder()
         .WithTcpServer(ipAddress.ToString(), 36669)
         .WithCredentials("hisenseservice", "multimqttservice")
@@ -111,9 +119,17 @@ internal class Foo
         await WakeOnLan.WakeAsync("18:30:0C:C3:F4:C8");
         //var dict = IPHelper.GetAllDevicesOnLAN();
 
-        var q = await HisenseTV.DiscoverAsync();
-        Console.WriteLine(q);
+        if (await HisenseTV.DiscoverAsync() is not { } client)
+        {
+            return;
+        }
+            await client.PublishAsync(new MqttApplicationMessage() { Topic = "ui.service", Payload = Encoding.UTF8.GetBytes("gettvstate") });
+            var r = await client.SubscribeAsync(new MQTTnet.Client.Subscribing.MqttClientSubscribeOptions()
+            {
+                TopicFilters = { new() { Topic = "ui.service" } }
+            });
+        
 
         //
-    }
+      }
 }

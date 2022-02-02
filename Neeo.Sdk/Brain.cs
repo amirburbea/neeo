@@ -93,7 +93,7 @@ public sealed class Brain : IAsyncDisposable
         }
         this._host = await Server.StartSdkAsync(
             new(this, devices, $"src-{UniqueNameGenerator.Generate(name ?? Dns.GetHostName())}"),
-            hostIPAddress ?? await Brain.GetFallbackHostIPAddress(this.IPAddress, cancellationToken).ConfigureAwait(false),
+            hostIPAddress ?? await this.GetFallbackHostIPAddress(cancellationToken).ConfigureAwait(false),
             port,
             consoleLogging,
             cancellationToken
@@ -112,16 +112,16 @@ public sealed class Brain : IAsyncDisposable
         await (host?.StopAsync(cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
-    private static async ValueTask<IPAddress> GetFallbackHostIPAddress(IPAddress brainIPAddress, CancellationToken cancellationToken)
+    private async ValueTask<IPAddress> GetFallbackHostIPAddress(CancellationToken cancellationToken)
     {
-        if (IPAddress.IsLoopback(brainIPAddress))
+        if (IPAddress.IsLoopback(this.IPAddress))
         {
             // If the Brain is running locally, we can just use localhost.
-            return brainIPAddress;
+            return this.IPAddress;
         }
         IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-        return Array.IndexOf(addresses, brainIPAddress) == -1 && Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is { } address
-            ? address
-            : IPAddress.Loopback;
+        return Array.IndexOf(addresses, this.IPAddress) != -1 || Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is not { } address
+            ? IPAddress.Loopback
+            : address;
     }
 }

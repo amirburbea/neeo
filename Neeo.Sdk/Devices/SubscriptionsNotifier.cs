@@ -29,7 +29,7 @@ internal sealed class SubscriptionsNotifier : IHostedService
         {
             if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
             {
-                tasks.Add(this.NotifySubscriptionsAsync(adapter.AdapterName, feature, cancellationToken));
+                tasks.Add(this.NotifySubscriptionsAsync(adapter, feature, cancellationToken));
             }
         }
         return tasks.Count switch
@@ -42,42 +42,12 @@ internal sealed class SubscriptionsNotifier : IHostedService
 
     Task IHostedService.StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task NotifySubscriptionsAsync(string adapterName, ISubscriptionFeature feature, CancellationToken cancellationToken)
+    private async Task NotifySubscriptionsAsync(IDeviceAdapter adapter, ISubscriptionFeature feature, CancellationToken cancellationToken)
     {
-        // Ensure device driver is initialized.
-        IDeviceAdapter adapter = await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false);
+        await this._database.InitializeDeviceAsync(adapter).ConfigureAwait(false);
         this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
         string path = string.Format(UrlPaths.SubscriptionsFormat, this._sdkAdapterName, adapter.AdapterName);
-        TaskCompletionSource<string[]> taskCompletionSource = new();
-        await FetchSubscriptionsAsync().ConfigureAwait(false);
-        string[] deviceIds = await taskCompletionSource.Task.ConfigureAwait(false);
+        string[] deviceIds = await this._client.GetAsync<string[]>(path, cancellationToken).ConfigureAwait(false);
         await feature.InitializeDeviceList(deviceIds).ConfigureAwait(false);
-
-        async Task FetchSubscriptionsAsync()
-        {
-            for (int i = 0; !cancellationToken.IsCancellationRequested && !taskCompletionSource.Task.IsCompleted && i <= Constants.MaxRetries; i++)
-            {
-                try
-                {
-                    taskCompletionSource.TrySetResult(await this._client.GetAsync<string[]>(path, cancellationToken).ConfigureAwait(false));
-                }
-                catch (Exception e) when (i == Constants.MaxRetries)
-                {
-                    this._logger.LogError(e, "Failed to get subscriptions.");
-                    taskCompletionSource.TrySetException(e);
-                }
-                catch (Exception e)
-                {
-                    this._logger.LogWarning("Failed to get subscriptions ({message}) - retrying in {seconds}s.", e.Message, Constants.RetryDelayMilliseconds / 1000d);
-                    await Task.Delay(Constants.RetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-    }
-
-    private static class Constants
-    {
-        public const int MaxRetries = 2;
-        public const int RetryDelayMilliseconds = 2500;
     }
 }

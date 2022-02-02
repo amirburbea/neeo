@@ -3,18 +3,18 @@ using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Discovery;
 
-namespace Neeo.Sdk.Examples;
+namespace Neeo.Sdk.Examples.Devices;
 
-public class DiscoveryExampleDeviceProvider : IExampleDeviceProvider
+public class DiscoveryExampleDevice : IExampleDevice
 {
     private const string THE_ANSWER = "42";
 
     private Credentials? _credentials;
 
-    public IDeviceBuilder Provide()
+    public DiscoveryExampleDevice()
     {
-        return Device.Create("Security Code Example", DeviceType.Accessory)
-            .SetManufacturer("NEEO")
+        this.Builder = Device.Create("Security Code Example", DeviceType.Accessory)
+            .SetManufacturer("Amir")
             .AddAdditionalSearchTokens("SDK")
             .AddTextLabel("the-answer", "The answer is", true, GetLabelValue)
             .EnableDiscovery(
@@ -30,6 +30,8 @@ public class DiscoveryExampleDeviceProvider : IExampleDeviceProvider
                 Register
             );
     }
+
+    public IDeviceBuilder Builder { get; }
 
     private Task<DiscoveredDevice[]> DiscoverDevices(string? deviceId)
     {
@@ -68,13 +70,13 @@ public class DiscoveryExampleDeviceProvider : IExampleDeviceProvider
         return Task.CompletedTask;
     }
 
-    private Task<RegistrationResult> Register(Credentials credentials)
+    private Task<RegistrationResult> Register(string code)
     {
-        if (credentials.Password != THE_ANSWER || credentials.UserName.Length == 0)
+        if (code != THE_ANSWER)
         {
             return Task.FromResult(RegistrationResult.Failed("This is fucked."));
         }
-        this._credentials = credentials;
+        this._credentials = new("",code);
         return Task.FromResult(RegistrationResult.Success);
     }
 }

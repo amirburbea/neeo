@@ -13,8 +13,8 @@ public enum DeviceIconOverride
     /// <summary>
     /// &quot;neeo&quot;
     /// </summary>
-    [Text("neeo")]
-    Neeo = 0,
+    [Text("neeo-brain")]
+    NeeoBrain = 0,
 
     /// <summary>
     /// &quot;sonos&quot;

@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Broadlink.RM;
@@ -51,17 +52,17 @@ public class RMDevice : IDisposable
 
     public virtual bool SupportsTemperature => false;
 
-    public Task BeginLearning() => this.SendCommand(0x03);
+    public Task BeginLearning(CancellationToken cancellationToken = default) => this.SendCommand(0x03, cancellationToken);
 
-    public Task CancelLearning() => this.SendCommand(0x1e);
+    public Task CancelLearning(CancellationToken cancellationToken = default) => this.SendCommand(0x1e, cancellationToken);
 
-    public Task CheckData() => this.SendCommand(0x04);
+    public Task CheckData(CancellationToken cancellationToken = default) => this.SendCommand(0x04, cancellationToken);
 
-    public Task CheckRFData() => this.SupportsRF ? this.SendCommand(0x1a) : throw new NotSupportedException();
+    public Task CheckRFData(CancellationToken cancellationToken = default) => this.SupportsRF ? this.SendCommand(0x1a, cancellationToken) : throw new NotSupportedException();
 
-    public Task CheckRFData2() => this.SupportsRF ? this.SendCommand(0x1b) : throw new NotSupportedException();
+    public Task CheckRFData2(CancellationToken cancellationToken = default) => this.SupportsRF ? this.SendCommand(0x1b, cancellationToken) : throw new NotSupportedException();
 
-    public Task CheckTemperature() => this.SupportsTemperature ? this.SendCommand(0x01) : throw new NotSupportedException();
+    public Task CheckTemperature(CancellationToken cancellationToken = default) => this.SupportsTemperature ? this.SendCommand(0x01, cancellationToken) : throw new NotSupportedException();
 
     public void Dispose()
     {
@@ -69,9 +70,9 @@ public class RMDevice : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public Task EnterRFSweep() => this.SupportsRF ? this.SendCommand(0x19) : throw new NotSupportedException();
+    public Task EnterRFSweep(CancellationToken cancellationToken = default) => this.SupportsRF ? this.SendCommand(0x19, cancellationToken) : throw new NotSupportedException();
 
-    public Task SendData(byte[] data) => this.SendRequest(RequestType.Command, RMDevice._dataHeader.Combine(data));
+    public Task SendData(byte[] data, CancellationToken cancellationToken = default) => this.SendRequest(RequestType.Command, RMDevice._dataHeader.Combine(data), cancellationToken);
 
     public Task WaitForAck()
     {
@@ -111,7 +112,7 @@ public class RMDevice : IDisposable
         return await source.Task.ConfigureAwait(false);
     }
 
-    internal Task Authenticate()
+    internal Task Authenticate(CancellationToken cancellation)
     {
         this._listeningTask.Start(TaskScheduler.Default);
         byte[] payload = new byte[0x50];
@@ -139,7 +140,7 @@ public class RMDevice : IDisposable
         payload[0x34] = (byte)' ';
         payload[0x35] = (byte)' ';
         payload[0x36] = (byte)'1';
-        return this.SendRequest(RequestType.Authenticate, payload);
+        return this.SendRequest(RequestType.Authenticate, payload, cancellation);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -241,16 +242,16 @@ public class RMDevice : IDisposable
         }
     }
 
-    private Task SendCommand(byte command)
+    private Task SendCommand(byte command, CancellationToken cancellationToken)
     {
         byte[] payload = new byte[16];
         payload[0] = 0x04;
         payload[1] = 0x00;
         payload[2] = command;
-        return this.SendRequest(RequestType.Command, payload);
+        return this.SendRequest(RequestType.Command, payload, cancellationToken);
     }
 
-    private async Task SendRequest(RequestType requestType, byte[] payload)
+    private async Task SendRequest(RequestType requestType, byte[] payload, CancellationToken cancellationToken)
     {
         this._count = (this._count + 1) & 0xffff;
         byte[] packet = new byte[0x38];
@@ -285,6 +286,6 @@ public class RMDevice : IDisposable
         checksum = packet.Checksum();
         packet[0x20] = (byte)(checksum & 0xff);
         packet[0x21] = (byte)(checksum >> 8);
-        await this._client.SendAsync(packet, packet.Length).ConfigureAwait(false);
+        await this._client.SendAsync(new(packet), cancellationToken).ConfigureAwait(false);
     }
 }

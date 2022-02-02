@@ -61,7 +61,7 @@ internal sealed partial class DeviceController : ControllerBase
             else
             {
                 this.Logger.LogInformation("Dynamic device needed for {component}.", componentName);
-                this._dynamicDevices.StorePlaceholderInRequest(httpContext, adapter, componentName);
+                this._dynamicDevices.StorePlaceholderInRequest(httpContext, componentName);
             }
             return Task.FromResult(Result.Success(componentName));
         }

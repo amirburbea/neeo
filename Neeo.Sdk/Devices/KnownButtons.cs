@@ -11,7 +11,7 @@ namespace Neeo.Sdk.Devices;
 /// </summary>
 /// <remarks>
 /// Note: This enumeration supports bitwise (flagged) combinations for easily adding multiple buttons via a single
-/// call to <see cref="IDeviceBuilder.AddButtons"/>.
+/// call to <see cref="IDeviceBuilder.AddButton"/>.
 /// </remarks>
 [Flags]
 public enum KnownButtons : ulong
@@ -41,10 +41,16 @@ public enum KnownButtons : ulong
     ChannelUp = ChannelDown << 1,
 
     /// <summary>
+    /// &quot;CLEAR QUEUE&quot;
+    /// </summary>
+    [Text("CLEAR QUEUE")]
+    ClearQueue = ChannelUp << 1,
+
+    /// <summary>
     /// &quot;CURSOR DOWN&quot;
     /// </summary>
     [Text("CURSOR DOWN")]
-    CursorDown = ChannelUp << 1,
+    CursorDown = ClearQueue << 1,
 
     /// <summary>
     /// &quot;CURSOR ENTER&quot;
@@ -227,16 +233,10 @@ public enum KnownButtons : ulong
     Language = InputToggle << 1,
 
     /// <summary>
-    /// &quot;LIVE&quot;
-    /// </summary>
-    [Text("LIVE")]
-    Live = Language << 1,
-
-    /// <summary>
     /// &quot;MENU&quot;
     /// </summary>
     [Text("MENU")]
-    Menu = Live << 1,
+    Menu = Language << 1,
 
     /// <summary>
     /// &quot;MUTE TOGGLE&quot;
@@ -263,10 +263,16 @@ public enum KnownButtons : ulong
     Next = Netflix << 1,
 
     /// <summary>
+    /// &quot;NEXT TRACK&quot;
+    /// </summary>
+    [Text("NEXT TRACK")]
+    NextTrack = Next << 1,
+
+    /// <summary>
     /// &quot;PAUSE&quot;
     /// </summary>
     [Text("PAUSE")]
-    Pause = Next << 1,
+    Pause = NextTrack << 1,
 
     /// <summary>
     /// &quot;PLAY&quot;
@@ -275,16 +281,16 @@ public enum KnownButtons : ulong
     Play = Pause << 1,
 
     /// <summary>
-    /// &quot;PLAY PAUSE TOGGLE&quot;
+    /// &quot;PLAY TOGGLE&quot;
     /// </summary>
-    [Text("PLAY PAUSE TOGGLE")]
-    PlayPauseToggle = Play << 1,
+    [Text("PLAY TOGGLE")]
+    PlayToggle = Play << 1,
 
     /// <summary>
     /// &quot;POWER OFF&quot;
     /// </summary>
     [Text("POWER OFF")]
-    PowerOff = PlayPauseToggle << 1,
+    PowerOff = PlayToggle << 1,
 
     /// <summary>
     /// &quot;POWER ON&quot;
@@ -307,20 +313,38 @@ public enum KnownButtons : ulong
     /// <summary>
     /// &quot;RECORD&quot;
     /// </summary>
+    [Text("PREVIOUS TRACK")]
+    PreviousTrack = Previous << 1,
+
+    /// <summary>
+    /// &quot;RECORD&quot;
+    /// </summary>
     [Text("RECORD")]
-    Record = Previous << 1,
+    Record = PreviousTrack << 1,
+
+    /// <summary>
+    /// &quot;REPEAT TOGGLE&quot;
+    /// </summary>
+    [Text("REPEAT TOGGLE")]
+    RepeatToggle = Record << 1,
 
     /// <summary>
     /// &quot;REVERSE&quot;
     /// </summary>
     [Text("REVERSE")]
-    Reverse = Record << 1,
+    Reverse = RepeatToggle << 1,
+
+    /// <summary>
+    /// &quot;SHUFFLE TOGGLE&quot;
+    /// </summary>
+    [Text("SHUFFLE TOGGLE")]
+    ShuffleToggle = Reverse << 1,
 
     /// <summary>
     /// &quot;SKIP BACKWARD&quot;
     /// </summary>
     [Text("SKIP BACKWARD")]
-    SkipBackward = Reverse << 1,
+    SkipBackward = ShuffleToggle << 1,
 
     /// <summary>
     /// &quot;SKIP FORWARD&quot;
@@ -369,8 +393,6 @@ public enum KnownButtons : ulong
     /// </summary>
     [Text("YOU TUBE")]
     YouTube = VolumeUp << 1,
-
-    // NEXT = 1ul << 59,
 }
 
 /// <summary>

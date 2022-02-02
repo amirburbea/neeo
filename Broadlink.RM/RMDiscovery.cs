@@ -9,15 +9,15 @@ using System.Threading.Tasks;
 namespace Broadlink.RM;
 
 /// <summary>
-/// 
+///
 /// </summary>
 public static class RMDiscovery
 {
     private static readonly Dictionary<string, RMDevice> _remotes = new();
 
-    public static async Task<RMDevice?> DiscoverDeviceAsync(Func<RMDevice, bool>? predicate = default)
+    public static async Task<RMDevice?> DiscoverDeviceAsync(Func<RMDevice, bool>? predicate = default, CancellationToken cancellationToken = default)
     {
-        foreach (IPAddress address in await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork).ConfigureAwait(false))
+        foreach (IPAddress address in await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false))
         {
             try
             {
@@ -59,10 +59,11 @@ public static class RMDiscovery
                 packet[0x21] = (byte)(checksum >> 8);
                 await client.SendAsync(packet, packet.Length, new(IPAddress.Broadcast, 80)).ConfigureAwait(false);
                 UdpReceiveResult result;
-                using (CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(2d)))
+                using (CancellationTokenSource cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
                 {
                     try
                     {
+                        cancellationTokenSource.CancelAfter(2000);
                         result = await client.ReceiveAsync(cancellationTokenSource.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException)
@@ -70,8 +71,6 @@ public static class RMDiscovery
                         continue;
                     }
                 }
-
-
 
                 byte[] mac = new byte[6];
                 for (int index = 0; index < mac.Length; index++)
@@ -95,7 +94,7 @@ public static class RMDiscovery
                 {
                     continue;
                 }
-                await current.Authenticate().ConfigureAwait(false);
+                await current.Authenticate(cancellationToken).ConfigureAwait(false);
                 TaskCompletionSource source = new();
 
                 void OnReady(object? sender, EventArgs e)
