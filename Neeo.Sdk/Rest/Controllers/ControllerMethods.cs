@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +19,11 @@ internal static class ControllerMethods
         return result;
     }
 
+    /// <summary>
+    /// The standard SystemTextJsonOutputFormatter calls <see cref="object.GetType"/> on objects to be serialized.
+    /// This ensures objects are serialized directly as the intended response type - useful when explicit properties
+    /// are used or JSON property attributes are applied on an interface as opposed to the implemented type.
+    /// </summary>
     private sealed class JsonOutputFormatter : IOutputFormatter
     {
         public static readonly JsonOutputFormatter Instance = new();

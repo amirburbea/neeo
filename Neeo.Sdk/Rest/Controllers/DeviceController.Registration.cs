@@ -1,14 +1,12 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Discovery;
 using Neeo.Sdk.Devices.Features;
-using Neeo.Sdk.Utilities;
 using Org.BouncyCastle.Bcpg;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 
@@ -28,7 +26,7 @@ internal partial class DeviceController
     }
 
     [HttpPost("{adapter}/register")]
-    public async Task<ActionResult<SuccessResponse>> RegisterAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter, [FromBody] CredentialsPayload payload)
+    public async Task<ActionResult> RegisterAsync([ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter, [FromBody] CredentialsPayload payload)
     {
         if (adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
@@ -38,10 +36,10 @@ internal partial class DeviceController
         using Stream stream = this.DeserializeEncrypted(payload.Data);
         if (await feature.RegisterAsync(stream).ConfigureAwait(false) is not { Error: string error })
         {
-            return this.Ok(new SuccessResponse(true));
+            return this.Ok();
         }
         ContentResult result = this.Content(error);
-        result.StatusCode = 500;
+        result.StatusCode = (int)HttpStatusCode.InternalServerError;
         return result;
     }
 

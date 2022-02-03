@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Net;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +13,7 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapter}/{componentName}/{deviceId}")]
-    public async Task<ActionResult<object>> GetValueAsync(
+    public async Task<ActionResult> GetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
         [ModelBinder(typeof(DeviceIdBinder))] string deviceId
@@ -29,7 +26,7 @@ internal partial class DeviceController
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature.Type switch
         {
-            FeatureType.Button => this.Ok(await DeviceController.ExecuteAsync(((IButtonFeature)feature).TriggerAsync(deviceId))), // SuccessResponse,
+            FeatureType.Button => await this.ExecuteAsync(((IButtonFeature)feature).TriggerAsync(deviceId)),
             FeatureType.Value => this.Ok(new ValueResponse(await ((IValueFeature)feature).GetValueAsync(deviceId))), // ValueResponse
             _ => this.BadRequest()
         };
@@ -50,7 +47,7 @@ internal partial class DeviceController
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature.Type switch
         {
-            FeatureType.Favorites => this.Ok(await DeviceController.ExecuteAsync(((IFavoritesFeature)feature).ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId))),
+            FeatureType.Favorites => await this.ExecuteAsync(((IFavoritesFeature)feature).ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
             FeatureType.Directory => this.Ok<IListBuilder>(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<ListParameters>())),
             _ => this.BadRequest()
         };
@@ -69,12 +66,11 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Perform directory action {action} on {name}:{id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
-        await feature.PerformActionAsync(deviceId, action.ActionIdentifier);
-        return this.Ok();
+        return await this.ExecuteAsync(feature.PerformActionAsync(deviceId, action.ActionIdentifier));
     }
 
     [HttpGet("{adapter}/{componentName}/{deviceId}/{value}")]
-    public async Task<ActionResult<SuccessResponse>> SetValueAsync(
+    public async Task<ActionResult> SetValueAsync(
         [ModelBinder(typeof(AdapterBinder))] IDeviceAdapter adapter,
         [ModelBinder(typeof(ComponentNameBinder))] string componentName,
         [ModelBinder(typeof(DeviceIdBinder))] string deviceId,
@@ -86,11 +82,13 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Set {component} value to {value} on {name}:{id}", componentName, value, adapter.DeviceName, deviceId);
-        return this.Ok(await DeviceController.ExecuteAsync(feature.SetValueAsync(deviceId, value)));
+        return await this.ExecuteAsync(feature.SetValueAsync(deviceId, value));
     }
 
+    private Task<OkResult> ExecuteAsync(Task task) => task.ContinueWith(_ => this.Ok(), TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
+
     private bool TryGetFeature<TFeature>(IDeviceAdapter adapter, string componentName, [NotNullWhen(true)] out TFeature? feature)
-        where TFeature : IFeature
+            where TFeature : IFeature
     {
         if (this.HttpContext.GetItem<IFeature>() is TFeature item)
         {
@@ -101,11 +99,6 @@ internal partial class DeviceController
         feature = default;
         return false;
     }
-
-    private static Task<SuccessResponse> ExecuteAsync(Task task) => task.ContinueWith(
-        _ => new SuccessResponse(true),
-        TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously
-    );
 
     public record struct ActionData(string ActionIdentifier);
 
