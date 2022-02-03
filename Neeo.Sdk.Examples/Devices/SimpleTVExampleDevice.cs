@@ -1,19 +1,19 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Examples.Devices;
 
-internal class SimpleTVExampleDevice : IExampleDevice
+internal class SimpleTVExampleDevice : IDeviceProvider
 {
     private readonly ILogger<SimpleTVExampleDevice> _logger;
 
-    public SimpleTVExampleDevice(ILogger<SimpleTVExampleDevice> logger)
+    public SimpleTVExampleDevice(ILogger<SimpleTVExampleDevice> logger) => this._logger = logger;
+
+    public IDeviceBuilder ProvideDevice()
     {
-        this._logger = logger;
         const string deviceName = "Simple TV Example Device";
-        this.Builder = Device.Create(deviceName, DeviceType.TV)
+        return Device.Create(deviceName, DeviceType.TV)
             .SetSpecificName(deviceName)
             .SetManufacturer("NEEO")
             .SetIcon(DeviceIconOverride.NeeoBrain)
@@ -24,8 +24,6 @@ internal class SimpleTVExampleDevice : IExampleDevice
             .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
             .AddButtonHandler(this.OnButtonPressed);
     }
-
-    public IDeviceBuilder Builder { get; }
 
     private Task InitializeDeviceList(string[] deviceIds)
     {

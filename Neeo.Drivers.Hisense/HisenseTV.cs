@@ -1,19 +1,22 @@
-﻿using System.Net;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Connecting;
 using MQTTnet.Client.Options;
 using MQTTnet.Exceptions;
 
-namespace HiSense.SmartTV;
+namespace Neeo.Drivers.Hisense;
 
 public class HisenseTV
 {
-
-
     private static readonly MqttFactory _mqttFactory = new();
 
     public static async Task<IMqttClient?> DiscoverAsync()
@@ -69,7 +72,7 @@ public class HisenseTV
         {
             foreach (IPAddress address in Dns.GetHostAddresses(Dns.GetHostName(), AddressFamily.InterNetwork))
             {
-                if (IPAddress.IsLoopback(address) || IPHelper.IsMulticast(address))
+                if (IPAddress.IsLoopback(address))// || NetworkDevices.IsMulticast(address))
                 {
                     continue;
                 }
@@ -103,33 +106,9 @@ public class HisenseTV
         }
     }
 
-
-
     private static IMqttClientOptions CreateClientOptions(IPAddress ipAddress) => new MqttClientOptionsBuilder()
         .WithTcpServer(ipAddress.ToString(), 36669)
         .WithCredentials("hisenseservice", "multimqttservice")
         .WithTls(parameters: new() { UseTls = true, AllowUntrustedCertificates = true, IgnoreCertificateChainErrors = true, IgnoreCertificateRevocationErrors = true })
         .Build();
-}
-
-internal class Foo
-{
-    private static async Task Main()
-    {
-        await WakeOnLan.WakeAsync("18:30:0C:C3:F4:C8");
-        //var dict = IPHelper.GetAllDevicesOnLAN();
-
-        if (await HisenseTV.DiscoverAsync() is not { } client)
-        {
-            return;
-        }
-            await client.PublishAsync(new MqttApplicationMessage() { Topic = "ui.service", Payload = Encoding.UTF8.GetBytes("gettvstate") });
-            var r = await client.SubscribeAsync(new MQTTnet.Client.Subscribing.MqttClientSubscribeOptions()
-            {
-                TopicFilters = { new() { Topic = "ui.service" } }
-            });
-        
-
-        //
-      }
 }

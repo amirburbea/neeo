@@ -20,13 +20,13 @@ public sealed class ExampleSdkService : IHostedService
 {
     private static readonly Regex _ipAddressRegex = new(@"^\d+\.\d+\.\d+\.\d+$");
 
-    private readonly IDeviceBuilder[] _devices;
+    private readonly IDeviceProvider[] _providers;
     private readonly ILogger<ExampleSdkService> _logger;
     private ISdkEnvironment? _environment;
 
-    public ExampleSdkService(IEnumerable<IExampleDevice> examples, ILogger<ExampleSdkService> logger)
+    public ExampleSdkService(IEnumerable<IDeviceProvider> providers, ILogger<ExampleSdkService> logger)
     {
-        (this._devices, this._logger) = (examples.Select(exampleDevice => exampleDevice.Builder).ToArray(), logger);
+        (this._providers, this._logger) = (providers.ToArray(), logger);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -45,7 +45,7 @@ public sealed class ExampleSdkService : IHostedService
             }
         }
         this._logger.LogInformation("Starting up...");
-        this._environment = await brain.StartServerAsync(this._devices, "Example Service",  cancellationToken: cancellationToken).ConfigureAwait(false);
+        this._environment = await brain.StartServerAsync(this._providers, "Example Service",  cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

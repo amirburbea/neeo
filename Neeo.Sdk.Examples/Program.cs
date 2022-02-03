@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Examples.Devices;
+using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Examples;
 
@@ -28,9 +28,9 @@ internal static class Program
             // Finds all device examples and registers them.
             foreach (Type type in Assembly.GetExecutingAssembly().GetTypes())
             {
-                if (type.IsAssignableTo(typeof(IExampleDevice)) && !type.IsInterface && !type.IsAbstract)
+                if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
                 {
-                    services.AddSingleton(typeof(IExampleDevice), type);
+                    services.AddSingleton(typeof(IDeviceProvider), type);
                 }
             }
         }

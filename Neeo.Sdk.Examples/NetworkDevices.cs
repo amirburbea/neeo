@@ -1,32 +1,27 @@
-﻿using System.Net;
+﻿using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
-namespace HiSense.SmartTV;
+namespace Neeo.Sdk.Examples;
 
-public static class IPHelper
+public static class NetworkDevices
 {
-    private static readonly PhysicalAddress _broadcastAddress = new(new byte[6] { 255, 255, 255, 255, 255, 255 });
-    private static readonly PhysicalAddress _virtualAddress = new(new byte[6] { 0, 0, 0, 0, 0, 0 });
+    private static ReadOnlySpan<byte> BroadcastAddress => new byte[] { 255, 255, 255, 255, 255, 255 };
+
+    private static ReadOnlySpan<byte> VirtualAddress => new byte[] { 0, 0, 0, 0, 0, 0 };
 
     /// <summary>
     /// Get the IP and MAC addresses of all known devices on the LAN
     /// </summary>
-    /// <remarks>
-    /// 1) This table is not updated often - it can take some human-scale time
-    ///    to notice that a device has dropped off the network, or a new device
-    ///    has connected.
-    /// 2) This discards non-local devices if they are found - these are multicast
-    ///    and can be discarded by IP address range.
-    /// </remarks>
-    /// <returns></returns>
-    public static Dictionary<IPAddress, PhysicalAddress> GetAllDevicesOnLAN()
+    public static async Task<Dictionary<IPAddress, PhysicalAddress>> GetNetworkDevicesAsync()
     {
         int spaceForNetTable = 0;
-        // Get the space needed
-        // We do that by requesting the table, but not giving any space at all.
-        // The return value will tell us how much we actually need.
+        // Get the space needed by requesting the table, but not giving any space at all.
+        // The return value will tell us how much space we actually need.
         _ = NativeMethods.GetIpNetTable(IntPtr.Zero, ref spaceForNetTable, false);
         IntPtr rawTable = IntPtr.Zero;
         try
@@ -40,7 +35,7 @@ public static class IPHelper
             int rowCount = Marshal.ReadInt32(rawTable);
             Dictionary<IPAddress, PhysicalAddress> output = new(rowCount + 1);
             // Add this PC to the list.
-            output.Add(GetHostIPAddress(), GetHostMacAddress());
+            output.Add(await GetHostIPAddressAsync().ConfigureAwait(false), GetHostMacAddress());
             IntPtr startPtr = new(rawTable.ToInt64() + Marshal.SizeOf<int>());
             // Convert the raw table to individual entries.
             MIB_IPNETROW[] rows = new MIB_IPNETROW[rowCount];
@@ -55,10 +50,10 @@ public static class IPHelper
                 {
                     continue;
                 }
-                PhysicalAddress macAddress = new(new byte[] { row.mac0, row.mac1, row.mac2, row.mac3, row.mac4, row.mac5 });
-                if (!_virtualAddress.Equals(macAddress) && !_broadcastAddress.Equals(macAddress))
+                byte[] bytes = new[] { row.mac0, row.mac1, row.mac2, row.mac3, row.mac4, row.mac5 };
+                if (bytes.AsSpan().IndexOf(VirtualAddress) < 0 && bytes.AsSpan().IndexOf(BroadcastAddress) < 0)
                 {
-                    output.Add(ipAddress, macAddress);
+                    output.Add(ipAddress, new(bytes));
                 }
             }
             return output;
@@ -69,15 +64,10 @@ public static class IPHelper
             Marshal.FreeCoTaskMem(rawTable);
         }
 
-        static IPAddress GetHostIPAddress()
+        static async Task<IPAddress> GetHostIPAddressAsync()
         {
-            string strHostName = Dns.GetHostName();
-            IPAddress[] addresses = Dns.GetHostAddresses(strHostName);
-            return addresses.Length == 0
-                ? IPAddress.Loopback
-                : Array.Find(addresses, static address => !IPAddress.IsLoopback(address) && !address.IsIPv6LinkLocal) is { } address
-                    ? address
-                    : addresses[0];
+            IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork).ConfigureAwait(false);
+            return Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) ?? IPAddress.Loopback;
         }
 
         static PhysicalAddress GetHostMacAddress()
@@ -88,7 +78,7 @@ public static class IPHelper
                 {
                     continue;
                 }
-                if (nic.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211 or NetworkInterfaceType.GigabitEthernet)
+                if (nic.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.Wireless80211)
                 {
                     return nic.GetPhysicalAddress();
                 }
@@ -96,21 +86,7 @@ public static class IPHelper
             return PhysicalAddress.None;
         }
 
-    }
-
-
-    public static bool IsMulticast(IPAddress ipAddress) => ipAddress.IsIPv6Multicast || ipAddress.GetAddressBytes()[0] is not < 224 and not > 239;
-
-    public static IPAddress? GetIPAddress(PhysicalAddress physicalAddress)
-    {
-        var localIPs = GetAllDevicesOnLAN();
-        foreach (var pair in localIPs)
-        {
-            if (pair.Value.Equals(physicalAddress))
-                return pair.Key;
-        }
-
-        return null;
+        static bool IsMulticast(IPAddress address) => address.IsIPv6Multicast || address.GetAddressBytes()[0] is not < 224 and not > 239;
     }
 
     /// <summary>
@@ -159,13 +135,6 @@ public static class IPHelper
 
     private static class NativeMethods
     {
-        /// <summary>
-        /// GetIpNetTable external method
-        /// </summary>
-        /// <param name="pIpNetTable"></param>
-        /// <param name="pdwSize"></param>
-        /// <param name="bOrder"></param>
-        /// <returns></returns>
         [DllImport("IpHlpApi.dll")]
         [return: MarshalAs(UnmanagedType.U4)]
         public static extern int GetIpNetTable(IntPtr pIpNetTable, [MarshalAs(UnmanagedType.U4)] ref int pdwSize, bool bOrder);

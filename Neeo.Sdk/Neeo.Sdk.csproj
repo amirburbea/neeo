@@ -29,4 +29,10 @@
 		</Compile>
 	</ItemGroup>
 
+	<ItemGroup>
+		<Compile Update="Utilities\NetworkDevices.*.cs">
+			<DependentUpon>NetworkDevices.cs</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
 </Project>

@@ -1,12 +1,12 @@
 {
   "profiles": {
-    "HiSense.SmartTV": {
-      "commandName": "Project"
-    },
     "WSL": {
       "commandName": "WSL2",
       "environmentVariables": {},
       "distributionName": ""
+    },
+    "Neeo.Drivers.Hisense": {
+      "commandName": "Project"
     }
   }
 }

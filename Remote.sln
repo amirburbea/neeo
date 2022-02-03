@@ -12,11 +12,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk", "Neeo.Sdk\Neeo.S
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Broadlink.RM", "Broadlink.RM\Broadlink.RM.csproj", "{4EB6E5A8-9ACF-4190-B127-08EDB399ADA2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HiSense.SmartTV", "HiSense.SmartTV\HiSense.SmartTV.csproj", "{DA5F3757-AD2B-470C-91F0-97BE6207D0EC}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Discovery", "Neeo.Discovery\Neeo.Discovery.csproj", "{3F0D2742-E7B3-402E-8276-00362774522D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk.Examples", "Neeo.Sdk.Examples\Neeo.Sdk.Examples.csproj", "{D69AE840-4383-4929-9382-DEFB3FE657A0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Drivers.Hisense", "Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj", "{5905563E-C361-4C60-AB48-4C4673D1DF71}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,10 +32,6 @@ Global
 		{4EB6E5A8-9ACF-4190-B127-08EDB399ADA2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4EB6E5A8-9ACF-4190-B127-08EDB399ADA2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4EB6E5A8-9ACF-4190-B127-08EDB399ADA2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DA5F3757-AD2B-470C-91F0-97BE6207D0EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DA5F3757-AD2B-470C-91F0-97BE6207D0EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DA5F3757-AD2B-470C-91F0-97BE6207D0EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DA5F3757-AD2B-470C-91F0-97BE6207D0EC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3F0D2742-E7B3-402E-8276-00362774522D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3F0D2742-E7B3-402E-8276-00362774522D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3F0D2742-E7B3-402E-8276-00362774522D}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -44,6 +40,10 @@ Global
 		{D69AE840-4383-4929-9382-DEFB3FE657A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D69AE840-4383-4929-9382-DEFB3FE657A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D69AE840-4383-4929-9382-DEFB3FE657A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

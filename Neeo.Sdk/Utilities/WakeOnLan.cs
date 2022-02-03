@@ -1,9 +1,11 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
-namespace HiSense.SmartTV;
+namespace Neeo.Sdk.Utilities;
 
 public static class WakeOnLan
 {
@@ -23,12 +25,6 @@ public static class WakeOnLan
             }
             using UdpClient client = new();
             await client.SendAsync(magicPacket, length, new(IPAddress.Broadcast, 9)).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            if (e.InnerException == null)
-            {
-            }
         }
         finally
         {

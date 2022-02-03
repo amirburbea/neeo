@@ -8,37 +8,18 @@ using Neeo.Sdk.Devices.Lists;
 
 namespace Neeo.Sdk.Examples.Devices;
 
-public class FileBrowserExampleDevice : IExampleDevice
+public class FileBrowserExampleDevice : IDeviceProvider
 {
-    public FileBrowserExampleDevice()
+    public IDeviceBuilder ProvideDevice()
     {
         const string deviceName = "File Browser Example";
-        this.Builder = Device.Create(deviceName, DeviceType.MediaPlayer)
+        return Device.Create(deviceName, DeviceType.MediaPlayer)
             .SetSpecificName(deviceName)
             .SetManufacturer("NEEO")
             .SetIcon(DeviceIconOverride.NeeoBrain)
             .AddAdditionalSearchTokens("explorer")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
             .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, populator: Browse, actionHandler: OnDirectoryAction);
-    }
-
-    public IDeviceBuilder Builder { get; }
-
-    private static IEnumerable<ListEntry> GetEntries(string directory)
-    {
-        foreach (string fullPath in Directory.EnumerateFileSystemEntries(directory))
-        {
-            string fileName = Path.GetFileName(fullPath);
-            bool isDirectory = (File.GetAttributes(fullPath) & FileAttributes.Directory) == FileAttributes.Directory;
-            yield return new(
-                title: fileName.Replace('\\', '/'),
-                label: fullPath.Replace('\\', '/'),
-                browseIdentifier: isDirectory ? fullPath : null,
-                actionIdentifier: isDirectory ? null : fullPath,
-                isQueueable:  isDirectory ? null : true,
-                thumbnailUri: isDirectory ? "https://neeo-sdk.neeo.io/folder.jpg" : "https://neeo-sdk.neeo.io/file.jpg"
-            );
-        }
     }
 
     private static Task Browse(string deviceId, IListBuilder builder)
@@ -87,6 +68,23 @@ public class FileBrowserExampleDevice : IExampleDevice
         }
 
         return Task.CompletedTask;
+    }
+
+    private static IEnumerable<ListEntry> GetEntries(string directory)
+    {
+        foreach (string fullPath in Directory.EnumerateFileSystemEntries(directory))
+        {
+            string fileName = Path.GetFileName(fullPath);
+            bool isDirectory = (File.GetAttributes(fullPath) & FileAttributes.Directory) == FileAttributes.Directory;
+            yield return new(
+                title: fileName.Replace('\\', '/'),
+                label: fullPath.Replace('\\', '/'),
+                browseIdentifier: isDirectory ? fullPath : null,
+                actionIdentifier: isDirectory ? null : fullPath,
+                isQueueable: isDirectory ? null : true,
+                thumbnailUri: isDirectory ? "https://neeo-sdk.neeo.io/folder.jpg" : "https://neeo-sdk.neeo.io/file.jpg"
+            );
+        }
     }
 
     private Task OnDirectoryAction(string deviceId, string actionIdentifier)

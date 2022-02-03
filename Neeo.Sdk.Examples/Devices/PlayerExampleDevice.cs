@@ -8,7 +8,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Examples.Devices;
 
-public sealed class PlayerExampleDevice : IExampleDevice
+public sealed class PlayerExampleDevice : IDeviceProvider
 {
     private static readonly Pet[] _pets = Enum.GetValues<Pet>();
 
@@ -17,22 +17,13 @@ public sealed class PlayerExampleDevice : IExampleDevice
     public PlayerExampleDevice(ILogger<PlayerExampleDevice> logger)
     {
         this._controller = new(logger);
-        const string deviceName = "Player SDK Example";
-        this.Builder = Device.Create(deviceName, DeviceType.MusicPlayer)
-            .SetManufacturer("NEEO")
-            .AddAdditionalSearchTokens("SDK", "player")
-            .RegisterInitializer(() => Task.CompletedTask)
-            .AddButtonGroup(ButtonGroups.Power)
-            .AddButtonHandler(this._controller.HandleButtonAsync)
-            .AddPlayerWidget(this._controller)
-            .EnableNotifications(notifier => this._controller.Notifier = notifier);
     }
 
     private enum Pet
     {
         Kitten,
         Puppy,
-        Folder
+        File
     }
 
     private enum PlayerKey
@@ -62,7 +53,21 @@ public sealed class PlayerExampleDevice : IExampleDevice
         Description,
     }
 
-    public IDeviceBuilder Builder { get; }
+    public IDeviceBuilder ProvideDevice()
+    {
+        const string deviceName = "Player SDK Example";
+        return Device.Create(deviceName, DeviceType.MusicPlayer)
+            .SetManufacturer("NEEO")
+            .SetDriverVersion(3)
+            .AddButtonGroup(ButtonGroups.MenuAndBack)
+            .AddButton(KnownButtons.Guide)
+            .AddAdditionalSearchTokens("SDK", "player")
+            .RegisterInitializer(() => Task.CompletedTask)
+            .AddButtonGroup(ButtonGroups.Power)
+            .AddButtonHandler(this._controller.HandleButtonAsync)
+            .AddPlayerWidget(this._controller)
+            .EnableNotifications(notifier => this._controller.Notifier = notifier);
+    }
 
     private static string GetCoverArt(Pet pet) => $"https://neeo-sdk.neeo.io/{pet.ToString().ToLower()}.jpg";
 
@@ -132,8 +137,9 @@ public sealed class PlayerExampleDevice : IExampleDevice
             KnownButtons.Pause => this.SetIsPlayingAsync(deviceId, false),
             KnownButtons.VolumeUp => this.SetVolumeAsync(deviceId, Math.Min(this._service.GetValue<double>(PlayerKey.Volume) + 5d, 100d)),
             KnownButtons.VolumeDown => this.SetVolumeAsync(deviceId, Math.Max(this._service.GetValue<double>(PlayerKey.Volume) - 5d, 0d)),
-            KnownButtons.NextTrack => this.ChangeTrackAsync(deviceId, (Pet)(1 + (int)this._service.Pet)),
-            KnownButtons.PreviousTrack => this.ChangeTrackAsync(deviceId, (Pet)(1 + (int)this._service.Pet)),
+            KnownButtons.NextTrack => this.ChangeTrackAsync(deviceId, (Pet)((int)this._service.Pet + 1)),
+            KnownButtons.PreviousTrack => this.ChangeTrackAsync(deviceId, (Pet)((int)this._service.Pet - 1)),
+            KnownButtons.MuteToggle => this.SetIsMutedAsync(deviceId, !this._service.GetValue<bool>(PlayerKey.Mute)),
             _ => Task.CompletedTask,
         };
 
@@ -154,9 +160,23 @@ public sealed class PlayerExampleDevice : IExampleDevice
 
         public Task PopulateRootDirectoryAsync(string deviceId, IListBuilder builder)
         {
-            foreach (Pet pet in PlayerExampleDevice._pets)
+            if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
             {
-                builder.AddEntry(new(GetTitle(pet), GetDescription(pet), null, Enum.GetName(pet), thumbnailUri: GetCoverArt(pet)));
+                builder.AddHeader("Artists");
+                for (int i = 0; i < 5; i++)
+                {
+                    string name = "Artist #" + i;
+                    builder.AddEntry(new(name, name, name));
+                }
+            }
+            else
+            {
+                builder.AddHeader(builder.Parameters.BrowseIdentifier);
+
+                foreach (Pet pet in PlayerExampleDevice._pets)
+                {
+                    builder.AddEntry(new(GetTitle(pet), GetDescription(pet), null, Enum.GetName(pet), thumbnailUri: GetCoverArt(pet)));
+                }
             }
             return Task.CompletedTask;
         }
@@ -171,20 +191,17 @@ public sealed class PlayerExampleDevice : IExampleDevice
 
         public Task SetVolumeAsync(string deviceId, double volume) => this.SetValueAsync(PlayerKey.Volume, deviceId, volume);
 
-        private Task ChangeTrackAsync(string deviceId, Pet pet)
+        private Task ChangeTrackAsync(string deviceId, Pet pet) => (int)pet switch
         {
-            return (int)pet switch
-            {
-                < 0 => this.ChangeTrackAsync(deviceId, _pets[^1]),
-                int value when value >= _pets.Length => this.ChangeTrackAsync(deviceId, 0),
-                _ => Task.WhenAll(
-                    Task.FromResult(this._service.Pet = pet),
-                    this.SetConverArtAsync(deviceId, GetCoverArt(pet)),
-                    this.SetTitleAsync(deviceId, GetTitle(pet)),
-                    this.SetDescriptionAsync(deviceId, GetDescription(pet))
-                )
-            };
-        }
+            < 0 => this.ChangeTrackAsync(deviceId, PlayerExampleDevice._pets[^1]), // Did we subtract 1 from 0? Go to last value.
+            int value when value >= PlayerExampleDevice._pets.Length => this.ChangeTrackAsync(deviceId, 0), // Did we add 1 to the last value? Go to 0.
+            _ => Task.WhenAll(
+                Task.FromResult(this._service.Pet = pet),
+                this.SetConverArtAsync(deviceId, PlayerExampleDevice.GetCoverArt(pet)),
+                this.SetTitleAsync(deviceId, PlayerExampleDevice.GetTitle(pet)),
+                this.SetDescriptionAsync(deviceId, PlayerExampleDevice.GetDescription(pet))
+            )
+        };
 
         private Task<TValue> GetValueAsync<TValue>(PlayerKey key, string deviceId)
         {

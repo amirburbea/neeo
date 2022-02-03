@@ -56,7 +56,7 @@ public sealed class TextAttribute : Attribute
             Dictionary<T, string> toText = new(values.Length);
             foreach (T value in values)
             {
-                if (Enum.GetName(value) is not { } name)
+                if (Enum.GetName(value) is not string name)
                 {
                     continue;
                 }
