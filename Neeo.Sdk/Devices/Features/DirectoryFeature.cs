@@ -9,7 +9,7 @@ public interface IDirectoryFeature : IFeature
 
     Task<IListBuilder> BrowseAsync(string deviceId, ListParameters parameters);
 
-    Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier);
+    Task PerformActionAsync(string deviceId, string actionIdentifier);
 }
 
 internal sealed class DirectoryFeature : IDirectoryFeature
@@ -29,9 +29,5 @@ internal sealed class DirectoryFeature : IDirectoryFeature
         return builder;
     }
 
-    public async Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier)
-    {
-        await this._actionHandler(deviceId, actionIdentifier).ConfigureAwait(false);
-        return true;
-    }
+    public Task PerformActionAsync(string deviceId, string actionIdentifier) => this._actionHandler(deviceId, actionIdentifier);
 }

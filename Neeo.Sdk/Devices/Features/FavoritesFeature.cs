@@ -7,7 +7,7 @@ public interface IFavoritesFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Favorites;
 
-    Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite);
+    Task ExecuteAsync(string deviceId, string favorite);
 }
 
 internal sealed class FavoritesFeature : IFavoritesFeature
@@ -16,9 +16,5 @@ internal sealed class FavoritesFeature : IFavoritesFeature
 
     public FavoritesFeature(FavoriteHandler handler) => this._handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
-    public async Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite)
-    {
-        await this._handler.Invoke(deviceId, favorite).ConfigureAwait(false);
-        return true;
-    }
+    public Task ExecuteAsync(string deviceId, string favorite) => this._handler(deviceId, favorite);
 }

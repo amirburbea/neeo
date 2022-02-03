@@ -14,11 +14,11 @@ internal sealed partial class DeviceController : ControllerBase
 {
     private readonly IDynamicDeviceRegistrar _dynamicDeviceRegistrar;
     private readonly ILogger<DeviceController> _logger;
-    private readonly PgpKeyPair _pgpKeys;
+    private readonly PgpPrivateKey _privateKey;
 
     public DeviceController(IDynamicDeviceRegistrar dynamicDeviceRegistrar, PgpKeyPair pgpKeys, ILogger<DeviceController> logger)
     {
-        (this._dynamicDeviceRegistrar, this._pgpKeys, this._logger) = (dynamicDeviceRegistrar, pgpKeys, logger);
+        (this._dynamicDeviceRegistrar, this._privateKey, this._logger) = (dynamicDeviceRegistrar, pgpKeys.PrivateKey, logger);
     }
 
     private sealed class AdapterBinder : ParameterBinderBase<IDeviceAdapter>

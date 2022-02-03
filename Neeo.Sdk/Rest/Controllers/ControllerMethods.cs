@@ -12,9 +12,9 @@ namespace Neeo.Sdk.Rest.Controllers;
 
 internal static class ControllerMethods
 {
-    public static OkObjectResult Serialize<TValue>(this ControllerBase controller, [ActionResultObjectValue] TValue value)
+    public static OkObjectResult Ok<TValue>(this ControllerBase controller, [ActionResultObjectValue] TValue value)
     {
-        OkObjectResult result = controller.Ok(value);
+        OkObjectResult result = controller.Ok(value); // Call the non-generic version of Ok first.
         result.DeclaredType = typeof(TValue);
         result.Formatters.Add(JsonOutputFormatter.Instance);
         return result;

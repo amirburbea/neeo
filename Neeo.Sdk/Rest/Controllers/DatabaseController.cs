@@ -14,13 +14,13 @@ internal sealed class DatabaseController : ControllerBase
     [HttpGet("adapterdefinition/{adapterName}")]
     public ActionResult<IDeviceModel> GetDeviceByAdapterName(string adapterName) => this._database.GetDeviceByAdapterName(adapterName) is not { } device
         ? this.NotFound()
-        : this.Serialize(device);
+        : this.Ok<IDeviceModel>(device);
 
     [HttpGet("{deviceId}")]
     public ActionResult<IDeviceModel> GetDeviceById(int deviceId) => this._database.GetDeviceById(deviceId) is not { } device
         ? this.NotFound()
-        : this.Serialize(device);
+        : this.Ok<IDeviceModel>(device);
 
     [HttpGet("search")]
-    public ActionResult<SearchEntry<IDeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this.Serialize(this._database.Search(query));
+    public ActionResult<SearchEntry<IDeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this.Ok(this._database.Search(query));
 }

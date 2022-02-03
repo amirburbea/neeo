@@ -49,11 +49,9 @@ internal sealed class ListBuilder : IListBuilder
 
     public ListBuilder(ListParameters parameters)
     {
-        (this.BrowseIdentifier, int limit, int? offset, string? title, int? totalMatchingItems) = this.Parameters = parameters;
+        (this.BrowseIdentifier, int limit, int? offset) = this.Parameters = parameters;
         this.Offset = offset is int value and > 0 ? value : 0;
         this._limit = limit is > 0 and <= Constants.MaxItems ? limit : Constants.MaxItems;
-        this.Title = title ?? string.Empty;
-        this.TotalMatchingItems = totalMatchingItems ?? 0;
         this.Build();
     }
 
@@ -67,7 +65,7 @@ internal sealed class ListBuilder : IListBuilder
 
     public ListParameters Parameters { get; }
 
-    public string Title { get; private set; }
+    public string Title { get; private set; } = string.Empty;
 
     public int TotalMatchingItems { get; private set; }
 

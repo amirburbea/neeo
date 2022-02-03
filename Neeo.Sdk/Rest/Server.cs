@@ -1,5 +1,8 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -13,7 +16,13 @@ using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Json;
 using Neeo.Sdk.Notifications;
-using Neeo.Sdk.Utilities;
+using Org.BouncyCastle.Bcpg;
+using Org.BouncyCastle.Bcpg.OpenPgp;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Math;
+using Org.BouncyCastle.Security;
 
 namespace Neeo.Sdk.Rest;
 
@@ -40,7 +49,7 @@ internal static class Server
             .AddSingleton<IDynamicDeviceRegistrar, DynamicDevices>()
             .AddSingleton<INotificationMapping, NotificationMapping>()
             .AddSingleton<INotificationService, NotificationService>()
-            .AddSingleton(PgpMethods.CreatePgpKeys()); // Creates new random PGP encryption keys.
+            .AddSingleton(Server.CreatePgpKeys()); // Creates new random PGP encryption keys.
         services
             .AddHostedService<SdkRegistration>()
             .AddHostedService<SubscriptionsNotifier>();
@@ -84,6 +93,19 @@ internal static class Server
                 builder.UseDeveloperExceptionPage();
             }
         });
+
+    private static PgpKeyPair CreatePgpKeys()
+    {
+        byte[] randomBytes = RandomNumberGenerator.GetBytes(64);
+        char[] passphrase = Encoding.ASCII.GetChars(randomBytes);
+        RsaKeyPairGenerator kpg = new();
+        kpg.Init(new RsaKeyGenerationParameters(BigInteger.ValueOf(0x10001), new(), 768, 8));
+        AsymmetricCipherKeyPair pair = kpg.GenerateKeyPair();
+        SecureRandom random = new();
+        random.SetSeed(randomBytes);
+        PgpSecretKey secretKey = new(PgpSignature.DefaultCertification, PublicKeyAlgorithmTag.RsaGeneral, pair.Public, pair.Private, DateTime.Now, Dns.GetHostName(), SymmetricKeyAlgorithmTag.Aes256, passphrase, null, null, random);
+        return new(secretKey.PublicKey, secretKey.ExtractPrivateKey(passphrase));
+    }
 
     private static class Constants
     {

@@ -1008,7 +1008,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     }
 
     private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
-            where TPayload : notnull
+        where TPayload : notnull
     {
         if (this.Setup.Discovery is null)
         {
@@ -1020,8 +1020,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         this.Setup.RegistrationHeaderText = Validator.ValidateText(headerText, maxLength: 255);
         this.Setup.RegistrationDescription = Validator.ValidateText(description, maxLength: 255);
+        this.RegistrationFeature = RegistrationFeature.Create(queryIsRegistered, processor);
         this.Setup.RegistrationType = type;
-        this.RegistrationFeature = new(queryIsRegistered, type, element => processor(element.Deserialize<TPayload>(JsonSerialization.Options)!));
         return this;
     }
 

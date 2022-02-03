@@ -9,7 +9,7 @@ namespace Neeo.Sdk.Json;
 public static class JsonSerialization
 {
     /// <summary>
-    /// An instance of <see cref="JsonSerializerOptions"/> suitable for interactions with the NEEO <see cref="Brain"/>.
+    /// <see cref="JsonSerializerOptions"/> suitable for interactions with the NEEO <see cref="Brain"/>.
     /// </summary>
     public static readonly JsonSerializerOptions Options = JsonSerialization.CreateJsonSerializerOptions();
 

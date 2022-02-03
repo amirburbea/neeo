@@ -7,25 +7,25 @@ public interface IValueFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Value;
 
-    Task<ValueResponse> GetValueAsync(string deviceId);
+    Task<object> GetValueAsync(string deviceId);
 
-    Task<SuccessResponse> SetValueAsync(string deviceId, string value);
+    Task SetValueAsync(string deviceId, string value);
 }
 
 internal sealed class ValueFeature : IValueFeature
 {
-    private readonly DeviceValueGetter<ValueResponse> _getter;
+    private readonly DeviceValueGetter<object> _getter;
     private readonly DeviceValueSetter<string>? _setter;
 
-    private ValueFeature(DeviceValueGetter<ValueResponse> getter, DeviceValueSetter<string>? setter = default)
+    private ValueFeature(DeviceValueGetter<object> getter, DeviceValueSetter<string>? setter = default)
     {
         (this._getter, this._setter) = (getter, setter);
     }
 
     public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter)
         where TValue : notnull => getter == null
-        ? throw new ArgumentNullException(nameof(getter)) 
-        : new(async deviceId => new(await getter(deviceId).ConfigureAwait(false)));
+        ? throw new ArgumentNullException(nameof(getter))
+        : new(async deviceId => await getter(deviceId).ConfigureAwait(false));
 
     public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue> setter)
         where TValue : notnull, IConvertible => (getter, setter) switch
@@ -33,16 +33,12 @@ internal sealed class ValueFeature : IValueFeature
             (null, _) => throw new ArgumentNullException(nameof(getter)),
             (_, null) => throw new ArgumentNullException(nameof(setter)),
             _ => new(
-                async deviceId => new(await getter(deviceId).ConfigureAwait(false)),
+                async deviceId => await getter(deviceId).ConfigureAwait(false),
                 (deviceId, value) => setter(deviceId, (TValue)Convert.ChangeType(value, typeof(TValue)))
             )
         };
 
-    public Task<ValueResponse> GetValueAsync(string deviceId) => this._getter(deviceId);
+    public Task<object> GetValueAsync(string deviceId) => this._getter(deviceId);
 
-    public async Task<SuccessResponse> SetValueAsync(string deviceId, string value)
-    {
-        await (this._setter ?? throw new NotSupportedException())(deviceId, value).ConfigureAwait(false);
-        return true;
-    }
+    public Task SetValueAsync(string deviceId, string value) => (this._setter ?? throw new NotSupportedException())(deviceId, value);
 }

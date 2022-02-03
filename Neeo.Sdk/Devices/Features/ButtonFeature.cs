@@ -6,7 +6,7 @@ public interface IButtonFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Button;
 
-    Task<SuccessResponse> TriggerAsync(string deviceId);
+    Task TriggerAsync(string deviceId);
 }
 
 internal sealed class ButtonFeature : IButtonFeature
@@ -16,9 +16,5 @@ internal sealed class ButtonFeature : IButtonFeature
 
     public ButtonFeature(ButtonHandler handler, string button) => (this._handler, this._button) = (handler, button);
 
-    public async Task<SuccessResponse> TriggerAsync(string deviceId)
-    {
-        await this._handler.Invoke(deviceId, this._button).ConfigureAwait(false);
-        return true;
-    }
+    public Task TriggerAsync(string deviceId) => this._handler.Invoke(deviceId, this._button);
 }

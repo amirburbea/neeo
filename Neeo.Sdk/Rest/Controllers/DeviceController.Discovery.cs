@@ -29,6 +29,6 @@ internal partial class DeviceController
                 }
             }
         }
-        return this.Serialize(devices);
+        return this.Ok(devices);
     }
 }

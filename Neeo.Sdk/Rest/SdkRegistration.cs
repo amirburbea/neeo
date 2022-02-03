@@ -32,7 +32,7 @@ internal sealed class SdkRegistration : IHostedService
         {
             try
             {
-                if (!await this._client.PostAsync(UrlPaths.RegisterServer, new { Name = adapterName, BaseUrl = hostAddress }, SuccessResponse.SuccessProjection, cancellationToken).ConfigureAwait(false))
+                if (!await this._client.PostAsync(UrlPaths.RegisterServer, new { Name = adapterName, BaseUrl = hostAddress }, (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
                 {
                     throw new ApplicationException("Failed to register on the brain - registration rejected.");
                 }
@@ -56,7 +56,7 @@ internal sealed class SdkRegistration : IHostedService
     {
         try
         {
-            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = this._environment.AdapterName }, SuccessResponse.SuccessProjection, cancellationToken).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = this._environment.AdapterName }, (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
             {
                 this._logger.LogInformation("Server unregistered from {brain}.", this._environment.Brain.HostName);
             }
