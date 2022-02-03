@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Neeo.Sdk;
 using Zeroconf;
 
-namespace Neeo.Discovery;
+namespace Neeo.Sdk.Discovery;
 
 /// <summary>
-/// Contains methods for discovery of the NEEO Brain on the network.
+/// Contains methods for discovery of NEEO <see cref="Brain"/>s on the network.
 /// </summary>
-public static class BrainDiscovery
+public static class Brains
 {
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(5d);
 
@@ -22,11 +21,11 @@ public static class BrainDiscovery
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>s.</returns>
     public static async Task<Brain[]> DiscoverAllAsync(CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, BrainDiscovery._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brains._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
         Brain[] brains = new Brain[hosts.Count];
         for (int i = 0; i < brains.Length; i++)
         {
-            brains[i] = BrainDiscovery.CreateBrain(hosts[i]);
+            brains[i] = Brains.CreateBrain(hosts[i]);
         }
         return brains;
     }
@@ -42,7 +41,7 @@ public static class BrainDiscovery
     public static async Task<Brain?> DiscoverAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
     {
         TaskCompletionSource<Brain?> brainTaskSource = new();
-        IObservable<IZeroconfHost> observable = ZeroconfResolver.Resolve(Constants.ServiceName, BrainDiscovery._scanTime);
+        IObservable<IZeroconfHost> observable = ZeroconfResolver.Resolve(Constants.ServiceName, Brains._scanTime);
         cancellationToken.Register(() => brainTaskSource.TrySetCanceled(cancellationToken));
         using (observable.Subscribe(OnHostDiscovered, () => brainTaskSource.TrySetResult(default)))
         {
@@ -51,7 +50,7 @@ public static class BrainDiscovery
 
         void OnHostDiscovered(IZeroconfHost host)
         {
-            Brain brain = BrainDiscovery.CreateBrain(host);
+            Brain brain = Brains.CreateBrain(host);
             if (predicate == null || predicate(brain))
             {
                 brainTaskSource.TrySetResult(brain);

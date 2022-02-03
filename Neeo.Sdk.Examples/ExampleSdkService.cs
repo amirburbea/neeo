@@ -7,9 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Neeo.Discovery;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Examples.Devices;
+using Neeo.Sdk.Discovery;
 
 namespace Neeo.Sdk.Examples;
 
@@ -20,8 +19,8 @@ public sealed class ExampleSdkService : IHostedService
 {
     private static readonly Regex _ipAddressRegex = new(@"^\d+\.\d+\.\d+\.\d+$");
 
-    private readonly IDeviceProvider[] _providers;
     private readonly ILogger<ExampleSdkService> _logger;
+    private readonly IDeviceProvider[] _providers;
     private ISdkEnvironment? _environment;
 
     public ExampleSdkService(IEnumerable<IDeviceProvider> providers, ILogger<ExampleSdkService> logger)
@@ -39,13 +38,13 @@ public sealed class ExampleSdkService : IHostedService
         else
         {
             this._logger.LogInformation("Discovering Brain...");
-            if ((brain = await BrainDiscovery.DiscoverAsync(cancellationToken: cancellationToken).ConfigureAwait(false)) is null)
+            if ((brain = await Brains.DiscoverAsync(cancellationToken: cancellationToken).ConfigureAwait(false)) is null)
             {
                 throw new InvalidOperationException("Brain not found.");
             }
         }
         this._logger.LogInformation("Starting up...");
-        this._environment = await brain.StartServerAsync(this._providers, "Example Service",  cancellationToken: cancellationToken).ConfigureAwait(false);
+        this._environment = await brain.StartServerAsync(this._providers, "Example Service", cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
