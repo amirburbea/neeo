@@ -2,6 +2,6 @@
 
 public record struct BrowseParameters(
     string? BrowseIdentifier = default,
-    int? Limit = default,
+    int Limit = Constants.MaxItems,
     int? Offset = default
 );

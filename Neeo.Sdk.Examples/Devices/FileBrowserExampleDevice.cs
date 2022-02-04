@@ -15,7 +15,6 @@ public class FileBrowserExampleDevice : IDeviceProvider
         const string deviceName = "File Browser Example";
         return Device.Create(deviceName, DeviceType.MediaPlayer)
             .SetSpecificName(deviceName)
-            .SetManufacturer("NEEO")
             .SetIcon(DeviceIconOverride.NeeoBrain)
             .AddAdditionalSearchTokens("explorer")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
@@ -28,7 +27,8 @@ public class FileBrowserExampleDevice : IDeviceProvider
         int limit = builder.BrowseParameters.Limit;
         if (string.IsNullOrEmpty(builder.BrowseParameters.BrowseIdentifier))
         {
-            builder.SetTitle("Drives").AddHeader(new("Drives"));
+            const string title = "Drives";
+            builder.SetTitle(title).AddHeader(title);
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 string text = drive.Name.Replace('\\', '/');
@@ -37,36 +37,31 @@ public class FileBrowserExampleDevice : IDeviceProvider
         }
         else
         {
-            string root = builder.BrowseParameters.BrowseIdentifier;
-            builder.SetTitle(root).AddHeader(new(root.Replace('\\', '/')));
-            if (offset == 0)
-            {
-                //builder.AddTileRow(
-                //    new ListTile("https://neeo-sdk.neeo.io/puppy.jpg", "puppy"),
-                //    new ListTile("https://neeo-sdk.neeo.io/kitten.jpg", "kitten")
-                //).AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"));
-
-                builder.AddButtonRow(
-                    new ListButton("Reload", "RELOAD", inverse: false, uiAction: ListUIAction.Reload),
-                    new ListButton("BACK", "BACKONE", inverse: true, uiAction: ListUIAction.GoBack),
-                    new ListButton("ROOT", "BACKTOROOT", inverse: true, uiAction: ListUIAction.GoToRoot)
-                );
-            }
             try
             {
-                var all = GetEntries(root).ToList();
-                foreach (var entry in all.Skip(offset).Take(limit))
+                string root = builder.BrowseParameters.BrowseIdentifier;
+                ListEntry[] array = GetEntries(root).ToArray();
+                string title = $"{root.Replace('\\', '/')} ({array.Length})";
+                builder.SetTitle(title);
+                if (offset == 0)
+                {
+                    builder
+                        .AddHeader(title)
+                        .AddTileRow(new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy"), new("https://neeo-sdk.neeo.io/kitten.jpg", "kitten"))
+                        .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
+                        .AddButtonRow(new("Reload", "RELOAD", inverse: false, uiAction: ListUIAction.Reload), new("BACK", "BACKONE", inverse: true, uiAction: ListUIAction.GoBack), new("ROOT", "BACKTOROOT", inverse: true, uiAction: ListUIAction.GoToRoot));
+                }
+                foreach (ListEntry entry in array[offset..Math.Min(offset + limit, array.Length)])
                 {
                     builder.AddEntry(entry);
                 }
-                builder.SetTotalMatchingItems(all.Count);
+                builder.SetTotalMatchingItems(array.Length);
             }
             catch (Exception e)
             {
-                builder.AddInfoItem(new("Error Occurred", e.Message, "CLOSE", "DON'T CARE"));
+                builder.AddInfoItem(new("Error Occurred", e.Message, "Close", "I Don't Care"));
             }
         }
-
         return Task.CompletedTask;
     }
 
