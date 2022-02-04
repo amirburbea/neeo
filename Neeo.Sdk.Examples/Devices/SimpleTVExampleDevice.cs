@@ -4,7 +4,7 @@ using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Examples.Devices;
 
-internal class SimpleTVExampleDevice : IDeviceProvider
+public class SimpleTVExampleDevice : IDeviceProvider
 {
     private readonly ILogger<SimpleTVExampleDevice> _logger;
 
@@ -17,10 +17,11 @@ internal class SimpleTVExampleDevice : IDeviceProvider
             .SetSpecificName(deviceName)
             .SetManufacturer("NEEO")
             .SetIcon(DeviceIconOverride.NeeoBrain)
+            .AddButton(KnownButtons.InputHdmi1) // Add a known button.
+            .AddButton(KnownButtons.InputHdmi2 | KnownButtons.InputHdmi3) // Add multiple known buttons at once.
+            .AddButton("SomeRandomName", "Randomly Named") // Add a button with a custom label.
             .AddButtonGroup(ButtonGroups.Power)
             .AddButtonGroup(ButtonGroups.ControlPad | ButtonGroups.ChannelZapper | ButtonGroups.Volume | ButtonGroups.MenuAndBack)
-            .AddButton(KnownButtons.InputHdmi1)
-            .AddButton(KnownButtons.InputHdmi2 | KnownButtons.InputHdmi3)
             .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
             .AddButtonHandler(this.OnButtonPressed);
     }

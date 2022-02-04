@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
@@ -10,7 +11,7 @@ namespace Neeo.Sdk.Examples.Devices;
 
 public sealed class PlayerExampleDevice : IDeviceProvider
 {
-    private static readonly Pet[] _pets = Enum.GetValues<Pet>();
+    internal static readonly Pet[] Pets = Enum.GetValues<Pet>();
 
     private readonly PlayerWidgetController _controller;
 
@@ -19,7 +20,7 @@ public sealed class PlayerExampleDevice : IDeviceProvider
         this._controller = new(logger);
     }
 
-    private enum Pet
+    internal enum Pet
     {
         Kitten,
         Puppy,
@@ -108,13 +109,13 @@ public sealed class PlayerExampleDevice : IDeviceProvider
 
         public bool IsQueueSupported => false;
 
-        public IDeviceNotifier? Notifier { get; set; }
+        public IDeviceNotifier Notifier { get; set; } = new DummyDeviceNotifier();
 
         string? IPlayerWidgetController.QueueDirectoryLabel { get; }
 
         string? IPlayerWidgetController.RootDirectoryLabel { get; }
 
-        public Task<string> GetCoverArtUriAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.CoverArt, deviceId);
+        public Task<string> GetCoverArtAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.CoverArt, deviceId);
 
         public Task<string> GetDescriptionAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.Description, deviceId);
 
@@ -145,6 +146,7 @@ public sealed class PlayerExampleDevice : IDeviceProvider
 
         Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier)
         {
+            // Queue is not supported for this demo.
             return Task.CompletedTask;
         }
 
@@ -160,20 +162,19 @@ public sealed class PlayerExampleDevice : IDeviceProvider
 
         public Task PopulateRootDirectoryAsync(string deviceId, IListBuilder builder)
         {
-            if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
+            if (string.IsNullOrEmpty(builder.BrowseParameters.BrowseIdentifier))
             {
                 builder.AddHeader("Artists");
                 for (int i = 0; i < 5; i++)
                 {
-                    string name = "Artist #" + i;
+                    string name = $"Artist #{i}";
                     builder.AddEntry(new(name, name, name));
                 }
             }
             else
             {
-                builder.AddHeader(builder.Parameters.BrowseIdentifier);
-
-                foreach (Pet pet in PlayerExampleDevice._pets)
+                builder.AddHeader(builder.BrowseParameters.BrowseIdentifier);
+                foreach (Pet pet in Pets)
                 {
                     builder.AddEntry(new(GetTitle(pet), GetDescription(pet), null, Enum.GetName(pet), thumbnailUri: GetCoverArt(pet)));
                 }
@@ -193,13 +194,13 @@ public sealed class PlayerExampleDevice : IDeviceProvider
 
         private Task ChangeTrackAsync(string deviceId, Pet pet) => (int)pet switch
         {
-            < 0 => this.ChangeTrackAsync(deviceId, PlayerExampleDevice._pets[^1]), // Did we subtract 1 from 0? Go to last value.
-            int value when value >= PlayerExampleDevice._pets.Length => this.ChangeTrackAsync(deviceId, 0), // Did we add 1 to the last value? Go to 0.
+            < 0 => this.ChangeTrackAsync(deviceId, Pets[^1]), // Did we subtract 1 from 0? Go to last value.
+            int value when value >= Pets.Length => this.ChangeTrackAsync(deviceId, 0), // Did we add 1 to the last value? Go to 0.
             _ => Task.WhenAll(
                 Task.FromResult(this._service.Pet = pet),
-                this.SetConverArtAsync(deviceId, PlayerExampleDevice.GetCoverArt(pet)),
-                this.SetTitleAsync(deviceId, PlayerExampleDevice.GetTitle(pet)),
-                this.SetDescriptionAsync(deviceId, PlayerExampleDevice.GetDescription(pet))
+                this.SetCoverArtAsync(deviceId, GetCoverArt(pet)),
+                this.SetTitleAsync(deviceId, GetTitle(pet)),
+                this.SetDescriptionAsync(deviceId, GetDescription(pet))
             )
         };
 
@@ -209,7 +210,7 @@ public sealed class PlayerExampleDevice : IDeviceProvider
             return Task.FromResult(this._service.GetValue<TValue>(key));
         }
 
-        private Task SetConverArtAsync(string deviceId, string coverArt) => this.SetValueAsync(PlayerKey.CoverArt, deviceId, coverArt);
+        private Task SetCoverArtAsync(string deviceId, string coverArt) => this.SetValueAsync(PlayerKey.CoverArt, deviceId, coverArt);
 
         private Task SetDescriptionAsync(string deviceId, string description) => this.SetValueAsync(PlayerKey.Description, deviceId, description);
 
@@ -218,8 +219,17 @@ public sealed class PlayerExampleDevice : IDeviceProvider
         private async Task SetValueAsync(PlayerKey key, string deviceId, object value)
         {
             this._logger.LogInformation("Setting component {deviceId} {key} to {value}", deviceId, key, value);
-            await (this.Notifier?.SendNotificationAsync(componentName: TextAttribute.GetText(key), value: value, deviceId: deviceId) ?? Task.CompletedTask).ConfigureAwait(false);
+            await this.Notifier.SendNotificationAsync(componentName: TextAttribute.GetText(key), value: value, deviceId: deviceId).ConfigureAwait(false);
             this._service.SetValue(key, value);
+        }
+
+        private sealed class DummyDeviceNotifier : IDeviceNotifier
+        {
+            bool IDeviceNotifier.SupportsPowerNotifications => true;
+
+            Task IDeviceNotifier.SendNotificationAsync(string componentName, object value, string deviceId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+            Task IDeviceNotifier.SendPowerNotificationAsync(bool powerState, string deviceId, CancellationToken cancellationToken) => Task.CompletedTask;
         }
     }
 }

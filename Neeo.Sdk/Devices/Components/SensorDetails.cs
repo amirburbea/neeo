@@ -1,4 +1,4 @@
-﻿using Neeo.Sdk.Json;
+﻿using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Components;
 

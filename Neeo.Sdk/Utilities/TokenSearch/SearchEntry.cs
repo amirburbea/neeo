@@ -22,6 +22,4 @@ public sealed class SearchEntry<T> : IComparable<SearchEntry<T>>
             ? scoreComparison
             : this.Item.CompareTo(other.Item)
         : -1;
-
-    internal object? GetValue(string propertyName) => TokenSearch<T>.GetItemValue(this.Item, propertyName);
 }

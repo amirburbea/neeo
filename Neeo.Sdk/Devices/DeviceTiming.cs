@@ -7,26 +7,9 @@ namespace Neeo.Sdk.Devices;
 /// </summary>
 public readonly struct DeviceTiming
 {
-    /// <summary>
-    /// Initialize a new <see cref="DeviceTiming"/> instance.
-    /// </summary>
-    /// <param name="powerOnDelay">
-    /// Optional: The number of milliseconds NEEO should wait after powering on the device
-    /// before sending it another command.
-    /// </param>
-    /// <param name="sourceSwitchDelay">
-    /// Optional: The number of milliseconds NEEO should wait after switching input on the device
-    /// before sending it another command.
-    /// </param>
-    /// <param name="shutdownDelay">
-    /// Optional: The number of milliseconds NEEO should wait after shutting down the device
-    /// before sending it another command.
-    /// </param>
-    public DeviceTiming(int? powerOnDelay = default, int? shutdownDelay = default, int? sourceSwitchDelay = default)
+    internal DeviceTiming(int? powerOnDelay = default, int? shutdownDelay = default, int? sourceSwitchDelay = default)
     {
-        Validator.ValidateDelay(this.PowerOnDelay = powerOnDelay, nameof(powerOnDelay));
-        Validator.ValidateDelay(this.ShutdownDelay = shutdownDelay, nameof(shutdownDelay));
-        Validator.ValidateDelay(this.SourceSwitchDelay = sourceSwitchDelay, nameof(sourceSwitchDelay));
+        (this.PowerOnDelay, this.ShutdownDelay, this.SourceSwitchDelay) = (powerOnDelay, shutdownDelay, sourceSwitchDelay);
     }
 
     /// <summary>

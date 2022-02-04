@@ -2,7 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Neeo.Sdk.Json;
+namespace Neeo.Sdk.Utilities;
 
 /// <summary>
 /// Specifies that objects of a specified base type should directly be serialized as their implemented types.

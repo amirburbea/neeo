@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Devices.Lists;
-using Neeo.Sdk.Json;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -48,7 +48,7 @@ internal partial class DeviceController
         return feature.Type switch
         {
             FeatureType.Favorites => await this.ExecuteAsync(((IFavoritesFeature)feature).ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
-            FeatureType.Directory => this.Ok<IListBuilder>(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<ListParameters>())),
+            FeatureType.Directory => this.Ok<IListBuilder>(await ((IDirectoryFeature)feature).BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>())),
             _ => this.BadRequest()
         };
     }

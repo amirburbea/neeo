@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Neeo.Sdk.Json;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest.Controllers;
 

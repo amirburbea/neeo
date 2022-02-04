@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Neeo.Sdk.Json;
+namespace Neeo.Sdk.Utilities;
 
 /// <summary>
 /// Contains the <see langword="static"/> JSON serialization options to use with the NEEO Brain.

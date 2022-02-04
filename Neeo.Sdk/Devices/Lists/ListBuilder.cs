@@ -17,7 +17,7 @@ public interface IListBuilder
     int Offset { get; }
 
     [JsonIgnore]
-    ListParameters Parameters { get; }
+    BrowseParameters BrowseParameters { get; }
 
     string Title { get; }
 
@@ -47,11 +47,11 @@ internal sealed class ListBuilder : IListBuilder
     private readonly List<IListItem> _items = new();
     private readonly int _limit;
 
-    public ListBuilder(ListParameters parameters)
+    public ListBuilder(BrowseParameters parameters)
     {
-        (this.BrowseIdentifier, int limit, int? offset) = this.Parameters = parameters;
-        this.Offset = offset is int value and > 0 ? value : 0;
-        this._limit = limit is > 0 and <= Constants.MaxItems ? limit : Constants.MaxItems;
+        (this.BrowseIdentifier, int? limit, int? offset) = this.BrowseParameters = parameters;
+        this.Offset = offset is int startIndex and > 0 ? startIndex : 0;
+        this._limit = limit is int maxItems and > 0 and <= Constants.MaxItems ? maxItems : Constants.MaxItems;
         this.Build();
     }
 
@@ -63,7 +63,7 @@ internal sealed class ListBuilder : IListBuilder
 
     public int Offset { get; }
 
-    public ListParameters Parameters { get; }
+    public BrowseParameters BrowseParameters { get; }
 
     public string Title { get; private set; } = string.Empty;
 

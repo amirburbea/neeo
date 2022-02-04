@@ -22,7 +22,7 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
 
     public DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder)
     {
-        (this._process, this.EnableDynamicDeviceBuilder) = (process??throw new ArgumentNullException(nameof(process)), enableDynamicDeviceBuilder);
+        (this._process, this.EnableDynamicDeviceBuilder) = (process ?? throw new ArgumentNullException(nameof(process)), enableDynamicDeviceBuilder);
     }
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId)

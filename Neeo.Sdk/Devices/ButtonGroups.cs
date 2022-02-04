@@ -50,7 +50,7 @@ public enum ButtonGroups : ulong
     /// <summary>
     /// &quot;MY RECORDINGS&quot;, &quot;RECORD&quot;, &quot;LIVE&quot;.
     /// </summary>
-    //Recording = MyRecordings | Record | Live,
+    Recording = MyRecordings | Record | Live,
 
     /// <summary>
     /// &quot;PLAY&quot;, &quot;PAUSE&quot;, &quot;STOP&quot;.

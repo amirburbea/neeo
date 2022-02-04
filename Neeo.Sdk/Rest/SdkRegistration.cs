@@ -1,38 +1,33 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Neeo.Sdk.Rest;
 
+/// <summary>
+/// Hosted service responsible for registering the integration server with the NEEO Brain.
+/// </summary>
 internal sealed class SdkRegistration : IHostedService
 {
     private readonly IApiClient _client;
     private readonly ISdkEnvironment _environment;
     private readonly ILogger<SdkRegistration> _logger;
-    private readonly IServer _server;
 
-    public SdkRegistration(
-        IApiClient client,
-        IServer server,
-        ISdkEnvironment environment,
-        ILogger<SdkRegistration> logger
-    )
+    public SdkRegistration(IApiClient client, ISdkEnvironment environment, ILogger<SdkRegistration> logger)
     {
         (this._client, this._environment, this._logger) = (client, environment, logger);
-        this._server = server;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        (string adapterName, Brain brain, string hostAddress) = (this._environment.AdapterName, this._environment.Brain, this._environment.HostAddress);
         for (int i = 0; i <= Constants.MaxRetries; i++)
         {
             try
             {
-                if (!await this._client.PostAsync(UrlPaths.RegisterServer, new { Name = adapterName, BaseUrl = hostAddress }, (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
+                (Brain brain, string adapterName, string hostAddress) = this._environment;
+                if (!await this.PostAsync(UrlPaths.RegisterServer, new { Name = adapterName, BaseUrl = hostAddress }, cancellationToken).ConfigureAwait(false))
                 {
                     throw new ApplicationException("Failed to register on the brain - registration rejected.");
                 }
@@ -56,9 +51,10 @@ internal sealed class SdkRegistration : IHostedService
     {
         try
         {
-            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = this._environment.AdapterName }, (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
+            (Brain brain, string adapterName) = this._environment;
+            if (await this.PostAsync(UrlPaths.UnregisterServer, new { Name = adapterName }, cancellationToken).ConfigureAwait(false))
             {
-                this._logger.LogInformation("Server unregistered from {brain}.", this._environment.Brain.HostName);
+                this._logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
             }
         }
         catch (Exception e)
@@ -66,6 +62,16 @@ internal sealed class SdkRegistration : IHostedService
             this._logger.LogWarning("Failed to unregister with brain - {content}.", e.Message);
         }
     }
+
+    /// <summary>
+    /// Makes a POST request to the NEEO Brain with an expected return type of <see cref="SuccessResponse"/> and returns the success value.
+    /// </summary>
+    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) => this._client.PostAsync(
+        path,
+        body,
+        (SuccessResponse response) => response.Success,
+        cancellationToken
+    );
 
     private static class Constants
     {

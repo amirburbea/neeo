@@ -11,7 +11,7 @@ namespace Neeo.Sdk.Devices;
 /// </summary>
 /// <remarks>
 /// Note: This enumeration supports bitwise (flagged) combinations for easily adding multiple buttons via a single
-/// call to <see cref="IDeviceBuilder.AddButton"/>.
+/// call to <see cref="IDeviceBuilder.AddButton(KnownButtons)"/>.
 /// </remarks>
 [Flags]
 public enum KnownButtons : ulong
@@ -233,10 +233,16 @@ public enum KnownButtons : ulong
     Language = InputToggle << 1,
 
     /// <summary>
+    /// &quot;LIVE&quot;
+    /// </summary>
+    [Text("LIVE")]
+    Live = Language << 1,
+
+    /// <summary>
     /// &quot;MENU&quot;
     /// </summary>
     [Text("MENU")]
-    Menu = Language << 1,
+    Menu = Live << 1,
 
     /// <summary>
     /// &quot;MUTE TOGGLE&quot;

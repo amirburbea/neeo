@@ -1,5 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
@@ -24,14 +24,12 @@ internal sealed class SubscriptionsNotifier : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        List<Task> tasks = new();
-        foreach (IDeviceAdapter adapter in this._database.Adapters)
-        {
-            if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
-            {
-                tasks.Add(this.NotifySubscriptionsAsync(adapter, feature, cancellationToken));
-            }
-        }
+        List<Task> tasks = new(
+            from adapter in this._database.Adapters
+            let feature = adapter.GetFeature(ComponentType.Subscription) as ISubscriptionFeature
+            where feature != null
+            select this.NotifySubscriptionsAsync(adapter, feature, cancellationToken)
+        );
         return tasks.Count switch
         {
             0 => Task.CompletedTask,
@@ -48,6 +46,6 @@ internal sealed class SubscriptionsNotifier : IHostedService
         this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
         string path = string.Format(UrlPaths.SubscriptionsFormat, this._sdkAdapterName, adapter.AdapterName);
         string[] deviceIds = await this._client.GetAsync<string[]>(path, cancellationToken).ConfigureAwait(false);
-        await feature.InitializeDeviceList(deviceIds).ConfigureAwait(false);
+        await feature.InitializeDeviceListAsync(deviceIds).ConfigureAwait(false);
     }
 }

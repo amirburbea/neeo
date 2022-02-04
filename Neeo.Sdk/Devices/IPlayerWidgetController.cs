@@ -11,7 +11,7 @@ public interface IPlayerWidgetController
 
     string? RootDirectoryLabel { get; }
 
-    Task<string> GetCoverArtUriAsync(string deviceId);
+    Task<string> GetCoverArtAsync(string deviceId);
 
     Task<string> GetDescriptionAsync(string deviceId);
 

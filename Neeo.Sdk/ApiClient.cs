@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Json;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk;
 

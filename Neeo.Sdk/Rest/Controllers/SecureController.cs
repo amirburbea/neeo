@@ -14,9 +14,9 @@ internal sealed class SecureController : ControllerBase
     public SecureController(PgpKeyPair pgpKeys) => this._publicKey = pgpKeys.PublicKey;
 
     [HttpGet("pubkey")]
-    public ActionResult<PublicKeyResponse> GetPublicKeyData() => this.Ok(new PublicKeyResponse(this.GetArmoredPublicKey()));
+    public ActionResult<PublicKeyResponse> GetPublicKey() => this.Ok(new PublicKeyResponse(this.GetArmoredPublicKey()));
 
-    public record struct PublicKeyResponse([property: JsonPropertyName("publickey")] string ArmoredPublicKey);
+    public record struct PublicKeyResponse([property: JsonPropertyName("publickey")] string PublicKey);
 
     private string GetArmoredPublicKey()
     {

@@ -110,11 +110,11 @@ public static class DeviceTypes
     /// </summary>
     /// <param name="type">The type of the device.</param>
     /// <returns>Boolean value.</returns>
-    public static bool RequiresInput(this DeviceType type) => type 
+    public static bool RequiresInput(this DeviceType type) => type
         is DeviceType.AVReceiver
-        or DeviceType.HdmiSwitch 
-        or DeviceType.Projector 
-        or DeviceType.SoundBar 
+        or DeviceType.HdmiSwitch
+        or DeviceType.Projector
+        or DeviceType.SoundBar
         or DeviceType.TV;
 
     /// <summary>
@@ -123,9 +123,9 @@ public static class DeviceTypes
     /// </summary>
     /// <param name="type">The type of the device.</param>
     /// <returns>Boolean value.</returns>
-    public static bool SupportsFavorites(this DeviceType type) => type 
-        is DeviceType.SetTopBox 
-        or DeviceType.Tuner 
+    public static bool SupportsFavorites(this DeviceType type) => type
+        is DeviceType.SetTopBox
+        or DeviceType.Tuner
         or DeviceType.TV;
 
     /// <summary>
@@ -135,9 +135,9 @@ public static class DeviceTypes
     /// </summary>
     /// <param name="type">The type of the device.</param>
     /// <returns>Boolean value.</returns>
-    public static bool SupportsPlayerWidget(this DeviceType type) => type 
-        is DeviceType.MediaPlayer 
-        or DeviceType.MusicPlayer 
+    public static bool SupportsPlayerWidget(this DeviceType type) => type
+        is DeviceType.MediaPlayer
+        or DeviceType.MusicPlayer
         or DeviceType.VideoOnDemand;
 
     /// <summary>

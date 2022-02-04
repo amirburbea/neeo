@@ -23,6 +23,10 @@ public interface ISdkEnvironment
     /// The host server address.
     /// </summary>
     string HostAddress { get; }
+
+    void Deconstruct(out Brain brain, out string adapterName);
+
+    void Deconstruct(out Brain brain, out string adapterName, out string hostAddress);
 }
 
 internal sealed class SdkEnvironment : ISdkEnvironment
@@ -40,4 +44,8 @@ internal sealed class SdkEnvironment : ISdkEnvironment
     public Brain Brain => this._sdkConfiguration.Brain;
 
     public string HostAddress => this._serverAddressesFeature.Addresses.First();
+
+    public void Deconstruct(out Brain brain, out string adapterName) => (brain, adapterName) = (this.Brain, this.AdapterName);
+
+    public void Deconstruct(out Brain brain, out string adapterName, out string hostAddress) => (brain, adapterName, hostAddress) = (this.Brain, this.AdapterName, this.HostAddress);
 }

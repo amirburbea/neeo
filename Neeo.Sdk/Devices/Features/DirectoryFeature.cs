@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Lists;
 
 namespace Neeo.Sdk.Devices.Features;
@@ -7,7 +8,7 @@ public interface IDirectoryFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Directory;
 
-    Task<IListBuilder> BrowseAsync(string deviceId, ListParameters parameters);
+    Task<IListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters);
 
     Task PerformActionAsync(string deviceId, string actionIdentifier);
 }
@@ -19,10 +20,11 @@ internal sealed class DirectoryFeature : IDirectoryFeature
 
     public DirectoryFeature(DeviceDirectoryPopulator populator, DirectoryActionHandler actionHandler)
     {
-        (this._populator, this._actionHandler) = (populator, actionHandler);
+        this._populator = populator ?? throw new ArgumentNullException(nameof(populator));
+        this._actionHandler = actionHandler ?? throw new ArgumentNullException(nameof(actionHandler));
     }
 
-    public async Task<IListBuilder> BrowseAsync(string deviceId, ListParameters parameters)
+    public async Task<IListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters)
     {
         ListBuilder builder = new(parameters);
         await this._populator(deviceId, builder).ConfigureAwait(false);

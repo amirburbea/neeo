@@ -16,12 +16,9 @@ internal sealed class TokenSearch<T>
 {
     public static readonly Func<T, string, object?> GetItemValue = TokenSearch<T>.CreateGetItemValue();
 
-    private readonly string[]? _searchProperties;
+    private readonly string[] _searchProperties;
 
-    public TokenSearch(params string[] searchProperties)
-    {
-        this._searchProperties = searchProperties is { Length: > 1 } ? searchProperties : null;
-    }
+    public TokenSearch(params string[] searchProperties) => this._searchProperties = searchProperties;
 
     public IEnumerable<SearchEntry<T>> Search(IEnumerable<T> collection, string query)
     {
@@ -80,7 +77,7 @@ internal sealed class TokenSearch<T>
         ).Compile();
     }
 
-    private static IEnumerable<SearchEntry<T>> Normalize(IEnumerable<SearchEntry<T>> entries, int maxScore, string[]? searchProperties)
+    private static IEnumerable<SearchEntry<T>> Normalize(IEnumerable<SearchEntry<T>> entries, int maxScore, string[] searchProperties)
     {
         double normalizedScore = 1d / maxScore;
         HashSet<string> hashSet = new(StringComparer.OrdinalIgnoreCase);
@@ -88,7 +85,7 @@ internal sealed class TokenSearch<T>
         {
             entry.Score = 1d - entry.Score * normalizedScore;
             entry.MaxScore = maxScore;
-            if (entry.Score <= 0.5 & hashSet.Add(searchProperties == null ? entry.Item.ToString() ?? string.Empty : string.Join(' ', searchProperties.Select(entry.GetValue))))
+            if (entry.Score <= 0.5 & hashSet.Add(string.Join(' ', searchProperties.Select(property => TokenSearch<T>.GetItemValue(entry.Item, property)))))
             {
                 yield return entry;
             }

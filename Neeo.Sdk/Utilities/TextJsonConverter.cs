@@ -10,7 +10,7 @@ namespace Neeo.Sdk.Utilities;
 /// See <see cref="TextAttribute"/> for more details.
 /// </summary>
 /// <typeparam name="TValue">The type of the enumerated value.</typeparam>
-internal sealed class TextJsonConverter<TValue> : JsonConverter<TValue>
+public sealed class TextJsonConverter<TValue> : JsonConverter<TValue>
     where TValue : struct, Enum
 {
     public override TValue Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) => reader.GetString() is { } text && TextAttribute.GetEnum<TValue>(text) is TValue value

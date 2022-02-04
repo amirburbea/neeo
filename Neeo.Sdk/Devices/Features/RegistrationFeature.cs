@@ -3,7 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Discovery;
-using Neeo.Sdk.Json;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Features;
 
@@ -23,13 +23,19 @@ internal sealed class RegistrationFeature : IRegistrationFeature
 
     private RegistrationFeature(QueryIsRegistered queryIsRegistered, Func<Stream, Task<RegistrationResult>> processor)
     {
-        (this._queryIsRegistered, this._processor) = (queryIsRegistered, processor);
+        (this._queryIsRegistered, this._processor) = (queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered)), processor);
     }
 
-    public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor) => new(
-        queryIsRegistered,
-        async stream => await processor((await JsonSerializer.DeserializeAsync<TPayload>(stream, JsonSerialization.Options).ConfigureAwait(false))!).ConfigureAwait(false)
-    );
+    public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
+    {
+        return new(queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered)), ProcessAsync);
+
+        async Task<RegistrationResult> ProcessAsync(Stream stream)
+        {
+            TPayload payload = (await JsonSerializer.DeserializeAsync<TPayload>(stream, JsonSerialization.Options).ConfigureAwait(false))!;
+            return await processor(payload).ConfigureAwait(false);
+        }
+    }
 
     public Task<bool> QueryIsRegisteredAsync() => this._queryIsRegistered();
 

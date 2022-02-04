@@ -1,7 +1,7 @@
 ﻿namespace Neeo.Sdk.Devices.Lists;
 
-public record struct ListParameters(
+public record struct BrowseParameters(
     string? BrowseIdentifier = default,
-    int Limit = Constants.MaxItems,
+    int? Limit = default,
     int? Offset = default
 );

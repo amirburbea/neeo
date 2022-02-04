@@ -24,9 +24,9 @@ public class FileBrowserExampleDevice : IDeviceProvider
 
     private static Task Browse(string deviceId, IListBuilder builder)
     {
-        int offset = builder.Parameters.Offset ?? 0;
-        int limit = builder.Parameters.Limit;
-        if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
+        int offset = builder.BrowseParameters.Offset ?? 0;
+        int limit = builder.BrowseParameters.Limit;
+        if (string.IsNullOrEmpty(builder.BrowseParameters.BrowseIdentifier))
         {
             builder.SetTitle("Drives").AddHeader(new("Drives"));
             foreach (DriveInfo drive in DriveInfo.GetDrives())
@@ -37,7 +37,7 @@ public class FileBrowserExampleDevice : IDeviceProvider
         }
         else
         {
-            string root = builder.Parameters.BrowseIdentifier;
+            string root = builder.BrowseParameters.BrowseIdentifier;
             builder.SetTitle(root).AddHeader(new(root.Replace('\\', '/')));
             if (offset == 0)
             {
