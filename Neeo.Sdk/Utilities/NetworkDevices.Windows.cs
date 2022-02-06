@@ -29,10 +29,10 @@ public static partial class NetworkDevices
                 throw new Exception($"Unable to retrieve network table. Error code {errorCode}.");
             }
             int rowCount = Marshal.ReadInt32(rawTable);
-            IntPtr startPointer = new(rawTable.ToInt64() + Marshal.SizeOf<int>());
+            long startAddress = rawTable.ToInt64() + Marshal.SizeOf<int>();
             for (int index = 0; index < rowCount; index++)
             {
-                MIB_IPNETROW row = Marshal.PtrToStructure<MIB_IPNETROW>(new(startPointer.ToInt64() + index * Marshal.SizeOf<MIB_IPNETROW>()));
+                MIB_IPNETROW row = Marshal.PtrToStructure<MIB_IPNETROW>(new(startAddress + index * Marshal.SizeOf<MIB_IPNETROW>()));
                 IPAddress ipAddress = new(BitConverter.GetBytes(row.dwAddr));
                 if (ipAddress.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(ipAddress) || IsMulticast(ipAddress))
                 {
@@ -51,7 +51,7 @@ public static partial class NetworkDevices
             Marshal.FreeCoTaskMem(rawTable);
         }
 
-        static bool IsMulticast(IPAddress address) => address.IsIPv6Multicast || address.GetAddressBytes()[0] is not < 224 and not > 239;
+        static bool IsMulticast(IPAddress address) => address.GetAddressBytes()[0] is not < 224 and not > 239;
     }
 
     /// <summary>

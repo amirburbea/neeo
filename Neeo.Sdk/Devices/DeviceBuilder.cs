@@ -263,9 +263,9 @@ public interface IDeviceBuilder
 
     IDeviceBuilder EnableNotifications(DeviceNotifierCallback callback);
 
-    IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);
+    IDeviceBuilder EnableRegistration(string headerText, string summary, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);
 
-    IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, SecurityCodeRegistrationProcessor processor);
+    IDeviceBuilder EnableRegistration(string headerText, string summary, QueryIsRegistered queryIsRegistered, SecurityCodeRegistrationProcessor processor);
 
     /// <summary>
     /// Specify a set of callbacks which allow tracking which devices are currently in use on the NEEO Brain.
@@ -503,12 +503,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
         string headerText,
-        string description,
+        string summary,
         QueryIsRegistered queryIsRegistered,
         CredentialsRegistrationProcessor processor
     ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
         headerText,
-        description,
+        summary,
         RegistrationType.Credentials,
         queryIsRegistered,
         (Credentials credentials) => processor(credentials)
@@ -516,12 +516,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
         string headerText,
-        string description,
+        string summary,
         QueryIsRegistered queryIsRegistered,
         SecurityCodeRegistrationProcessor processor
     ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
         headerText,
-        description,
+        summary,
         RegistrationType.SecurityCode,
         queryIsRegistered,
         (SecurityCodeContainer container) => processor(container.SecurityCode)
@@ -984,7 +984,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder)
+    private DeviceBuilder EnableDiscovery(string headerText, string summary, DiscoveryProcess process, bool enableDynamicDeviceBuilder)
     {
         if (this.Setup.Discovery.HasValue)
         {
@@ -992,7 +992,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         this.Setup.Discovery = true;
         this.Setup.DiscoveryHeaderText = Validator.ValidateText(headerText, maxLength: 255);
-        this.Setup.DiscoveryDescription = Validator.ValidateText(description, maxLength: 255);
+        this.Setup.DiscoverySummary = Validator.ValidateText(summary, maxLength: 255);
         this.Setup.EnableDynamicDeviceBuilder = enableDynamicDeviceBuilder;
         this.DiscoveryFeature = new(process, enableDynamicDeviceBuilder);
         return this;
@@ -1008,7 +1008,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
+    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string summary, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
         where TPayload : notnull
     {
         if (this.Setup.RegistrationType.HasValue)
@@ -1020,7 +1020,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new InvalidOperationException($"Registration is only supported on devices with discovery. (Call {nameof(IDeviceBuilder.EnableDiscovery)} first).");
         }
         this.Setup.RegistrationHeaderText = Validator.ValidateText(headerText, maxLength: 255);
-        this.Setup.RegistrationDescription = Validator.ValidateText(description, maxLength: 255);
+        this.Setup.RegistrationSummary = Validator.ValidateText(summary, maxLength: 255);
         this.RegistrationFeature = RegistrationFeature.Create(queryIsRegistered, processor);
         this.Setup.RegistrationType = type;
         return this;
