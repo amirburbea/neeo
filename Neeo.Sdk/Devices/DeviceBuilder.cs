@@ -234,6 +234,8 @@ public interface IDeviceBuilder
         string unit = "%"
     );
 
+    IDeviceBuilder AddSmartAppButton(SmartAppButtons button);
+
     IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
     IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool? isLabelVisible = default);
@@ -471,8 +473,10 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         string unit
     ) => this.AddSlider(name, label, getter, setter, rangeLow, rangeHigh, unit);
 
+    IDeviceBuilder IDeviceBuilder.AddSmartAppButton(SmartAppButtons button) => this.AddSmartAppButton(button);
+
     IDeviceBuilder IDeviceBuilder.AddSwitch(
-        string name,
+            string name,
         string? label,
         DeviceValueGetter<bool> getter,
         DeviceValueSetter<bool> setter
@@ -743,6 +747,11 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         return this;
     }
+
+    private DeviceBuilder AddSmartAppButton(SmartAppButtons buttons) => SmartAppButton.GetNames(buttons).Aggregate(
+        this,
+        static (builder, name) => builder.AddButton(name)
+    );
 
     private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
     {

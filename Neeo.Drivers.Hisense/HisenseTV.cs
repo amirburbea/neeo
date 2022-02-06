@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client;
@@ -34,6 +34,10 @@ public sealed class HisenseTV : IDisposable
         this._clientIdPrefix = clientIdPrefix ?? Dns.GetHostName();
     }
 
+    public event EventHandler? Connected;
+
+    public event EventHandler? Disconnected;
+
     public event EventHandler? Sleep;
 
     public event EventHandler<StateChangedEventArgs>? StateChanged;
@@ -54,14 +58,13 @@ public sealed class HisenseTV : IDisposable
             cancellationToken,
             async (pair, cancellationToken) =>
             {
-                (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
                 try
                 {
-                    if (await HisenseTV.TryCreate(ipAddress, macAddress, true, clientIdPrefix, cancellationToken).ConfigureAwait(false) is not { } tv)
+                    (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
+                    if (await HisenseTV.TryCreate(ipAddress, macAddress, true, clientIdPrefix, cancellationToken).ConfigureAwait(false) is { } tv)
                     {
-                        return;
+                        bag.Add(tv);
                     }
-                    bag.Add(tv);
                 }
                 catch (OperationCanceledException)
                 {
@@ -81,23 +84,22 @@ public sealed class HisenseTV : IDisposable
 
         async void DiscoverOneAsync()
         {
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             try
             {
+                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 await Parallel.ForEachAsync(
                     NetworkMethods.GetNetworkDevices(),
                     cts.Token,
                     async (pair, cancellationToken) =>
                     {
-                        (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
                         try
                         {
-                            if (await HisenseTV.TryCreate(ipAddress, macAddress, true, clientIdPrefix, cancellationToken).ConfigureAwait(false) is not { } tv)
+                            (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
+                            if (await HisenseTV.TryCreate(ipAddress, macAddress, true, clientIdPrefix, cancellationToken).ConfigureAwait(false) is { } tv)
                             {
-                                return;
+                                taskCompletionSource.TrySetResult(tv);
+                                cts.Cancel();
                             }
-                            taskCompletionSource.TrySetResult(tv);
-                            cts.Cancel();
                         }
                         catch (OperationCanceledException)
                         {
@@ -105,67 +107,45 @@ public sealed class HisenseTV : IDisposable
                         }
                     }
                 ).ConfigureAwait(false);
+                taskCompletionSource.TrySetResult(default);
             }
             catch (OperationCanceledException)
             {
-            }
-            taskCompletionSource.TrySetResult(default);
-        }
-    }
-
-    public static async Task<HisenseTV?> TryCreate(PhysicalAddress macAddress, bool connectionRequired = false, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
-    {
-        foreach ((IPAddress ipAddress, PhysicalAddress physicalAddress) in NetworkMethods.GetNetworkDevices())
-        {
-            if (macAddress.Equals(physicalAddress))
-            {
-                return await HisenseTV.TryCreate(ipAddress, macAddress, connectionRequired, clientIdPrefix, cancellationToken).ConfigureAwait(false);
+                // Ignore.
             }
         }
-        return default;
     }
 
-    public Task<IState> AuthenticateAsync(string code, CancellationToken cancellationToken = default)
+    public static Task<HisenseTV?> TryCreate(PhysicalAddress macAddress, bool connectionRequired = false, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
-        return this._connection == null
-            ? throw new InvalidOperationException()
-            : this._connection.AuthenticateAsync(code, cancellationToken);
+        return NetworkMethods.GetNetworkDevices().Where(pair => pair.Value.Equals(macAddress)).Select(pair => pair.Key).FirstOrDefault() is { } ipAddress
+            ? HisenseTV.TryCreate(ipAddress, macAddress, connectionRequired, clientIdPrefix, cancellationToken)
+            : Task.FromResult(default(HisenseTV));
     }
 
-    public async Task LaunchAppAsync(string name, CancellationToken cancellationToken = default)
+    public Task<IState> AuthenticateAsync(string code)
     {
-        if (this._connection != null)
-        {
-            await this._connection.LaunchAppAsync(name, cancellationToken).ConfigureAwait(false);
-        }
-        else if (await this.TryConnectAsync(cancellationToken).ConfigureAwait(false))
-        {
-            await this.LaunchAppAsync(name, cancellationToken).ConfigureAwait(false);
-        }
+        return this._connection is { } connection
+            ? connection.AuthenticateAsync(code)
+            : throw new InvalidOperationException();
     }
 
     public async Task ChangeSourceAsync(string name, CancellationToken cancellationToken = default)
     {
-        if (this._connection != null)
+        if (this._connection == null)
         {
-            await this._connection.ChangeSourceAsync(name, cancellationToken).ConfigureAwait(false);
+            await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        else if (await this.TryConnectAsync(cancellationToken).ConfigureAwait(false))
-        {
-            await this.ChangeSourceAsync(name, cancellationToken).ConfigureAwait(false);
-        }
+        await (this._connection?.ChangeSourceAsync(name) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
     public async Task ChangeVolumeAsync(int value, CancellationToken cancellationToken = default)
     {
-        if (this._connection != null)
+        if (this._connection == null)
         {
-            await this._connection.ChangeVolumeAsync(value).ConfigureAwait(false);
+            await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        else if (await this.TryConnectAsync(cancellationToken).ConfigureAwait(false))
-        {
-            await this.ChangeVolumeAsync(value, cancellationToken).ConfigureAwait(false);
-        }
+        await (this._connection?.ChangeVolumeAsync(value) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
     public void Dispose()
@@ -176,17 +156,17 @@ public sealed class HisenseTV : IDisposable
             timer.Dispose();
         }
         using Connection? connection = Interlocked.Exchange(ref this._connection, null);
-        this.RemoveListeners(connection);
+        if (connection != null)
+        {
+            this.RemoveListeners(connection);
+        }
     }
-
-    [Obsolete("DELETE AND MAKE CLASS PRIVATE")]
-    public Connection? GetConnection() => this._connection;
 
     public async Task<IState?> GetStateAsync(CancellationToken cancellationToken = default)
     {
         if (this._connection != null)
         {
-            return await this._connection.GetStateAsync(cancellationToken).ConfigureAwait(false);
+            return await this._connection.GetStateAsync().ConfigureAwait(false);
         }
         if (await this.TryConnectAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -199,13 +179,25 @@ public sealed class HisenseTV : IDisposable
     {
         if (this._connection != null)
         {
-            return await this._connection.GetVolumeAsync(cancellationToken).ConfigureAwait(false);
+            return await this._connection.GetVolumeAsync().ConfigureAwait(false);
         }
         if (await this.TryConnectAsync(cancellationToken).ConfigureAwait(false))
         {
             return await this.GetVolumeAsync(cancellationToken).ConfigureAwait(false);
         }
         return 0d;
+    }
+
+    public async Task LaunchAppAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (this._connection != null)
+        {
+            await this._connection.LaunchAppAsync(name).ConfigureAwait(false);
+        }
+        else if (await this.TryConnectAsync(cancellationToken).ConfigureAwait(false))
+        {
+            await this.LaunchAppAsync(name, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public async Task<bool> SendKeyAsync(RemoteKey key, CancellationToken cancellationToken = default)
@@ -236,12 +228,13 @@ public sealed class HisenseTV : IDisposable
 
     private void Connection_Disconnected(object? sender, EventArgs e)
     {
-        this.RemoveListeners(sender as Connection);
+        this.RemoveListeners((Connection)sender!);
         this._connection = null;
         if (!this._isDisposed)
         {
             this.StartReconnectTimer();
         }
+        this.Disconnected?.Invoke(this, e);
     }
 
     private void Connection_Sleep(object? sender, EventArgs e) => this.Sleep?.Invoke(this, e);
@@ -250,12 +243,8 @@ public sealed class HisenseTV : IDisposable
 
     private void Connection_VolumeChanged(object? sender, VolumeChangedEventArgs e) => this.VolumeChanged?.Invoke(this, e);
 
-    private void RemoveListeners(Connection? connection)
+    private void RemoveListeners(Connection connection)
     {
-        if (connection == null)
-        {
-            return;
-        }
         connection.Sleep -= this.Connection_Sleep;
         connection.StateChanged -= this.Connection_StateChanged;
         connection.VolumeChanged -= this.Connection_VolumeChanged;
@@ -269,11 +258,11 @@ public sealed class HisenseTV : IDisposable
         this._timer = timer;
     }
 
-    private async void Timer_Tick(object? state)
+    private void Timer_Tick(object? state)
     {
         if (!this._isDisposed)
         {
-            await this.TryConnectAsync();
+            this.TryConnectAsync().Wait();
         }
     }
 
@@ -298,24 +287,19 @@ public sealed class HisenseTV : IDisposable
         {
             timer.Dispose();
         }
+        this.Connected?.Invoke(this, EventArgs.Empty);
         return true;
     }
 
-    public sealed class Connection : IDisposable
+    private sealed class Connection : IDisposable
     {
         private static readonly IMqttClientFactory _clientFactory = new MqttFactory();
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
-
-        private static readonly string _launcherTopic = Connection.GetBroadcastTopic("ui_service", "actions/remote_launcher");
-        private static readonly string _settingsTopic = GetBroadcastTopic("ui_service", "actions/remote_setting");
-        private static readonly string _sleepTopic = GetBroadcastTopic("platform_service", "actions/tvsleep");
-        private static readonly string _stateTopic = GetBroadcastTopic("ui_service", suffix: "state");
-        private static readonly string[] _stateTopics = new[] { Connection._stateTopic, Connection._launcherTopic, Connection._settingsTopic };
-        private static readonly string _volumeChangeTopic = GetBroadcastTopic("platform_service", suffix: "actions/volumechange");
-
-        private readonly ConcurrentDictionary<string, Channel<MqttApplicationMessage>> _channels = new();
         private readonly IMqttClient _client;
+
         private readonly IMqttClientOptions _options;
+
+        private TaskCompletionSource<MqttApplicationMessage>? _taskCompletionSource;
 
         public Connection(IPAddress ipAddress, PhysicalAddress macAddress, string clientIdPrefix)
         {
@@ -324,6 +308,7 @@ public sealed class HisenseTV : IDisposable
                 .WithClientId(Uri.EscapeDataString($"{clientIdPrefix}-{macAddress}"))
                 .WithTcpServer(ipAddress.ToString(), 36669)
                 .WithCredentials("hisenseservice", "multimqttservice")
+                .WithCommunicationTimeout(TimeSpan.FromMilliseconds(500))
                 .WithTls(parameters: new() { UseTls = true, AllowUntrustedCertificates = true, IgnoreCertificateChainErrors = true, IgnoreCertificateRevocationErrors = true })
                 .Build();
         }
@@ -338,37 +323,30 @@ public sealed class HisenseTV : IDisposable
 
         public bool IsConnected => this._client.IsConnected;
 
-        public async Task<IState> AuthenticateAsync(string code, CancellationToken cancellationToken = default)
+        public async Task<IState> AuthenticateAsync(string code)
         {
-            const string action = "authenticationcode";
-            const string service = "ui_service";
-            await this.SendMessageAsync(this.GetPublishTopic(service, action), new { AuthNum = code }).ConfigureAwait(false);
-            MqttApplicationMessage message = await this.WaitForMessageAsync(this.GetDataTopic(service, action), cancellationToken).ConfigureAwait(false);
+            MqttApplicationMessage message = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "authenticationcode"), new { AuthNum = code }).ConfigureAwait(false);
             return JsonSerializer.Deserialize<SuccessPayload>(message.Payload, Connection._jsonOptions).Result != 1
                 ? new State(StateType.AuthenticationRequired)
-                : await this.GetStateAsync(cancellationToken).ConfigureAwait(false);
+                : await this.GetStateAsync().ConfigureAwait(false);
         }
 
-        public async Task ChangeSourceAsync(string name, CancellationToken cancellationToken)
+        public async Task ChangeSourceAsync(string name)
         {
-            const string service = "ui_service";
-            const string action = "changesource";
-            SourceInfo[] sources = await this.GetSourcesAsync(cancellationToken);
+            SourceInfo[] sources = await this.GetSourcesAsync().ConfigureAwait(false);
             if (Array.FindIndex(sources, source => source.Name == name) is int index and >= 0)
             {
-                await this.SendMessageAsync(this.GetPublishTopic(service, action), sources[index]).ConfigureAwait(false);
+                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "changesource"), sources[index]).ConfigureAwait(false);
             }
         }
 
         public Task ChangeVolumeAsync(int volume)
         {
-            const string service = "ui_service";
-            const string action = "changevolume";
             if (volume is < 0 or > 100)
             {
                 throw new ArgumentOutOfRangeException(nameof(volume), "Volume must be between 0 and 100.");
             }
-            return this.SendMessageAsync(this.GetPublishTopic(service, action), volume.ToString());
+            return this.SendMessageAsync(this.GetPublishTopic("ui_service", "changevolume"), volume.ToString());
         }
 
         public void Dispose()
@@ -377,58 +355,42 @@ public sealed class HisenseTV : IDisposable
             this._client.Dispose();
         }
 
-        public async Task<AppInfo[]> GetAppsAsync(CancellationToken cancellationToken = default)
+        public async Task<AppInfo[]> GetAppsAsync()
         {
-            const string service = "ui_service";
-            const string action = "applist";
-            await this.SendMessageAsync(this.GetPublishTopic(service, action)).ConfigureAwait(false);
-            MqttApplicationMessage message = await this.WaitForMessageAsync(this.GetDataTopic(service, action), cancellationToken).ConfigureAwait(false);
+            MqttApplicationMessage message = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "applist")).ConfigureAwait(false);
             return JsonSerializer.Deserialize<AppInfo[]>(message.Payload, Connection._jsonOptions)!;
         }
 
-        public async Task<SourceInfo[]> GetSourcesAsync(CancellationToken cancellationToken = default)
+        public async Task<SourceInfo[]> GetSourcesAsync()
         {
-            const string service = "ui_service";
-            const string action = "sourcelist";
-            await this.SendMessageAsync(this.GetPublishTopic(service, action)).ConfigureAwait(false);
-            MqttApplicationMessage message = await this.WaitForMessageAsync(this.GetDataTopic(service, action), cancellationToken).ConfigureAwait(false);
+            MqttApplicationMessage message = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "sourcelist")).ConfigureAwait(false);
             return JsonSerializer.Deserialize<SourceInfo[]>(message.Payload, Connection._jsonOptions)!;
         }
 
-        public async Task<IState> GetStateAsync(CancellationToken cancellationToken = default)
+        public async Task<IState> GetStateAsync()
         {
-            const string service = "ui_service";
-            await this.SendMessageAsync(this.GetPublishTopic(service, "gettvstate")).ConfigureAwait(false);
-            string authenticationRequiredTopic = this.GetDataTopic(service, "authentication");
-            string[] topics = new string[Connection._stateTopics.Length + 1];
-            topics[0] = authenticationRequiredTopic;
-            Connection._stateTopics.AsSpan().CopyTo(topics.AsSpan(1));
-            MqttApplicationMessage message = await this.WaitForFirstMessageAsync(topics, cancellationToken).ConfigureAwait(false);
-            return message.Topic == authenticationRequiredTopic
-                ? new State(StateType.AuthenticationRequired)
-                : TranslateStateMessage(message);
+            MqttApplicationMessage message = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "gettvstate")).ConfigureAwait(false);
+            return TranslateStateMessage(message);
         }
 
-        public async Task<int> GetVolumeAsync(CancellationToken cancellationToken = default)
+        public async Task<int> GetVolumeAsync()
         {
-            const string action = "getvolume";
-            await this.SendMessageAsync(this.GetPublishTopic("ui_service", action)).ConfigureAwait(false);
-            MqttApplicationMessage message = await this.WaitForMessageAsync(this.GetDataTopic("platform_service", action), cancellationToken).ConfigureAwait(false);
+            MqttApplicationMessage message = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "getvolume")).ConfigureAwait(false);
             return Connection.TranslateVolumeMessage(message);
         }
 
-        public async Task LaunchAppAsync(string name, CancellationToken cancellationToken = default)
+        public async Task LaunchAppAsync(string name)
         {
-            AppInfo[] apps = await this.GetAppsAsync(cancellationToken).ConfigureAwait(false);
+            AppInfo[] apps = await this.GetAppsAsync().ConfigureAwait(false);
             if (Array.FindIndex(apps, app => string.Equals(app.Name, name, StringComparison.OrdinalIgnoreCase)) is int index and not -1)
             {
                 await this.SendMessageAsync(this.GetPublishTopic("ui_service", "launchapp"), apps[index]).ConfigureAwait(false);
             }
         }
 
-        public Task SendKeyAsync(RemoteKey key) => this.SendMessageAsync(this.GetPublishTopic("remote_service", "sendkey"), TextAttribute.GetText(key));
+        public Task SendKeyAsync(RemoteKey key) => this.SendMessageAsync(this.GetPublishTopic("remote_service", "sendkey"), TextAttribute.GetText(key), waitForNextMessage: false);
 
-        public async Task SendMessageAsync(string topic, object? body = default)
+        public async Task<MqttApplicationMessage> SendMessageAsync(string topic, object? body = default, bool waitForNextMessage = true)
         {
             string payload = body switch
             {
@@ -437,7 +399,29 @@ public sealed class HisenseTV : IDisposable
                 _ => JsonSerializer.Serialize(body, Connection._jsonOptions)
             };
             Debug.WriteLine("sending message '{0}' to topic {1}.", payload, topic);
-            await this._client.PublishAsync(topic, payload).ConfigureAwait(false);
+            MqttApplicationMessage message = new MqttApplicationMessageBuilder()
+                .WithTopic(topic)
+                .WithPayload(payload)
+                .Build();
+            await this._client.PublishAsync(message).ConfigureAwait(false);
+            return waitForNextMessage ? await WaitForNextMessageAsync().ConfigureAwait(false) : message;
+
+            async Task<MqttApplicationMessage> WaitForNextMessageAsync()
+            {
+                if (this._taskCompletionSource is { } source)
+                {
+                    return await source.Task.ConfigureAwait(false);
+                }
+                TaskCompletionSource<MqttApplicationMessage> taskCompletionSource = new();
+                try
+                {
+                    return await (this._taskCompletionSource = taskCompletionSource).Task.ConfigureAwait(false);
+                }
+                finally
+                {
+                    this._taskCompletionSource = default;
+                }
+            }
         }
 
         public async Task<bool> TryConnectAsync(CancellationToken cancellationToken)
@@ -448,7 +432,7 @@ public sealed class HisenseTV : IDisposable
                 {
                     this._client.UseApplicationMessageReceivedHandler(this.OnMessageReceived);
                     this._client.UseDisconnectedHandler(this.OnDisconnected);
-                    await this._client.SubscribeAsync("/remoteapp/mobile/#");
+                    await this._client.SubscribeAsync("/remoteapp/mobile/#").ConfigureAwait(false);
                     return true;
                 }
             }
@@ -459,30 +443,7 @@ public sealed class HisenseTV : IDisposable
             return false;
         }
 
-        private static string GetBroadcastTopic(string service, string suffix) => $"/remoteapp/mobile/broadcast/{service}/{suffix}";
-
-        private static IState TranslateStateMessage(MqttApplicationMessage message)
-        {
-            if (message.Topic == Connection._launcherTopic)
-            {
-                return new State(StateType.Launcher);
-            }
-            if (message.Topic == Connection._settingsTopic)
-            {
-                return new State(StateType.Settings);
-            }
-            StateData data = JsonSerializer.Deserialize<StateData>(message.Payload, Connection._jsonOptions);
-            return data.Type switch
-            {
-                "livetv" => new State(StateType.LiveTV),
-                "app" => new AppState(new(data.Name!, data.Url!)),
-                _ => throw new(Encoding.UTF8.GetString(message.Payload)),
-            };
-        }
-
         private static int TranslateVolumeMessage(MqttApplicationMessage message) => JsonSerializer.Deserialize<VolumeData>(message.Payload, Connection._jsonOptions).Value;
-
-        private Channel<MqttApplicationMessage> GetChannel(string topic) => this._channels.GetOrAdd(topic, _ => Channel.CreateUnbounded<MqttApplicationMessage>(new() { SingleWriter = true }));
 
         private string GetDataTopic(string service, string action) => $"/remoteapp/mobile/{this._client.Options.ClientId}/{service}/data/{action}";
 
@@ -495,43 +456,61 @@ public sealed class HisenseTV : IDisposable
             return Task.CompletedTask;
         }
 
-        private async Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
+        private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             string topic = e.ApplicationMessage.Topic;
-            Debug.WriteLine("Received message on topic {0} ({1})", (object)topic, e.ApplicationMessage.Payload is null ? string.Empty : Encoding.UTF8.GetString(e.ApplicationMessage.Payload));
-            await this.GetChannel(topic).Writer.WriteAsync(e.ApplicationMessage).ConfigureAwait(false);
-            if (topic == Connection._volumeChangeTopic)
+            Debug.WriteLine("Received message on topic {0} ({1})", topic, e.ApplicationMessage.Payload is null ? string.Empty : Encoding.UTF8.GetString(e.ApplicationMessage.Payload));
+            if (this._taskCompletionSource is { } source)
             {
-                this.VolumeChanged?.Invoke(this, new(Connection.TranslateVolumeMessage(e.ApplicationMessage)));
+                source.TrySetResult(e.ApplicationMessage);
             }
-            else if (topic == Connection._sleepTopic)
+            switch (topic)
             {
-                this.Sleep?.Invoke(this, EventArgs.Empty);
+                case BroadcastTopics.Sleep:
+                    this.Sleep?.Invoke(this, EventArgs.Empty);
+                    break;
+                case BroadcastTopics.VolumeChange:
+                    this.VolumeChanged?.Invoke(this, new(Connection.TranslateVolumeMessage(e.ApplicationMessage)));
+                    break;
+                case BroadcastTopics.Launcher:
+                case BroadcastTopics.Settings:
+                case BroadcastTopics.State:
+                    this.StateChanged?.Invoke(this, new(this.TranslateStateMessage(e.ApplicationMessage)));
+                    break;
             }
-            else if (Array.IndexOf(_stateTopics, topic) != -1)
-            {
-                this.StateChanged?.Invoke(this, new(TranslateStateMessage(e.ApplicationMessage)));
-            }
-            await e.AcknowledgeAsync(default).ConfigureAwait(false);
+            return e.AcknowledgeAsync(default);
         }
 
-        private async Task<MqttApplicationMessage> WaitForFirstMessageAsync(string[] topics, CancellationToken cancellationToken = default)
+        private IState TranslateStateMessage(MqttApplicationMessage message)
         {
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            Task<MqttApplicationMessage>? task = default;
-            try
+            switch (message.Topic)
             {
-                task = await Task.WhenAny(Array.ConvertAll(topics, topic => this.WaitForMessageAsync(topic, cts.Token))).ConfigureAwait(false);
-                cts.Cancel();
+                case BroadcastTopics.Launcher:
+                    return new State(StateType.Launcher);
+                case BroadcastTopics.Settings:
+                    return new State(StateType.Settings);
+                case BroadcastTopics.State:
+                    StateData data = JsonSerializer.Deserialize<StateData>(message.Payload, Connection._jsonOptions);
+                    return data.Type switch
+                    {
+                        "livetv" => new State(StateType.LiveTV),
+                        "app" => new AppState(new(data.Name!, data.Url!)),
+                        _ => throw new(Encoding.UTF8.GetString(message.Payload)),
+                    };
+                case string topic when topic == this.GetDataTopic("ui_service", "authentication"):
+                    return new State(StateType.AuthenticationRequired);
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                // do nothing.
-            }
-            return task!.Result;
+            return new State(StateType.Unknown);
         }
 
-        private async Task<MqttApplicationMessage> WaitForMessageAsync(string topic, CancellationToken cancellationToken = default) => await this.GetChannel(topic).Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        private static class BroadcastTopics
+        {
+            public const string Launcher = "/remoteapp/mobile/broadcast/ui_service/actions/remote_launcher";
+            public const string Settings = "/remoteapp/mobile/broadcast/ui_service/actions/remote_setting";
+            public const string Sleep = "/remoteapp/mobile/broadcast/platform_service/actions/tvsleep";
+            public const string State = "/remoteapp/mobile/broadcast/ui_service/state";
+            public const string VolumeChange = "/remoteapp/mobile/broadcast/platform_service/actions/volumechange";
+        }
     }
 
     private record struct State(StateType Type) : IState;
@@ -549,5 +528,3 @@ public sealed class HisenseTV : IDisposable
         string? Url = default
     );
 }
-
-public record struct SourceInfo([property: JsonPropertyName("sourcename")] string Name, [property: JsonPropertyName("sourceid")] int SourceId, [property: JsonPropertyName("displayname")] string DisplayName);

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;
@@ -17,16 +16,10 @@ namespace Neeo.Sdk.Devices;
 public enum KnownButtons : ulong
 {
     /// <summary>
-    /// &quot;AMAZON&quot;
-    /// </summary>
-    [Text("AMAZON")]
-    Amazon = 1UL,
-
-    /// <summary>
     /// &quot;BACK&quot;
     /// </summary>
     [Text("BACK")]
-    Back = Amazon << 1,
+    Back = 1,
 
     /// <summary>
     /// &quot;CHANNEL DOWN&quot;
@@ -244,17 +237,11 @@ public enum KnownButtons : ulong
     [Text("MUTE TOGGLE")]
     MuteToggle = Menu << 1,
 
-     /// <summary>
-    /// &quot;NETFLIX&quot;
-    /// </summary>
-    [Text("NETFLIX")]
-    Netflix = MuteToggle << 1,
-
     /// <summary>
     /// &quot;NEXT&quot;
     /// </summary>
     [Text("NEXT")]
-    Next = Netflix << 1,
+    Next = MuteToggle << 1,
 
     /// <summary>
     /// &quot;NEXT TRACK&quot;
@@ -368,13 +355,7 @@ public enum KnownButtons : ulong
     /// &quot;VOLUME UP&quot;
     /// </summary>
     [Text("VOLUME UP")]
-    VolumeUp = VolumeDown << 1,
-
-    /// <summary>
-    /// &quot;YOU TUBE&quot;
-    /// </summary>
-    [Text("YOU TUBE")]
-    YouTube = VolumeUp << 1,
+    VolumeUp = VolumeDown << 1
 }
 
 /// <summary>
@@ -383,43 +364,16 @@ public enum KnownButtons : ulong
 public static class KnownButton
 {
     /// <summary>
-    /// Attempts to get the associated <see cref="KnownButtons"/> value for a button name.
-    /// </summary>
-    /// <param name="name">The name of the button.</param>
-    /// <returns><see cref="KnownButtons"/> value if found, otherwise <c>null</c>.</returns>
-    public static KnownButtons? TryGetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
-
-    /// <summary>
     /// Gets the button names in the specified combination of <paramref name="buttons"/>.
     /// </summary>
     /// <param name="buttons">The (potentially flagged) <see cref="KnownButtons"/> value.</param>
     /// <returns>The collection of button names.</returns>
-    public static IEnumerable<string> GetNames(KnownButtons buttons)
-    {
-        ulong value = (ulong)buttons;
-        if (value == default)
-        {
-            return Enumerable.Empty<string>();
-        }
-        bool isSingleFlag = (value & (value - 1ul)) == default;
-        return isSingleFlag
-            ? new[] { TextAttribute.GetText(buttons) }
-            : KnownButton.ExtractFlags(value);
-    }
+    public static IEnumerable<string> GetNames(KnownButtons buttons) => FlaggedEnumerations<KnownButtons>.GetNames(buttons);
 
-    private static IEnumerable<string> ExtractFlags(ulong value)
-    {
-        for (int bits = 0; bits < 64; bits++)
-        {
-            ulong flag = 1ul << bits;
-            if (flag > value)
-            {
-                yield break;
-            }
-            if ((value & flag) == flag)
-            {
-                yield return TextAttribute.GetText((KnownButtons)flag);
-            }
-        }
-    }
+    /// <summary>
+    /// Attempts to get the associated <see cref="KnownButtons"/> value for a button name.
+    /// </summary>
+    /// <param name="name">The name of the button.</param>
+    /// <returns><see cref="KnownButtons"/> value if found, otherwise <c>null</c>.</returns>
+    public static KnownButtons? TryResolve(string name) => FlaggedEnumerations<KnownButtons>.TryResolve(name);
 }

@@ -7,4 +7,5 @@ public enum StateType
     Launcher,
     LiveTV,
     Settings,
+    Unknown,
 }

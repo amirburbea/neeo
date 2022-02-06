@@ -131,7 +131,7 @@ public sealed class PlayerExampleDevice : IDeviceProvider
 
         public Task<double> GetVolumeAsync(string deviceId) => this.GetValueAsync<double>(PlayerKey.Volume, deviceId);
 
-        public Task HandleButtonAsync(string deviceId, string button) => KnownButton.TryGetKnownButton(button) switch
+        public Task HandleButtonAsync(string deviceId, string button) => KnownButton.TryResolve(button) switch
         {
             KnownButtons.Play => this.SetIsPlayingAsync(deviceId, true),
             KnownButtons.PlayPauseToggle => this.SetIsPlayingAsync(deviceId, !this._service.GetValue<bool>(PlayerKey.Playing)),

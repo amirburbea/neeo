@@ -11,7 +11,7 @@ namespace Neeo.Sdk.Devices;
 /// <param name="button">
 /// The name of the button being pressed.
 /// <para/>
-/// Note that <see cref="KnownButton.TryGetKnownButton"/> may be able to translate this into a <see cref="KnownButtons"/> enumerated value.
+/// Note that <see cref="KnownButton.TryResolve"/> may be able to translate this into a <see cref="KnownButtons"/> enumerated value.
 /// </param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
 public delegate Task ButtonHandler(string deviceId, string button);

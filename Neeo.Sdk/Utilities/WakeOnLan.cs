@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Utilities;
@@ -17,32 +18,26 @@ public static class WakeOnLan
     /// Sends the Wake-On-Lan magic packet to a network card with the specified MAC address.
     /// </summary>
     /// <param name="macAddress">The MAC address associated with the the network card of the device to wake.</param>
+    /// <param name="cancellationToken">The token to monitor for cancellation requets. The default value is <see cref="CancellationToken.None"/>.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    public static Task WakeAsync(string macAddress) => PhysicalAddress.Parse(macAddress).WakeAsync();
+    public static Task WakeAsync(string macAddress, CancellationToken cancellationToken = default) => PhysicalAddress.Parse(macAddress).WakeAsync(cancellationToken);
 
     /// <summary>
     /// Sends the Wake-On-Lan magic packet to a network card with the specified MAC address.
     /// </summary>
     /// <param name="macAddress">The MAC address associated with the the network card of the device to wake.</param>
+    /// <param name="cancellationToken">The token to monitor for cancellation requets. The default value is <see cref="CancellationToken.None"/>.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    public static async Task WakeAsync(this PhysicalAddress macAddress)
+    public static async Task WakeAsync(this PhysicalAddress macAddress, CancellationToken cancellationToken = default)
     {
-        const int length = 102;
-        byte[] magicPacket = ArrayPool<byte>.Shared.Rent(length);
-        try
+        byte[] addressBytes = macAddress.GetAddressBytes();
+        byte[] magicPacket = new byte[102];
+        magicPacket.AsSpan(0, 6).Fill(byte.MaxValue);
+        for (int i = 0; i < 16; i++)
         {
-            byte[] addressBytes = macAddress.GetAddressBytes();
-            magicPacket.AsSpan(0, 6).Fill(byte.MaxValue);
-            for (int i = 0; i < 16; i++)
-            {
-                addressBytes.CopyTo(magicPacket.AsSpan(6 + (i * 6)));
-            }
-            using UdpClient client = new();
-            await client.SendAsync(magicPacket, length, new(IPAddress.Broadcast, 9)).ConfigureAwait(false);
+            addressBytes.CopyTo(magicPacket.AsSpan(6 + (i * 6)));
         }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(magicPacket);
-        }
+        using UdpClient client = new();
+        await client.SendAsync(magicPacket.AsMemory(), new(IPAddress.Broadcast, 9), cancellationToken).ConfigureAwait(false);
     }
 }
