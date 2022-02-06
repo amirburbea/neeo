@@ -16,8 +16,8 @@ internal static class Program
     private static readonly Assembly[] _assemblies = new[]
     {
         Assembly.GetExecutingAssembly(),
-        typeof(HisenseClient).Assembly,
-        typeof(KodiClient).Assembly,
+        typeof(HisenseDeviceProvider).Assembly,
+        typeof(KodiDeviceProvider).Assembly,
     };
 
     private static async Task Main()

@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace Neeo.Sdk.Utilities;
 
-public static partial class NetworkDevices
+public static partial class NetworkMethods
 {
     private static ReadOnlySpan<byte> BroadcastAddress => new byte[] { 255, 255, 255, 255, 255, 255 };
 
@@ -39,7 +39,7 @@ public static partial class NetworkDevices
                     continue;
                 }
                 byte[] bytes = new[] { row.mac0, row.mac1, row.mac2, row.mac3, row.mac4, row.mac5 };
-                if (bytes.AsSpan().IndexOf(NetworkDevices.VirtualAddress) < 0 && bytes.AsSpan().IndexOf(NetworkDevices.BroadcastAddress) < 0)
+                if (bytes.AsSpan().IndexOf(NetworkMethods.VirtualAddress) < 0 && bytes.AsSpan().IndexOf(NetworkMethods.BroadcastAddress) < 0)
                 {
                     output.Add(ipAddress, new(bytes));
                 }

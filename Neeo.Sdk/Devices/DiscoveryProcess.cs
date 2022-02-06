@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Discovery;
 
 namespace Neeo.Sdk.Devices;
@@ -9,5 +10,6 @@ namespace Neeo.Sdk.Devices;
 /// <param name="optionalDeviceId">
 /// If not <see langword="null"/>, the results should be filtered to the single specified device identifier.
 /// </param>
+/// <param name="cancellationToken">The cancellation token.</param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
-public delegate Task<DiscoveredDevice[]> DiscoveryProcess(string? optionalDeviceId = default);
+public delegate Task<DiscoveredDevice[]> DiscoveryProcess(string? optionalDeviceId = default, CancellationToken cancellationToken = default);

@@ -1080,7 +1080,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
         public const ButtonGroups PlayerButtonGroups = ButtonGroups.Volume;
 
-        public const KnownButtons PlayerButtons = KnownButtons.Play | KnownButtons.PlayToggle | KnownButtons.Pause | KnownButtons.NextTrack | KnownButtons.PreviousTrack | KnownButtons.ShuffleToggle | KnownButtons.RepeatToggle | KnownButtons.ClearQueue;
+        public const KnownButtons PlayerButtons = KnownButtons.Play | KnownButtons.PlayPauseToggle | KnownButtons.Pause | KnownButtons.NextTrack | KnownButtons.PreviousTrack | KnownButtons.ShuffleToggle | KnownButtons.RepeatToggle | KnownButtons.ClearQueue;
 
         public const string PlayingSwitchName = "PLAYING";
 

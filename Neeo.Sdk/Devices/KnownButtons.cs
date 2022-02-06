@@ -221,28 +221,22 @@ public enum KnownButtons : ulong
     InputHdmi3 = InputHdmi2 << 1,
 
     /// <summary>
+    /// &quot;INPUT HDMI3&quot;
+    /// </summary>
+    [Text("INPUT HDMI4")]
+    InputHdmi4 = InputHdmi3 << 1,
+
+    /// <summary>
     /// &quot;INPUT TOGGLE&quot;
     /// </summary>
     [Text("INPUT TOGGLE")]
-    InputToggle = InputHdmi3 << 1,
-
-    /// <summary>
-    /// &quot;LANGUAGE&quot;
-    /// </summary>
-    [Text("LANGUAGE")]
-    Language = InputToggle << 1,
-
-    /// <summary>
-    /// &quot;LIVE&quot;
-    /// </summary>
-    [Text("LIVE")]
-    Live = Language << 1,
+    InputToggle = InputHdmi4 << 1,
 
     /// <summary>
     /// &quot;MENU&quot;
     /// </summary>
     [Text("MENU")]
-    Menu = Live << 1,
+    Menu = InputToggle << 1,
 
     /// <summary>
     /// &quot;MUTE TOGGLE&quot;
@@ -250,17 +244,11 @@ public enum KnownButtons : ulong
     [Text("MUTE TOGGLE")]
     MuteToggle = Menu << 1,
 
-    /// <summary>
-    /// &quot;MY RECORDINGS&quot;
-    /// </summary>
-    [Text("MY RECORDINGS")]
-    MyRecordings = MuteToggle << 1,
-
-    /// <summary>
+     /// <summary>
     /// &quot;NETFLIX&quot;
     /// </summary>
     [Text("NETFLIX")]
-    Netflix = MyRecordings << 1,
+    Netflix = MuteToggle << 1,
 
     /// <summary>
     /// &quot;NEXT&quot;
@@ -287,16 +275,16 @@ public enum KnownButtons : ulong
     Play = Pause << 1,
 
     /// <summary>
-    /// &quot;PLAY TOGGLE&quot;
+    /// &quot;PLAY PAUSE TOGGLE&quot;
     /// </summary>
-    [Text("PLAY TOGGLE")]
-    PlayToggle = Play << 1,
+    [Text("PLAY PAUSE TOGGLE")]
+    PlayPauseToggle = Play << 1,
 
     /// <summary>
     /// &quot;POWER OFF&quot;
     /// </summary>
     [Text("POWER OFF")]
-    PowerOff = PlayToggle << 1,
+    PowerOff = PlayPauseToggle << 1,
 
     /// <summary>
     /// &quot;POWER ON&quot;
@@ -359,22 +347,10 @@ public enum KnownButtons : ulong
     SkipForward = SkipBackward << 1,
 
     /// <summary>
-    /// &quot;SKIP SECONDS BACKWARD&quot;
-    /// </summary>
-    [Text("SKIP SECONDS BACKWARD")]
-    SkipSecondsBackward = SkipForward << 1,
-
-    /// <summary>
-    /// &quot;SKIP SECONDS FORWARD&quot;
-    /// </summary>
-    [Text("SKIP SECONDS FORWARD")]
-    SkipSecondsForward = SkipSecondsBackward << 1,
-
-    /// <summary>
     /// &quot;STOP&quot;
     /// </summary>
     [Text("STOP")]
-    Stop = SkipSecondsForward << 1,
+    Stop = SkipForward << 1,
 
     /// <summary>
     /// &quot;SUBTITLE&quot;
@@ -411,7 +387,7 @@ public static class KnownButton
     /// </summary>
     /// <param name="name">The name of the button.</param>
     /// <returns><see cref="KnownButtons"/> value if found, otherwise <c>null</c>.</returns>
-    public static KnownButtons? GetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
+    public static KnownButtons? TryGetKnownButton(string name) => TextAttribute.GetEnum<KnownButtons>(name);
 
     /// <summary>
     /// Gets the button names in the specified combination of <paramref name="buttons"/>.

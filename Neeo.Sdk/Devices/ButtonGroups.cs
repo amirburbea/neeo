@@ -27,11 +27,6 @@ public enum ButtonGroups : ulong
     ControlPad = CursorDown | CursorEnter | CursorLeft | CursorRight | CursorUp,
 
     /// <summary>
-    /// &quot;SUBTITLE&quot;, &quot;LANGUAGE&quot;.
-    /// </summary>
-    Locale = Subtitle | Language,
-
-    /// <summary>
     /// &quot;MENU&quot;, &quot;BACK&quot;.
     /// </summary>
     MenuAndBack = Menu | Back,
@@ -48,11 +43,6 @@ public enum ButtonGroups : ulong
     Power = PowerOn | PowerOff,
 
     /// <summary>
-    /// &quot;MY RECORDINGS&quot;, &quot;RECORD&quot;, &quot;LIVE&quot;.
-    /// </summary>
-    Recording = MyRecordings | Record | Live,
-
-    /// <summary>
     /// &quot;PLAY&quot;, &quot;PAUSE&quot;, &quot;STOP&quot;.
     /// </summary>
     Transport = Play | Pause | Stop,
@@ -66,11 +56,6 @@ public enum ButtonGroups : ulong
     /// &quot;REVERSE&quot;, &quot;FORWARD&quot;.
     /// </summary>
     TransportSearch = Reverse | Forward,
-
-    /// <summary>
-    /// &quot;SKIP SECONDS BACKWARD&quot;, &quot;SKIP SECONDS FORWARD&quot;.
-    /// </summary>
-    TransportSkip = SkipSecondsBackward | SkipSecondsForward,
 
     /// <summary>
     /// &quot;VOLUME UP&quot;, &quot;VOLUME DOWN&quot;, &quot;MUTE TOGGLE&quot;.

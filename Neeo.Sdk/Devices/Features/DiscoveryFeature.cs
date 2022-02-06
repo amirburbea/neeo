@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Discovery;
 
@@ -11,7 +12,7 @@ public interface IDiscoveryFeature : IFeature
 
     bool EnableDynamicDeviceBuilder { get; }
 
-    Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default);
+    Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default);
 }
 
 internal sealed class DiscoveryFeature : IDiscoveryFeature
@@ -25,9 +26,9 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
         (this._process, this.EnableDynamicDeviceBuilder) = (process ?? throw new ArgumentNullException(nameof(process)), enableDynamicDeviceBuilder);
     }
 
-    public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId)
+    public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
-        DiscoveredDevice[] results = await this._process(optionalDeviceId).ConfigureAwait(false);
+        DiscoveredDevice[] results = await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false);
         if (results.Length == 0)
         {
             return results;

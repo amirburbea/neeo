@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Utilities;
@@ -11,7 +12,7 @@ namespace Neeo.Sdk.Utilities;
 /// <summary>
 /// A utility class for getting the IP and MAC address of devices on the network.
 /// </summary>
-public static partial class NetworkDevices
+public static partial class NetworkMethods
 {
     /// <summary>
     /// Gets the devices on the network via a call to the operating system's ARP command.
@@ -32,13 +33,35 @@ public static partial class NetworkDevices
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             // Uses a win32 API to get access to the table.
-            NetworkDevices.PopulateNetworkDevicesViaInterop(output);
+            NetworkMethods.PopulateNetworkDevicesViaInterop(output);
         }
         else
         {
             // Runs the *nix command and parses the output.
-            NetworkDevices.PopulateNetworkDevicesViaCommandLine(output);
+            NetworkMethods.PopulateNetworkDevicesViaCommandLine(output);
         }
         return output;
+    }
+
+    public static async Task<bool> TryPingAsync(IPAddress address, CancellationToken cancellationToken)
+    {
+        using Ping ping = new();
+        TaskCompletionSource<bool> taskSource = new();
+        await using (cancellationToken.Register(OnCancellationRequested).ConfigureAwait(false))
+        {
+            ping.PingCompleted += OnPingCompleted;
+            ping.SendAsync(address, 25, taskSource);
+            bool success = await taskSource.Task.ConfigureAwait(false);
+            ping.PingCompleted -= OnPingCompleted;
+            return success;
+
+            static void OnPingCompleted(object? _, PingCompletedEventArgs e) => ((TaskCompletionSource<bool>)e.UserState!).TrySetResult(e.Reply is { Status: IPStatus.Success });
+        }
+
+        void OnCancellationRequested()
+        {
+            ping.SendAsyncCancel();
+            taskSource.TrySetCanceled(cancellationToken);
+        }
     }
 }

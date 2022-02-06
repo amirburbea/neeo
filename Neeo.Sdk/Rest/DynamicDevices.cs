@@ -43,7 +43,7 @@ internal sealed class DynamicDevices : IDynamicDevices
             this._logger.LogWarning("No discovery component found.");
             return false;
         }
-        await feature.DiscoverAsync(deviceId).ConfigureAwait(false);
+        await feature.DiscoverAsync(deviceId, httpContext.RequestAborted).ConfigureAwait(false);
         return TryStore();
 
         bool TryStore()

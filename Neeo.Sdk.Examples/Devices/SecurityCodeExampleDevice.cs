@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Discovery;
 
@@ -17,7 +18,7 @@ public class SecurityCodeExampleDevice : IDeviceProvider
             .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelTextAsync);
     }
 
-    private Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId)
+    private Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId,CancellationToken cancellationToken)
     {
         return Task.FromResult(new[] { new DiscoveredDevice("code-device", "Security Code Device", true) });
     }

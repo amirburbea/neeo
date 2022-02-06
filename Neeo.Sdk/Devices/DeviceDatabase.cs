@@ -95,6 +95,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             this._logger.LogInformation("Initializing device: {name}", adapter.AdapterName);
             this._initializationTasks.Add(adapter.AdapterName, task = adapter.Initializer());
             await task.ConfigureAwait(false);
+            this._initializedAdapters.Add(adapter.AdapterName);
         }
         catch (Exception e)
         {
