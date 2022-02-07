@@ -49,9 +49,9 @@ internal sealed class ListBuilder : IListBuilder
 
     public ListBuilder(BrowseParameters parameters)
     {
-        (this.BrowseIdentifier, int? limit, int? offset) = this.BrowseParameters = parameters;
+        (this.BrowseIdentifier, int limit, int? offset) = this.BrowseParameters = parameters;
         this.Offset = offset is int startIndex and > 0 ? startIndex : 0;
-        this._limit = limit is int maxItems and > 0 and <= Constants.MaxItems ? maxItems : Constants.MaxItems;
+        this._limit = limit is > 0 and <= Constants.MaxItems ? limit : Constants.MaxItems;
         this.Build();
     }
 

@@ -8,4 +8,5 @@ public enum StateType
     LiveTV,
     Settings,
     Unknown,
+    SourceSwitch,
 }
