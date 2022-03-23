@@ -8,8 +8,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Neeo.Sdk.Notifications;
 
+/// <summary>
+/// Interface for a service that can get (and cache) the notification keys for a device and component.
+/// </summary>
 public interface INotificationMapping
 {
+    /// <summary>
+    /// Given an adapter, device identifier and component name, get the associated notification keys from the NEEO Brain.
+    /// </summary>
+    /// <param name="deviceAdapterName">The name of the device adapter.</param>
+    /// <param name="deviceId">The device identifier.</param>
+    /// <param name="componentName">The name of the component.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="ValueTask"/> to represent the asynchronous operation.</returns>
     ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string deviceId, string componentName, CancellationToken cancellationToken = default);
 }
 
