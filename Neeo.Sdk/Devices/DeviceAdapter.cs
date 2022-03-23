@@ -86,8 +86,18 @@ public interface IDeviceAdapter
     /// </summary>
     UriPrefixCallback? UriPrefixCallback { get; }
 
+    /// <summary>
+    /// Gets the feature (if it exists) for the device adapter with the specified <paramref name="name"/>.
+    /// </summary>
+    /// <param name="name">The name of the feature.</param>
+    /// <returns>Feature (or <see langword="null"/> if it does not exist).</returns>
     IFeature? GetFeature(string name);
 
+    /// <summary>
+    /// Gets the feature (if it exists) for the device adapter with the specified component <paramref name="type"/>.
+    /// </summary>
+    /// <param name="type">The component type for which to fetch the assciated feature.</param>
+    /// <returns>Feature (or <see langword="null"/> if it does not exist).</returns>
     IFeature? GetFeature(ComponentType type) => this.GetFeature(TextAttribute.GetText(type));
 }
 

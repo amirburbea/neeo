@@ -245,6 +245,15 @@ public interface IDeviceBuilder
 
     IDeviceBuilder AddPlayerWidget(IPlayerWidgetController controller);
 
+    /// <summary>
+    /// Defines a sensor by which NEEO can detemine if the device is powered on/off. This is useful in
+    /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot.
+    /// 
+    /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
+    /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
+    /// </summary>
+    /// <param name="sensor">A sensor callback that can be used to determine if the device is on or off.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
     IDeviceBuilder AddSensor(
