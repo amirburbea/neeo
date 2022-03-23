@@ -18,7 +18,7 @@ public static class WakeOnLan
     /// Sends the Wake-On-Lan magic packet to a network card with the specified MAC address.
     /// </summary>
     /// <param name="macAddress">The MAC address associated with the the network card of the device to wake.</param>
-    /// <param name="cancellationToken">The token to monitor for cancellation requets. The default value is <see cref="CancellationToken.None"/>.</param>
+    /// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     public static Task WakeAsync(string macAddress, CancellationToken cancellationToken = default) => PhysicalAddress.Parse(macAddress).WakeAsync(cancellationToken);
 
@@ -26,7 +26,7 @@ public static class WakeOnLan
     /// Sends the Wake-On-Lan magic packet to a network card with the specified MAC address.
     /// </summary>
     /// <param name="macAddress">The MAC address associated with the the network card of the device to wake.</param>
-    /// <param name="cancellationToken">The token to monitor for cancellation requets. The default value is <see cref="CancellationToken.None"/>.</param>
+    /// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     public static async Task WakeAsync(this PhysicalAddress macAddress, CancellationToken cancellationToken = default)
     {

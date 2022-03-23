@@ -48,7 +48,7 @@ public static partial class NetworkMethods
     /// returns the round trip time, or <see langword="null"/> if the ping failed.
     /// </summary>
     /// <param name="address">The IP address of the device to ping.</param>
-    /// <param name="cancellationToken">The token to monitor for cancellation requets. The default value is <see cref="CancellationToken.None"/>.</param>
+    /// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
     public static async Task<long?> TryPingAsync(IPAddress address, CancellationToken cancellationToken)
     {
