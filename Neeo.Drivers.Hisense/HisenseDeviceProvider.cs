@@ -84,7 +84,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
             return;
         }
         list.AddTileRow(new ListTile("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png"));
-        AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync().ConfigureAwait(false), app => !app.IsUninstalled);
+        AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync().ConfigureAwait(false), static app => !app.IsUninstalled);
         (_, int limit, int? offset) = list.Parameters;
         if (offset is > 0 && limit < apps.Length)
         {

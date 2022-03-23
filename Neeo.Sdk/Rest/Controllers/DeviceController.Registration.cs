@@ -34,7 +34,7 @@ internal partial class DeviceController
         }
         this._logger.LogInformation("Registering {adapter}...", adapterName);
         using Stream stream = this.DeserializeEncrypted(payload.Data);
-        return await feature.RegisterAsync(stream) is not { Error: string error }
+        return await feature.RegisterAsync(stream) is not { Error: { } error }
             ? this.Ok()
             : this.StatusCode((int)HttpStatusCode.InternalServerError, error);
     }

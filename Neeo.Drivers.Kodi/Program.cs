@@ -11,7 +11,7 @@ internal static class Program
     private static void ConfigureLogging(HostBuilderContext context, ILoggingBuilder builder) => builder
         .ClearProviders()
         .AddDebug()
-        .AddSimpleConsole(options => options.SingleLine = true);
+        .AddSimpleConsole(static options => options.SingleLine = true);
 
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services) => services
         .AddSingleton<IDeviceProvider, KodiRemoteDeviceProvider>()

@@ -85,5 +85,5 @@ public readonly struct DeviceModel : IComparable<DeviceModel>
     /// </summary>
     public DeviceType Type => this._adapter.Type;
 
-    int IComparable<DeviceModel>.CompareTo(DeviceModel other) => StringComparer.OrdinalIgnoreCase.Compare(this.Name, other.Name);
+    int IComparable<DeviceModel>.CompareTo(DeviceModel other) => string.Compare(this.Name, other.Name, StringComparison.OrdinalIgnoreCase);
 }

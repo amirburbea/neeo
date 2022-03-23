@@ -20,7 +20,7 @@ public record struct SongInfo(
 
     public string GetCoverArt() => this.Thumbnail;
 
-    public string GetDescription() => string.Join(" - ", new[] { string.Join(", ", this.Artists), this.Album }.Where(str => !string.IsNullOrEmpty(str)));
+    public string GetDescription() => string.Join(" - ", new[] { string.Join(", ", this.Artists), this.Album }.Where(static str => !string.IsNullOrEmpty(str)));
 
     public string GetTitle() => this.Track is int track ? $"{track}. {this.Label}" : this.Label;
 }

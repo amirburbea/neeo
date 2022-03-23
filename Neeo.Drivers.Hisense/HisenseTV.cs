@@ -116,7 +116,7 @@ public sealed class HisenseTV : IDisposable
 
     public static Task<HisenseTV?> TryCreate(PhysicalAddress macAddress, ILogger logger, bool connectionRequired = false, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
-        return NetworkMethods.GetNetworkDevices().Where(pair => pair.Value.Equals(macAddress)).Select(pair => pair.Key).FirstOrDefault() is { } ipAddress
+        return NetworkMethods.GetNetworkDevices().Where(pair => pair.Value.Equals(macAddress)).Select(static pair => pair.Key).FirstOrDefault() is { } ipAddress
             ? HisenseTV.TryCreate(ipAddress, macAddress, logger, connectionRequired, clientIdPrefix, cancellationToken)
             : Task.FromResult(default(HisenseTV));
     }

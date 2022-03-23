@@ -26,13 +26,13 @@ public static class Program
             .ConfigureServices(ConfigureServices)
             .RunConsoleAsync().ConfigureAwait(false);
 
-        static void ConfigureLogging(ILoggingBuilder builder) => builder.ClearProviders().AddSimpleConsole(options => options.SingleLine = true);
+        static void ConfigureLogging(ILoggingBuilder builder) => builder.ClearProviders().AddSimpleConsole(static options => options.SingleLine = true);
 
         static void ConfigureServices(IServiceCollection services)
         {
             services.AddHostedService<ExampleSdkService>();
             // Finds all device examples and registers them.
-            foreach (Type type in Program._assemblies.Distinct().SelectMany(assembly => assembly.GetTypes()))
+            foreach (Type type in Program._assemblies.Distinct().SelectMany(static assembly => assembly.GetTypes()))
             {
                 if (type.IsAssignableTo(typeof(IDeviceProvider)) && !type.IsInterface && !type.IsAbstract)
                 {
