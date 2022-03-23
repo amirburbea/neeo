@@ -2,14 +2,10 @@
 
 namespace Neeo.Sdk.Utilities.TokenSearch;
 
-/// <summary>
-/// 
-/// </summary>
-/// <typeparam name="T"></typeparam>
 public sealed class SearchEntry<T> : IComparable<SearchEntry<T>>
     where T : notnull, IComparable<T>
 {
-    public SearchEntry(T item) => this.Item = item;
+    internal SearchEntry(T item) => this.Item = item;
 
     public T Item { get; }
 

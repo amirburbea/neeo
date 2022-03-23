@@ -3,7 +3,7 @@
 namespace Neeo.Sdk.Utilities;
 
 /// <summary>
-/// Generic event for reporting a piece of data.
+/// Generic event arguments for reporting data.
 /// </summary>
 /// <typeparam name="TData">Type of data for the event.</typeparam>
 public sealed class DataEventArgs<TData> : EventArgs

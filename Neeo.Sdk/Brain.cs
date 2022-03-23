@@ -65,7 +65,7 @@ public sealed class Brain : IAsyncDisposable
     /// <summary>
     /// Discovers all <see cref="Brain"/>s on the network.
     /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>s.</returns>
     public static async Task<Brain[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
@@ -83,7 +83,7 @@ public sealed class Brain : IAsyncDisposable
     /// <paramref name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the first
     /// <see cref="Brain"/> discovered.
     /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="predicate">Optional predicate that must be matched by the Brain (if not <see langword="null"/>).</param>
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
     public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
@@ -124,7 +124,7 @@ public sealed class Brain : IAsyncDisposable
     /// </param>
     /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
     /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     public async Task<ISdkEnvironment> StartServerAsync(
         IDeviceBuilder[] devices,
@@ -165,7 +165,7 @@ public sealed class Brain : IAsyncDisposable
     /// </param>
     /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
     /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     public Task<ISdkEnvironment> StartServerAsync(
         IDeviceProvider[] providers,
@@ -193,7 +193,7 @@ public sealed class Brain : IAsyncDisposable
     /// <summary>
     /// Asynchronously stops the SDK integration server and unregisters it from the NEEO Brain.
     /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     public async Task StopServerAsync(CancellationToken cancellationToken = default)
     {
