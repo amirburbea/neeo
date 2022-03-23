@@ -10,6 +10,6 @@ namespace Neeo.Sdk.Devices;
 /// <param name="optionalDeviceId">
 /// If not <see langword="null"/>, the results should be filtered to the single specified device identifier.
 /// </param>
-/// <param name="cancellationToken">The cancellation token.</param>
+/// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
 public delegate Task<DiscoveredDevice[]> DiscoveryProcess(string? optionalDeviceId = default, CancellationToken cancellationToken = default);

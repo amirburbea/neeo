@@ -18,6 +18,13 @@ public interface IDiscoveryFeature : IFeature
     /// </summary>
     bool EnableDynamicDeviceBuilder { get; }
 
+    /// <summary>
+    /// Asynchronously discover devices.
+    /// </summary>
+    /// <param name="optionalDeviceId">The (optional) device identifier. If specified, it is expected that the method will return
+    /// either an empty array or the single device requested.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
     Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default);
 }
 

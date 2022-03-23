@@ -13,21 +13,15 @@ public enum ListButtonIcon
     Repeat
 }
 
-public sealed class ListButton
+public sealed class ListButton : ClickableListItemBase
 {
     public ListButton(string title, string actionIdentifier, bool? inverse = default, ListButtonIcon? icon = default, ListUIAction? uiAction = default)
+        : base(actionIdentifier, uiAction)
     {
         this.Title = Validator.ValidateText(title, maxLength: 255);
         this.Icon = icon;
         this.Inverse = inverse;
-        this.ActionIdentifier = actionIdentifier;
-        this.UIAction = uiAction;
     }
-
-    [JsonPropertyName("uiAction")]
-    public ListUIAction? UIAction { get; }
-
-    public string ActionIdentifier { get; }
 
     [JsonPropertyName("iconName")]
     public ListButtonIcon? Icon { get; }

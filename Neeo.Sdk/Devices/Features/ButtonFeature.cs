@@ -2,11 +2,19 @@
 
 namespace Neeo.Sdk.Devices.Features;
 
+/// <summary>
+/// Feature support for a single button.
+/// </summary>
 public interface IButtonFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Button;
 
-    Task TriggerAsync(string deviceId);
+    /// <summary>
+    /// The button has been pressed - execute the associated <see cref="ButtonHandler"/>.
+    /// </summary>
+    /// <param name="deviceId">The device identifier.</param>
+    /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
+    Task ExecuteAsync(string deviceId);
 }
 
 internal sealed class ButtonFeature : IButtonFeature
@@ -16,5 +24,5 @@ internal sealed class ButtonFeature : IButtonFeature
 
     public ButtonFeature(ButtonHandler handler, string button) => (this._handler, this._button) = (handler, button);
 
-    public Task TriggerAsync(string deviceId) => this._handler.Invoke(deviceId, this._button);
+    public Task ExecuteAsync(string deviceId) => this._handler(deviceId, this._button);
 }

@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Sdk.Devices.Lists;
 
-public sealed class ListEntry : ClickableListItem, IListItem
+public sealed class ListEntry : ClickableListItemBase, IListItem
 {
     public ListEntry(string title, string? label = default, string? browseIdentifier = default, string? actionIdentifier = default, string? thumbnailUri = default, bool? isQueueable = default, ListUIAction? uiAction = default)
         : base(actionIdentifier, uiAction)

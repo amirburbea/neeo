@@ -22,12 +22,12 @@ public interface IApiClient
     /// </summary>
     /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
     /// <param name="path">The API path on the NEEO Brain.</param>
-    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TData> GetAsync<TData>(
-        string path,
-        CancellationToken cancellationToken = default
-    ) => this.GetAsync(path, static (TData data) => data, cancellationToken);
+    Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken = default)
+    {
+        return this.GetAsync(path, static (TData data) => data, cancellationToken);
+    }
 
     /// <summary>
     /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
@@ -37,7 +37,7 @@ public interface IApiClient
     /// <typeparam name="TOutput">The output type of the transform.</typeparam>
     /// <param name="path">The API path on the NEEO Brain.</param>
     /// <param name="transform">The transformation to run on the data.</param>
-    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default);
 
@@ -49,13 +49,12 @@ public interface IApiClient
     /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
     /// <param name="path">The API path on the NEEO Brain.</param>
     /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
-    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TData> PostAsync<TBody, TData>(
-        string path,
-        TBody body,
-        CancellationToken cancellationToken = default
-    ) => this.PostAsync(path, body, static (TData data) => data, cancellationToken);
+    Task<TData> PostAsync<TBody, TData>(string path, TBody body, CancellationToken cancellationToken = default)
+    {
+        return this.PostAsync(path, body, static (TData data) => data, cancellationToken);
+    }
 
     /// <summary>
     /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
@@ -67,7 +66,7 @@ public interface IApiClient
     /// <param name="path">The API path on the NEEO Brain.</param>
     /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
     /// <param name="transform">The transformation to run on the data.</param>
-    /// <param name="cancellationToken">A cancellation token for the request.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default);
 }
@@ -84,13 +83,10 @@ internal sealed class ApiClient : IApiClient, IDisposable
 
     public void Dispose() => this._httpClient.Dispose();
 
-    public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken) => this.FetchAsync(
-        path,
-        HttpMethod.Get,
-        null,
-        transform,
-        cancellationToken
-    );
+    public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken)
+    {
+        return this.FetchAsync(path, HttpMethod.Get, default, transform, cancellationToken);
+    }
 
     public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken)
     {

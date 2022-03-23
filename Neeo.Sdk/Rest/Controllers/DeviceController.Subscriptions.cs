@@ -17,7 +17,7 @@ internal partial class DeviceController
         }
         if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
-            await feature.SubscribeAsync(deviceId);
+            await feature.NotifyDeviceAddedAsync(deviceId);
         }
         this._logger.LogInformation("Device added {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
         return this.Ok();
@@ -32,7 +32,7 @@ internal partial class DeviceController
         }
         if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
-            await feature.UnsubscribeAsync(deviceId);
+            await feature.NotifyDeviceRemovedAsync(deviceId);
         }
         this._logger.LogInformation("Device removed {adapter}:{deviceId}.", adapter.AdapterName, deviceId);
         return this.Ok();

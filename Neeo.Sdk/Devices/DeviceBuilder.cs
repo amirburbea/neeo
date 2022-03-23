@@ -212,6 +212,11 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddButtonHandler(ButtonHandler handler);
 
+    /// <summary>
+    /// Adds a special/unique characteristic to the device definition.
+    /// </summary>
+    /// <param name="characteristic">The characteristic to add to the device definition.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic);
 
     IDeviceBuilder AddDirectory(
@@ -279,6 +284,10 @@ public interface IDeviceBuilder
 
     IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool? isLabelVisible = default);
 
+    /// <summary>
+    /// Builds a device adapter based on this instance.
+    /// </summary>
+    /// <returns>The created device adapter.</returns>
     IDeviceAdapter BuildAdapter();
 
     /// <summary>
@@ -304,6 +313,12 @@ public interface IDeviceBuilder
 
     IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder = false);
 
+    /// <summary>
+    /// Specify that this device will be able to send notifications to the NEEO Brain about changes in the state of one or more of its components.
+    /// A callback is provided for receiving an <see cref="IDeviceNotifier"/>.
+    /// </summary>
+    /// <param name="callback">A callback for receiving the <see cref="IDeviceNotifier"/>.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder EnableNotifications(DeviceNotifierCallback callback);
 
     IDeviceBuilder EnableRegistration(string headerText, string summary, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);

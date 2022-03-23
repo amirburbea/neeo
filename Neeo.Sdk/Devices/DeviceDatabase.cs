@@ -19,7 +19,7 @@ public interface IDeviceDatabase
     /// has a registered initializer, ensures the adapter is initialized.
     /// </summary>
     /// <param name="adapterName">The name of the adapter.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <returns><see cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName);
 
     /// <summary>

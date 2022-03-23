@@ -41,6 +41,6 @@ internal sealed class SubscriptionsNotifier : IHostedService
         this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
         string path = string.Format(UrlPaths.SubscriptionsFormat, this._sdkAdapterName, adapter.AdapterName);
         string[] deviceIds = await this._client.GetAsync<string[]>(path, cancellationToken).ConfigureAwait(false);
-        await feature.InitializeDeviceListAsync(deviceIds).ConfigureAwait(false);
+        await feature.NotifyDeviceListAsync(deviceIds).ConfigureAwait(false);
     }
 }

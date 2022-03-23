@@ -7,12 +7,24 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Features;
 
+/// <summary>
+/// Feature support for device registration.
+/// </summary>
 public interface IRegistrationFeature : IFeature
 {
     FeatureType IFeature.Type => FeatureType.Registration;
 
+    /// <summary>
+    /// Asynchronously determine if the device is already registered. If the device was previously registered, then NEEO will not prompt for credentials.
+    /// </summary>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task<bool> QueryIsRegisteredAsync();
 
+    /// <summary>
+    /// Given a stream containing PGP decrypted credentials, attempt to register the device.
+    /// </summary>
+    /// <param name="stream"></param>
+    /// <returns></returns>
     Task<RegistrationResult> RegisterAsync(Stream stream);
 }
 

@@ -16,7 +16,7 @@ public interface INotificationService
     /// </summary>
     /// <param name="notification">The notification to send to the Brain.</param>
     /// <param name="deviceAdapterName">The adapter name of the device with an updated component value.</param>
-    /// <param name="cancellationToken">The optional cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
     /// <remarks>
     /// This method is only used to send power notifications.
@@ -28,7 +28,7 @@ public interface INotificationService
     /// </summary>
     /// <param name="notification">The notification to send to the Brain.</param>
     /// <param name="deviceAdapterName">The adapter name of the device with an updated component value.</param>
-    /// <param name="cancellationToken">The optional cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
     Task SendSensorNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken = default);
 }

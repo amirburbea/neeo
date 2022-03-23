@@ -36,7 +36,7 @@ public sealed class Brain : IAsyncDisposable
     /// <param name="version">The firmware version of the NEEO Brain.</param>
     public Brain(IPAddress ipAddress, int servicePort = 3000, string? hostName = default, string version = "0.50.0")
     {
-        if (ipAddress is not { AddressFamily: AddressFamily.InterNetwork })
+        if (ipAddress.AddressFamily != AddressFamily.InterNetwork)
         {
             throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress));
         }
@@ -167,7 +167,7 @@ public sealed class Brain : IAsyncDisposable
     /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
     /// <param name="cancellationToken">Optional cancellation token.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public async Task<ISdkEnvironment> StartServerAsync(
+    public Task<ISdkEnvironment> StartServerAsync(
         IDeviceProvider[] providers,
         string? name = default,
         IPAddress? hostIPAddress = null,
@@ -180,20 +180,14 @@ public sealed class Brain : IAsyncDisposable
         {
             throw new ArgumentException("At least one device is required.", nameof(providers));
         }
-        if (this._host is not null)
-        {
-            throw new InvalidOperationException("Server is already running.");
-        }
-        this._host = await Server.StartSdkAsync(
-            this,
+        return this.StartServerAsync(
             Array.ConvertAll(providers, static provider => provider.DeviceBuilder),
-            $"src-{UniqueNameGenerator.Generate(name ?? Dns.GetHostName())}",
-            hostIPAddress ?? await this.GetFallbackHostIPAddress(cancellationToken).ConfigureAwait(false),
+            name,
+            hostIPAddress,
             port,
             configureLogging,
             cancellationToken
-        ).ConfigureAwait(false);
-        return this._host.Services.GetRequiredService<ISdkEnvironment>();
+        );
     }
 
     /// <summary>

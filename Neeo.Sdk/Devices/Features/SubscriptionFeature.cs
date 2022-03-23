@@ -12,15 +12,25 @@ public interface ISubscriptionFeature : IFeature
     FeatureType IFeature.Type => FeatureType.Subscription;
 
     /// <summary>
-    /// 
+    /// Asynchronously notifies that a device has been added.
     /// </summary>
-    /// <param name="deviceIds"></param>
-    /// <returns></returns>
-    Task InitializeDeviceListAsync(string[] deviceIds);
+    /// <param name="deviceId">The device identifier.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task NotifyDeviceAddedAsync(string deviceId);
 
-    Task SubscribeAsync(string deviceId);
+    /// <summary>
+    /// Asynchronously initialize the device list.
+    /// </summary>
+    /// <param name="deviceIds">The device identifiers.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task NotifyDeviceListAsync(string[] deviceIds);
 
-    Task UnsubscribeAsync(string deviceId);
+    /// <summary>
+    /// Asynchronously notifies that a device has been removed.
+    /// </summary>
+    /// <param name="deviceId">The device identifier.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task NotifyDeviceRemovedAsync(string deviceId);
 }
 
 internal sealed record class SubscriptionFeature : ISubscriptionFeature
@@ -36,9 +46,9 @@ internal sealed record class SubscriptionFeature : ISubscriptionFeature
         this._deviceListInitializer = initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList));
     }
 
-    public Task InitializeDeviceListAsync(string[] deviceIds) => this._deviceListInitializer(deviceIds);
+    public Task NotifyDeviceListAsync(string[] deviceIds) => this._deviceListInitializer(deviceIds);
 
-    public Task SubscribeAsync(string deviceId) => this._onDeviceAdded(deviceId);
+    public Task NotifyDeviceAddedAsync(string deviceId) => this._onDeviceAdded(deviceId);
 
-    public Task UnsubscribeAsync(string deviceId) => this._onDeviceRemoved(deviceId);
+    public Task NotifyDeviceRemovedAsync(string deviceId) => this._onDeviceRemoved(deviceId);
 }

@@ -25,7 +25,7 @@ public interface IDeviceNotifier
     /// <param name="componentName">The name of the component on which to register the change.</param>
     /// <param name="value">The updated value.</param>
     /// <param name="deviceId">The unique identifier of the device. Typically, this will be &quot;default&quot; for most (but not all) drivers.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     Task SendNotificationAsync(string componentName, object value, string deviceId = "default", CancellationToken cancellationToken = default);
 
@@ -35,7 +35,7 @@ public interface IDeviceNotifier
     /// </summary>
     /// <param name="powerState">The power state (where <see langword="true"/> indicates power on).</param>
     /// <param name="deviceId">The unique identifier of the device. Typically, this will be &quot;default&quot; for most (but not all) drivers.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     Task SendPowerNotificationAsync(bool powerState, string deviceId = "default", CancellationToken cancellationToken = default);
 }
