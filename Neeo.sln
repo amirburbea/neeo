@@ -1,0 +1,60 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32104.313
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk", "Neeo.Sdk\Neeo.Sdk.csproj", "{E7AE10FA-82A6-4639-902C-BA165B783BE9}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk.Examples", "Neeo.Sdk.Examples\Neeo.Sdk.Examples.csproj", "{D69AE840-4383-4929-9382-DEFB3FE657A0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Drivers.Hisense", "Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj", "{5905563E-C361-4C60-AB48-4C4673D1DF71}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Drivers.Kodi", "Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj", "{C4091BE8-824E-4917-B7F9-47DD8D9A5198}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Drivers.WebOS", "Neeo.Drivers.WebOS\Neeo.Drivers.WebOS.csproj", "{64F8C1E8-C36D-4063-B302-E5994E55BC99}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sdk", "Sdk", "{93702E4F-E0FF-4847-8CE6-34CB33011F3C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Drivers", "Drivers", "{BF10C3F7-4530-4783-85B3-26E6B09CDD6F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E7AE10FA-82A6-4639-902C-BA165B783BE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7AE10FA-82A6-4639-902C-BA165B783BE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7AE10FA-82A6-4639-902C-BA165B783BE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7AE10FA-82A6-4639-902C-BA165B783BE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D69AE840-4383-4929-9382-DEFB3FE657A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D69AE840-4383-4929-9382-DEFB3FE657A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D69AE840-4383-4929-9382-DEFB3FE657A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D69AE840-4383-4929-9382-DEFB3FE657A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5905563E-C361-4C60-AB48-4C4673D1DF71}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4091BE8-824E-4917-B7F9-47DD8D9A5198}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4091BE8-824E-4917-B7F9-47DD8D9A5198}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4091BE8-824E-4917-B7F9-47DD8D9A5198}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4091BE8-824E-4917-B7F9-47DD8D9A5198}.Release|Any CPU.Build.0 = Release|Any CPU
+		{64F8C1E8-C36D-4063-B302-E5994E55BC99}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{64F8C1E8-C36D-4063-B302-E5994E55BC99}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{64F8C1E8-C36D-4063-B302-E5994E55BC99}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{64F8C1E8-C36D-4063-B302-E5994E55BC99}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E7AE10FA-82A6-4639-902C-BA165B783BE9} = {93702E4F-E0FF-4847-8CE6-34CB33011F3C}
+		{D69AE840-4383-4929-9382-DEFB3FE657A0} = {93702E4F-E0FF-4847-8CE6-34CB33011F3C}
+		{5905563E-C361-4C60-AB48-4C4673D1DF71} = {BF10C3F7-4530-4783-85B3-26E6B09CDD6F}
+		{C4091BE8-824E-4917-B7F9-47DD8D9A5198} = {BF10C3F7-4530-4783-85B3-26E6B09CDD6F}
+		{64F8C1E8-C36D-4063-B302-E5994E55BC99} = {BF10C3F7-4530-4783-85B3-26E6B09CDD6F}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {01A57CDF-5F63-440F-9388-1CCED77653D0}
+	EndGlobalSection
+EndGlobal

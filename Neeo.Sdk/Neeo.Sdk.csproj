@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<LangVersion>10.0</LangVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<PlatformTarget>AnyCPU</PlatformTarget>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<PlatformTarget>AnyCPU</PlatformTarget>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="BouncyCastle.NetCore" Version="1.8.10" />
+	  <PackageReference Include="Zeroconf" Version="3.6.11" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<Compile Update="Rest\Controllers\DeviceController.*.cs">
+			<DependentUpon>DeviceController.cs</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="Utilities\NetworkMethods.*.cs">
+	    <DependentUpon>NetworkMethods.cs</DependentUpon>
+	  </Compile>
+	</ItemGroup>
+
+</Project>

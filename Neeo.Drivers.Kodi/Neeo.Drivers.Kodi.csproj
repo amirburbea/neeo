@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<LangVersion>10.0</LangVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Remove="Images\filter.jpg" />
+	  <None Remove="Images\movie.jpg" />
+	  <None Remove="Images\music.jpg" />
+	  <None Remove="Images\pvr.jpg" />
+	  <None Remove="Images\tvshow.jpg" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Include="Images\filter.jpg" />
+	  <EmbeddedResource Include="Images\movie.jpg" />
+	  <EmbeddedResource Include="Images\music.jpg" />
+	  <EmbeddedResource Include="Images\pvr.jpg" />
+	  <EmbeddedResource Include="Images\tvshow.jpg" />
+	</ItemGroup>
+
+
+
+	<ItemGroup>
+	  <PackageReference Include="Zeroconf" Version="3.6.11" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
+	</ItemGroup>
+</Project>
