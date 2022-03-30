@@ -16,7 +16,7 @@ internal partial class DeviceController
     {
         if (await this._database.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
-            throw new NotSupportedException();
+            return this.NotFound();
         }
         this._logger.LogInformation("Beginning discovery for {adapter}.", adapter.AdapterName);
         DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken: cancellationToken);

@@ -39,28 +39,28 @@ public interface IDeviceDatabase
     /// </summary>
     /// <param name="adapterName">The name of the device adapter.</param>
     /// <returns>The device model if it exists, <see langword="null"/> otherwise.</returns>
-    DeviceModel? GetDeviceByAdapterName(string adapterName);
+    DeviceAdapterModel? GetDeviceByAdapterName(string adapterName);
 
     /// <summary>
     /// Gets the device model with the specified <paramref name="id"/>.
     /// </summary>
     /// <param name="id">The device identifier.</param>
     /// <returns>The device model if it exists, <see langword="null"/> otherwise.</returns>
-    DeviceModel? GetDeviceById(int id);
+    DeviceAdapterModel? GetDeviceById(int id);
 
     /// <summary>
     /// Searches for a device with a token matching the search <paramref name="query"/>.
     /// </summary>
     /// <param name="query">The search query.</param>
     /// <returns>An array of sort entries ranked as per a similar algorithm to &quot;tokenseach.js&quot;.</returns>
-    SearchEntry<DeviceModel>[] Search(string? query);
+    SearchEntry<DeviceAdapterModel>[] Search(string? query);
 }
 
 internal sealed class DeviceDatabase : IDeviceDatabase
 {
     private readonly Dictionary<string, IDeviceAdapter> _adapters;
-    private readonly TokenSearch<DeviceModel> _deviceIndex;
-    private readonly DeviceModel[] _devices;
+    private readonly TokenSearch<DeviceAdapterModel> _deviceIndex;
+    private readonly DeviceAdapterModel[] _devices;
     private readonly Dictionary<string, Task> _initializationTasks = new();
     private readonly HashSet<string> _initializedAdapters = new();
     private readonly ILogger<IDeviceDatabase> _logger;
@@ -71,14 +71,14 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     {
         this._notificationService = notificationService;
         this._logger = logger;
-        this._devices = new DeviceModel[devices.Count];
+        this._devices = new DeviceAdapterModel[devices.Count];
         this._adapters = new(this._devices.Length);
         foreach (IDeviceBuilder device in devices)
         {
             IDeviceAdapter adapter = device.BuildAdapter();
             int index = this._adapters.Count;
             this._adapters.Add(adapter.AdapterName, adapter);
-            this._devices[index] = new DeviceModel(index, adapter);
+            this._devices[index] = new DeviceAdapterModel(index, adapter);
             if (device.NotifierCallback is { } callback)
             {
                 callback(new DeviceNotifier(this._notificationService, device.AdapterName, device.HasPowerStateSensor));
@@ -86,10 +86,10 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         }
         this._deviceIndex = new(
             this._devices,
-            nameof(DeviceModel.Manufacturer),
-            nameof(DeviceModel.Name),
-            nameof(DeviceModel.Tokens),
-            nameof(DeviceModel.Type)
+            nameof(DeviceAdapterModel.Manufacturer),
+            nameof(DeviceAdapterModel.Name),
+            nameof(DeviceAdapterModel.Tokens),
+            nameof(DeviceAdapterModel.Type)
         );
     }
 
@@ -107,16 +107,16 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     public IEnumerable<IDeviceAdapter> GetAdaptersWithSubscription() => this._adapters.Values.Where(static adapter => adapter.GetFeature(ComponentType.Subscription) is { });
 
-    public DeviceModel? GetDeviceByAdapterName(string name) => Array.FindIndex(this._devices, device => device.AdapterName == name) is int index and > -1
+    public DeviceAdapterModel? GetDeviceByAdapterName(string name) => Array.FindIndex(this._devices, device => device.AdapterName == name) is int index and > -1
         ? this._devices[index]
-        : default(DeviceModel?);
+        : default(DeviceAdapterModel?);
 
-    public DeviceModel? GetDeviceById(int id) => id >= 0 && id < this._devices.Length
+    public DeviceAdapterModel? GetDeviceById(int id) => id >= 0 && id < this._devices.Length
         ? this._devices[id]
-        : default(DeviceModel?);
+        : default(DeviceAdapterModel?);
 
-    public SearchEntry<DeviceModel>[] Search(string? query) => string.IsNullOrEmpty(query)
-        ? Array.Empty<SearchEntry<DeviceModel>>()
+    public SearchEntry<DeviceAdapterModel>[] Search(string? query) => string.IsNullOrEmpty(query)
+        ? Array.Empty<SearchEntry<DeviceAdapterModel>>()
         : this._deviceIndex.Search(query).Take(OptionConstants.MaxSearchResults).ToArray();
 
     private async ValueTask InitializeDeviceAsync(IDeviceAdapter adapter)

@@ -17,12 +17,10 @@ internal sealed class SubscriptionsNotifier : IHostedService
     private readonly ILogger<SubscriptionsNotifier> _logger;
     private readonly string _sdkAdapterName;
 
-    public SubscriptionsNotifier(
-        IApiClient client,
-        IDeviceDatabase database,
-        ISdkEnvironment environment,
-        ILogger<SubscriptionsNotifier> logger
-    ) => (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.AdapterName);
+    public SubscriptionsNotifier(IApiClient client, IDeviceDatabase database, ISdkEnvironment environment, ILogger<SubscriptionsNotifier> logger)
+    {
+        (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.AdapterName);
+    }
 
     Task IHostedService.StartAsync(CancellationToken cancellationToken) => Parallel.ForEachAsync(
         this._database.GetAdaptersWithSubscription(),

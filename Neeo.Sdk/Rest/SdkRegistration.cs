@@ -63,15 +63,10 @@ internal sealed class SdkRegistration : IHostedService
         }
     }
 
-    /// <summary>
-    /// Makes a POST request to the NEEO Brain with an expected return type of <see cref="SuccessResponse"/> and returns the success value.
-    /// </summary>
-    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) => this._client.PostAsync(
-        path,
-        body,
-        static (SuccessResponse response) => response.Success,
-        cancellationToken
-    );
+    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken)
+    {
+        return this._client.PostAsync(path, body, static (SuccessResponse response) => response.Success, cancellationToken);
+    }
 
     private static class Constants
     {

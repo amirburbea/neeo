@@ -12,15 +12,15 @@ internal sealed class DatabaseController : ControllerBase
     public DatabaseController(IDeviceDatabase database) => this._database = database;
 
     [HttpGet("adapterdefinition/{adapterName}")]
-    public ActionResult<DeviceModel> GetDeviceByAdapterName(string adapterName) => this._database.GetDeviceByAdapterName(adapterName) is not { } device
+    public ActionResult<DeviceAdapterModel> GetDeviceByAdapterName(string adapterName) => this._database.GetDeviceByAdapterName(adapterName) is not { } device
         ? this.NotFound()
         : this.Ok(device);
 
     [HttpGet("{deviceId}")]
-    public ActionResult<DeviceModel> GetDeviceById(int deviceId) => this._database.GetDeviceById(deviceId) is not { } device
+    public ActionResult<DeviceAdapterModel> GetDeviceById(int deviceId) => this._database.GetDeviceById(deviceId) is not { } device
         ? this.NotFound()
         : this.Ok(device);
 
     [HttpGet("search")]
-    public ActionResult<SearchEntry<DeviceModel>[]> Search([FromQuery(Name = "q")] string? query) => this._database.Search(query);
+    public ActionResult<SearchEntry<DeviceAdapterModel>[]> Search([FromQuery(Name = "q")] string? query) => this._database.Search(query);
 }

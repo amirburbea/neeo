@@ -219,14 +219,7 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic);
 
-    IDeviceBuilder AddDirectory(
-        string name,
-        string? label,
-        DirectoryRole? role,
-        DirectoryBrowser populator,
-        DirectoryActionHandler actionHandler,
-        string? identifier = default
-    );
+    IDeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DirectoryBrowser populator, DirectoryActionHandler actionHandler, string? identifier = default);
 
     /// <summary>
     /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
@@ -235,13 +228,7 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddFavoriteHandler(FavoriteHandler handler);
 
-    IDeviceBuilder AddImageUrl(
-        string name,
-        string? label,
-        ImageSize size,
-        DeviceValueGetter<string>? getter = default,
-        string? uri = default
-    );
+    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string>? getter = default, string? uri = default);
 
     IDeviceBuilder AddPlayerWidget(IPlayerWidgetController controller);
 
@@ -256,36 +243,13 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
-    IDeviceBuilder AddSensor(
-        string name,
-        string? label,
-        DeviceValueGetter<double> getter,
-        double rangeLow = 0d,
-        double rangeHigh = 100d,
-        string unit = "%"
-    );
+    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow = 0d, double rangeHigh = 100d, string unit = "%");
 
-    IDeviceBuilder AddSensor(
-        string name,
-        string? label,
-        DeviceValueGetter<bool> getter
-    );
+    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter);
 
-    IDeviceBuilder AddSensor(
-        string name,
-        string? label,
-        DeviceValueGetter<string> getter
-    );
+    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter);
 
-    IDeviceBuilder AddSlider(
-        string name,
-        string? label,
-        DeviceValueGetter<double> getter,
-        DeviceValueSetter<double> setter,
-        double rangeLow = 0d,
-        double rangeHigh = 100d,
-        string unit = "%"
-    );
+    IDeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow = 0d, double rangeHigh = 100d, string unit = "%");
 
     IDeviceBuilder AddSmartApplicationButton(SmartApplicationButtons button);
 
@@ -318,7 +282,17 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder DefineTiming(int? powerOnDelay = default, int? shutdownDelay = default, int? sourceSwitchDelay = default);
 
-    IDeviceBuilder EnableDeviceRoute(UriPrefixCallback uriCallback, DeviceRouteHandler routeHandler);
+    /// <summary>
+    /// Enables the device adapter to take advantage of the server set up for the Brain integration.
+    /// Enabling device routes will invoke the <paramref name="routeHandler"/> callback, to handle all HTTP requests
+    /// with a Uri which starts with a specific prefix. This prefix is supplied to the adapter via the <paramref name="uriPrefixCallback"/>.
+    /// <para/>
+    /// This has a multitude of uses, such as serving images to the remote, or when integration with the underlying device itself requires an HTTP server.
+    /// </summary>
+    /// <param name="uriPrefixCallback">Callback invoked upon starting the REST server indicating which prefix to use for requests to be handled by this device.</param>
+    /// <param name="routeHandler">Callback to handle HTTP requests with the URI prefix.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder EnableDeviceRoute(UriPrefixCallback uriPrefixCallback, DeviceRouteHandler routeHandler);
 
     IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder = false);
 
@@ -406,10 +380,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
     private bool _hasInput;
     private bool _hasPlayerWidget;
     private int _roles;
-
     private DeviceRouteHandler? _routeHandler;
-
-    private UriPrefixCallback? _uriCallback;
+    private UriPrefixCallback? _uriPrefixCallback;
 
     internal DeviceBuilder(string name, DeviceType type, string? prefix)
     {
@@ -566,7 +538,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         int? sourceSwitchDelay
     ) => this.DefineTiming(powerOnDelay, shutdownDelay, sourceSwitchDelay);
 
-    IDeviceBuilder IDeviceBuilder.EnableDeviceRoute(UriPrefixCallback uriCallback, DeviceRouteHandler routeHandler) => this.EnableDeviceRoute(uriCallback, routeHandler);
+    IDeviceBuilder IDeviceBuilder.EnableDeviceRoute(UriPrefixCallback uriPrefixCallback, DeviceRouteHandler routeHandler) => this.EnableDeviceRoute(uriPrefixCallback, routeHandler);
 
     IDeviceBuilder IDeviceBuilder.EnableDiscovery(
         string headerText,
@@ -954,7 +926,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             this.Timing ?? new(),
             this.AdditionalSearchTokens,
             this.Type,
-            this._uriCallback
+            this._uriPrefixCallback
         );
 
         void AddComponentAndRouteHandler(Component component, IFeature feature)
@@ -1066,13 +1038,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder EnableDeviceRoute(UriPrefixCallback uriCallback, DeviceRouteHandler routeHandler)
+    private DeviceBuilder EnableDeviceRoute(UriPrefixCallback uriPrefixCallback, DeviceRouteHandler routeHandler)
     {
-        if (this._uriCallback is not null)
+        if (this._uriPrefixCallback is not null)
         {
             throw new InvalidOperationException("Device route already defined.");
         }
-        (this._uriCallback, this._routeHandler) = (uriCallback, routeHandler);
+        (this._uriPrefixCallback, this._routeHandler) = (uriPrefixCallback, routeHandler);
         return this;
     }
 

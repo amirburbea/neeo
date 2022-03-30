@@ -63,38 +63,39 @@ internal sealed class NotificationMapping : INotificationMapping
 
     private record struct Entry(string Name, string EventKey, string? Label);
 
-    private sealed record EntryCache
+    private sealed record EntryCache(Entry[] Entries)
     {
-        private readonly Entry[] _entries;
         private readonly Dictionary<string, string[]> _cache = new();
-
-        public EntryCache(Entry[] entries) => this._entries = entries;
 
         public string[] GetNotificationKeys(string componentName)
         {
             if (!this._cache.TryGetValue(componentName, out string[]? keys))
             {
-                this._cache.Add(
-                    componentName,
-                    keys = this.Find(entry => entry.Name == componentName) is { Length: > 0 } matches
-                        ? matches
-                        : this.Find(entry => entry.Label == componentName)
-                );
+                this._cache.Add(componentName, keys = GetKeys());
             }
             return keys;
+
+            string[] GetKeys()
+            {
+                if (this.Find(entry => entry.Name == componentName) is not { Length: > 0 } matches)
+                {
+                    matches = this.Find(entry => entry.Label == componentName);
+                }
+                return matches;
+            }
         }
 
         private string[] Find(Predicate<Entry> predicate)
         {
-            int index = Array.FindIndex(this._entries, predicate);
+            int index = Array.FindIndex(this.Entries, predicate);
             if (index == -1)
             {
                 return Array.Empty<string>();
             }
-            HashSet<string> keys = new() { this._entries[index++].EventKey };
-            for (; index < this._entries.Length; index++)
+            HashSet<string> keys = new() { this.Entries[index++].EventKey };
+            for (; index < this.Entries.Length; index++)
             {
-                Entry entry = this._entries[index];
+                Entry entry = this.Entries[index];
                 if (predicate(entry))
                 {
                     keys.Add(entry.EventKey);

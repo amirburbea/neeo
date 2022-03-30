@@ -44,7 +44,7 @@ internal partial class DeviceController
                 await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId);
                 return this.Ok(new SuccessResponse(true));
             case IDirectoryFeature directoryFeature:
-                return JsonResult.Ok(await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>()));
+                return JsonSerialization.Ok(await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>()));
         }
         return this.NotFound();
     }

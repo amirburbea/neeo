@@ -27,7 +27,7 @@ internal sealed class DynamicDevices : IDynamicDevices
         try
         {
             this._lock.EnterReadLock();
-            if (this._discoveredDevices.GetValueOrDefault(deviceId) is { } discoveredDevice)
+            if (this._discoveredDevices.TryGetValue(deviceId, out IDeviceAdapter? discoveredDevice))
             {
                 return discoveredDevice;
             }
