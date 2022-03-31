@@ -76,9 +76,9 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         foreach (IDeviceBuilder device in devices)
         {
             IDeviceAdapter adapter = device.BuildAdapter();
-            int index = this._adapters.Count;
+            int id = this._adapters.Count;
+            this._devices[id] = new(id, adapter);
             this._adapters.Add(adapter.AdapterName, adapter);
-            this._devices[index] = new DeviceAdapterModel(index, adapter);
             if (device.NotifierCallback is { } callback)
             {
                 callback(new DeviceNotifier(this._notificationService, device.AdapterName, device.HasPowerStateSensor));

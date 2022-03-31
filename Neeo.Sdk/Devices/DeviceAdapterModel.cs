@@ -14,7 +14,8 @@ public readonly struct DeviceAdapterModel : IComparable<DeviceAdapterModel>
 
     internal DeviceAdapterModel(int id, IDeviceAdapter adapter)
     {
-        (this.Id, this._adapter) = (id, adapter);
+        this.Id = id;
+        this._adapter = adapter;
         this.Device = new(adapter);
         this.Tokens = string.Join(' ', adapter.Tokens);
     }

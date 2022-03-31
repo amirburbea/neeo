@@ -27,12 +27,12 @@ internal sealed class SdkRegistration : IHostedService
         {
             try
             {
-                string adapterName = this._environment.AdapterName;
-                if (!await this.PostAsync(UrlPaths.RegisterServer, new { Name = adapterName, BaseUrl = this._environment.HostAddress }, cancellationToken).ConfigureAwait(false))
+
+                if (!await this._client.PostAsync(UrlPaths.RegisterServer, new { Name = this._environment.AdapterName, BaseUrl = this._environment.HostAddress }, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
                 {
                     throw new ApplicationException("Failed to register on the brain - registration rejected.");
                 }
-                this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainAddress}).", adapterName, this._brain.HostName, this._brain.IPAddress);
+                this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainAddress}).", this._environment.AdapterName, this._brain.HostName, this._brain.IPAddress);
                 break;
             }
             catch (Exception) when (i != Constants.MaxRetries)
@@ -52,7 +52,7 @@ internal sealed class SdkRegistration : IHostedService
     {
         try
         {
-            if (await this.PostAsync(UrlPaths.UnregisterServer, new { Name = this._environment.AdapterName }, cancellationToken).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = this._environment.AdapterName }, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
             {
                 this._logger.LogInformation("Server unregistered from {brain}.", this._brain.HostName);
             }
@@ -61,11 +61,6 @@ internal sealed class SdkRegistration : IHostedService
         {
             this._logger.LogWarning("Failed to unregister with brain - {content}.", e.Message);
         }
-    }
-
-    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken)
-    {
-        return this._client.PostAsync(path, body, static (SuccessResponse response) => response.Success, cancellationToken);
     }
 
     private static class Constants

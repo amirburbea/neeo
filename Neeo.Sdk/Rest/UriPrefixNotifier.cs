@@ -17,10 +17,9 @@ internal sealed class UriPrefixNotifier : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        string hostAddress = this._environment.HostAddress;
         foreach (IDeviceAdapter adapter in this._database.GetAdaptersWithDeviceRoutes())
         {
-            adapter.UriPrefixCallback!($"{hostAddress}/device/{adapter.AdapterName}/custom/");
+            adapter.UriPrefixCallback!($"{this._environment.HostAddress}/device/{adapter.AdapterName}/custom/");
         }
         return Task.CompletedTask;
     }
