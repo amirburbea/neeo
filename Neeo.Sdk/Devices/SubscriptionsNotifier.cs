@@ -23,14 +23,14 @@ internal sealed class SubscriptionsNotifier : IHostedService
     }
 
     Task IHostedService.StartAsync(CancellationToken cancellationToken) => Parallel.ForEachAsync(
-        this._database.GetAdaptersWithSubscription(),
+        this._database.Adapters,
         cancellationToken,
-        async (adapterName, cancellationToken) => await this.NotifySubscriptionsAsync(adapterName, cancellationToken).ConfigureAwait(false)
+        this.NotifySubscriptionsAsync
     );
 
     Task IHostedService.StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task NotifySubscriptionsAsync(IDeviceAdapter adapter, CancellationToken cancellationToken)
+    private async ValueTask NotifySubscriptionsAsync(IDeviceAdapter adapter, CancellationToken cancellationToken)
     {
         if (adapter.GetFeature(ComponentType.Subscription) is not ISubscriptionFeature feature)
         {

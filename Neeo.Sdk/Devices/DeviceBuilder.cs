@@ -283,11 +283,11 @@ public interface IDeviceBuilder
     IDeviceBuilder DefineTiming(int? powerOnDelay = default, int? shutdownDelay = default, int? sourceSwitchDelay = default);
 
     /// <summary>
-    /// Enables the device adapter to take advantage of the server set up for the Brain integration.
-    /// Enabling device routes will invoke the <paramref name="routeHandler"/> callback, to handle all HTTP requests
-    /// with a Uri which starts with a specific prefix. This prefix is supplied to the adapter via the <paramref name="uriPrefixCallback"/>.
+    /// Enables the device adapter to take advantage of the HTTP server set up for the Brain integration. Enabling
+    /// device routes will invoke the <paramref name="routeHandler"/> callback to handle all HTTP requests with a URI 
+    /// starting with a specific prefix. This prefix is supplied to the device adapter via the <paramref name="uriPrefixCallback"/>.
     /// <para/>
-    /// This has a multitude of uses, such as serving images to the remote, or when integration with the underlying device itself requires an HTTP server.
+    /// This could be used for serving images to the remote, or when integration with the underlying device itself requires an HTTP server.
     /// </summary>
     /// <param name="uriPrefixCallback">Callback invoked upon starting the REST server indicating which prefix to use for requests to be handled by this device.</param>
     /// <param name="routeHandler">Callback to handle HTTP requests with the URI prefix.</param>
@@ -304,9 +304,35 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder EnableNotifications(DeviceNotifierCallback callback);
 
-    IDeviceBuilder EnableRegistration(string headerText, string summary, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);
+    /// <summary>
+    /// Instructs NEEO during setup of a device previously configured to support discovery (via a call to <see cref="IDeviceBuilder.EnableDiscovery"/>),
+    /// to prompt the user for a user name and password for devices requiring credentials.
+    /// </summary>
+    /// <param name="headerText">The header text to display when a user is entering registration credentials.</param>
+    /// <param name="description">The descriptive summary text to display when a user is entering registration credentials.</param>
+    /// <param name="queryIsRegistered">
+    /// A callback invoked by the NEEO Brain to check whether registration has been previously performed successfully.
+    /// <para />
+    /// If the task result is <see langword = "true" /> then the setup process will skip registration.
+    /// </param>
+    /// <param name="processor">Callback to process the credentials and return a <see cref="RegistrationResult"/>.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, CredentialsRegistrationProcessor processor);
 
-    IDeviceBuilder EnableRegistration(string headerText, string summary, QueryIsRegistered queryIsRegistered, SecurityCodeRegistrationProcessor processor);
+    /// <summary>
+    /// Instructs NEEO during setup of a device previously configured to support discovery (via a call to <see cref="IDeviceBuilder.EnableDiscovery"/>),
+    /// to prompt the user for a security code for devices requiring credentials.
+    /// </summary>
+    /// <param name="headerText">The header text to display when a user is entering registration credentials.</param>
+    /// <param name="description">The descriptive summary text to display when a user is entering registration credentials.</param>
+    /// <param name="queryIsRegistered">
+    /// A callback invoked by the NEEO Brain to check whether registration has been previously performed successfully.
+    /// <para />
+    /// If the task result is <see langword = "true" /> then the setup process will skip registration.
+    /// </param>
+    /// <param name="processor">Callback to process the security code and return a <see cref="RegistrationResult"/>.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder EnableRegistration(string headerText, string description, QueryIsRegistered queryIsRegistered, SecurityCodeRegistrationProcessor processor);
 
     /// <summary>
     /// Specify a set of callbacks which allow tracking which devices are currently in use on the NEEO Brain.
@@ -551,12 +577,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
         string headerText,
-        string summary,
+        string description,
         QueryIsRegistered queryIsRegistered,
         CredentialsRegistrationProcessor processor
     ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
         headerText,
-        summary,
+        description,
         RegistrationType.Credentials,
         queryIsRegistered,
         (Credentials credentials) => processor(credentials.UserName, credentials.Password)
@@ -564,12 +590,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
         string headerText,
-        string summary,
+        string description,
         QueryIsRegistered queryIsRegistered,
         SecurityCodeRegistrationProcessor processor
     ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
         headerText,
-        summary,
+        description,
         RegistrationType.SecurityCode,
         queryIsRegistered,
         (SecurityCodeContainer container) => processor(container.SecurityCode)
@@ -1072,7 +1098,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string summary, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
+    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
         where TPayload : struct
     {
         if (this.Setup.RegistrationType.HasValue)
@@ -1084,7 +1110,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new InvalidOperationException($"Registration is only supported on devices with discovery. (Call {nameof(IDeviceBuilder.EnableDiscovery)} first).");
         }
         this.Setup.RegistrationHeaderText = Validator.ValidateText(headerText, maxLength: 255);
-        this.Setup.RegistrationSummary = Validator.ValidateText(summary, maxLength: 255);
+        this.Setup.RegistrationSummary = Validator.ValidateText(description, maxLength: 255);
         this.RegistrationFeature = RegistrationFeature.Create(queryIsRegistered, processor);
         this.Setup.RegistrationType = type;
         return this;

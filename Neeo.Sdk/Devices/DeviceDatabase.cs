@@ -15,24 +15,18 @@ namespace Neeo.Sdk.Devices;
 public interface IDeviceDatabase
 {
     /// <summary>
+    /// Gets the collection of device adapters.
+    /// </summary>
+    /// <remarks>Note that the adapters may not have run their associated initializer.</remarks>
+    IEnumerable<IDeviceAdapter> Adapters { get; }
+
+    /// <summary>
     /// Get the adapter with the specified <paramref name="adapterName"/>. If the adapter
     /// has a registered initializer, ensures the adapter is initialized.
     /// </summary>
     /// <param name="adapterName">The name of the adapter.</param>
     /// <returns><see cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName);
-
-    /// <summary>
-    /// Gets the adapters supporting device routes.
-    /// </summary>
-    /// <remarks>Note that the adapters may not have run their associated initializer.</remarks>
-    IEnumerable<IDeviceAdapter> GetAdaptersWithDeviceRoutes();
-
-    /// <summary>
-    /// Gets the adapters supporting device subscription.
-    /// </summary>
-    /// <remarks>Note that the adapters may not have run their associated initializer.</remarks>
-    IEnumerable<IDeviceAdapter> GetAdaptersWithSubscription();
 
     /// <summary>
     /// Gets the associated device model for an adapter with the specified <paramref name="adapterName"/>, or <see langword="null"/> if not found.
@@ -93,6 +87,8 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         );
     }
 
+    IEnumerable<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values;
+
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName)
     {
         if (!this._adapters.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out IDeviceAdapter? adapter))
@@ -102,10 +98,6 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         await this.InitializeDeviceAsync(adapter).ConfigureAwait(false);
         return adapter;
     }
-
-    public IEnumerable<IDeviceAdapter> GetAdaptersWithDeviceRoutes() => this._adapters.Values.Where(static adapter => adapter.RouteHandler is { });
-
-    public IEnumerable<IDeviceAdapter> GetAdaptersWithSubscription() => this._adapters.Values.Where(static adapter => adapter.GetFeature(ComponentType.Subscription) is { });
 
     public DeviceAdapterModel? GetDeviceByAdapterName(string name) => Array.FindIndex(this._devices, device => device.AdapterName == name) is int index and > -1
         ? this._devices[index]
