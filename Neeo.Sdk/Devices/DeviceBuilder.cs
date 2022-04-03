@@ -865,7 +865,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
         }
-        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
+        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic).ToList();
         string pathPrefix = $"/device/{this.AdapterName}/";
         HashSet<string> paths = new();
         List<Component> components = new();
