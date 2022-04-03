@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Sdk.Devices.Discovery;
+namespace Neeo.Sdk.Devices.Setup;
 
 /// <summary>
 /// Registration types supported by NEEO.

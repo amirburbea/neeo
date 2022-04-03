@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Neeo.Sdk.Devices.Discovery;
+namespace Neeo.Sdk.Devices.Setup;
 
 /// <summary>
 /// Represents a device found during the discovery phase.

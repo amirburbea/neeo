@@ -1,5 +1,5 @@
 ﻿using System.Text.Json.Serialization;
-using Neeo.Sdk.Devices.Discovery;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;

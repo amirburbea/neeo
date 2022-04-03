@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace Neeo.Sdk.Devices.Discovery;
+namespace Neeo.Sdk.Devices.Setup;
 
 /// <summary>
 /// A callback invoked by the NEEO Brain to check whether registration has been previously
