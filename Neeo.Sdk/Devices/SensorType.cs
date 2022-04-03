@@ -37,6 +37,6 @@ public enum SensorType
     /// <summary>
     /// Not recommended for use.
     /// </summary>
-    [Text("custom"), EditorBrowsable(EditorBrowsableState.Never)]
+    [Text("custom")]
     Custom
 }

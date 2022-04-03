@@ -19,7 +19,7 @@ internal sealed class SubscriptionsNotifier : IHostedService
 
     public SubscriptionsNotifier(IApiClient client, IDeviceDatabase database, ISdkEnvironment environment, ILogger<SubscriptionsNotifier> logger)
     {
-        (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.AdapterName);
+        (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.SdkAdapterName);
     }
 
     Task IHostedService.StartAsync(CancellationToken cancellationToken) => Parallel.ForEachAsync(
@@ -38,7 +38,7 @@ internal sealed class SubscriptionsNotifier : IHostedService
         }
         this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
         string path = string.Format(UrlPaths.SubscriptionsFormat, this._sdkAdapterName, adapter.AdapterName);
-        string[] deviceIds = await this._client.GetAsync<string[]>(path, cancellationToken).ConfigureAwait(false);
-        await feature.NotifyDeviceListAsync(deviceIds).ConfigureAwait(false);
+        string[] deviceIds = await this._client.GetAsync(path, static (string[] deviceIds) => deviceIds, cancellationToken).ConfigureAwait(false);
+        await feature.InitializeDeviceListAsync(deviceIds).ConfigureAwait(false);
     }
 }

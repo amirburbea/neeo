@@ -33,7 +33,7 @@ internal sealed class NotificationMapping : INotificationMapping
 
     public NotificationMapping(ISdkEnvironment environment, IApiClient client, ILogger<NotificationMapping> logger)
     {
-        this._sdkAdapterName = environment.AdapterName;
+        this._sdkAdapterName = environment.SdkAdapterName;
         this._client = client;
         this._logger = logger;
     }
@@ -43,7 +43,7 @@ internal sealed class NotificationMapping : INotificationMapping
         (string, string) cacheKey = (deviceAdapterName, deviceId);
         if (!this._cache.TryGetValue(cacheKey, out EntryCache? entries))
         {
-            this._cache[cacheKey] = entries = new(await this.FetchEntriesAsync(deviceAdapterName, deviceId, cancellationToken).ConfigureAwait(false));
+            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(deviceAdapterName, deviceId, cancellationToken).ConfigureAwait(false);
         }
         if (entries.GetNotificationKeys(componentName) is { Length: not 0 } keys)
         {
@@ -54,12 +54,11 @@ internal sealed class NotificationMapping : INotificationMapping
         return Array.Empty<string>();
     }
 
-    private async Task<Entry[]> FetchEntriesAsync(string deviceAdapterName, string deviceId, CancellationToken cancellationToken)
-    {
-        string path = string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, deviceAdapterName, deviceId);
-        Entry[] entries = await this._client.GetAsync<Entry[]>(path, cancellationToken).ConfigureAwait(false);
-        return Array.FindAll(entries, static entry => entry.EventKey is not null);
-    }
+    private Task<EntryCache> FetchEntriesAsync(string deviceAdapterName, string deviceId, CancellationToken cancellationToken) => this._client.GetAsync(
+        string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, deviceAdapterName, deviceId),
+        static (Entry[] entries) => new EntryCache(entries),
+        cancellationToken
+    );
 
     private record struct Entry(string Name, string EventKey, string? Label);
 
@@ -77,9 +76,9 @@ internal sealed class NotificationMapping : INotificationMapping
 
             string[] GetKeys()
             {
-                if (this.Find(entry => entry.Name == componentName) is not { Length: > 0 } matches)
+                if (this.Find(entry => entry.EventKey != null && entry.Name == componentName) is not { Length: > 0 } matches)
                 {
-                    matches = this.Find(entry => entry.Label == componentName);
+                    matches = this.Find(entry => entry.EventKey != null && entry.Label == componentName);
                 }
                 return matches;
             }

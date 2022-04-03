@@ -19,15 +19,12 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
-        switch (feature)
+        return feature switch
         {
-            case IButtonFeature buttonFeature:
-                await buttonFeature.ExecuteAsync(deviceId);
-                return this.Ok(new SuccessResponse(true));
-            case IValueFeature valueFeature:
-                return this.Ok(new ValueResponse(await valueFeature.GetValueAsync(deviceId)));
-        }
-        return this.NotFound();
+            IButtonFeature buttonFeature => this.Ok(await buttonFeature.ExecuteAsync(deviceId)),
+            IValueFeature valueFeature => this.Ok(await valueFeature.GetValueAsync(deviceId)),
+            _ => this.NotFound(),
+        };
     }
 
     [HttpPost("{adapterName}/{componentName}/{deviceId}")]
@@ -38,15 +35,12 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
-        switch (feature)
+        return feature switch
         {
-            case IFavoritesFeature favoritesFeature:
-                await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId);
-                return this.Ok(new SuccessResponse(true));
-            case IDirectoryFeature directoryFeature:
-                return JsonSerialization.Ok(await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>()));
-        }
-        return this.NotFound();
+            IFavoritesFeature favoritesFeature => this.Ok(await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
+            IDirectoryFeature directoryFeature => JsonSerialization.Ok(await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>())),
+            _ => this.NotFound(),
+        };
     }
 
     [HttpPost("{adapterName}/{componentName}/{deviceId}/action")]
@@ -57,8 +51,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Perform directory action {action} on {name}:{id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
-        await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier);
-        return this.Ok(new SuccessResponse(true));
+        return this.Ok(await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier));
     }
 
     [HttpGet("{adapterName}/{componentName}/{deviceId}/{value}")]
@@ -69,8 +62,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Set {component} value to {value} on {name}:{id}", componentName, value, adapter.DeviceName, deviceId);
-        await valueFeature.SetValueAsync(deviceId, value);
-        return this.Ok(new SuccessResponse(true));
+        return this.Ok(await valueFeature.SetValueAsync(deviceId, value));
     }
 
     private async ValueTask<(IDeviceAdapter, IFeature)> TryResolveAsync(string adapterName, string componentName, string deviceId)
@@ -93,6 +85,4 @@ internal partial class DeviceController
     public record struct ActionData(string ActionIdentifier);
 
     private record struct FavoriteData(string FavoriteId);
-
-    private record struct ValueResponse(object Value);
 }

@@ -8,6 +8,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -206,13 +207,13 @@ public sealed class KodiClient : IDisposable
             command is InputCommand.Select ? "Input.ShowOSD" : "Player.Seek",
             command switch
             {
-                InputCommand.Left => new { playerid = 1, value = "smallbackward" },
-                InputCommand.Right => new { playerid = 1, value = "smallforward" },
-                InputCommand.Down => new { playerid = 1, value = "bigbackward" },
-                InputCommand.Up => new { playerid = 1, value = "bigforward" },
+                InputCommand.Left => new { playerid = 1, value = new { step = "smallbackward" } },
+                InputCommand.Right => new { playerid = 1, value = new { step = "smallforward" } },
+                InputCommand.Down => new { playerid = 1, value = new { step = "bigbackward" } },
+                InputCommand.Up => new { playerid = 1, value = new { step = "bigforward" } },
                 _ => default,
             },
-            static (string result) => result == "OK"
+            static (SeekResult result) => result.Percentage >= 0d
         ).ConfigureAwait(false);
 
         static bool IsCursorCommand(InputCommand command) => command is InputCommand.Right or InputCommand.Left or InputCommand.Up or InputCommand.Down or InputCommand.Select;
@@ -482,7 +483,23 @@ public sealed class KodiClient : IDisposable
                 return await Task.FromCanceled<TResult>(new(true)).ConfigureAwait(false);
             }
             JsonElement element = await source.Task.ConfigureAwait(false);
-            TPayload payload = typeof(TPayload) == typeof(JsonElement) ? Unsafe.As<JsonElement, TPayload>(ref element) : element.Deserialize<TPayload>(KodiClient.SerializerOptions)!;
+            TPayload payload;
+            if (typeof(TPayload) == typeof(JsonElement))
+            {
+                payload = Unsafe.As<JsonElement, TPayload>(ref element);
+            }
+            else
+            {
+                try
+                {
+                    payload = element.Deserialize<TPayload>(KodiClient.SerializerOptions)!;
+                }
+                catch (JsonException)
+                {
+                    Console.WriteLine("Failed to deserialize to {0} from {1}.", typeof(TPayload), element);
+                    throw;
+                }
+            }
             return transform(payload);
         }
     }
@@ -548,14 +565,15 @@ public sealed class KodiClient : IDisposable
         PlayerInfo Player
     );
 
-    private record struct VolumeInfo(
-        int Volume,
-        bool Muted = false
-    );
-
     private record struct ResponseParameters(
         JsonElement Data,
         string Sender
+    );
+
+    private record struct SeekResult(
+        double Percentage,
+        Time Time,
+        Time TotalTime
     );
 
     private record struct SortOrder(
@@ -564,5 +582,17 @@ public sealed class KodiClient : IDisposable
         [property: JsonPropertyName("ignorearticle")] bool IgnoreArticle = true
     );
 
+    private record struct Time(
+        int Hours,
+        int Minutes,
+        int Seconds,
+        int Milliseconds
+    );
+
     private record struct TVShowsListResult(Limits Limits, [property: JsonPropertyName("tvshows")] TVShowInfo[] TVShows);
+
+    private record struct VolumeInfo(
+        int Volume,
+        bool Muted = false
+    );
 }

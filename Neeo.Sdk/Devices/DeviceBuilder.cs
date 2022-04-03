@@ -249,6 +249,8 @@ public interface IDeviceBuilder
 
     IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter);
 
+    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter);
+
     IDeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow = 0d, double rangeHigh = 100d, string unit = "%");
 
     IDeviceBuilder AddSmartApplicationButton(SmartApplicationButtons button);
@@ -531,6 +533,12 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         DeviceValueGetter<bool> getter
     ) => this.AddSensor(name, label, getter);
 
+    IDeviceBuilder IDeviceBuilder.AddSensor(
+        string name,
+        string? label,
+        DeviceValueGetter<object> getter
+    ) => this.AddSensor(name, label, getter);
+
     IDeviceBuilder IDeviceBuilder.AddSlider(
         string name,
         string? label,
@@ -758,42 +766,34 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddSensor(SensorType type, string name, string? label, ValueFeature controller)
-    {
-        if (name == Constants.PowerSensorName)
-        {
-            throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
-        }
-        SensorParameters parameters = new(
-            type,
-            Validator.ValidateText(name),
-            Validator.ValidateText(label, allowNull: true),
-            controller
-        );
-        if (!this._sensors.TryAdd(name, parameters))
-        {
-            throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
-        }
-        return this;
-    }
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter) => this.AddSensor(name, SensorType.Binary, label, getter);
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter) => this.AddSensor(SensorType.Binary, name, label, ValueFeature.Create(getter));
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter) => this.AddSensor(name, SensorType.String, label, getter);
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter) => this.AddSensor(SensorType.String, name, label, ValueFeature.Create(getter));
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter) => this.AddSensor(name, SensorType.Custom, label, getter);
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string unit)
-    {
-        if (name == Constants.PowerSensorName)
-        {
-            throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
-        }
-        RangeSensorParameters parameters = new(
+    private DeviceBuilder AddSensor<T>(string name, SensorType type, string? label, DeviceValueGetter<T> getter) where T : notnull => this.AddSensorParameters(
+        name,
+        new(type, Validator.ValidateText(name), Validator.ValidateText(label, allowNull: true), ValueFeature.Create(getter))
+    );
+
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string unit) => this.AddSensorParameters(
+        name,
+        new RangeSensorParameters(
             Validator.ValidateText(name),
             Validator.ValidateText(label, allowNull: true),
             ValueFeature.Create(getter),
             Validator.ValidateRange(rangeLow, rangeHigh),
             Validator.ValidateText(unit)
-        );
+        )
+    );
+
+    private DeviceBuilder AddSensorParameters(string name, SensorParameters parameters)
+    {
+        if (name == Constants.PowerSensorName)
+        {
+            throw new ArgumentException($"Name can not be {Constants.PowerSensorName}.", nameof(name));
+        }
         if (!this._sensors.TryAdd(name, parameters))
         {
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));

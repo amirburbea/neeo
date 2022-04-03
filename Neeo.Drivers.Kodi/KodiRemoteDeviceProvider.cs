@@ -25,5 +25,9 @@ public sealed class KodiRemoteDeviceProvider : KodiDeviceProviderBase
         .AddButton("Scan Audio Library")
         .AddButton("TOGGLE FULLSCREEN")
         .AddButton(Buttons.SkipBackward | Buttons.SkipForward | Buttons.Exit | Buttons.Forward | Buttons.Previous | Buttons.PreviousTrack | Buttons.Next | Buttons.NextTrack | Buttons.Home | Buttons.Reverse | Buttons.PlayPauseToggle | Buttons.Info | Buttons.Subtitle)
-        .AddButton("INPUT KODI", "Kodi"); // Need an Input for TV so we just pretend there's a generic input called KODI.
+        // Need an Input for TV so we just pretend there's a generic input.
+        .AddButton("INPUT KODI", "Kodi");
+
+    protected override string GetDisplayName(KodiClient client) => $"{client.DisplayName} - Remote";
+
 }

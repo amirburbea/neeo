@@ -11,40 +11,34 @@ namespace Neeo.Sdk.Rest;
 /// </summary>
 internal sealed class SdkRegistration : IHostedService
 {
+    private readonly Brain _brain;
     private readonly IApiClient _client;
     private readonly ISdkEnvironment _environment;
     private readonly ILogger<SdkRegistration> _logger;
-    private readonly Brain _brain;
 
     public SdkRegistration(Brain brain, IApiClient client, ISdkEnvironment environment, ILogger<SdkRegistration> logger)
     {
         (this._brain, this._client, this._environment, this._logger) = (brain, client, environment, logger);
     }
 
+    private string BaseUrl => this._environment.HostAddress;
+
+    private string Name => this._environment.SdkAdapterName;
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        for (int i = 0; i <= Constants.MaxRetries; i++)
+        try
         {
-            try
+            if (!await this.PostAsync(UrlPaths.RegisterServer, new { this.Name, this.BaseUrl }, cancellationToken).ConfigureAwait(false))
             {
-
-                if (!await this._client.PostAsync(UrlPaths.RegisterServer, new { Name = this._environment.AdapterName, BaseUrl = this._environment.HostAddress }, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
-                {
-                    throw new ApplicationException("Failed to register on the brain - registration rejected.");
-                }
-                this._logger.LogInformation("Server {adapterName} registered on {brain} ({brainAddress}).", this._environment.AdapterName, this._brain.HostName, this._brain.IPAddress);
-                break;
+                throw new ApplicationException("Registration rejected.");
             }
-            catch (Exception) when (i != Constants.MaxRetries)
-            {
-                this._logger.LogWarning("Failed to register with brain (on attempt #{attempt}). Retrying...", i + 1);
-                continue;
-            }
-            catch (Exception e)
-            {
-                this._logger.LogError(e, "Failed to register on the brain - giving up.");
-                throw;
-            }
+            this._logger.LogInformation("Server {name} registered on {brain} ({brainAddress}).", this.Name, this._brain.HostName, this._brain.IPAddress);
+        }
+        catch (Exception e)
+        {
+            this._logger.LogWarning("Failed to unregister with brain - {content}.", e.Message);
+            throw;
         }
     }
 
@@ -52,7 +46,7 @@ internal sealed class SdkRegistration : IHostedService
     {
         try
         {
-            if (await this._client.PostAsync(UrlPaths.UnregisterServer, new { Name = this._environment.AdapterName }, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
+            if (await this.PostAsync(UrlPaths.UnregisterServer, new { this.Name }, cancellationToken).ConfigureAwait(false))
             {
                 this._logger.LogInformation("Server unregistered from {brain}.", this._brain.HostName);
             }
@@ -63,8 +57,10 @@ internal sealed class SdkRegistration : IHostedService
         }
     }
 
-    private static class Constants
-    {
-        public const int MaxRetries = 8;
-    }
+    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) => this._client.PostAsync(
+        path,
+        body,
+        static (SuccessResponse response) => response.Success,
+        cancellationToken
+    );
 }

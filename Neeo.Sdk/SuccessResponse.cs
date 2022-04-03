@@ -4,4 +4,4 @@
 /// A structure indicating success - used as a standard return type for NEEO Brain APIs.
 /// </summary>
 /// <param name="Success">A value indicating if the API call was successful.</param>
-internal record struct SuccessResponse(bool Success);
+public record struct SuccessResponse(bool Success);

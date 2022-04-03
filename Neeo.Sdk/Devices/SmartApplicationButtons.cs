@@ -5,7 +5,7 @@ using Neeo.Sdk.Utilities;
 namespace Neeo.Sdk.Devices;
 
 /// <summary>
-/// The NEEO Brain has special rendering for launcher buttons of several known SmartTV applications.
+/// The NEEO remote has special rendering for launcher buttons of several known SmartTV applications.
 /// </summary>
 /// <remarks>
 /// Note: This enumeration supports bitwise (flagged) combinations for easily adding multiple app buttons via a single

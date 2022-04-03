@@ -72,16 +72,11 @@ internal sealed class NotificationService : INotificationService
     private bool IsDuplicate(Message message)
     {
         (string key, object data) = NotificationService.ExtractTypeAndData(message);
-        return this._cache.GetValueOrDefault(key) == data;
+        return this._cache.TryGetValue(key, out object? value) && value.Equals(data);
     }
 
     private async Task<bool> SendAsync(Message message, CancellationToken cancellationToken)
     {
-        if (message.Type == null)
-        {
-            this._logger.LogWarning("Ignored: Uninitialized message.");
-            return false;
-        }
         if (this.IsDuplicate(message))
         {
             this._logger.LogWarning("Ignored: Duplicate message.");

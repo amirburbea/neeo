@@ -71,4 +71,6 @@ public sealed class KodiPlayerDeviceProvider : KodiDeviceProviderBase, IPlayerWi
         .AddPlayerWidget(this)
         .AddButtonGroup(ButtonGroups.Power | ButtonGroups.ChannelZapper | ButtonGroups.ControlPad | ButtonGroups.MenuAndBack)
         .AddButton(Buttons.Stop);
+
+    protected override string GetDisplayName(KodiClient client) => $"{client.DisplayName} - Player";
 }

@@ -14,7 +14,7 @@ public interface IButtonFeature : IFeature
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
-    Task ExecuteAsync(string deviceId);
+    Task<SuccessResponse> ExecuteAsync(string deviceId);
 }
 
 internal sealed class ButtonFeature : IButtonFeature
@@ -24,5 +24,9 @@ internal sealed class ButtonFeature : IButtonFeature
 
     public ButtonFeature(ButtonHandler handler, string button) => (this._handler, this._button) = (handler, button);
 
-    public Task ExecuteAsync(string deviceId) => this._handler(deviceId, this._button);
+    public async Task<SuccessResponse> ExecuteAsync(string deviceId)
+    {
+        await this._handler(deviceId, this._button).ConfigureAwait(false);
+        return new(true);
+    }
 }

@@ -25,7 +25,7 @@ public interface IDirectoryFeature : IFeature
     /// <param name="deviceId">The device identifier.</param>
     /// <param name="actionIdentifier">The identifier for the action to be performed (such as the file to be opened).</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task PerformActionAsync(string deviceId, string actionIdentifier);
+    Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier);
 }
 
 internal sealed class DirectoryFeature : IDirectoryFeature
@@ -48,5 +48,9 @@ internal sealed class DirectoryFeature : IDirectoryFeature
         return builder;
     }
 
-    public Task PerformActionAsync(string deviceId, string actionIdentifier) => this._actionHandler(deviceId, actionIdentifier);
+    public async Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier)
+    {
+        await this._actionHandler(deviceId, actionIdentifier).ConfigureAwait(false);
+        return new(true);
+    }
 }

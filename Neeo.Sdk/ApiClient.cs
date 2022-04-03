@@ -18,19 +18,6 @@ public interface IApiClient
 {
     /// <summary>
     /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
-    /// <paramref name="path"/>.
-    /// </summary>
-    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
-    /// <param name="path">The API path on the NEEO Brain.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken = default)
-    {
-        return this.GetAsync(path, static (TData data) => data, cancellationToken);
-    }
-
-    /// <summary>
-    /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
     /// <paramref name="path"/> and return the output of the specified <paramref name="transform"/>.
     /// </summary>
     /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
@@ -40,21 +27,6 @@ public interface IApiClient
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
-    /// <paramref name="path"/>.
-    /// </summary>
-    /// <typeparam name="TBody">The type of the body.</typeparam>
-    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
-    /// <param name="path">The API path on the NEEO Brain.</param>
-    /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TData> PostAsync<TBody, TData>(string path, TBody body, CancellationToken cancellationToken = default)
-    {
-        return this.PostAsync(path, body, static (TData data) => data, cancellationToken);
-    }
 
     /// <summary>
     /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
@@ -83,10 +55,13 @@ internal sealed class ApiClient : IApiClient, IDisposable
 
     public void Dispose() => this._httpClient.Dispose();
 
-    public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken)
-    {
-        return this.FetchAsync(path, HttpMethod.Get, default, transform, cancellationToken);
-    }
+    public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken) => this.FetchAsync(
+        path,
+        HttpMethod.Get,
+        default,
+        transform,
+        cancellationToken
+    );
 
     public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken)
     {
@@ -103,13 +78,12 @@ internal sealed class ApiClient : IApiClient, IDisposable
         this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
         using HttpRequestMessage request = new(method, uri) { Content = content };
         using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode != HttpStatusCode.OK)
-        {
-            using StreamReader reader = new(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false));
-            string text = await reader.ReadToEndAsync().ConfigureAwait(false);
-            throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${text}");
-        }
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return transform((await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!);
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            return transform((await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!);
+        }
+        using StreamReader reader = new(stream);
+        throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${reader.ReadToEnd()}");
     }
 }

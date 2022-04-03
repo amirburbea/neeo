@@ -133,6 +133,8 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         string.Empty
     );
 
+    protected virtual string GetDisplayName(KodiClient client) => client.DisplayName;
+
     protected Task<bool> GetIsMutedAsync(string deviceId) => this.GetClientDataAsync(
         deviceId,
         static client => client.IsMuted,
@@ -332,7 +334,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
     }
 
     private static void PopulateMoviesLibraryRoot(IListBuilder list, EmbeddedImages images) => list
-            .AddHeader("Movies")
+        .AddHeader("Movies")
         .AddEntry(new("Movies", thumbnailUri: images.Movie, browseIdentifier: ".movies.movies"))
         .AddEntry(new("Movies - In Progress", thumbnailUri: images.Movie, browseIdentifier: ".movies.inprogress"))
         .AddEntry(new("Movies - Unwatched", thumbnailUri: images.Movie, browseIdentifier: ".movies.unwatched"))
@@ -467,6 +469,8 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         }
     }
 
+    private DiscoveredDevice CreateDiscoveredDevice(KodiClient client) => new(client.MacAddress.ToString(), this.GetDisplayName(client), client.IsConnected);
+
     private void DetachEventHandlers(KodiClient client)
     {
         client.Connected -= this.Client_Connected;
@@ -481,15 +485,13 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         await this._clientManager.DiscoverAsync(1000, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(deviceId))
         {
-            return this._clientManager.Clients.Select(DiscoveredDevice).ToArray();
+            return this._clientManager.Clients.Select(this.CreateDiscoveredDevice).ToArray();
         }
         if (this.GetClientOrDefault(deviceId) is { } client)
         {
-            return new[] { DiscoveredDevice(client) };
+            return new[] { this.CreateDiscoveredDevice(client) };
         }
         return Array.Empty<DiscoveredDevice>();
-
-        static DiscoveredDevice DiscoveredDevice(KodiClient client) => new(client.MacAddress.ToString(), client.DisplayName, client.IsConnected);
     }
 
     private Task<bool> GetIsPoweredOnAsync(string deviceId) => Task.FromResult(this.IsClientReady(deviceId));

@@ -43,7 +43,12 @@ public sealed class ExampleSdkService : IHostedService
             }
         }
         this._logger.LogInformation("Starting SDK with Brain {ip}...", brain.IPAddress);
-        await (this._brain = brain).StartServerAsync(this._providers, "Examples", cancellationToken: cancellationToken).ConfigureAwait(false);
+        await (this._brain = brain).StartServerAsync(
+            this._providers,
+            "Examples",
+            configureLogging: static (context, builder) => builder.AddSimpleConsole(static options => options.SingleLine = true),
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

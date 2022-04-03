@@ -10,26 +10,26 @@ namespace Neeo.Sdk;
 public interface ISdkEnvironment
 {
     /// <summary>
-    /// The encoded SDK adapter name as registered on the NEEO Brain.
-    /// </summary>
-    string AdapterName { get; }
-
-    /// <summary>
     /// The host server address.
     /// </summary>
     string HostAddress { get; }
+
+    /// <summary>
+    /// The encoded SDK adapter name as registered on the NEEO Brain.
+    /// </summary>
+    string SdkAdapterName { get; }
 }
 
 internal sealed class SdkEnvironment : ISdkEnvironment
 {
     private readonly IServerAddressesFeature _serverAddressesFeature;
 
-    public SdkEnvironment(SdkAdapterName adapterName, IServer server)
+    public SdkEnvironment(SdkAdapterName sdkAdapterName, IServer server)
     {
-        (this.AdapterName, this._serverAddressesFeature) = ((string)adapterName, server.Features.Get<IServerAddressesFeature>()!);
+        (this.SdkAdapterName, this._serverAddressesFeature) = ((string)sdkAdapterName, server.Features.Get<IServerAddressesFeature>()!);
     }
 
-    public string AdapterName { get; }
-
     public string HostAddress => this._serverAddressesFeature.Addresses.Single();
+
+    public string SdkAdapterName { get; }
 }
