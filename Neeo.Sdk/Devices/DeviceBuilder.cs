@@ -1013,8 +1013,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
                 Power state sensors are added by AddPowerStateSensor with the name "powerstate".
                 For backward compatibility, we need to avoid changing it to "POWERSTATE_SENSOR".
             */
-            string legacyNoSuffixName = Uri.EscapeDataString(Constants.PowerSensorName);
-            return component with { Name = legacyNoSuffixName, Path = pathPrefix + legacyNoSuffixName };
+            return component with { Name = Constants.PowerSensorName, Path = pathPrefix + Constants.PowerSensorName };
         }
 
         static TextLabelComponent BuildTextLabel(string pathPrefix, string name, string? label, bool? isLabelVisible)
