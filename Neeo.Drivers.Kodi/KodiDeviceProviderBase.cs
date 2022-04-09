@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Kodi.Models;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Discovery;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Devices.Lists;
 using Neeo.Sdk.Utilities;
 
@@ -96,7 +96,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         .SetSpecificName(this._deviceName)
         .AddAdditionalSearchTokens(nameof(Kodi), "XBMC")
         .AddButtonHandler(this.HandleButtonAsync)
-        .AddDirectory("Library", "Library", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".")
+        .AddDirectory("Library", "Library", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync)
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddDirectory("MovieLibrary", "Movies", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".movies")
         .AddDirectory("MusicLibrary", "Music", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".music")
@@ -186,13 +186,12 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
             return;
         }
         EmbeddedImages images = new(this._uriPrefix);
-        string identifier = builder.Parameters.BrowseIdentifier ?? ".";
+        string identifier = builder.Parameters.BrowseIdentifier ?? String.Empty;
         int offset = builder.Parameters.Offset ?? 0;
         int limit = builder.Parameters.Limit;
         switch (identifier)
         {
             case "":
-            case ".":
                 KodiDeviceProviderBase.PopulateLibraryRoot(builder, images);
                 return;
             case ".movies":

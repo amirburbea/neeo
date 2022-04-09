@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Discovery;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Devices.Lists;
 using Neeo.Sdk.Utilities;
 

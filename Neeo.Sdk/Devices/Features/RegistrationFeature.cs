@@ -2,7 +2,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Neeo.Sdk.Devices.Discovery;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Features;

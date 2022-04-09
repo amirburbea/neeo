@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Components;
-using Neeo.Sdk.Devices.Discovery;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Utilities;
 
@@ -234,7 +234,7 @@ public interface IDeviceBuilder
 
     /// <summary>
     /// Defines a sensor by which NEEO can detemine if the device is powered on/off. This is useful in
-    /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot.
+    /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot;.
     /// 
     /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
     /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
@@ -865,7 +865,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         {
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
         }
-        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(characteristic => (DeviceCapability)characteristic).ToList();
+        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic).ToList();
         string pathPrefix = $"/device/{this.AdapterName}/";
         HashSet<string> paths = new();
         List<Component> components = new();
@@ -1013,8 +1013,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
                 Power state sensors are added by AddPowerStateSensor with the name "powerstate".
                 For backward compatibility, we need to avoid changing it to "POWERSTATE_SENSOR".
             */
-            string legacyNoSuffixName = Uri.EscapeDataString(Constants.PowerSensorName);
-            return component with { Name = legacyNoSuffixName, Path = pathPrefix + legacyNoSuffixName };
+            return component with { Name = Constants.PowerSensorName, Path = pathPrefix + Constants.PowerSensorName };
         }
 
         static TextLabelComponent BuildTextLabel(string pathPrefix, string name, string? label, bool? isLabelVisible)

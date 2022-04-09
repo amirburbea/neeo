@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace Neeo.Sdk.Devices.Discovery;
+namespace Neeo.Sdk.Devices.Setup;
 
 /// <summary>
 /// Attempt to register a device adapter given a <paramref name="userName"/> and <paramref name="password" />.
