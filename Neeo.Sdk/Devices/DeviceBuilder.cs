@@ -234,7 +234,7 @@ public interface IDeviceBuilder
 
     /// <summary>
     /// Defines a sensor by which NEEO can detemine if the device is powered on/off. This is useful in
-    /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot.
+    /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot;.
     /// 
     /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
     /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
