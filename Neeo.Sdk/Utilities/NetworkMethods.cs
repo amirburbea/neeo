@@ -23,12 +23,11 @@ public static partial class NetworkMethods
     {
         Dictionary<IPAddress, PhysicalAddress> output = new(
             // Seed with information about the local machine.
-            from networkInterface in NetworkInterface.GetAllNetworkInterfaces()
-            where networkInterface.OperationalStatus == OperationalStatus.Up
-            where networkInterface.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.Wireless80211
-            from unicastInfo in networkInterface.GetIPProperties().UnicastAddresses
+            from nic in NetworkInterface.GetAllNetworkInterfaces()
+            where nic is { OperationalStatus: OperationalStatus.Up, NetworkInterfaceType: NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.Wireless80211 }
+            from unicastInfo in nic.GetIPProperties().UnicastAddresses
             where unicastInfo.Address.AddressFamily == AddressFamily.InterNetwork
-            select KeyValuePair.Create(unicastInfo.Address, networkInterface.GetPhysicalAddress())
+            select KeyValuePair.Create(unicastInfo.Address, nic.GetPhysicalAddress())
         );
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
