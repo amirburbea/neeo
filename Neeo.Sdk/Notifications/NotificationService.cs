@@ -1,7 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
+using BitFaster.Caching.Lru;
 using Microsoft.Extensions.Logging;
 
 namespace Neeo.Sdk.Notifications;
@@ -33,18 +34,22 @@ public interface INotificationService
     Task SendSensorNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken = default);
 }
 
-internal sealed class NotificationService : INotificationService
+internal sealed class NotificationService : INotificationService, IDisposable
 {
-    private readonly Dictionary<string, object> _cache = new();
+    private readonly ConcurrentLru<string, object> _cache = new(Constants.MaxCachedEntries);
+    private readonly Channel<Message> _channel = Channel.CreateBounded<Message>(options: new(Constants.MaxQueueSize) { FullMode = BoundedChannelFullMode.DropWrite });
     private readonly IApiClient _client;
+    private readonly CancellationTokenSource _cts = new();
     private readonly ILogger<NotificationService> _logger;
     private readonly INotificationMapping _notificationMapping;
-    private int _queueSize;
 
     public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<NotificationService> logger)
     {
         (this._client, this._notificationMapping, this._logger) = (client, notificationMapping, logger);
+        Task.Factory.StartNew(this.Worker, TaskCreationOptions.LongRunning);
     }
+
+    public void Dispose() => this._cts.Cancel();
 
     public Task SendNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken)
     {
@@ -61,52 +66,30 @@ internal sealed class NotificationService : INotificationService
         return message.Data is SensorData { SensorEventKey: { } eventKey, SensorValue: { } value } ? (eventKey, value) : (message.Type, message.Data);
     }
 
-    private void DecreaseQueueSize()
-    {
-        if (this._queueSize > 0)
-        {
-            this._queueSize--;
-        }
-    }
-
     private bool IsDuplicate(Message message)
     {
         (string key, object data) = NotificationService.ExtractTypeAndData(message);
-        return this._cache.TryGetValue(key, out object? value) && value.Equals(data);
+        return this._cache.TryGet(key, out object? value) && value.Equals(data);
     }
 
-    private async Task<bool> SendAsync(Message message, CancellationToken cancellationToken)
+    private async Task SendAsync(Message message)
     {
         if (this.IsDuplicate(message))
         {
             this._logger.LogWarning("Ignored: Duplicate message.");
-            return false;
-        }
-        if (this._queueSize >= Constants.MaxQueueSize)
-        {
-            this._logger.LogDebug("Ignored: Max Queue Size Reached.");
-            return false;
+            return;
         }
         this._logger.LogDebug("Sending {message}", message);
-        this._queueSize++;
         try
         {
-            if (await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResponse response) => response.Success, this._cts.Token).ConfigureAwait(false))
             {
                 this.UpdateCache(message);
-                return true;
             }
-            this._logger.LogWarning("Failed to send notification - Brain rejected.");
-            return false;
         }
         catch (Exception e)
         {
             this._logger.LogError(e, "Failed to send notification.");
-            return false;
-        }
-        finally
-        {
-            this.DecreaseQueueSize();
         }
     }
 
@@ -120,12 +103,7 @@ internal sealed class NotificationService : INotificationService
         }
         this._logger.LogInformation("Send notification:{message}", notification);
         string[] keys = await this._notificationMapping.GetNotificationKeysAsync(deviceAdapterName, deviceId, component, cancellationToken).ConfigureAwait(false);
-        await (keys.Length switch
-        {
-            0 => Task.CompletedTask,
-            1 => this.SendAsync(FormatNotification(keys[0]), cancellationToken),
-            _ => Task.WhenAll(Array.ConvertAll(keys, key => this.SendAsync(FormatNotification(key), cancellationToken))),
-        }).ConfigureAwait(false);
+        await Task.WhenAll(Array.ConvertAll(keys, key => this._channel.Writer.WriteAsync(FormatNotification(key), cancellationToken).AsTask())).ConfigureAwait(false);
 
         Message FormatNotification(string notificationKey) => isSensorNotification
             ? new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value))
@@ -135,12 +113,15 @@ internal sealed class NotificationService : INotificationService
     private void UpdateCache(Message message)
     {
         (string key, object data) = NotificationService.ExtractTypeAndData(message);
-        if (this._cache.Count >= Constants.MaxCachedEntries)
+        this._cache.AddOrUpdate(key, data);
+    }
+
+    private async Task Worker()
+    {
+        while (await this._channel.Reader.ReadAsync(this._cts.Token).ConfigureAwait(false) is { } message)
         {
-            this._logger.LogInformation("Clearing notification cache. Cache size exceeded.");
-            this._cache.Clear();
+            _ = this.SendAsync(message);
         }
-        this._cache[key] = data;
     }
 
     private static class Constants

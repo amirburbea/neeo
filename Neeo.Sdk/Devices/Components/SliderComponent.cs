@@ -6,7 +6,7 @@
 public interface ISliderComponent : IComponent
 {
     /// <summary>
-    /// Gets the details of the slider..
+    /// Gets the details of the slider.
     /// </summary>
     ISliderDetails Slider { get; }
 }
