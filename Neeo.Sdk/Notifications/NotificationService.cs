@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using BitFaster.Caching.Lru;
 using Microsoft.Extensions.Logging;
 
@@ -36,20 +36,24 @@ public interface INotificationService
 
 internal sealed class NotificationService : INotificationService, IDisposable
 {
+    private readonly ActionBlock<Message> _actionBlock;
     private readonly ConcurrentLru<string, object> _cache = new(Constants.MaxCachedEntries);
-    private readonly Channel<Message> _channel = Channel.CreateBounded<Message>(options: new(Constants.MaxQueueSize) { FullMode = BoundedChannelFullMode.DropWrite });
     private readonly IApiClient _client;
-    private readonly CancellationTokenSource _cts = new();
+    private readonly CancellationTokenSource _cancellationSource = new();
     private readonly ILogger<NotificationService> _logger;
     private readonly INotificationMapping _notificationMapping;
 
     public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<NotificationService> logger)
     {
         (this._client, this._notificationMapping, this._logger) = (client, notificationMapping, logger);
-        Task.Factory.StartNew(this.Worker, TaskCreationOptions.LongRunning);
+        this._actionBlock = new(this.SendAsync, new() { MaxDegreeOfParallelism = Constants.MaxConcurrency, CancellationToken = this._cancellationSource.Token });
     }
 
-    public void Dispose() => this._cts.Cancel();
+    public void Dispose()
+    {
+        this._cancellationSource.Cancel();
+        this._actionBlock.Complete();
+    }
 
     public Task SendNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken)
     {
@@ -82,7 +86,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._logger.LogDebug("Sending {message}", message);
         try
         {
-            if (await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResponse response) => response.Success, this._cts.Token).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResponse response) => response.Success, this._cancellationSource.Token).ConfigureAwait(false))
             {
                 this.UpdateCache(message);
             }
@@ -98,12 +102,22 @@ internal sealed class NotificationService : INotificationService, IDisposable
         (string deviceId, string component, object value) = notification;
         if (deviceId is null || component is null || value is null)
         {
-            this._logger.LogWarning("Invalid notification:{message}.", notification);
+            this._logger.LogWarning("Invalid notification:{notification}.", notification);
             return;
         }
-        this._logger.LogInformation("Send notification:{message}", notification);
-        string[] keys = await this._notificationMapping.GetNotificationKeysAsync(deviceAdapterName, deviceId, component, cancellationToken).ConfigureAwait(false);
-        await Task.WhenAll(Array.ConvertAll(keys, key => this._channel.Writer.WriteAsync(FormatNotification(key), cancellationToken).AsTask())).ConfigureAwait(false);
+        this._logger.LogInformation("Send notification:{notification}", notification);
+        if (await this._notificationMapping.GetNotificationKeysAsync(deviceAdapterName, deviceId, component, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } keys)
+        {
+            return;
+        }
+        await Parallel.ForEachAsync(keys, cancellationToken, async (key, token) =>
+        {
+            Message message = FormatNotification(key);
+            if (!await this._actionBlock.SendAsync(message, token).ConfigureAwait(false))
+            {
+                this._logger.LogWarning("Failed to send notification:{message}", message);
+            }
+        }).ConfigureAwait(false);
 
         Message FormatNotification(string notificationKey) => isSensorNotification
             ? new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value))
@@ -116,19 +130,11 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._cache.AddOrUpdate(key, data);
     }
 
-    private async Task Worker()
-    {
-        while (await this._channel.Reader.ReadAsync(this._cts.Token).ConfigureAwait(false) is { } message)
-        {
-            _ = this.SendAsync(message);
-        }
-    }
-
     private static class Constants
     {
         public const string DeviceSensorUpdateKey = "DEVICE_SENSOR_UPDATE";
         public const int MaxCachedEntries = 50;
-        public const int MaxQueueSize = 20;
+        public const int MaxConcurrency = 20;
     }
 
     private record struct Message(string Type, object Data);

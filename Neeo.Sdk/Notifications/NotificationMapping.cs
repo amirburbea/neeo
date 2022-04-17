@@ -91,6 +91,10 @@ internal sealed class NotificationMapping : INotificationMapping
             {
                 return Array.Empty<string>();
             }
+            if (index == this.Entries.Length - 1)
+            {
+                return new[] { this.Entries[index].EventKey };
+            }
             HashSet<string> keys = new() { this.Entries[index++].EventKey };
             for (; index < this.Entries.Length; index++)
             {
