@@ -7,20 +7,20 @@ using Neeo.Sdk.Devices.Features;
 
 namespace Neeo.Sdk.Rest;
 
-public interface IDynamicDevices
+public interface IDynamicDeviceRegistry
 {
     ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId);
 
     void RegisterDiscoveredDevice(string deviceId, IDeviceAdapter adapter);
 }
 
-internal sealed class DynamicDevices : IDynamicDevices
+internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 {
     private readonly Dictionary<string, IDeviceAdapter> _discoveredDevices = new();
     private readonly ReaderWriterLockSlim _lock = new();
-    private readonly ILogger<DynamicDevices> _logger;
+    private readonly ILogger<DynamicDeviceRegistry> _logger;
 
-    public DynamicDevices(ILogger<DynamicDevices> logger) => this._logger = logger;
+    public DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) => this._logger = logger;
 
     public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter adapter, string deviceId)
     {

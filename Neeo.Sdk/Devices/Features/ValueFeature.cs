@@ -66,7 +66,7 @@ internal sealed class ValueFeature : IValueFeature
         return async (deviceId, value) =>
         {
             await setter(deviceId, (TValue)Convert.ChangeType(value, typeof(TValue)));
-            return new(true);
+            return true;
         };
     }
 }

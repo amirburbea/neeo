@@ -71,7 +71,7 @@ internal static class Server
         .AddSingleton(Server.CreatePgpKeys()) // Keys are created at random at the start of the server.
         .AddSingleton<IApiClient, ApiClient>()
         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-        .AddSingleton<IDynamicDevices, DynamicDevices>()
+        .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
         .AddSingleton<INotificationMapping, NotificationMapping>()
         .AddSingleton<INotificationService, NotificationService>()
         .AddSingleton<ISdkEnvironment, SdkEnvironment>()
