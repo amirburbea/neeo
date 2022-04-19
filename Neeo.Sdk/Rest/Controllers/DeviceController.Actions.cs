@@ -21,8 +21,8 @@ internal partial class DeviceController
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
-            IButtonFeature buttonFeature => this.Ok(await buttonFeature.ExecuteAsync(deviceId)),
-            IValueFeature valueFeature => this.Ok(await valueFeature.GetValueAsync(deviceId)),
+            IButtonFeature buttonFeature => JsonSerialization.Ok(await buttonFeature.ExecuteAsync(deviceId)),
+            IValueFeature valueFeature => JsonSerialization.Ok(await valueFeature.GetValueAsync(deviceId)),
             _ => this.NotFound(),
         };
     }
@@ -37,7 +37,7 @@ internal partial class DeviceController
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
-            IFavoritesFeature favoritesFeature => this.Ok(await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
+            IFavoritesFeature favoritesFeature => JsonSerialization.Ok(await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
             IDirectoryFeature directoryFeature => JsonSerialization.Ok(await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>())),
             _ => this.NotFound(),
         };
@@ -51,7 +51,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Perform directory action {action} on {name}:{id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
-        return this.Ok(await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier));
+        return await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier);
     }
 
     [HttpGet("{adapterName}/{componentName}/{deviceId}/{value}")]
@@ -62,7 +62,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Set {component} value to {value} on {name}:{id}", componentName, value, adapter.DeviceName, deviceId);
-        return this.Ok(await valueFeature.SetValueAsync(deviceId, value));
+        return await valueFeature.SetValueAsync(deviceId, value);
     }
 
     private async ValueTask<(IDeviceAdapter, IFeature)> TryResolveAsync(string adapterName, string componentName, string deviceId)
@@ -76,8 +76,13 @@ internal partial class DeviceController
             // Static device component.
             return (adapter, feature);
         }
-        // It may be from a dynamic device.
-        return await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId) is { } dynamicDeviceAdapter && dynamicDeviceAdapter.GetFeature(componentName) is { } dynamicDeviceFeature
+        // Check for a discovered device with `EnableDynamicDeviceBuilder`.
+        if (await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId).ConfigureAwait(false) is not { } dynamicDeviceAdapter)
+        {
+            return default;
+        }
+        // Check that the dynamic device has the feature.
+        return dynamicDeviceAdapter.GetFeature(componentName) is { } dynamicDeviceFeature
             ? (dynamicDeviceAdapter, dynamicDeviceFeature)
             : default;
     }

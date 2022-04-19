@@ -80,10 +80,10 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
         public PlayerService()
         {
             // We could just set false, but for performance we'll use a pre-cached boxed version of false.
-            this.SetValue(PlayerKey.Playing, BooleanBoxes.False);
-            this.SetValue(PlayerKey.Mute, BooleanBoxes.False);
-            this.SetValue(PlayerKey.Shuffle, BooleanBoxes.False);
-            this.SetValue(PlayerKey.Repeat, BooleanBoxes.False);
+            this.SetValue(PlayerKey.Playing, false);
+            this.SetValue(PlayerKey.Mute, false);
+            this.SetValue(PlayerKey.Shuffle, false);
+            this.SetValue(PlayerKey.Repeat, false);
             this.SetValue(PlayerKey.Volume, 50d);
             this.SetValue(PlayerKey.CoverArt, GetCoverArt(Pet.Kitten));
             this.SetValue(PlayerKey.Title, GetTitle(Pet.Kitten));

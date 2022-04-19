@@ -44,7 +44,7 @@ public sealed class WebOSClient : IDisposable
             CancellationTokenSource cts = new();
             try
             {
-                await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:9090/jsonrpc"), cancellationToken).ConfigureAwait(false);
+                await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:3000"), cancellationToken).ConfigureAwait(false);
                 this._cancellationTokenSource = cts;
                 this._webSocket = webSocket;
                 _ = Task.Factory.StartNew(this.MessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);

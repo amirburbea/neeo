@@ -817,7 +817,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddSmartApplicationButton(SmartApplicationButtons buttons) => SmartAppButton.GetNames(buttons).Aggregate(
+    private DeviceBuilder AddSmartApplicationButton(SmartApplicationButtons buttons) => SmartApplicationButton.GetNames(buttons).Aggregate(
         this,
         static (builder, name) => builder.AddButton(name)
     );

@@ -38,15 +38,20 @@ internal sealed class NotificationService : INotificationService, IDisposable
 {
     private readonly ActionBlock<Message> _actionBlock;
     private readonly ConcurrentLru<string, object> _cache = new(Constants.MaxCachedEntries);
-    private readonly IApiClient _client;
     private readonly CancellationTokenSource _cancellationSource = new();
+    private readonly IApiClient _client;
     private readonly ILogger<NotificationService> _logger;
     private readonly INotificationMapping _notificationMapping;
 
     public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<NotificationService> logger)
     {
         (this._client, this._notificationMapping, this._logger) = (client, notificationMapping, logger);
-        this._actionBlock = new(this.SendAsync, new() { MaxDegreeOfParallelism = Constants.MaxConcurrency, CancellationToken = this._cancellationSource.Token });
+        this._actionBlock = new(this.SendAsync, new()
+        {
+            MaxDegreeOfParallelism = Constants.MaxConcurrency,
+            BoundedCapacity = Constants.MaxConcurrency,
+            CancellationToken = this._cancellationSource.Token
+        });
     }
 
     public void Dispose()
@@ -110,18 +115,16 @@ internal sealed class NotificationService : INotificationService, IDisposable
         {
             return;
         }
-        await Parallel.ForEachAsync(keys, cancellationToken, async (key, token) =>
+        foreach (string notificationKey in keys)
         {
-            Message message = FormatNotification(key);
-            if (!await this._actionBlock.SendAsync(message, token).ConfigureAwait(false))
+            Message message = isSensorNotification
+                ? new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value))
+                : new(notificationKey, value);
+            if (!this._actionBlock.Post(message))
             {
                 this._logger.LogWarning("Failed to send notification:{message}", message);
             }
-        }).ConfigureAwait(false);
-
-        Message FormatNotification(string notificationKey) => isSensorNotification
-            ? new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value))
-            : new(notificationKey, value);
+        }
     }
 
     private void UpdateCache(Message message)
@@ -139,5 +142,5 @@ internal sealed class NotificationService : INotificationService, IDisposable
 
     private record struct Message(string Type, object Data);
 
-    private record struct SensorData(string SensorEventKey, object SensorValue);
+    private sealed record class SensorData(string SensorEventKey, object SensorValue);
 }

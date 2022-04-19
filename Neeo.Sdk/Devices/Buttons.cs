@@ -386,5 +386,5 @@ public static class Button
     /// </summary>
     /// <param name="name">The name of the button.</param>
     /// <returns><see cref="Buttons"/> value if found, otherwise <see langword="null"/>.</returns>
-    public static Buttons? TryResolve(string name) => FlaggedEnumerations<Buttons>.TryResolve(name);
+    public static Buttons? TryResolve(string name) => TextAttribute.GetEnum<Buttons>(name);
 }

@@ -30,6 +30,6 @@ internal partial class DeviceController
                 }
             }
         }
-        return this.Ok(devices);
+        return devices;
     }
 }

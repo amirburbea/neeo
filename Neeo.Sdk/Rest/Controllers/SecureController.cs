@@ -25,7 +25,7 @@ internal sealed class SecureController : ControllerBase
         }
         outputStream.Seek(0L, SeekOrigin.Begin);
         using StreamReader reader = new(outputStream);
-        return this.Ok(new PublicKeyResponse(await reader.ReadToEndAsync()));
+        return new PublicKeyResponse(await reader.ReadToEndAsync());
     }
 
     public record struct PublicKeyResponse([property: JsonPropertyName("publickey")] string PublicKey);

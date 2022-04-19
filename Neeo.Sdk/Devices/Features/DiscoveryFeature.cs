@@ -11,12 +11,12 @@ namespace Neeo.Sdk.Devices.Features;
 /// </summary>
 public interface IDiscoveryFeature : IFeature
 {
-    FeatureType IFeature.Type => FeatureType.Discovery;
-
     /// <summary>
     /// Gets a value indicating whether or not this device supports the creation of dynamic devices.
     /// </summary>
     bool EnableDynamicDeviceBuilder { get; }
+
+    FeatureType IFeature.Type => FeatureType.Discovery;
 
     /// <summary>
     /// Asynchronously discover devices.
@@ -32,22 +32,21 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
 {
     private readonly DiscoveryProcess _process;
 
-    public bool EnableDynamicDeviceBuilder { get; }
-
     public DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder)
     {
         (this._process, this.EnableDynamicDeviceBuilder) = (process ?? throw new ArgumentNullException(nameof(process)), enableDynamicDeviceBuilder);
     }
 
+    public bool EnableDynamicDeviceBuilder { get; }
+
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
-        DiscoveredDevice[] results = await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false);
-        if (results.Length != 0)
+        if (await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false) is { Length: > 0 } results)
         {
             // Validate results first.
             this.Validate(results);
         }
-        return results;
+        return Array.Empty<DiscoveredDevice>();
     }
 
     private void Validate(DiscoveredDevice[] results)

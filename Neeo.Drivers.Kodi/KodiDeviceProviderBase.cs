@@ -432,11 +432,11 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         switch (e.Data.PlayState)
         {
             case PlayState.Paused:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING", BooleanBoxes.False, deviceId));
+                tasks.Add(notifier.SendNotificationAsync("PLAYING",false, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
                 break;
             case PlayState.Stopped or PlayState.Playing:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING", BooleanBoxes.GetBox(e.Data.PlayState == PlayState.Playing), deviceId));
+                tasks.Add(notifier.SendNotificationAsync("PLAYING",e.Data.PlayState == PlayState.Playing, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("TITLE_SENSOR", e.Data.NowPlayingLabel, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("COVER_ART_SENSOR", e.Data.NowPlayingImage, deviceId));

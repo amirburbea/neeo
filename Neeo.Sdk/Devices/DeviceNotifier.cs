@@ -30,6 +30,24 @@ public interface IDeviceNotifier
     Task SendNotificationAsync(string componentName, object value, string deviceId = "default", CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sends a notification to the NEEO Brain that the <paramref name="value"/> of a component
+    /// has changed on a device with the given <paramref name="deviceId"/>.
+    /// <para />
+    /// This overload (though not required to be used) contains a minor performance enhancement for boolean values.
+    /// </summary>
+    /// <param name="componentName">The name of the component on which to register the change.</param>
+    /// <param name="value">The updated value.</param>
+    /// <param name="deviceId">The unique identifier of the device. Typically, this will be &quot;default&quot; for most (but not all) drivers.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> to indicate completion.</returns>
+    Task SendNotificationAsync(string componentName, bool value, string deviceId = "default", CancellationToken cancellationToken = default) => this.SendNotificationAsync(
+        componentName, 
+        BooleanBoxes.GetBox(value), 
+        deviceId, 
+        cancellationToken
+    );
+
+    /// <summary>
     /// Sends a notification to the NEEO Brain that the power state
     /// has changed on a device with the given <paramref name="deviceId"/>.
     /// </summary>

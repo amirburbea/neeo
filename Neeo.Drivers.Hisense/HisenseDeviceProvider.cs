@@ -113,7 +113,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     private async Task InitializeDeviceList(string[] deviceIds)
     {
         this._logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceList), string.Join(',', deviceIds));
-        if (deviceIds.Length == 0)
+        if (deviceIds.Length != 1)
         {
             return;
         }
@@ -134,22 +134,22 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return Task.CompletedTask;
         }
-        if (Button.TryResolve(buttonName) is { } knownButton)
+        if (Button.TryResolve(buttonName) is { } button)
         {
-            return knownButton switch
+            return button switch
             {
                 Buttons.PowerOn => tv.MacAddress.WakeAsync(),
                 Buttons.InputHdmi1 => tv.ChangeSourceAsync("HDMI 1"),
                 Buttons.InputHdmi2 => tv.ChangeSourceAsync("HDMI 2"),
                 Buttons.InputHdmi3 => tv.ChangeSourceAsync("HDMI 3"),
                 Buttons.InputHdmi4 => tv.ChangeSourceAsync("HDMI 4"),
-                _ when HisenseDeviceProvider._remoteKeys.TryGetValue(knownButton, out RemoteKey key) => tv.SendKeyAsync(key),
+                _ when HisenseDeviceProvider._remoteKeys.TryGetValue(button, out RemoteKey key) => tv.SendKeyAsync(key),
                 _ => Task.CompletedTask
             };
         }
-        if (SmartAppButton.TryResolve(buttonName) is { } smartAppButton)
+        if (SmartApplicationButton.TryResolve(buttonName) is { } smartButton)
         {
-            return smartAppButton switch
+            return smartButton switch
             {
                 SmartApplicationButtons.Netflix => tv.LaunchAppAsync("Netflix"),
                 SmartApplicationButtons.YouTube => tv.LaunchAppAsync("YouTube"),

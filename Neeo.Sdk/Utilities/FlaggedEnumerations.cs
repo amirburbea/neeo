@@ -7,7 +7,7 @@ namespace Neeo.Sdk.Utilities;
 internal static class FlaggedEnumerations<T>
     where T : struct, Enum
 {
-    private static readonly bool _isValidType = Enum.GetUnderlyingType(typeof(T)) == typeof(ulong) ? true : throw new InvalidOperationException($"{typeof(T)} is not an enum based on {typeof(ulong)}.");
+    private static readonly bool _isValidType = Enum.GetUnderlyingType(typeof(T)) == typeof(ulong);
 
     public static IEnumerable<string> GetNames(T flaggedValue)
     {
@@ -36,6 +36,4 @@ internal static class FlaggedEnumerations<T>
             }
         }
     }
-
-    public static T? TryResolve(string name) => TextAttribute.GetEnum<T>(name);
 }

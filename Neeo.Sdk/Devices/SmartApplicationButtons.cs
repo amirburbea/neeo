@@ -78,7 +78,7 @@ public enum SmartApplicationButtons : ulong
 /// <summary>
 /// Contains <see langword="static"/> methods for interacting with the <see cref="SmartApplicationButtons"/> enumeration.
 /// </summary>
-public static class SmartAppButton
+public static class SmartApplicationButton
 {
     /// <summary>
     /// Gets the button names in the specified combination of <paramref name="buttons"/>.
@@ -92,5 +92,5 @@ public static class SmartAppButton
     /// </summary>
     /// <param name="name">The name of the button.</param>
     /// <returns><see cref="SmartApplicationButtons"/> value if found, otherwise <see langword="null"/>.</returns>
-    public static SmartApplicationButtons? TryResolve(string name) => FlaggedEnumerations<SmartApplicationButtons>.TryResolve(name);
+    public static SmartApplicationButtons? TryResolve(string name) => TextAttribute.GetEnum<SmartApplicationButtons>(name);
 }

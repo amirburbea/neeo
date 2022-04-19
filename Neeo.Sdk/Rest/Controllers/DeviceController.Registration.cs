@@ -15,14 +15,14 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapterName}/registered")]
-    public async Task<ActionResult> QueryIsRegisteredAsync(string adapterName)
+    public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync(string adapterName)
     {
         if (await this._database.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
             return this.NotFound();
         }
         this._logger.LogInformation("Querying registration for {adapter}...", adapterName);
-        return this.Ok(new { Registered = await feature.QueryIsRegisteredAsync() });
+        return new IsRegisteredResponse(await feature.QueryIsRegisteredAsync());
     }
 
     [HttpPost("{adapterName}/register")]
@@ -60,4 +60,6 @@ internal partial class DeviceController
     }
 
     public record struct CredentialsPayload(string Data);
+
+    public record struct IsRegisteredResponse(bool Registered);
 }

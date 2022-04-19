@@ -24,10 +24,11 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 
     public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter adapter, string deviceId)
     {
+        string key = $"{adapter.AdapterName}|{deviceId}";
         try
         {
             this._lock.EnterReadLock();
-            if (this._discoveredDevices.TryGetValue(deviceId, out IDeviceAdapter? discoveredDevice))
+            if (this._discoveredDevices.TryGetValue(key, out IDeviceAdapter? discoveredDevice))
             {
                 return discoveredDevice;
             }
@@ -40,19 +41,19 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
             await feature.DiscoverAsync(deviceId).ConfigureAwait(false) is { Length: 1 } devices && 
             devices[0].DeviceBuilder is { } builder)
         {
-            this.RegisterDiscoveredDevice(deviceId, adapter = builder.BuildAdapter());
+            this.RegisterDiscoveredDevice(key, adapter = builder.BuildAdapter());
             return adapter;
         }
         return default;
     }
 
-    public void RegisterDiscoveredDevice(string deviceId, IDeviceAdapter adapter)
+    public void RegisterDiscoveredDevice(string key, IDeviceAdapter adapter)
     {
         int count;
         try
         {
             this._lock.EnterWriteLock();
-            this._discoveredDevices.Add(deviceId, adapter);
+            this._discoveredDevices.Add(key, adapter);
             count = this._discoveredDevices.Count;
         }
         finally
