@@ -19,7 +19,7 @@ internal partial class DeviceController
         }
         this._logger.LogInformation("Beginning discovery for {adapter}.", adapter.AdapterName);
         DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken: cancellationToken);
-        if (feature.EnableDynamicDeviceBuilder && devices.Length > 1)
+        if (feature.EnableDynamicDeviceBuilder)
         {
             foreach (DiscoveredDevice device in devices)
             {
