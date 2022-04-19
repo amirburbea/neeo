@@ -26,7 +26,8 @@ internal partial class DeviceController
             {
                 if (device.DeviceBuilder is { } builder)
                 {
-                    this._dynamicDevices.RegisterDiscoveredDevice(device.Id, builder.BuildAdapter());
+                    string key = this._dynamicDevices.ComputeKey(adapter.AdapterName, device.Id);
+                    this._dynamicDevices.RegisterDiscoveredDevice(key, builder.BuildAdapter());
                 }
             }
         }

@@ -9,6 +9,8 @@ namespace Neeo.Sdk.Rest;
 
 public interface IDynamicDeviceRegistry
 {
+    string ComputeKey(string rootAdapterName, string deviceId);
+
     ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId);
 
     void RegisterDiscoveredDevice(string deviceId, IDeviceAdapter adapter);
@@ -22,9 +24,11 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 
     public DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) => this._logger = logger;
 
+    string IDynamicDeviceRegistry.ComputeKey(string rootAdapterName, string deviceId) => DynamicDeviceRegistry.ComputeKey(rootAdapterName, deviceId);
+
     public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter adapter, string deviceId)
     {
-        string key = $"{adapter.AdapterName}|{deviceId}";
+        string key = DynamicDeviceRegistry.ComputeKey(adapter.AdapterName, deviceId);
         try
         {
             this._lock.EnterReadLock();
@@ -37,8 +41,8 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         {
             this._lock.ExitReadLock();
         }
-        if (adapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature && 
-            await feature.DiscoverAsync(deviceId).ConfigureAwait(false) is { Length: 1 } devices && 
+        if (adapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature &&
+            await feature.DiscoverAsync(deviceId).ConfigureAwait(false) is { Length: 1 } devices &&
             devices[0].DeviceBuilder is { } builder)
         {
             this.RegisterDiscoveredDevice(key, adapter = builder.BuildAdapter());
@@ -62,4 +66,6 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         }
         this._logger.LogInformation("Added device, currently registered {count} dynamic device(s).", count);
     }
+
+    private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
 }
