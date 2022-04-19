@@ -1,11 +1,10 @@
-﻿using System;
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Devices.Setup;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -26,8 +25,7 @@ internal partial class DeviceController
             {
                 if (device.DeviceBuilder is { } builder)
                 {
-                    string key = this._dynamicDevices.ComputeKey(adapter.AdapterName, device.Id);
-                    this._dynamicDevices.RegisterDiscoveredDevice(key, builder.BuildAdapter());
+                    this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, builder);
                 }
             }
         }

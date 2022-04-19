@@ -9,11 +9,9 @@ namespace Neeo.Sdk.Rest;
 
 public interface IDynamicDeviceRegistry
 {
-    string ComputeKey(string rootAdapterName, string deviceId);
-
     ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId);
 
-    void RegisterDiscoveredDevice(string deviceId, IDeviceAdapter adapter);
+    void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder);
 }
 
 internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
@@ -24,11 +22,9 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 
     public DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) => this._logger = logger;
 
-    string IDynamicDeviceRegistry.ComputeKey(string rootAdapterName, string deviceId) => DynamicDeviceRegistry.ComputeKey(rootAdapterName, deviceId);
-
-    public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter adapter, string deviceId)
+    public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId)
     {
-        string key = DynamicDeviceRegistry.ComputeKey(adapter.AdapterName, deviceId);
+        string key = DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId);
         try
         {
             this._lock.EnterReadLock();
@@ -41,17 +37,24 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         {
             this._lock.ExitReadLock();
         }
-        if (adapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature &&
+        if (rootAdapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature &&
             await feature.DiscoverAsync(deviceId).ConfigureAwait(false) is { Length: 1 } devices &&
             devices[0].DeviceBuilder is { } builder)
         {
-            this.RegisterDiscoveredDevice(key, adapter = builder.BuildAdapter());
-            return adapter;
+            this.RegisterDiscoveredDevice(key, rootAdapter = builder.BuildAdapter());
+            return rootAdapter;
         }
         return default;
     }
 
-    public void RegisterDiscoveredDevice(string key, IDeviceAdapter adapter)
+    public void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder)
+    {
+        this.RegisterDiscoveredDevice(DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId), builder.BuildAdapter());
+    }
+
+    private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
+
+    private void RegisterDiscoveredDevice(string key, IDeviceAdapter adapter)
     {
         int count;
         try
@@ -66,6 +69,4 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         }
         this._logger.LogInformation("Added device, currently registered {count} dynamic device(s).", count);
     }
-
-    private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
 }
