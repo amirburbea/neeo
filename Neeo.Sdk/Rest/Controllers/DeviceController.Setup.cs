@@ -2,11 +2,13 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Devices.Setup;
 using Org.BouncyCastle.Bcpg;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 
@@ -14,6 +16,28 @@ namespace Neeo.Sdk.Rest.Controllers;
 
 internal partial class DeviceController
 {
+    [HttpGet("{adapterName}/discover")]
+    public async Task<ActionResult<DiscoveredDevice[]>> DiscoverAsync(string adapterName, CancellationToken cancellationToken = default)
+    {
+        if (await this._database.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
+        {
+            return this.NotFound();
+        }
+        this._logger.LogInformation("Beginning discovery for {adapter}.", adapter.AdapterName);
+        DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken: cancellationToken);
+        if (feature.EnableDynamicDeviceBuilder)
+        {
+            foreach (DiscoveredDevice device in devices)
+            {
+                if (device.DeviceBuilder is { } builder)
+                {
+                    this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, builder);
+                }
+            }
+        }
+        return devices;
+    }
+
     [HttpGet("{adapterName}/registered")]
     public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync(string adapterName)
     {
@@ -34,9 +58,11 @@ internal partial class DeviceController
         }
         this._logger.LogInformation("Registering {adapter}...", adapterName);
         using Stream stream = this.DeserializeEncrypted(payload.Data);
-        return await feature.RegisterAsync(stream) is not { Error: { } error }
-            ? this.Ok()
-            : this.StatusCode((int)HttpStatusCode.InternalServerError, error);
+        if (await feature.RegisterAsync(stream) is { Error: { } error })
+        {
+            return this.StatusCode((int)HttpStatusCode.InternalServerError, new[] { error });
+        }
+        return this.Ok();
     }
 
     private Stream DeserializeEncrypted(string armoredText)

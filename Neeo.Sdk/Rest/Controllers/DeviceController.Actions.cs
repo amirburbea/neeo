@@ -44,7 +44,7 @@ internal partial class DeviceController
     }
 
     [HttpPost("{adapterName}/{componentName}/{deviceId}/action")]
-    public async Task<ActionResult<SuccessResponse>> PerformActionAsync(string adapterName, string componentName, string deviceId, [FromBody] ActionData action)
+    public async Task<ActionResult<SuccessResponse>> PerformActionAsync(string adapterName, string componentName, string deviceId, [FromBody] DirectoryAction action)
     {
         if (await this.TryResolveAsync(adapterName, componentName, deviceId) is not ({ } adapter, IDirectoryFeature directoryFeature))
         {
@@ -87,7 +87,7 @@ internal partial class DeviceController
             : default;
     }
 
-    public record struct ActionData(string ActionIdentifier);
+    public record struct DirectoryAction(string ActionIdentifier);
 
     private record struct FavoriteData(string FavoriteId);
 }

@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -14,6 +16,12 @@ public interface IDynamicDeviceRegistry
 {
     ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId);
 
+    /// <summary>
+    /// Adds a dynamically discovered device to the registry.
+    /// </summary>
+    /// <param name="rootAdapter">The root device adapter.</param>
+    /// <param name="deviceId">The identifier for the created device.</param>
+    /// <param name="builder">The dynamic device builder.</param>
     void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder);
 }
 
@@ -31,7 +39,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         try
         {
             this._lock.EnterReadLock();
-            if (this._discoveredDevices.TryGetValue(key, out IDeviceAdapter? discoveredDevice))
+            if (this._discoveredDevices.GetValueOrDefault(key) is { } discoveredDevice)
             {
                 return discoveredDevice;
             }
@@ -40,14 +48,15 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         {
             this._lock.ExitReadLock();
         }
-        if (rootAdapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature &&
-            await feature.DiscoverAsync(deviceId).ConfigureAwait(false) is { Length: 1 } devices &&
-            devices[0].DeviceBuilder is { } builder)
+        if (rootAdapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature ||
+            await feature.DiscoverAsync(deviceId).ConfigureAwait(false) is not { Length: 1 } devices ||
+            devices[0].DeviceBuilder is not { } builder)
         {
-            this.RegisterDiscoveredDevice(key, rootAdapter = builder.BuildAdapter());
-            return rootAdapter;
+            return default;
         }
-        return default;
+        IDeviceAdapter adapter = builder.BuildAdapter();
+        this.RegisterDiscoveredDevice(key, adapter);
+        return adapter;
     }
 
     public void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder) => this.RegisterDiscoveredDevice(
@@ -57,13 +66,17 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 
     private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
 
-    private void RegisterDiscoveredDevice(string key, IDeviceAdapter adapter)
+    private void RegisterDiscoveredDevice(string key, IDeviceAdapter device)
     {
+        if (!device.DeviceCapabilities.Contains(DeviceCapability.DynamicDevice))
+        {
+            throw new ArgumentException("Dynamically defined devices must have DeviceCharacteristic.DynamicDevice", nameof(device));
+        }
         int count;
         try
         {
             this._lock.EnterWriteLock();
-            this._discoveredDevices.Add(key, adapter);
+            this._discoveredDevices.Add(key, device);
             count = this._discoveredDevices.Count;
         }
         finally

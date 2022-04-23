@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -76,7 +75,7 @@ internal static class Server
         .AddSingleton<INotificationMapping, NotificationMapping>()
         .AddSingleton<INotificationService, NotificationService>()
         .AddSingleton<ISdkEnvironment, SdkEnvironment>()
-        .AddSingleton(serviceProvider => Server.CreatePublicKeyResponse(serviceProvider.GetRequiredService<PgpKeyPair>()))
+        .AddSingleton<PgpPublicKeyResponse>()
         .AddHostedService<SdkRegistration>()
         .AddHostedService<SubscriptionsNotifier>()
         .AddHostedService<UriPrefixNotifier>();
@@ -119,19 +118,6 @@ internal static class Server
         AsymmetricCipherKeyPair pair = generator.GenerateKeyPair();
         PgpSecretKey secretKey = new(PgpSignature.DefaultCertification, PublicKeyAlgorithmTag.RsaGeneral, pair.Public, pair.Private, DateTime.Now, Dns.GetHostName(), SymmetricKeyAlgorithmTag.Aes256, passphrase, null, null, random);
         return new(secretKey.PublicKey, secretKey.ExtractPrivateKey(passphrase));
-    }
-
-    private static PublicKeyResponse CreatePublicKeyResponse(PgpKeyPair pgpKeys)
-    {
-        using MemoryStream outputStream = new();
-        using (ArmoredOutputStream armoredStream = new(outputStream))
-        {
-            armoredStream.SetHeader(ArmoredOutputStream.HeaderVersion, default);
-            pgpKeys.PublicKey.Encode(armoredStream);
-        }
-        outputStream.Seek(0L, SeekOrigin.Begin);
-        using StreamReader reader = new(outputStream);
-        return new PublicKeyResponse(reader.ReadToEnd());
     }
 
     private static class Constants

@@ -41,12 +41,13 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
-        if (await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false) is { Length: > 0 } results)
+        if (await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } results)
         {
-            // Validate results first.
-            this.Validate(results);
+            return Array.Empty<DiscoveredDevice>();
         }
-        return Array.Empty<DiscoveredDevice>();
+        // Validate results first.
+        this.Validate(results);
+        return results;
     }
 
     private void Validate(DiscoveredDevice[] results)
