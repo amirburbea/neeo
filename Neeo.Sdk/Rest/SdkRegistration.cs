@@ -21,19 +21,16 @@ internal sealed class SdkRegistration : IHostedService
         (this._brain, this._client, this._environment, this._logger) = (brain, client, environment, logger);
     }
 
-    private string BaseUrl => this._environment.HostAddress;
-
-    private string Name => this._environment.SdkAdapterName;
-
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         try
         {
-            if (!await this.PostAsync(UrlPaths.RegisterServer, new { this.Name, this.BaseUrl }, cancellationToken).ConfigureAwait(false))
+            (string name, string baseUrl) = this._environment;
+            if (!await this.PostAsync(UrlPaths.RegisterServer, new { name, baseUrl }, cancellationToken).ConfigureAwait(false))
             {
                 throw new ApplicationException("Registration rejected.");
             }
-            this._logger.LogInformation("Server {name} registered on {brain} ({brainAddress}).", this.Name, this._brain.HostName, this._brain.IPAddress);
+            this._logger.LogInformation("Server {name} registered on {brain} ({brainAddress}).", name, this._brain.HostName, this._brain.IPAddress);
         }
         catch (Exception e)
         {
@@ -46,7 +43,7 @@ internal sealed class SdkRegistration : IHostedService
     {
         try
         {
-            if (await this.PostAsync(UrlPaths.UnregisterServer, new { this.Name }, cancellationToken).ConfigureAwait(false))
+            if (await this.PostAsync(UrlPaths.UnregisterServer, new { name = this._environment.SdkAdapterName }, cancellationToken).ConfigureAwait(false))
             {
                 this._logger.LogInformation("Server unregistered from {brain}.", this._brain.HostName);
             }

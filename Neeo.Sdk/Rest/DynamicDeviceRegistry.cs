@@ -7,6 +7,9 @@ using Neeo.Sdk.Devices.Features;
 
 namespace Neeo.Sdk.Rest;
 
+/// <summary>
+/// Describes a class responsible for maintaining a registry of discovered dynamic devices.
+/// </summary>
 public interface IDynamicDeviceRegistry
 {
     ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId);
@@ -47,10 +50,10 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         return default;
     }
 
-    public void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder)
-    {
-        this.RegisterDiscoveredDevice(DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId), builder.BuildAdapter());
-    }
+    public void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder) => this.RegisterDiscoveredDevice(
+        DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId),
+        builder.BuildAdapter()
+    );
 
     private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
 

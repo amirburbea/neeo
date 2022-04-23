@@ -1,7 +1,7 @@
 ﻿namespace Neeo.Sdk.Devices.Features;
 
 /// <summary>
-/// Interface for device feature support.
+/// Describes a device feature.
 /// </summary>
 public interface IFeature
 {
