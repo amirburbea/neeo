@@ -10,7 +10,7 @@ namespace Neeo.Sdk.Utilities.TokenSearch;
 /// A class to search a collection of items by tokens and return ranked results.
 /// Based on <a href="https://github.com/neophob/tokensearch.js">tokensearch.js</a>.
 /// </summary>
-/// <typeparam name="T">The type </typeparam>
+/// <typeparam name="T">The type of items being searched</typeparam>
 internal sealed class TokenSearch<T>
     where T : notnull, IComparable<T>
 {

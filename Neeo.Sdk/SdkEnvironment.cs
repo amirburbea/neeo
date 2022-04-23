@@ -19,6 +19,9 @@ public interface ISdkEnvironment
     /// </summary>
     string SdkAdapterName { get; }
 
+    /// <summary>
+    /// Deconstructs this instance.
+    /// </summary>
     void Deconstruct(out string sdkAdapterName, out string hostAddress) => (sdkAdapterName, hostAddress) = (this.SdkAdapterName, this.HostAddress);
 }
 

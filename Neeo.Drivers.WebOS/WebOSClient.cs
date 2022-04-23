@@ -48,7 +48,7 @@ public sealed class WebOSClient : IDisposable
                 this._cancellationTokenSource = cts;
                 this._webSocket = webSocket;
                 _ = Task.Factory.StartNew(this.MessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-                await this.OnConnected().ConfigureAwait(false);
+                this.OnConnected();
                 return true;
             }
             catch (WebSocketException)
@@ -78,7 +78,7 @@ public sealed class WebOSClient : IDisposable
         source?.Cancel();
     }
 
-    private async Task OnConnected()
+    private void OnConnected()
     {
         this.Connected?.Invoke(this, EventArgs.Empty);
     }
