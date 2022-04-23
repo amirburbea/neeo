@@ -5,6 +5,10 @@ using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Rest;
 
+/// <summary>
+/// Notifies adapters supporting device routes of their associated URI prefix.
+/// Requests beginning with such a prefix will be passed to the route handler to be processed.
+/// </summary>
 internal sealed class UriPrefixNotifier : IHostedService
 {
     private readonly IDeviceDatabase _database;
@@ -17,7 +21,7 @@ internal sealed class UriPrefixNotifier : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        Parallel.ForEach(this._database.Adapters, adapter =>
+        Parallel.ForEach(this._database.Adapters, new() { CancellationToken = cancellationToken }, adapter =>
         {
             if (adapter.UriPrefixCallback is { } callback)
             {

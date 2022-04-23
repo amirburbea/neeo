@@ -299,8 +299,6 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
             return;
         }
         string deviceId = tv.MacAddress.ToString();
-        Parallel.ForEach(new[] { Task.CompletedTask }, task => task.Wait());
-
         await Task.WhenAll(
             notifier.SendNotificationAsync("VOLUME", (double)e.Data, deviceId),
             notifier.SendNotificationAsync("VOLUME-LABEL", e.Data.ToString(), deviceId)

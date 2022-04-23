@@ -29,14 +29,14 @@ public interface IDeviceDatabase
     ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName);
 
     /// <summary>
-    /// Gets the associated device model for an adapter with the specified <paramref name="adapterName"/>, or <see langword="null"/> if not found.
+    /// Gets the associated model for an adapter with the specified <paramref name="adapterName"/>, or <see langword="null"/> if not found.
     /// </summary>
     /// <param name="adapterName">The name of the device adapter.</param>
     /// <returns>The device model if it exists, <see langword="null"/> otherwise.</returns>
     DeviceAdapterModel? GetDeviceByAdapterName(string adapterName);
 
     /// <summary>
-    /// Gets the device model with the specified <paramref name="id"/>.
+    /// Gets the device adapter model with the specified <paramref name="id"/>.
     /// </summary>
     /// <param name="id">The device identifier.</param>
     /// <returns>The device model if it exists, <see langword="null"/> otherwise.</returns>
