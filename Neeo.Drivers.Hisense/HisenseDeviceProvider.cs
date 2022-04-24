@@ -305,7 +305,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         );
     }
 
-    private record struct DeviceTuple(IPAddress IPAddress, PhysicalAddress MacAddress);
+    private readonly record struct DeviceTuple(IPAddress IPAddress, PhysicalAddress MacAddress);
 
     private static class Constants
     {

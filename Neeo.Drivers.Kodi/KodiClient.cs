@@ -504,22 +504,22 @@ public sealed class KodiClient : IDisposable
         }
     }
 
-    private record struct AlbumListResult(Limits Limits, AlbumInfo[] Albums);
+    private readonly record struct AlbumListResult(Limits Limits, AlbumInfo[] Albums);
 
-    private record struct EpisodeListResult(Limits Limits, EpisodeInfo[] Episodes);
+    private readonly record struct EpisodeListResult(Limits Limits, EpisodeInfo[] Episodes);
 
-    private record struct ItemInfo(
+    private readonly record struct ItemInfo(
         string? File,
         int Id,
         ItemType Type
     );
 
-    private record struct JsonRpcError(
+    private readonly record struct JsonRpcError(
         int Code,
         string Message
     );
 
-    private record struct JsonRpcRequest(string Method, [property: JsonPropertyName("params")] object? Parameters)
+    private readonly record struct JsonRpcRequest(string Method, [property: JsonPropertyName("params")] object? Parameters)
     {
         public string Id { get; } = Guid.NewGuid().ToString();
 
@@ -527,7 +527,7 @@ public sealed class KodiClient : IDisposable
         public string JsonRpcVersion { get; } = "2.0";
     }
 
-    private record struct JsonRpcResponse(
+    private readonly record struct JsonRpcResponse(
         JsonRpcError? Error = default,
         string? Id = default,
         string? Method = default,
@@ -535,18 +535,18 @@ public sealed class KodiClient : IDisposable
         JsonElement? Result = default
     );
 
-    private record struct Limits(int Start, int End, int Total);
+    private readonly record struct Limits(int Start, int End, int Total);
 
-    private record struct MoviesListResult(Limits Limits, VideoInfo[] Movies);
+    private readonly record struct MoviesListResult(Limits Limits, VideoInfo[] Movies);
 
-    private record struct Notification(
+    private readonly record struct Notification(
         string Title,
         string Message,
         string? Image,
         [property: JsonPropertyName("displaytime")] int DisplayTime
     );
 
-    private record struct PictureInfo(
+    private readonly record struct PictureInfo(
         string Label,
         string Thumbnail
     )
@@ -554,44 +554,44 @@ public sealed class KodiClient : IDisposable
         public static readonly string[] Fields = new[] { "thumbnail", "title" };
     }
 
-    private record struct PlayerInfo(
+    private readonly record struct PlayerInfo(
         [property: JsonPropertyName("playerid")] int Id,
         int? Speed = default,
         PlayerType? Type = default
     );
 
-    private record struct PlayParameters(
+    private readonly record struct PlayParameters(
         ItemInfo Item,
         PlayerInfo Player
     );
 
-    private record struct ResponseParameters(
+    private readonly record struct ResponseParameters(
         JsonElement Data,
         string Sender
     );
 
-    private record struct SeekResult(
+    private readonly record struct SeekResult(
         double Percentage,
         Time Time,
         Time TotalTime
     );
 
-    private record struct SortOrder(
+    private readonly record struct SortOrder(
         string Method,
         string Order = "ascending",
         [property: JsonPropertyName("ignorearticle")] bool IgnoreArticle = true
     );
 
-    private record struct Time(
+    private readonly record struct Time(
         int Hours,
         int Minutes,
         int Seconds,
         int Milliseconds
     );
 
-    private record struct TVShowsListResult(Limits Limits, [property: JsonPropertyName("tvshows")] TVShowInfo[] TVShows);
+    private readonly record struct TVShowsListResult(Limits Limits, [property: JsonPropertyName("tvshows")] TVShowInfo[] TVShows);
 
-    private record struct VolumeInfo(
+    private readonly record struct VolumeInfo(
         int Volume,
         bool Muted = false
     );

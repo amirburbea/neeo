@@ -6,4 +6,4 @@
 /// <param name="DeviceId">The unique identifier of the device.</param>
 /// <param name="Component">The component where the value has changed.</param>
 /// <param name="Value">The updated value.</param>
-public record struct Notification(string DeviceId, string Component, object Value);
+public readonly record struct Notification(string DeviceId, string Component, object Value);

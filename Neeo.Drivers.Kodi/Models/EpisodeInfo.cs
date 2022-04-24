@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Neeo.Drivers.Kodi.Models;
 
-public record struct EpisodeInfo(
+public readonly record struct EpisodeInfo(
     JsonElement Art,
     int? Episode,
     int? Season,

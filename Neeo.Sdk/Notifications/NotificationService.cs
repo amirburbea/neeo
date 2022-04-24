@@ -140,7 +140,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         public const int MaxConcurrency = 20;
     }
 
-    private record struct Message(string Type, object Data);
+    private readonly record struct Message(string Type, object Data);
 
     private sealed record class SensorData(string SensorEventKey, object SensorValue);
 }

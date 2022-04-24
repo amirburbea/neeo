@@ -3,4 +3,4 @@ using System.Text.Json.Serialization;
 
 namespace Neeo.Drivers.Hisense;
 
-public record struct AppInfo(String Name, String Url,[property:JsonPropertyName("isunInstalled")] bool IsUninstalled);
+public readonly record struct AppInfo(String Name, String Url,[property:JsonPropertyName("isunInstalled")] bool IsUninstalled);

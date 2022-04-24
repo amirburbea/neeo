@@ -3,7 +3,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi.Models;
 
-public record struct Filter(
+public readonly record struct Filter(
     string Field,
     string Value,
     FilterOperator Operator = FilterOperator.Is

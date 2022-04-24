@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Neeo.Drivers.Kodi.Models;
 
-public record struct VideoInfo(
+public readonly record struct VideoInfo(
     JsonElement Art,
     [property: JsonPropertyName("genre")] string[]? Genres,
     string? Thumbnail,

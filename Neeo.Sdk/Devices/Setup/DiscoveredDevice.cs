@@ -13,7 +13,7 @@ namespace Neeo.Sdk.Devices.Setup;
 /// When `enableDynamicDeviceBuilder` was configured via a call to <see cref="IDeviceBuilder.EnableDiscovery" />,
 /// represents the individual dynamic device (which needn't be similar to the discovering adapter).
 /// </param>
-public record struct DiscoveredDevice(
+public readonly record struct DiscoveredDevice(
     string Id,
     string Name,
     bool? Reachable = default,

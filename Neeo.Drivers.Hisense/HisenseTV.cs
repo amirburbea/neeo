@@ -515,16 +515,16 @@ public sealed class HisenseTV : IDisposable
         }
     }
 
-    private record struct State(StateType Type) : IState;
+    private readonly record struct State(StateType Type) : IState;
 
-    private record struct SuccessPayload(int Result);
+    private readonly record struct SuccessPayload(int Result);
 
-    private record struct VolumeData(
+    private readonly record struct VolumeData(
         [property: JsonPropertyName("volume_type")] int Type,
         [property: JsonPropertyName("volume_value")] int Value
     );
 
-    private record struct StateData(
+    private readonly record struct StateData(
         [property: JsonPropertyName("statetype")] string Type,
         string? Name = default,
         string? Url = default

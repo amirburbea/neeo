@@ -60,7 +60,7 @@ internal sealed class NotificationMapping : INotificationMapping
         cancellationToken
     );
 
-    private record struct Entry(string Name, string EventKey, string? Label);
+    private readonly record struct Entry(string Name, string EventKey, string? Label);
 
     private sealed record EntryCache(Entry[] Entries)
     {

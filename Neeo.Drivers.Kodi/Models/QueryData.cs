@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Drivers.Kodi.Models;
 
-public record struct QueryData<TData>(int Total, TData[] Data);
+public readonly record struct QueryData<TData>(int Total, TData[] Data);
 
 internal static class QueryData
 {

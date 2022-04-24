@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Neeo.Drivers.Kodi.Models;
 
-public record struct SongInfo(
+public readonly record struct SongInfo(
     string? Album,
     [property: JsonPropertyName("artist")] string[] Artists,
     int Id,

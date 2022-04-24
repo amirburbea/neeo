@@ -101,7 +101,7 @@ public interface IDeviceAdapter
     IFeature? GetFeature(ComponentType type) => this.GetFeature(TextAttribute.GetText(type));
 }
 
-internal record struct DeviceAdapter(
+internal readonly record struct DeviceAdapter(
     string AdapterName,
     IReadOnlyCollection<IComponent> Components,
     IReadOnlyDictionary<string, IFeature> Features,

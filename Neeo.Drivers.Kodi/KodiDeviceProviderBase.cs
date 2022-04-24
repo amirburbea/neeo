@@ -607,5 +607,5 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         public const string HttpServiceName = "_xbmc-jsonrpc-h._tcp.local.";
     }
 
-    private record struct Identifier(string Key, int Value, string Suffix);
+    private readonly record struct Identifier(string Key, int Value, string Suffix);
 }

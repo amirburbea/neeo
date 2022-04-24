@@ -1161,7 +1161,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private sealed record ButtonParameters(string Name, string? Label) : ParametersBase(Name, Label);
 
-    private record struct Credentials([property: JsonPropertyName("username")] string UserName, string Password);
+    private readonly record struct Credentials([property: JsonPropertyName("username")] string UserName, string Password);
 
     private static class DeviceBuilderConstants
     {
@@ -1177,7 +1177,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private sealed record RangeSensorParameters(string Name, string? Label, ValueFeature Feature, IReadOnlyCollection<double> Range, string Unit) : SensorParameters(SensorType.Range, Name, Label, Feature);
 
-    private record struct SecurityCodeContainer(string SecurityCode);
+    private readonly record struct SecurityCodeContainer(string SecurityCode);
 
     private record SensorParameters(SensorType Type, string Name, string? Label, ValueFeature ValueFeature) : ParametersBase(Name, Label);
 

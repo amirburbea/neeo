@@ -58,11 +58,15 @@ internal partial class DeviceController
         }
         this._logger.LogInformation("Registering {adapter}...", adapterName);
         using Stream stream = this.DeserializeEncrypted(payload.Data);
-        if (await feature.RegisterAsync(stream) is { Error: { } error })
+        if (await feature.RegisterAsync(stream) is not { Error: { } error })
         {
-            return this.StatusCode((int)HttpStatusCode.InternalServerError, new[] { error });
+            return this.Ok();
         }
-        return this.Ok();
+        return new ObjectResult(error)
+        { 
+            StatusCode = (int)HttpStatusCode.Forbidden,
+            ContentTypes = { "text/plain" }
+        };
     }
 
     private Stream DeserializeEncrypted(string armoredText)
@@ -85,7 +89,7 @@ internal partial class DeviceController
         return literal.GetInputStream();
     }
 
-    public record struct CredentialsPayload(string Data);
+    public readonly record struct CredentialsPayload(string Data);
 
-    public record struct IsRegisteredResponse(bool Registered);
+    public readonly record struct IsRegisteredResponse(bool Registered);
 }

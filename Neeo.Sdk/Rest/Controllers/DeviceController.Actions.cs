@@ -87,7 +87,7 @@ internal partial class DeviceController
             : default;
     }
 
-    public record struct DirectoryAction(string ActionIdentifier);
+    public readonly record struct DirectoryAction(string ActionIdentifier);
 
-    private record struct FavoriteData(string FavoriteId);
+    private readonly record struct FavoriteData(string FavoriteId);
 }
