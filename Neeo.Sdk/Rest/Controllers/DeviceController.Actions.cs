@@ -67,24 +67,22 @@ internal partial class DeviceController
 
     private async ValueTask<(IDeviceAdapter, IFeature)> TryResolveAsync(string adapterName, string componentName, string deviceId)
     {
-        if (await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false) is not { } adapter)
+        if (await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false) is { } adapter)
         {
-            return default;
+            if (adapter.GetFeature(componentName) is { } feature)
+            {
+                // Static device component.
+                return (adapter, feature);
+            }
+            // Check for a discovered device with `EnableDynamicDeviceBuilder` and that the dynamic device has a component with that name.
+            if (adapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } &&
+                await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.HttpContext.RequestAborted).ConfigureAwait(false) is { } dynamicDeviceAdapter &&
+                (feature = dynamicDeviceAdapter.GetFeature(componentName)) is not null)
+            {
+                return (dynamicDeviceAdapter, feature);
+            }
         }
-        if (adapter.GetFeature(componentName) is { } feature)
-        {
-            // Static device component.
-            return (adapter, feature);
-        }
-        // Check for a discovered device with `EnableDynamicDeviceBuilder`.
-        if (await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.HttpContext.RequestAborted).ConfigureAwait(false) is not { } dynamicDeviceAdapter)
-        {
-            return default;
-        }
-        // Check that the dynamic device has the feature.
-        return dynamicDeviceAdapter.GetFeature(componentName) is { } dynamicDeviceFeature
-            ? (dynamicDeviceAdapter, dynamicDeviceFeature)
-            : default;
+        return default;
     }
 
     public readonly record struct DirectoryAction(string ActionIdentifier);

@@ -2,7 +2,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -35,7 +34,7 @@ public static class JsonSerialization
     internal static OkObjectResult Ok<TValue>([ActionResultObjectValue] TValue value) => new(value)
     {
         DeclaredType = typeof(TValue),
-        Formatters = { JsonOutputFormatter.Instance }
+        Formatters = { JsonOutputFormatter<TValue>.Instance }
     };
 
     /// <summary>
@@ -43,9 +42,9 @@ public static class JsonSerialization
     /// This instead ensures objects are serialized directly as the intended response type - useful when explicit properties
     /// are used or JSON property attributes are applied on an interface as opposed to the implemented type.
     /// </summary>
-    private sealed class JsonOutputFormatter : IOutputFormatter
+    private sealed class JsonOutputFormatter<TValue> : IOutputFormatter
     {
-        public static readonly JsonOutputFormatter Instance = new();
+        public static readonly JsonOutputFormatter<TValue> Instance = new();
 
         private JsonOutputFormatter()
         {
@@ -55,19 +54,12 @@ public static class JsonSerialization
 
         public async Task WriteAsync(OutputFormatterWriteContext context)
         {
-            HttpContext httpContext = context.HttpContext;
             try
             {
-                await JsonSerializer.SerializeAsync(
-                    httpContext.Response.Body,
-                    context.Object,
-                    context.ObjectType ?? typeof(object),
-                    JsonSerialization.Options,
-                    httpContext.RequestAborted
-                ).ConfigureAwait(false);
-                await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(context.HttpContext.Response.Body, (TValue)context.Object!, JsonSerialization.Options, context.HttpContext.RequestAborted).ConfigureAwait(false);
+                await context.HttpContext.Response.Body.FlushAsync(context.HttpContext.RequestAborted).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested) { }
+            catch (OperationCanceledException) when (context.HttpContext.RequestAborted.IsCancellationRequested) { }
         }
     }
 }
