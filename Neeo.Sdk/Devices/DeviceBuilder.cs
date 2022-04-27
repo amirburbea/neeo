@@ -253,7 +253,14 @@ public interface IDeviceBuilder
 
     IDeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow = 0d, double rangeHigh = 100d, string unit = "%");
 
-    IDeviceBuilder AddSmartApplicationButton(SmartApplicationButtons button);
+    /// <summary>
+    /// Add a smart application button (or bitwise combination of buttons) to the device.
+    /// </summary>
+    /// <param name="buttons">The button (or bitwise combination of buttons) to add.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    /// <remarks>Note that adding buttons to the device requires defining a button handler via
+    /// <see cref="AddButtonHandler"/>.</remarks>
+    IDeviceBuilder AddSmartApplicationButton(SmartApplicationButtons buttons);
 
     IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
@@ -297,13 +304,13 @@ public interface IDeviceBuilder
     IDeviceBuilder EnableDeviceRoute(UriPrefixCallback uriPrefixCallback, DeviceRouteHandler routeHandler);
 
     /// <summary>
-    /// 
+    /// Instructs NEEO during setup of a device to support device discovery.
     /// </summary>
-    /// <param name="headerText"></param>
-    /// <param name="description"></param>
-    /// <param name="process"></param>
-    /// <param name="enableDynamicDeviceBuilder"></param>
-    /// <returns></returns>
+    /// <param name="headerText">The header text to display before device discovery.</param>
+    /// <param name="description">The descriptive summary text to display during device discovery.</param>
+    /// <param name="process">The process invoked by the NEEO Brain to discover devices.</param>
+    /// <param name="enableDynamicDeviceBuilder">A value indicating if devices discovered would have a different device definition.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder = false);
 
     /// <summary>

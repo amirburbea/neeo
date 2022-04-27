@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -38,7 +37,7 @@ internal partial class DeviceController
         this._logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
-            IFavoritesFeature favoritesFeature => JsonSerialization.Ok(await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<FavoriteData>().FavoriteId)),
+            IFavoritesFeature favoritesFeature => JsonSerialization.Ok(await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<Favorite>().FavoriteId)),
             IDirectoryFeature directoryFeature => JsonSerialization.Ok(await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>())),
             _ => this.NotFound(),
         };
@@ -90,5 +89,5 @@ internal partial class DeviceController
 
     public readonly record struct DirectoryAction(string ActionIdentifier);
 
-    private readonly record struct FavoriteData(string FavoriteId);
+    private readonly record struct Favorite(string FavoriteId);
 }

@@ -1,7 +1,7 @@
-﻿namespace Neeo.Sdk;
+﻿namespace Neeo.Sdk.Devices.Features;
 
 /// <summary>
-/// Simple container for a value in response to a REST request.
+/// Container for a value in response to a call to <see cref="IValueFeature.GetValueAsync" />.
 /// </summary>
 /// <param name="Value">The value to contain.</param>
 public readonly record struct ValueResponse(object Value);

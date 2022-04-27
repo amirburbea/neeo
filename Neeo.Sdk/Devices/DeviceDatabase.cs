@@ -18,7 +18,7 @@ public interface IDeviceDatabase
     /// Gets the collection of device adapters.
     /// </summary>
     /// <remarks>Note that the adapters may not have run their associated initializer.</remarks>
-    IEnumerable<IDeviceAdapter> Adapters { get; }
+    IReadOnlyCollection<IDeviceAdapter> Adapters { get; }
 
     /// <summary>
     /// Get the adapter with the specified <paramref name="adapterName"/>. If the adapter
@@ -87,7 +87,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         );
     }
 
-    IEnumerable<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values;
+    IReadOnlyCollection<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values;
 
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName)
     {

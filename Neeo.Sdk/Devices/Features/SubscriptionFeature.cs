@@ -39,11 +39,7 @@ internal sealed record class SubscriptionFeature : ISubscriptionFeature
     private readonly DeviceSubscriptionHandler _onDeviceRemoved;
     private readonly DeviceSubscriptionListHandler _deviceListInitializer;
 
-    public SubscriptionFeature(
-        DeviceSubscriptionHandler onDeviceAdded,
-        DeviceSubscriptionHandler onDeviceRemoved,
-        DeviceSubscriptionListHandler initializeDeviceList
-    )
+    public SubscriptionFeature(DeviceSubscriptionHandler onDeviceAdded, DeviceSubscriptionHandler onDeviceRemoved, DeviceSubscriptionListHandler initializeDeviceList)
     {
         this._onDeviceAdded = onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded));
         this._onDeviceRemoved = onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved));

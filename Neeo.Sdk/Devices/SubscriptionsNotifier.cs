@@ -22,13 +22,12 @@ internal sealed class SubscriptionsNotifier : IHostedService
         (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.SdkAdapterName);
     }
 
-    Task IHostedService.StartAsync(CancellationToken cancellationToken) => Parallel.ForEachAsync(
-        this._database.Adapters,
-        cancellationToken,
-        this.NotifySubscriptionsAsync
-    );
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        return Parallel.ForEachAsync(this._database.Adapters, cancellationToken, this.NotifySubscriptionsAsync);
+    }
 
-    Task IHostedService.StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     private async ValueTask NotifySubscriptionsAsync(IDeviceAdapter adapter, CancellationToken cancellationToken)
     {

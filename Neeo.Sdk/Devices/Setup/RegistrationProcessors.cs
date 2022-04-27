@@ -19,7 +19,7 @@ public delegate Task<RegistrationResult> SecurityCodeRegistrationProcessor(strin
 /// <summary>
 /// Represents the result of a registration attempt.
 /// </summary>
-public sealed class RegistrationResult
+public readonly struct RegistrationResult
 {
     /// <summary>
     /// Gets a registration result for a successful attempt.

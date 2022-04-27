@@ -37,8 +37,7 @@ public enum DeviceCapability
     BridgeDevice = DeviceCharacteristic.BridgeDevice,
 
     /// <summary>
-    /// If <see cref="DeviceSetup.EnableDynamicDeviceBuilder"/> is enabled, dynamically defined devices should
-    /// specify this characteristic.
+    /// If <see cref="DeviceSetup.EnableDynamicDeviceBuilder"/> is enabled, dynamically defined devices should specify this characteristic.
     /// </summary>
     [Text("dynamicDevice")]
     DynamicDevice = DeviceCharacteristic.DynamicDevice,

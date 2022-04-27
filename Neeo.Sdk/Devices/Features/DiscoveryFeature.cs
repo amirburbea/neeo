@@ -63,11 +63,11 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
             {
                 throw new InvalidOperationException("Names can not be null or blank.");
             }
-            if (this.EnableDynamicDeviceBuilder != (device is { }))
+            if (this.EnableDynamicDeviceBuilder == device is null)
             {
-                throw new InvalidOperationException(device != null
-                    ? "EnableDynamicDeviceBuilder was not specified but a device was supplied."
-                    : "EnableDynamicDeviceBuilder was specified but a device was not supplied."
+                throw new InvalidOperationException(device is null
+                    ? "EnableDynamicDeviceBuilder was specified but a device was not supplied."
+                    : "EnableDynamicDeviceBuilder was not specified but a device was supplied."
                 );
             }
         }

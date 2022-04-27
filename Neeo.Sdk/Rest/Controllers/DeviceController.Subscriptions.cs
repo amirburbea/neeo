@@ -28,11 +28,11 @@ internal partial class DeviceController
 
     private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, string, Task> notifyAsync, string method)
     {
-        this._logger.LogInformation("{method} {adapter}:{deviceId}.", method, adapterName, deviceId);
         if (await this._database.GetAdapterAsync(adapterName) is not { } adapter)
         {
             return this.NotFound();
         }
+        this._logger.LogInformation("{method} {adapter}:{deviceId}.", method, adapter.DeviceName, deviceId);
         if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
             await notifyAsync(feature, deviceId);

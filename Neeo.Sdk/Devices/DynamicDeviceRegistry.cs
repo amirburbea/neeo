@@ -4,25 +4,31 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
 
-namespace Neeo.Sdk.Rest;
+namespace Neeo.Sdk.Devices;
 
 /// <summary>
 /// Describes a class responsible for maintaining a registry of discovered dynamic devices.
 /// </summary>
 public interface IDynamicDeviceRegistry
 {
+    /// <summary>
+    /// Gets (or attemps to asynchronously discover and add) a discovered dynamic device.
+    /// </summary>
+    /// <param name="rootAdapter">The root device adapter.</param>
+    /// <param name="deviceId">The identifier for the created device.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="ValueTask"/> representing the potentially asynchronous operation.</returns>
     ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Adds a dynamically discovered device to the registry.
     /// </summary>
-    /// <param name="rootAdapter">The root device adapter.</param>
+    /// <param name="rootAdapterName">The name of the root device adapter.</param>
     /// <param name="deviceId">The identifier for the created device.</param>
     /// <param name="builder">The dynamic device builder.</param>
-    void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder);
+    void RegisterDiscoveredDevice(string rootAdapterName, string deviceId, IDeviceBuilder builder);
 }
 
 internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
@@ -59,8 +65,8 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         return adapter;
     }
 
-    public void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder) => this.RegisterDiscoveredDevice(
-        DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId),
+    public void RegisterDiscoveredDevice(string rootAdapterName, string deviceId, IDeviceBuilder builder) => this.RegisterDiscoveredDevice(
+        DynamicDeviceRegistry.ComputeKey(rootAdapterName, deviceId),
         builder.BuildAdapter()
     );
 
