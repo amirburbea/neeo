@@ -10,7 +10,7 @@ namespace Neeo.Sdk.Devices;
 /// This can be used to allow the driver to host web content (such as dynamically generated images)
 /// without requiring setting up another HTTP endpoint.
 /// </summary>
-/// <param name="httpContext">The HTTP context relating to the current request.</param>
-/// <param name="path">Gets the path substring (the substring of the true path after the URI prefix returned via a <see cref="UriPrefixCallback"/>).</param>
+/// <param name="request">The current HTTP request.</param>
+/// <param name="path">The path substring (the substring of the true path after the URI prefix returned via a <see cref="UriPrefixCallback"/>).</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task<ActionResult> DeviceRouteHandler(HttpContext httpContext, string path);
+public delegate Task<ActionResult> DeviceRouteHandler(HttpRequest request, string path);

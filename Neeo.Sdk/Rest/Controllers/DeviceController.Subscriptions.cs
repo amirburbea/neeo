@@ -15,7 +15,7 @@ internal partial class DeviceController
         adapterName,
         deviceId,
         static (feature, deviceId) => feature.NotifyDeviceAddedAsync(deviceId),
-        "added"
+        nameof(ISubscriptionFeature.NotifyDeviceAddedAsync)
     );
 
     [HttpGet("{adapterName}/unsubscribe/{deviceId}")]
@@ -23,12 +23,12 @@ internal partial class DeviceController
         adapterName,
         deviceId,
         static (feature, deviceId) => feature.NotifyDeviceRemovedAsync(deviceId),
-        "removed"
+        nameof(ISubscriptionFeature.NotifyDeviceRemovedAsync)
     );
 
-    [SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Values passed in are constants.")]
-    private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, string, Task> notifyAsync, string verb)
+    private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, string, Task> notifyAsync, string method)
     {
+        this._logger.LogInformation("{method} {adapter}:{deviceId}.", method, adapterName, deviceId);
         if (await this._database.GetAdapterAsync(adapterName) is not { } adapter)
         {
             return this.NotFound();
@@ -37,7 +37,6 @@ internal partial class DeviceController
         {
             await notifyAsync(feature, deviceId);
         }
-        this._logger.LogInformation("Device {verb} {adapter}:{deviceId}.", verb, adapter.AdapterName, deviceId);
         return this.Ok();
     }
 }

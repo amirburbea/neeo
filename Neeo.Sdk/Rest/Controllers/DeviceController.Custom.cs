@@ -14,6 +14,6 @@ internal partial class DeviceController
             return this.NotFound();
         }
         this._logger.LogInformation("Running route handler for {adapter} with \"{suffix}\"", adapter.DeviceName, suffix);
-        return await handler(this.HttpContext, suffix);
+        return await handler(this.Request, suffix);
     }
 }

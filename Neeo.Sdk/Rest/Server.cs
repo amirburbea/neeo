@@ -45,7 +45,7 @@ internal static class Server
             .ConfigureLogging(configureLogging ?? Server.ConfigureLoggingDefaults)
             .ConfigureServices(services => Server.ConfigureServices(services, brain, devices, adapterName))
             .Build();
-        await host.StartAsync(cancellationToken);
+        await host.StartAsync(cancellationToken).ConfigureAwait(false);
         return host;
     }
 
@@ -81,19 +81,19 @@ internal static class Server
         .AddHostedService<UriPrefixNotifier>();
 
     private static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPAddress hostAddress, int port) => builder
-        .ConfigureKestrel((context, options) =>
+        .ConfigureKestrel(options =>
         {
             options.AddServerHeader = false;
             options.Limits.MaxRequestBodySize = Constants.MaxRequestBodySize;
             options.Listen(hostAddress, port);
         })
-        .ConfigureServices((context, services) =>
+        .ConfigureServices(services =>
         {
             services
-                .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
-                .AddJsonOptions(options => Server.ConfigureJsonOptions(options.JsonSerializerOptions))
-                .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-                .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AssemblyControllerFeatureProvider.Instance));
+               .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
+               .AddJsonOptions(options => Server.ConfigureJsonOptions(options.JsonSerializerOptions))
+               .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+               .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AssemblyControllerFeatureProvider.Instance));
         })
         .Configure((context, builder) =>
         {

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -77,7 +78,7 @@ internal partial class DeviceController
             return (adapter, feature);
         }
         // Check for a discovered device with `EnableDynamicDeviceBuilder`.
-        if (await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId).ConfigureAwait(false) is not { } dynamicDeviceAdapter)
+        if (await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.HttpContext.RequestAborted).ConfigureAwait(false) is not { } dynamicDeviceAdapter)
         {
             return default;
         }

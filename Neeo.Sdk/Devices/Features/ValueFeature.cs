@@ -26,47 +26,41 @@ public interface IValueFeature : IFeature
     Task<SuccessResponse> SetValueAsync(string deviceId, string value);
 }
 
-internal sealed class ValueFeature : IValueFeature
+internal abstract class ValueFeature : IValueFeature
 {
-    private readonly Func<string, Task<ValueResponse>> _getter;
-    private readonly Func<string, string, Task<SuccessResponse>>? _setter;
+    public static ValueFeature<TValue> Create<TValue>(DeviceValueGetter<TValue> getter)
+        where TValue : notnull
+    {
+        return new(getter ?? throw new ArgumentNullException(nameof(getter)));
+    }
 
-    private ValueFeature(Func<string, Task<ValueResponse>> getter, Func<string, string, Task<SuccessResponse>>? setter = default)
+    public static ValueFeature<TValue> Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue> setter)
+         where TValue : notnull, IConvertible
+    {
+        return new(getter ?? throw new ArgumentNullException(nameof(getter)), setter ?? throw new ArgumentNullException(nameof(setter)));
+    }
+
+    public abstract Task<ValueResponse> GetValueAsync(string deviceId);
+
+    public abstract Task<SuccessResponse> SetValueAsync(string deviceId, string value);
+}
+
+internal sealed class ValueFeature<TValue> : ValueFeature
+    where TValue : notnull
+{
+    private readonly DeviceValueGetter<TValue> _getter;
+    private readonly DeviceValueSetter<TValue>? _setter;
+
+    public ValueFeature(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue>? setter = default)
     {
         (this._getter, this._setter) = (getter, setter);
     }
 
-    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter)
-        where TValue : notnull => new(ValueFeature.WrapGetter(getter));
+    public override async Task<ValueResponse> GetValueAsync(string deviceId) => new(await this._getter(deviceId).ConfigureAwait(false));
 
-    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue> setter)
-        where TValue : notnull, IConvertible => new(ValueFeature.WrapGetter(getter), ValueFeature.WrapSetter(setter));
-
-    public Task<ValueResponse> GetValueAsync(string deviceId) => this._getter(deviceId);
-
-    public Task<SuccessResponse> SetValueAsync(string deviceId, string value) => (this._setter ?? throw new NotSupportedException())(deviceId, value);
-
-    private static Func<string, Task<ValueResponse>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter)
-        where TValue : notnull
+    public override async Task<SuccessResponse> SetValueAsync(string deviceId, string value)
     {
-        if (getter == null)
-        {
-            throw new ArgumentNullException(nameof(getter));
-        }
-        return async deviceId => new(await getter(deviceId).ConfigureAwait(false));
-    }
-
-    private static Func<string, string, Task<SuccessResponse>> WrapSetter<TValue>(DeviceValueSetter<TValue> setter)
-        where TValue : notnull, IConvertible
-    {
-        if (setter == null)
-        {
-            throw new ArgumentNullException(nameof(setter));
-        }
-        return async (deviceId, value) =>
-        {
-            await setter(deviceId, (TValue)Convert.ChangeType(value, typeof(TValue)));
-            return true;
-        };
+        await (this._setter ?? throw new NotSupportedException())(deviceId, (TValue)Convert.ChangeType(value, typeof(TValue))).ConfigureAwait(false);
+        return true;
     }
 }

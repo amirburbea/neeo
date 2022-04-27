@@ -14,7 +14,7 @@ namespace Neeo.Sdk.Rest;
 /// </summary>
 public interface IDynamicDeviceRegistry
 {
-    ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId);
+    ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Adds a dynamically discovered device to the registry.
@@ -33,7 +33,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 
     public DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) => this._logger = logger;
 
-    public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId)
+    public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken)
     {
         string key = DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId);
         try
@@ -49,7 +49,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
             this._lock.ExitReadLock();
         }
         if (rootAdapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature ||
-            await feature.DiscoverAsync(deviceId).ConfigureAwait(false) is not { Length: 1 } devices ||
+            await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not { Length: 1 } devices ||
             devices[0].DeviceBuilder is not { } builder)
         {
             return default;

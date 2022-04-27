@@ -17,14 +17,14 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapterName}/discover")]
-    public async Task<ActionResult<DiscoveredDevice[]>> DiscoverAsync(string adapterName, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<DiscoveredDevice[]>> DiscoverAsync(string adapterName)
     {
         if (await this._database.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
             return this.NotFound();
         }
         this._logger.LogInformation("Beginning discovery for {adapter}.", adapter.AdapterName);
-        DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken: cancellationToken);
+        DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken: this.HttpContext.RequestAborted);
         if (feature.EnableDynamicDeviceBuilder)
         {
             foreach (DiscoveredDevice device in devices)
@@ -71,20 +71,20 @@ internal partial class DeviceController
 
     private Stream DeserializeEncrypted(string armoredText)
     {
-        const string invalidTextError = "Invalid input text.";
         using MemoryStream inputStream = new(Encoding.ASCII.GetBytes(armoredText));
         using ArmoredInputStream armoredInputStream = new(inputStream);
         PgpObjectFactory inputFactory = new(armoredInputStream);
         PgpObject next = inputFactory.NextPgpObject() as PgpEncryptedDataList ?? inputFactory.NextPgpObject();
+        const string invalidTextError = "Invalid input text.";
         if (next is not PgpEncryptedDataList { Count: > 0 } list || list[0] is not PgpPublicKeyEncryptedData data)
         {
-            throw new InvalidOperationException(invalidTextError);
+            throw new ArgumentException(invalidTextError, nameof(armoredText));
         }
         using Stream privateStream = data.GetDataStream(this._privateKey);
         PgpObjectFactory privateFactory = new(privateStream);
         if (privateFactory.NextPgpObject() is not PgpLiteralData literal)
         {
-            throw new InvalidOperationException(invalidTextError);
+            throw new ArgumentException(invalidTextError, nameof(armoredText));
         }
         return literal.GetInputStream();
     }

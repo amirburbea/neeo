@@ -296,6 +296,14 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder EnableDeviceRoute(UriPrefixCallback uriPrefixCallback, DeviceRouteHandler routeHandler);
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="headerText"></param>
+    /// <param name="description"></param>
+    /// <param name="process"></param>
+    /// <param name="enableDynamicDeviceBuilder"></param>
+    /// <returns></returns>
     IDeviceBuilder EnableDiscovery(string headerText, string description, DiscoveryProcess process, bool enableDynamicDeviceBuilder = false);
 
     /// <summary>
@@ -968,42 +976,26 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         static Component BuildButton(string pathPrefix, string featureName, string? label)
         {
             string name = Uri.EscapeDataString(featureName);
-            string path = pathPrefix + name;
-            return new(ComponentType.Button, name, label is { } text ? Uri.EscapeDataString(text) : name, path);
+            return new(ComponentType.Button, name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name);
         }
 
         static Component BuildComponent(string pathPrefix, ComponentType type)
         {
             string name = Uri.EscapeDataString(TextAttribute.GetText(type));
-            string path = pathPrefix + name;
-            return new(type, name, default, path);
+            return new(type, name, default, pathPrefix + name);
         }
 
         static DirectoryComponent BuildDirectory(string pathPrefix, DirectoryParameters parameters)
         {
-            (string name, string? label, DirectoryRole? role, _) = parameters;
-            string directoryName = Uri.EscapeDataString(name);
-            string path = pathPrefix + directoryName;
-            return new(
-                directoryName,
-                label is { } text ? Uri.EscapeDataString(text) : directoryName,
-                path,
-                role
-            );
+            (string directoryName, string? label, DirectoryRole? role, _) = parameters;
+            string name = Uri.EscapeDataString(directoryName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, role);
         }
 
-        static ImageUrlComponent BuildImageUrl(string pathPrefix, string name, string? label, ImageSize size, string? uri)
+        static ImageUrlComponent BuildImageUrl(string pathPrefix, string imageName, string? label, ImageSize size, string? uri)
         {
-            string imageName = Uri.EscapeDataString(name);
-            string path = pathPrefix + imageName;
-            return new(
-                imageName,
-                label is { } text ? Uri.EscapeDataString(text) : imageName,
-                path,
-                uri,
-                size,
-                GetSensorName(imageName)
-            );
+            string name = Uri.EscapeDataString(imageName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, uri, size, GetSensorName(name));
         }
 
         static SensorComponent BuildPowerSensor(string pathPrefix)
@@ -1016,32 +1008,28 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             return component with { Name = Constants.PowerSensorName, Path = pathPrefix + Constants.PowerSensorName };
         }
 
-        static TextLabelComponent BuildTextLabel(string pathPrefix, string name, string? label, bool? isLabelVisible)
+        static TextLabelComponent BuildTextLabel(string pathPrefix, string labelName, string? label, bool? isLabelVisible)
         {
-            string textLabelName = Uri.EscapeDataString(name);
-            string path = pathPrefix + textLabelName;
-            return new(textLabelName, label is { } text ? Uri.EscapeDataString(text) : textLabelName, path, isLabelVisible, GetSensorName(textLabelName));
+            string name = Uri.EscapeDataString(labelName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, isLabelVisible, GetSensorName(name));
         }
 
-        static SensorComponent BuildSensor(string pathPrefix, string name, string? label, SensorDetails sensor)
+        static SensorComponent BuildSensor(string pathPrefix, string sensorName, string? label, SensorDetails sensor)
         {
-            string sensorName = GetSensorName(Uri.EscapeDataString(name));
-            string path = pathPrefix + sensorName;
-            return new(sensorName, Uri.EscapeDataString(label ?? name), path, sensor);
+            string name = GetSensorName(Uri.EscapeDataString(sensorName));
+            return new(name, Uri.EscapeDataString(label ?? sensorName), pathPrefix + name, sensor);
         }
 
-        static SliderComponent BuildSlider(string pathPrefix, string name, string? label, IReadOnlyCollection<double> range, string unit)
+        static SliderComponent BuildSlider(string pathPrefix, string sliderName, string? label, IReadOnlyCollection<double> range, string unit)
         {
-            string sliderName = Uri.EscapeDataString(name);
-            string path = pathPrefix + sliderName;
-            return new(sliderName, label is { } text ? Uri.EscapeDataString(text) : sliderName, path, new(range, Uri.EscapeDataString(unit), GetSensorName(sliderName)));
+            string name = Uri.EscapeDataString(sliderName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, new(range, Uri.EscapeDataString(unit), GetSensorName(name)));
         }
 
-        static SwitchComponent BuildSwitch(string pathPrefix, string name, string? label)
+        static SwitchComponent BuildSwitch(string pathPrefix, string switchName, string? label)
         {
-            string switchName = Uri.EscapeDataString(name);
-            string path = pathPrefix + switchName;
-            return new(switchName, Uri.EscapeDataString(label ?? string.Empty), path, GetSensorName(switchName));
+            string name = Uri.EscapeDataString(switchName);
+            return new(name, Uri.EscapeDataString(label ?? string.Empty), pathPrefix + name, GetSensorName(name));
         }
 
         static string GetSensorName(string name) => name.EndsWith(SensorDetails.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorDetails.ComponentSuffix);
