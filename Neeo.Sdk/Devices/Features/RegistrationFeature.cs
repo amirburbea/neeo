@@ -24,10 +24,10 @@ public interface IRegistrationFeature : IFeature
     Task<IsRegisteredResponse> QueryIsRegisteredAsync();
 
     /// <summary>
-    /// Given PGP encrypted credentials, attempt to register the device.
+    /// Given PGP encrypted credentials and a private key, attempt to register the device.
     /// </summary>
-    /// <param name="credentials"></param>
-    /// <param name="privateKey"></param>
+    /// <param name="credentials">The PGP encrypted credentials.</param>
+    /// <param name="privateKey">The PGP private key.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task<RegistrationResult> RegisterAsync(string credentials, PgpPrivateKey privateKey);
 }
@@ -72,6 +72,6 @@ internal sealed class RegistrationFeature : IRegistrationFeature
                 return await this._register(credentialsStream).ConfigureAwait(false);
             }
         }
-        return RegistrationResult.Failed("Invalid credentials.");
+        return RegistrationResult.Failed("Failed to decrypt credentials.");
     }
 }

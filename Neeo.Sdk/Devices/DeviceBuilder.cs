@@ -891,7 +891,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         }
         foreach ((string name, string? label, ValueFeature valueFeature, IReadOnlyCollection<double> range, string unit) in this._sliders.Values)
         {
-            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new RangeSensorDetails(range, unit)), valueFeature);
+            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new RangeSensorDetails(range, Uri.EscapeDataString(unit))), valueFeature);
             AddComponentAndRouteHandler(BuildSlider(pathPrefix, name, label, range, unit), valueFeature);
         }
         foreach ((string name, string? label, ValueFeature valueFeature) in this._switches.Values)
@@ -918,8 +918,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             AddComponentAndRouteHandler(
                 parameters switch
                 {
+                    RangeSensorParameters rsd => BuildSensor(pathPrefix, rsd.Name, rsd.Label, new RangeSensorDetails(rsd.Range, Uri.EscapeDataString(rsd.Unit))),
                     { Type: SensorType.Power } => BuildPowerSensor(pathPrefix),
-                    RangeSensorParameters rsd => BuildSensor(pathPrefix, rsd.Name, rsd.Label, new RangeSensorDetails(rsd.Range, rsd.Unit)),
                     _ => BuildSensor(pathPrefix, parameters.Name, parameters.Label, new(parameters.Type))
                 },
                 parameters.ValueFeature
