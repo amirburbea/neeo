@@ -41,9 +41,9 @@ public interface IDeviceNotifier
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     Task SendNotificationAsync(string componentName, bool value, string deviceId = "default", CancellationToken cancellationToken = default) => this.SendNotificationAsync(
-        componentName, 
-        BooleanBoxes.GetBox(value), 
-        deviceId, 
+        componentName,
+        BooleanBoxes.GetBox(value),
+        deviceId,
         cancellationToken
     );
 

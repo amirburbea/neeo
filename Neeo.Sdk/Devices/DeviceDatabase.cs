@@ -99,13 +99,15 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         return adapter;
     }
 
-    public DeviceAdapterModel? GetDeviceByAdapterName(string name) => Array.FindIndex(this._devices, device => device.AdapterName == name) is int index and > -1
-        ? this._devices[index]
-        : default(DeviceAdapterModel?);
+    public DeviceAdapterModel? GetDeviceByAdapterName(string name)
+    {
+        return Array.FindIndex(this._devices, device => device.AdapterName == name) is int index and > -1 ? this._devices[index] : null;
+    }
 
-    public DeviceAdapterModel? GetDeviceById(int id) => id >= 0 && id < this._devices.Length
-        ? this._devices[id]
-        : default(DeviceAdapterModel?);
+    public DeviceAdapterModel? GetDeviceById(int id)
+    {
+        return id >= 0 && id < this._devices.Length ? this._devices[id] : null;
+    }
 
     public SearchEntry<DeviceAdapterModel>[] Search(string? query) => string.IsNullOrEmpty(query)
         ? Array.Empty<SearchEntry<DeviceAdapterModel>>()

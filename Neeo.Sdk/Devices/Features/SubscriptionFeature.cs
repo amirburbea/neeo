@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices.Features;
 
@@ -9,46 +8,36 @@ namespace Neeo.Sdk.Devices.Features;
 /// </summary>
 public interface ISubscriptionFeature : IFeature
 {
-    FeatureType IFeature.Type => FeatureType.Subscription;
-
     /// <summary>
     /// Asynchronously initialize the device list.
     /// </summary>
-    /// <param name="deviceIds">The device identifiers.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task InitializeDeviceListAsync(string[] deviceIds);
+    DeviceSubscriptionListHandler DeviceListInitializer { get; }
 
     /// <summary>
     /// Asynchronously notifies that a device has been added.
     /// </summary>
-    /// <param name="deviceId">The device identifier.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task NotifyDeviceAddedAsync(string deviceId);
+    DeviceSubscriptionHandler OnDeviceAdded { get; }
 
     /// <summary>
     /// Asynchronously notifies that a device has been removed.
     /// </summary>
-    /// <param name="deviceId">The device identifier.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task NotifyDeviceRemovedAsync(string deviceId);
+    DeviceSubscriptionHandler OnDeviceRemoved { get; }
+
+    FeatureType IFeature.Type => FeatureType.Subscription;
 }
 
-internal sealed record class SubscriptionFeature : ISubscriptionFeature
+internal sealed class SubscriptionFeature : ISubscriptionFeature
 {
-    private readonly DeviceSubscriptionHandler _onDeviceAdded;
-    private readonly DeviceSubscriptionHandler _onDeviceRemoved;
-    private readonly DeviceSubscriptionListHandler _deviceListInitializer;
-
     public SubscriptionFeature(DeviceSubscriptionHandler onDeviceAdded, DeviceSubscriptionHandler onDeviceRemoved, DeviceSubscriptionListHandler initializeDeviceList)
     {
-        this._onDeviceAdded = onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded));
-        this._onDeviceRemoved = onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved));
-        this._deviceListInitializer = initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList));
+        this.OnDeviceAdded = onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded));
+        this.OnDeviceRemoved = onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved));
+        this.DeviceListInitializer = initializeDeviceList ?? throw new ArgumentNullException(nameof(initializeDeviceList));
     }
 
-    public Task InitializeDeviceListAsync(string[] deviceIds) => this._deviceListInitializer(deviceIds);
+    public DeviceSubscriptionListHandler DeviceListInitializer { get; }
 
-    public Task NotifyDeviceAddedAsync(string deviceId) => this._onDeviceAdded(deviceId);
+    public DeviceSubscriptionHandler OnDeviceAdded { get; }
 
-    public Task NotifyDeviceRemovedAsync(string deviceId) => this._onDeviceRemoved(deviceId);
+    public DeviceSubscriptionHandler OnDeviceRemoved { get; }
 }

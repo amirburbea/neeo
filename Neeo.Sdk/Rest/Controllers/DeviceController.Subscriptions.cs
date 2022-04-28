@@ -14,7 +14,7 @@ internal partial class DeviceController
     public Task<ActionResult> SubscribeAsync(string adapterName, string deviceId) => this.HandleSubscriptionsAsync(
         adapterName,
         deviceId,
-        static (feature, deviceId) => feature.NotifyDeviceAddedAsync(deviceId),
+        static feature => feature.OnDeviceAdded,
         nameof(this.SubscribeAsync)
     );
 
@@ -22,20 +22,20 @@ internal partial class DeviceController
     public Task<ActionResult> UnsubscribeAsync(string adapterName, string deviceId) => this.HandleSubscriptionsAsync(
         adapterName,
         deviceId,
-        static (feature, deviceId) => feature.NotifyDeviceRemovedAsync(deviceId),
+        static feature => feature.OnDeviceRemoved,
         nameof(this.UnsubscribeAsync)
     );
 
-    private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, string, Task> notifyAsync, string method)
+    private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, DeviceSubscriptionHandler> handlerProjection, string method)
     {
         if (await this._database.GetAdapterAsync(adapterName) is not { } adapter)
         {
             return this.NotFound();
         }
         this._logger.LogInformation("{method} {adapter}:{deviceId}.", method, adapter.DeviceName, deviceId);
-        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
+        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature && handlerProjection(feature) is { } subscriptionHandler)
         {
-            await notifyAsync(feature, deviceId);
+            await subscriptionHandler(deviceId);
         }
         return this.Ok();
     }
