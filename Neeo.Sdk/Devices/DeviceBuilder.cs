@@ -6,8 +6,8 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Components;
-using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;
@@ -235,7 +235,7 @@ public interface IDeviceBuilder
     /// <summary>
     /// Defines a sensor by which NEEO can detemine if the device is powered on/off. This is useful in
     /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot;.
-    /// 
+    ///
     /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
     /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
     /// </summary>
@@ -293,7 +293,7 @@ public interface IDeviceBuilder
 
     /// <summary>
     /// Enables the device adapter to take advantage of the HTTP server set up for the Brain integration. Enabling
-    /// device routes will invoke the <paramref name="routeHandler"/> callback to handle all HTTP requests with a URI 
+    /// device routes will invoke the <paramref name="routeHandler"/> callback to handle all HTTP requests with a URI
     /// starting with a specific prefix. This prefix is supplied to the device adapter via the <paramref name="uriPrefixCallback"/>.
     /// <para/>
     /// This could be used for serving images to the remote, or when integration with the underlying device itself requires an HTTP server.
@@ -781,15 +781,15 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter) => this.AddSensor(name, SensorType.Binary, label, getter);
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter) => this.AddSensor(name, SensorType.Binary, label, ValueFeature.Create(getter));
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter) => this.AddSensor(name, SensorType.String, label, getter);
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter) => this.AddSensor(name, SensorType.String, label, ValueFeature.Create(getter));
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter) => this.AddSensor(name, SensorType.Custom, label, getter);
+    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter) => this.AddSensor(name, SensorType.Custom, label, ValueFeature.Create(getter));
 
-    private DeviceBuilder AddSensor<T>(string name, SensorType type, string? label, DeviceValueGetter<T> getter) where T : notnull => this.AddSensorParameters(
+    private DeviceBuilder AddSensor(string name, SensorType type, string? label, ValueFeature valueFeature) => this.AddSensorParameters(
         name,
-        new(type, Validator.ValidateText(name), Validator.ValidateText(label, allowNull: true), ValueFeature.Create(getter))
+        new(type, Validator.ValidateText(name), Validator.ValidateText(label, allowNull: true), valueFeature)
     );
 
     private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string unit) => this.AddSensorParameters(

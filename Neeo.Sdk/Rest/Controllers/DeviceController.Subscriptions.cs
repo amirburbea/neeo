@@ -15,7 +15,7 @@ internal partial class DeviceController
         adapterName,
         deviceId,
         static (feature, deviceId) => feature.NotifyDeviceAddedAsync(deviceId),
-        nameof(ISubscriptionFeature.NotifyDeviceAddedAsync)
+        nameof(this.SubscribeAsync)
     );
 
     [HttpGet("{adapterName}/unsubscribe/{deviceId}")]
@@ -23,7 +23,7 @@ internal partial class DeviceController
         adapterName,
         deviceId,
         static (feature, deviceId) => feature.NotifyDeviceRemovedAsync(deviceId),
-        nameof(ISubscriptionFeature.NotifyDeviceRemovedAsync)
+        nameof(this.UnsubscribeAsync)
     );
 
     private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, string, Task> notifyAsync, string method)

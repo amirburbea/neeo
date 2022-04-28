@@ -11,8 +11,8 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Kodi.Models;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
@@ -148,7 +148,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
     );
 
     protected Task<string> GetTitleAsync(string deviceId) => this.GetClientDataAsync(
-            deviceId,
+        deviceId,
         static client => client.PlayerState.NowPlayingLabel,
         string.Empty
     );
@@ -432,11 +432,11 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         switch (e.Data.PlayState)
         {
             case PlayState.Paused:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING",false, deviceId));
+                tasks.Add(notifier.SendNotificationAsync("PLAYING", false, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
                 break;
             case PlayState.Stopped or PlayState.Playing:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING",e.Data.PlayState == PlayState.Playing, deviceId));
+                tasks.Add(notifier.SendNotificationAsync("PLAYING", e.Data.PlayState == PlayState.Playing, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("TITLE_SENSOR", e.Data.NowPlayingLabel, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("COVER_ART_SENSOR", e.Data.NowPlayingImage, deviceId));

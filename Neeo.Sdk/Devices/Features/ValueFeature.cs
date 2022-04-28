@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Features;
 
@@ -26,41 +27,66 @@ public interface IValueFeature : IFeature
     Task<SuccessResponse> SetValueAsync(string deviceId, string value);
 }
 
-internal abstract class ValueFeature : IValueFeature
+internal sealed class ValueFeature : IValueFeature
 {
-    public static ValueFeature<TValue> Create<TValue>(DeviceValueGetter<TValue> getter)
-        where TValue : notnull
-    {
-        return new(getter ?? throw new ArgumentNullException(nameof(getter)));
-    }
+    private readonly Func<string, Task<ValueResponse>> _getter;
+    private readonly Func<string, string, Task<SuccessResponse>>? _setter;
 
-    public static ValueFeature<TValue> Create<TValue>(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue> setter)
-         where TValue : notnull, IConvertible
-    {
-        return new(getter ?? throw new ArgumentNullException(nameof(getter)), setter ?? throw new ArgumentNullException(nameof(setter)));
-    }
-
-    public abstract Task<ValueResponse> GetValueAsync(string deviceId);
-
-    public abstract Task<SuccessResponse> SetValueAsync(string deviceId, string value);
-}
-
-internal sealed class ValueFeature<TValue> : ValueFeature
-    where TValue : notnull
-{
-    private readonly DeviceValueGetter<TValue> _getter;
-    private readonly DeviceValueSetter<TValue>? _setter;
-
-    public ValueFeature(DeviceValueGetter<TValue> getter, DeviceValueSetter<TValue>? setter = default)
+    private ValueFeature(Func<string, Task<ValueResponse>> getter, Func<string, string, Task<SuccessResponse>>? setter = default)
     {
         (this._getter, this._setter) = (getter, setter);
     }
 
-    public override async Task<ValueResponse> GetValueAsync(string deviceId) => new(await this._getter(deviceId).ConfigureAwait(false));
+    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter)
+        where TValue : notnull => new(
+        ValueFeature.WrapGetter(getter, ObjectConverter<TValue>.Default)
+    );
 
-    public override async Task<SuccessResponse> SetValueAsync(string deviceId, string value)
+    public static ValueFeature Create(DeviceValueGetter<bool> getter) => new(
+        ValueFeature.WrapGetter(getter, BooleanBoxes.GetBox)
+    );
+
+    public static ValueFeature Create(DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter) => new(
+        ValueFeature.WrapGetter(getter, BooleanBoxes.GetBox),
+        ValueFeature.WrapSetter(setter, bool.Parse)
+    );
+
+    public static ValueFeature Create(DeviceValueGetter<double> getter, DeviceValueSetter<double> setter) => new(
+        ValueFeature.WrapGetter(getter, ObjectConverter<double>.Default),
+        ValueFeature.WrapSetter(setter, double.Parse)
+    );
+
+    public Task<ValueResponse> GetValueAsync(string deviceId) => this._getter(deviceId);
+
+    public Task<SuccessResponse> SetValueAsync(string deviceId, string value) => (this._setter ?? throw new NotSupportedException())(deviceId, value);
+
+    private static Func<string, Task<ValueResponse>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
+        where TValue : notnull
     {
-        await (this._setter ?? throw new NotSupportedException())(deviceId, (TValue)Convert.ChangeType(value, typeof(TValue))).ConfigureAwait(false);
-        return true;
+        if (getter == null)
+        {
+            throw new ArgumentNullException(nameof(getter));
+        }
+        return async deviceId => new(converter(await getter(deviceId).ConfigureAwait(false)));
+    }
+
+    private static Func<string, string, Task<SuccessResponse>> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
+        where TValue : notnull
+    {
+        if (setter == null)
+        {
+            throw new ArgumentNullException(nameof(setter));
+        }
+        return async (deviceId, value) =>
+        {
+            await setter(deviceId, converter(value));
+            return true;
+        };
+    }
+
+    private static class ObjectConverter<T>
+        where T : notnull
+    {
+        public static readonly Converter<T, object> Default = static value => value;
     }
 }
