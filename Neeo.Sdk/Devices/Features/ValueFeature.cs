@@ -29,10 +29,10 @@ public interface IValueFeature : IFeature
 
 internal sealed class ValueFeature : IValueFeature
 {
-    private readonly Func<string, Task<ValueResponse>> _getter;
-    private readonly Func<string, string, Task<SuccessResponse>>? _setter;
+    private readonly Func<string, Task<object>> _getter;
+    private readonly Func<string, string, Task>? _setter;
 
-    private ValueFeature(Func<string, Task<ValueResponse>> getter, Func<string, string, Task<SuccessResponse>>? setter = default)
+    private ValueFeature(Func<string, Task<object>> getter, Func<string, string, Task>? setter = default)
     {
         (this._getter, this._setter) = (getter, setter);
     }
@@ -56,33 +56,23 @@ internal sealed class ValueFeature : IValueFeature
         ValueFeature.WrapSetter(setter, double.Parse)
     );
 
-    public Task<ValueResponse> GetValueAsync(string deviceId) => this._getter(deviceId);
+    public async Task<ValueResponse> GetValueAsync(string deviceId) => new(await this._getter(deviceId).ConfigureAwait(false));
 
-    public Task<SuccessResponse> SetValueAsync(string deviceId, string value) => (this._setter ?? throw new NotSupportedException())(deviceId, value);
-
-    private static Func<string, Task<ValueResponse>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
-        where TValue : notnull
+    public async Task<SuccessResponse> SetValueAsync(string deviceId, string value)
     {
-        if (getter == null)
-        {
-            throw new ArgumentNullException(nameof(getter));
-        }
-        return async deviceId => new(converter(await getter(deviceId).ConfigureAwait(false)));
+        await (this._setter ?? throw new NotSupportedException())(deviceId, value).ConfigureAwait(false);
+        return true;
     }
 
-    private static Func<string, string, Task<SuccessResponse>> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
-        where TValue : notnull
-    {
-        if (setter == null)
-        {
-            throw new ArgumentNullException(nameof(setter));
-        }
-        return async (deviceId, value) =>
-        {
-            await setter(deviceId, converter(value));
-            return true;
-        };
-    }
+    private static Func<string, Task<object>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
+        where TValue : notnull => getter == null
+        ? throw new ArgumentNullException(nameof(getter))
+        : async deviceId => converter(await getter(deviceId).ConfigureAwait(false));
+
+    private static Func<string, string, Task> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
+        where TValue : notnull => setter == null
+        ? throw new ArgumentNullException(nameof(setter))
+        : (deviceId, value) => setter(deviceId, converter(value));
 
     private static class ObjectConverter<T>
         where T : notnull
