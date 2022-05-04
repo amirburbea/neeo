@@ -97,12 +97,11 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         .AddAdditionalSearchTokens(nameof(Kodi), "XBMC")
         .AddButtonHandler(this.HandleButtonAsync)
         .AddDirectory("Library", "Library", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync)
-        .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddDirectory("MovieLibrary", "Movies", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".movies")
         .AddDirectory("MusicLibrary", "Music", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".music")
         .AddDirectory("TVShowLibrary", "TV Shows", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".tvshows")
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
-        .AddSlider("VOLUMESLIDER", default, this.GetVolumeAsync, this.SetVolumeAsync)
+        .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddPowerStateSensor(this.GetIsPoweredOnAsync)
         .EnableDeviceRoute(prefix => this._uriPrefix = prefix, static (_, path) => KodiDeviceProviderBase.HandleDeviceRouteAsync(path))
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
@@ -432,11 +431,11 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         switch (e.Data.PlayState)
         {
             case PlayState.Paused:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING", false, deviceId));
+                tasks.Add(notifier.SendNotificationAsync("PLAYING_SENSOR", false, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
                 break;
             case PlayState.Stopped or PlayState.Playing:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING", e.Data.PlayState == PlayState.Playing, deviceId));
+                tasks.Add(notifier.SendNotificationAsync("PLAYING_SENSOR", e.Data.PlayState == PlayState.Playing, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("TITLE_SENSOR", e.Data.NowPlayingLabel, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("COVER_ART_SENSOR", e.Data.NowPlayingImage, deviceId));
@@ -452,11 +451,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
             return;
         }
         string deviceId = client.MacAddress.ToString();
-        await Task.WhenAll(new[]
-        {
-            notifier.SendNotificationAsync("VOLUME", e.Data, deviceId),
-            notifier.SendNotificationAsync("VOLUMESLIDER", e.Data, deviceId)
-        }).ConfigureAwait(false);
+        await notifier.SendNotificationAsync("VOLUME_SENSOR", e.Data, deviceId).ConfigureAwait(false);
     }
 
     private async void ClientManager_ClientDiscovered(object? sender, DataEventArgs<KodiClient> e)

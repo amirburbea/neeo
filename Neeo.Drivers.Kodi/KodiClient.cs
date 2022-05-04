@@ -8,7 +8,6 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -64,15 +63,7 @@ public sealed class KodiClient : IDisposable
     public bool IsMuted
     {
         get => this._isMuted;
-        private set
-        {
-            if (this._isMuted == value)
-            {
-                return;
-            }
-            this._isMuted = value;
-            this.IsMutedChanged?.Invoke(this, value);
-        }
+        private set => this.SetValue(ref this._isMuted, value, this.IsMutedChanged);
     }
 
     public PhysicalAddress MacAddress { get; private set; } = PhysicalAddress.None;
@@ -80,29 +71,13 @@ public sealed class KodiClient : IDisposable
     public PlayerState PlayerState
     {
         get => this._playerState;
-        private set
-        {
-            if (this._playerState == value)
-            {
-                return;
-            }
-            this._playerState = value;
-            this.PlayerStateChanged?.Invoke(this, value);
-        }
+        private set => this.SetValue(ref this._playerState, value, this.PlayerStateChanged);
     }
 
     public int Volume
     {
         get => this._volume;
-        private set
-        {
-            if (this._volume == value)
-            {
-                return;
-            }
-            this._volume = value;
-            this.VolumeChanged?.Invoke(this, value);
-        }
+        private set => this.SetValue(ref this._volume, value, this.VolumeChanged);
     }
 
     public Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
@@ -282,13 +257,9 @@ public sealed class KodiClient : IDisposable
                 return;
             }
             int previousLength = 0;
-            using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(8192);
-            while (webSocket.State == WebSocketState.Open && await webSocket.ReceiveAsync(buffer.Memory, cts.Token).ConfigureAwait(false) is { } result)
+            using IMemoryOwner<byte> buffer = MemoryPool<byte>.Shared.Rent(32768);
+            while (webSocket.State == WebSocketState.Open && await webSocket.ReceiveAsync(buffer.Memory, cts.Token).ConfigureAwait(false) is { MessageType: not WebSocketMessageType.Close } result)
             {
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    break;
-                }
                 if (previous.Length == 0 && result.EndOfMessage)
                 {
                     // Complete message was received.
@@ -502,6 +473,16 @@ public sealed class KodiClient : IDisposable
             }
             return transform(payload);
         }
+    }
+
+    private void SetValue<TValue>(ref TValue field, TValue value, EventHandler<DataEventArgs<TValue>>? valueChanged)
+    {
+        if (EqualityComparer<TValue>.Default.Equals(field, value))
+        {
+            return;
+        }
+        field = value;
+        valueChanged?.Invoke(this, value);
     }
 
     private readonly record struct AlbumListResult(Limits Limits, AlbumInfo[] Albums);

@@ -24,6 +24,7 @@ public sealed class KodiRemoteDeviceProvider : KodiDeviceProviderBase
         .AddButton("Scan Video Library")
         .AddButton("Scan Audio Library")
         .AddButton("TOGGLE FULLSCREEN")
+        .AddSlider("VOLUME", default, this.GetVolumeAsync, this.SetVolumeAsync)
         .AddButton(Buttons.SkipBackward | Buttons.SkipForward | Buttons.Exit | Buttons.Forward | Buttons.Previous | Buttons.PreviousTrack | Buttons.Next | Buttons.NextTrack | Buttons.Home | Buttons.Reverse | Buttons.PlayPauseToggle | Buttons.Info | Buttons.Subtitle)
         // Need an Input for TV so we just pretend there's a generic input.
         .AddButton("INPUT KODI", "Kodi");

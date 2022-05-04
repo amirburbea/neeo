@@ -60,7 +60,7 @@ public sealed class KodiClientManager : IDisposable
         async Task InitializeDiscoveryAsync()
         {
             // Use a short initial window.
-            await this.DiscoverAsync(2000).ConfigureAwait(false);
+            await this.DiscoverAsync(1000).ConfigureAwait(false);
             _ = CreateDiscoveryTimer();
         }
 
