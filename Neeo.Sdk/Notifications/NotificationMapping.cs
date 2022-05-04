@@ -75,37 +75,39 @@ internal sealed class NotificationMapping : INotificationMapping
             }
             return keys;
 
+            string[] Find(Func<Entry, string?> projection)
+            {
+                int index = Array.FindIndex(this.Entries, Match);
+                if (index == -1)
+                {
+                    return Array.Empty<string>();
+                }
+                if (index == this.Entries.Length - 1)
+                {
+                    return new[] { this.Entries[index].EventKey };
+                }
+                List<string> keys = new() { this.Entries[index++].EventKey };
+                for (; index < this.Entries.Length; index++)
+                {
+                    Entry entry = this.Entries[index];
+                    if (Match(entry))
+                    {
+                        keys.Add(entry.EventKey);
+                    }
+                }
+                return keys.Count == 1 ? new[] { keys[0] } : keys.Distinct().ToArray();
+
+                bool Match(Entry entry) => componentName == projection(entry);
+            }
+
             string[] GetKeys()
             {
-                if (this.Find(entry => entry.EventKey != null && entry.Name == componentName) is not { Length: > 0 } matches)
+                if (Find(static entry => entry.Name) is not { Length: > 0 } matches)
                 {
-                    matches = this.Find(entry => entry.EventKey != null && entry.Label == componentName);
+                    matches = Find(static entry => entry.Label);
                 }
                 return matches;
             }
-        }
-
-        private string[] Find(Predicate<Entry> predicate)
-        {
-            int index = Array.FindIndex(this.Entries, predicate);
-            if (index == -1)
-            {
-                return Array.Empty<string>();
-            }
-            if (index == this.Entries.Length - 1)
-            {
-                return new[] { this.Entries[index].EventKey };
-            }
-            HashSet<string> keys = new() { this.Entries[index++].EventKey };
-            for (; index < this.Entries.Length; index++)
-            {
-                Entry entry = this.Entries[index];
-                if (predicate(entry))
-                {
-                    keys.Add(entry.EventKey);
-                }
-            }
-            return keys.ToArray();
         }
     }
 }
