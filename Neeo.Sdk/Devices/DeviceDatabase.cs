@@ -75,7 +75,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             this._adapters.Add(adapter.AdapterName, adapter);
             if (device.NotifierCallback is { } callback)
             {
-                callback(new DeviceNotifier(this._notificationService, device.AdapterName, device.HasPowerStateSensor));
+                callback(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor));
             }
         }
         this._deviceIndex = new(
@@ -91,11 +91,10 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName)
     {
-        if (!this._adapters.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out IDeviceAdapter? adapter))
+        if (this._adapters.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out IDeviceAdapter? adapter) && adapter.Initializer is { } initializer)
         {
-            return default;
+            await this.InitializeDeviceAsync(adapter.AdapterName, initializer).ConfigureAwait(false);
         }
-        await this.InitializeDeviceAsync(adapter).ConfigureAwait(false);
         return adapter;
     }
 
@@ -113,21 +112,17 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         ? Array.Empty<SearchEntry<DeviceAdapterModel>>()
         : this._deviceIndex.Search(query).Take(OptionConstants.MaxSearchResults).ToArray();
 
-    private async ValueTask InitializeDeviceAsync(IDeviceAdapter adapter)
+    private async ValueTask InitializeDeviceAsync(string adapterName, DeviceInitializer initializer)
     {
-        if (adapter.Initializer is not { } initializer)
-        {
-            return;
-        }
-        Task? inProgressTask = default;
+        Task? inProgressTask;
         try
         {
             this._readerWriterLockSlim.EnterReadLock();
-            if (this._initializedAdapters.Contains(adapter.AdapterName))
+            if (this._initializedAdapters.Contains(adapterName))
             {
                 return;
             }
-            inProgressTask = this._initializationTasks.GetValueOrDefault(adapter.AdapterName);
+            inProgressTask = this._initializationTasks.GetValueOrDefault(adapterName);
         }
         finally
         {
@@ -138,37 +133,42 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             await inProgressTask.ConfigureAwait(false);
             return;
         }
+        bool started = false;
         try
         {
             this._readerWriterLockSlim.EnterWriteLock();
-            if (!this._initializationTasks.TryGetValue(adapter.AdapterName, out inProgressTask))
+            if (!this._initializationTasks.TryGetValue(adapterName, out inProgressTask))
             {
-                this._logger.LogInformation("Initializing device: {name}", adapter.AdapterName);
-                this._initializationTasks.TryAdd(adapter.AdapterName, inProgressTask = initializer());
+                this._logger.LogInformation("Initializing device: {name}", adapterName);
+                this._initializationTasks.TryAdd(adapterName, inProgressTask = initializer());
+                started = true;
             }
         }
         finally
         {
             this._readerWriterLockSlim.ExitWriteLock();
         }
-        bool initialized;
+        bool success;
         try
         {
             await inProgressTask.ConfigureAwait(false);
-            initialized = true;
+            success = true;
         }
         catch (Exception e)
         {
-            this._logger.LogError(e, "Initializing device failed.");
-            initialized = false;
+            if (started) // If this is not the execution chain which started the task, this thread should not log.
+            {
+                this._logger.LogError(e, "Initializing device failed.");
+            }
+            success = false;
         }
         try
         {
             this._readerWriterLockSlim.EnterWriteLock();
-            this._initializationTasks.Remove(adapter.AdapterName);
-            if (initialized)
+            this._initializationTasks.Remove(adapterName);
+            if (success)
             {
-                this._initializedAdapters.Add(adapter.AdapterName);
+                this._initializedAdapters.Add(adapterName);
             }
         }
         finally

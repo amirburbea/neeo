@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Notifications;
 
@@ -16,46 +17,46 @@ public interface INotificationMapping
     /// <summary>
     /// Given an adapter, device identifier and component name, get the associated notification keys from the NEEO Brain.
     /// </summary>
-    /// <param name="deviceAdapterName">The name of the device adapter.</param>
+    /// <param name="adapter">The device adapter.</param>
     /// <param name="deviceId">The device identifier.</param>
     /// <param name="componentName">The name of the component.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="ValueTask"/> to represent the asynchronous operation.</returns>
-    ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string deviceId, string componentName, CancellationToken cancellationToken = default);
+    ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationMapping : INotificationMapping
 {
-    private readonly ConcurrentDictionary<(string, string), EntryCache> _cache = new();
+    private readonly ConcurrentDictionary<string, EntryCache> _cache = new();
     private readonly IApiClient _client;
     private readonly ILogger<NotificationMapping> _logger;
     private readonly string _sdkAdapterName;
 
-    public NotificationMapping(ISdkEnvironment environment, IApiClient client, ILogger<NotificationMapping> logger)
+    public NotificationMapping(IApiClient client, ISdkEnvironment environment, ILogger<NotificationMapping> logger)
     {
         this._sdkAdapterName = environment.SdkAdapterName;
         this._client = client;
         this._logger = logger;
     }
 
-    public async ValueTask<string[]> GetNotificationKeysAsync(string deviceAdapterName, string deviceId, string componentName, CancellationToken cancellationToken)
+    public async ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken)
     {
-        (string, string) cacheKey = (deviceAdapterName, deviceId);
+        string cacheKey = string.Concat(adapter.AdapterName, "|", deviceId);
         if (!this._cache.TryGetValue(cacheKey, out EntryCache? entries))
         {
-            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(deviceAdapterName, deviceId, cancellationToken).ConfigureAwait(false);
+            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(adapter.AdapterName, deviceId, cancellationToken).ConfigureAwait(false);
         }
         if (entries.GetNotificationKeys(componentName) is { Length: not 0 } keys)
         {
             return keys;
         }
-        this._logger.LogWarning("Component {component} not found.", componentName); // Maybe our definition is out of date?
+        this._logger.LogWarning("Component {deviceName} {component} not found.", adapter.DeviceName, componentName); // Maybe our definition is out of date?
         this._cache.TryRemove(cacheKey, out _);
         return Array.Empty<string>();
     }
 
-    private Task<EntryCache> FetchEntriesAsync(string deviceAdapterName, string deviceId, CancellationToken cancellationToken) => this._client.GetAsync(
-        string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, deviceAdapterName, deviceId),
+    private Task<EntryCache> FetchEntriesAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this._client.GetAsync(
+        string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, adapterName, deviceId),
         static (Entry[] entries) => new EntryCache(entries),
         cancellationToken
     );

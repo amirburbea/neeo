@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using BitFaster.Caching.Lru;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Notifications;
 
@@ -15,23 +16,23 @@ public interface INotificationService
     /// <summary>
     /// Send a notification to the NEEO Brain that a change in a component value has occurred.
     /// </summary>
+    /// <param name="adapter">The adapter for the device with an updated component value.</param>
     /// <param name="notification">The notification to send to the Brain.</param>
-    /// <param name="deviceAdapterName">The adapter name of the device with an updated component value.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
     /// <remarks>
     /// This method is only used to send power notifications.
     /// </remarks>
-    Task SendNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken = default);
+    Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Send a notification to the NEEO Brain that a change in a component's associated sensor value has occurred.
     /// </summary>
+    /// <param name="adapter">The adapter for the device with an updated power state.</param>
     /// <param name="notification">The notification to send to the Brain.</param>
-    /// <param name="deviceAdapterName">The adapter name of the device with an updated component value.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
-    Task SendSensorNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken = default);
+    Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default);
 }
 
 internal sealed class NotificationService : INotificationService, IDisposable
@@ -60,14 +61,14 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._actionBlock.Complete();
     }
 
-    public Task SendNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken)
+    public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken)
     {
-        return this.SendNotificationAsync(notification, deviceAdapterName, false, cancellationToken);
+        return this.SendNotificationAsync(adapter, notification, false, cancellationToken);
     }
 
-    public Task SendSensorNotificationAsync(Notification notification, string deviceAdapterName, CancellationToken cancellationToken)
+    public Task SendSensorNotificationAsync(IDeviceAdapter adapter,Notification notification,  CancellationToken cancellationToken)
     {
-        return this.SendNotificationAsync(notification, deviceAdapterName, true, cancellationToken);
+        return this.SendNotificationAsync(adapter, notification, true, cancellationToken);
     }
 
     private static (string, object) ExtractTypeAndData(Message message)
@@ -102,7 +103,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         }
     }
 
-    private async Task SendNotificationAsync(Notification notification, string deviceAdapterName, bool isSensorNotification, CancellationToken cancellationToken)
+    private async Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, bool isSensorNotification, CancellationToken cancellationToken)
     {
         (string deviceId, string component, object value) = notification;
         if (deviceId is null || component is null || value is null)
@@ -111,11 +112,11 @@ internal sealed class NotificationService : INotificationService, IDisposable
             return;
         }
         this._logger.LogInformation("Send notification:{notification}", notification);
-        if (await this._notificationMapping.GetNotificationKeysAsync(deviceAdapterName, deviceId, component, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } keys)
+        if (await this._notificationMapping.GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } keys)
         {
             return;
         }
-        foreach (string notificationKey in keys)
+        Parallel.ForEach(keys, notificationKey =>
         {
             Message message = isSensorNotification
                 ? new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value))
@@ -124,7 +125,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
             {
                 this._logger.LogWarning("Failed to send notification:{message}", message);
             }
-        }
+        });
     }
 
     private void UpdateCache(Message message)

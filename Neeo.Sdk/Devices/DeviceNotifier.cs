@@ -60,12 +60,12 @@ public interface IDeviceNotifier
 
 internal sealed class DeviceNotifier : IDeviceNotifier
 {
-    private readonly string _deviceAdapterName;
+    private readonly IDeviceAdapter _adapter;
     private readonly INotificationService _notificationService;
 
-    public DeviceNotifier(INotificationService notificationService, string deviceAdapterName, bool supportsPowerNotifications)
+    public DeviceNotifier(IDeviceAdapter adapter, INotificationService notificationService, bool supportsPowerNotifications)
     {
-        (this._notificationService, this._deviceAdapterName, this.SupportsPowerNotifications) = (notificationService, deviceAdapterName, supportsPowerNotifications);
+        (this._adapter, this._notificationService, this.SupportsPowerNotifications) = (adapter, notificationService,  supportsPowerNotifications);
     }
 
     public bool SupportsPowerNotifications { get; }
@@ -73,8 +73,8 @@ internal sealed class DeviceNotifier : IDeviceNotifier
     public Task SendNotificationAsync(string componentName, object value, string deviceId, CancellationToken cancellationToken)
     {
         return this._notificationService.SendSensorNotificationAsync(
+            this._adapter,
             new(deviceId, componentName, value),
-            this._deviceAdapterName,
             cancellationToken
         );
     }
@@ -86,8 +86,8 @@ internal sealed class DeviceNotifier : IDeviceNotifier
             throw new NotSupportedException("The device did not register a power state sensor.");
         }
         return this._notificationService.SendNotificationAsync(
+            this._adapter,
             new(deviceId, Constants.PowerSensorName, BooleanBoxes.GetBox(powerState)),
-            this._deviceAdapterName,
             cancellationToken
         );
     }
