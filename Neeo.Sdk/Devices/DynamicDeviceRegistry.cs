@@ -20,7 +20,7 @@ public interface IDynamicDeviceRegistry
     /// <param name="deviceId">The identifier for the created device.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="ValueTask"/> representing the potentially asynchronous operation.</returns>
-    ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken);
+    ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Adds a dynamically discovered device to the registry.

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -67,7 +68,7 @@ internal partial class DeviceController
 
     private async ValueTask<(IDeviceAdapter, IFeature)> TryResolveAsync(string adapterName, string componentName, string deviceId)
     {
-        if (await this._database.GetAdapterAsync(adapterName).ConfigureAwait(false) is { } adapter)
+        if (await this.GetAdapterAsync(adapterName) is { } adapter)
         {
             if (adapter.GetFeature(componentName) is { } feature)
             {
@@ -76,7 +77,7 @@ internal partial class DeviceController
             }
             // Check for a discovered device with `EnableDynamicDeviceBuilder` and that the dynamic device has a component with that name.
             if (adapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } &&
-                await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.HttpContext.RequestAborted).ConfigureAwait(false) is { } dynamicDeviceAdapter &&
+                await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.HttpContext.RequestAborted) is { } dynamicDeviceAdapter &&
                 (feature = dynamicDeviceAdapter.GetFeature(componentName)) is not null)
             {
                 return (dynamicDeviceAdapter, feature);

@@ -3,7 +3,12 @@ using System.Text.Json.Serialization;
 
 namespace Neeo.Drivers.Kodi.Models;
 
-public readonly record struct TVShowInfo(string Label, JsonElement Art, int Year, [property: JsonPropertyName("tvshowid")] int TVShowId) : IMediaInfo
+public readonly record struct TVShowInfo(
+    string Label, 
+    JsonElement Art, 
+    int Year, 
+    [property: JsonPropertyName("tvshowid")] int TVShowId
+) : IMediaInfo
 {
     internal static readonly string[] Fields = { "art", "year" };
 

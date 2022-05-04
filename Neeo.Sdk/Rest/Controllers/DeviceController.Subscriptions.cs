@@ -28,7 +28,7 @@ internal partial class DeviceController
 
     private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, DeviceSubscriptionHandler> handlerProjection, string method)
     {
-        if (await this._database.GetAdapterAsync(adapterName) is not { } adapter)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter)
         {
             return this.NotFound();
         }

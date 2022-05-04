@@ -174,6 +174,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
             return;
         }
         EmbeddedImages images = new(this._uriPrefix);
+        await Task.CompletedTask.ConfigureAwait(false);
         throw new NotImplementedException();
     }
 
@@ -476,12 +477,16 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
 
     private async Task<DiscoveredDevice[]> DiscoverAsync(string? deviceId, CancellationToken cancellationToken)
     {
-        await this._clientManager.DiscoverAsync(1000, cancellationToken).ConfigureAwait(false);
+        if (deviceId != null && this._clientManager.GetClientOrDefault(deviceId) is { } client)
+        {
+            return new[] { this.CreateDiscoveredDevice(client) };
+        }
+        await this._clientManager.DiscoverAsync(1000, client => client.MacAddress.ToString() == deviceId, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(deviceId))
         {
             return this._clientManager.Clients.Select(this.CreateDiscoveredDevice).ToArray();
         }
-        if (this.GetClientOrDefault(deviceId) is { } client)
+        if ((client = this.GetClientOrDefault(deviceId)) != null)
         {
             return new[] { this.CreateDiscoveredDevice(client) };
         }
@@ -521,7 +526,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         }
     }
 
-    private Task InitializeAsync() => this._clientManager.InitializeAsync();
+    private Task InitializeAsync(CancellationToken cancellationToken) => this._clientManager.InitializeAsync(cancellationToken);
 
     private Task InitializeDeviceList(string[] deviceIds) => deviceIds.Length == 0 ? Task.CompletedTask : Task.WhenAll(Array.ConvertAll(deviceIds, this.OnDeviceAdded));
 

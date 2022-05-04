@@ -24,7 +24,6 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             .AddButtonGroup(ButtonGroups.MenuAndBack)
             .AddButton(Buttons.Guide)
             .AddAdditionalSearchTokens("SDK", "player")
-            .RegisterInitializer(() => Task.CompletedTask)
             .AddButtonGroup(ButtonGroups.Power)
             .AddButtonHandler(this._controller.HandleButtonAsync)
             .AddPlayerWidget(this._controller)

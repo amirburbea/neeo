@@ -16,8 +16,8 @@ public sealed class KodiClientManager : IDisposable
 {
     private readonly ConcurrentDictionary<string, KodiClient> _clients = new();
     private readonly ILogger<KodiClientManager> _logger;
-    private Task? _initializationTask;
     private PeriodicTimer? _discoveryTimer;
+    private Task? _initializationTask;
 
     public KodiClientManager(ILogger<KodiClientManager> logger) => this._logger = logger;
 
@@ -25,9 +25,13 @@ public sealed class KodiClientManager : IDisposable
 
     public IEnumerable<KodiClient> Clients => this._clients.Values;
 
-    public Task DiscoverAsync(int scanTime = 5000, CancellationToken cancellationToken = default)
+    public Task DiscoverAsync(int scanTime = 5000, CancellationToken cancellationToken = default) => this.DiscoverAsync(scanTime, default, cancellationToken);
+
+    public Task DiscoverAsync(int scanTime, Func<KodiClient, bool>? considerDiscoveryComplete, CancellationToken cancellationToken = default)
     {
-        return ZeroconfResolver.ResolveAsync(Constants.HttpServiceName, TimeSpan.FromMilliseconds(scanTime), callback: OnHostDiscovered, cancellationToken: cancellationToken);
+        CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        return ZeroconfResolver.ResolveAsync(Constants.HttpServiceName, TimeSpan.FromMilliseconds(scanTime), callback: OnHostDiscovered, cancellationToken: source.Token);
 
         async void OnHostDiscovered(IZeroconfHost host)
         {
@@ -46,6 +50,10 @@ public sealed class KodiClientManager : IDisposable
             }
             this._clients[client.MacAddress.ToString()] = client;
             this.ClientDiscovered?.Invoke(this, client);
+            if (considerDiscoveryComplete != null && considerDiscoveryComplete(client))
+            {
+                source.Cancel();
+            }
         }
     }
 
@@ -53,31 +61,41 @@ public sealed class KodiClientManager : IDisposable
 
     public KodiClient? GetClientOrDefault(string id) => this._clients.GetValueOrDefault(id);
 
-    public Task InitializeAsync()
+    public Task InitializeAsync(CancellationToken cancellationToken)
     {
         return this._initializationTask ??= InitializeDiscoveryAsync();
 
         async Task InitializeDiscoveryAsync()
         {
-            // Use a short initial window.
-            await this.DiscoverAsync(1000).ConfigureAwait(false);
-            _ = CreateDiscoveryTimer();
-        }
-
-        async Task CreateDiscoveryTimer()
-        {
-            this._discoveryTimer = new PeriodicTimer(TimeSpan.FromMinutes(1d));
             try
             {
-                while (await this._discoveryTimer.WaitForNextTickAsync().ConfigureAwait(false))
-                {
-                    await this.DiscoverAsync().ConfigureAwait(false);
-                }
+                // Use a short initial window.
+                await this.DiscoverAsync(2000, static _ => true, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                // This is expected when the class gets disposed.
+                // Ignore.
             }
+            finally
+            {
+                _ = this.CreateDiscoveryTimer();
+            }
+        }
+    }
+
+    private async Task CreateDiscoveryTimer()
+    {
+        try
+        {
+            this._discoveryTimer = new(TimeSpan.FromMinutes(1d));
+            while (await this._discoveryTimer.WaitForNextTickAsync().ConfigureAwait(false))
+            {
+                await this.DiscoverAsync().ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // This is expected when the class gets disposed.
         }
     }
 

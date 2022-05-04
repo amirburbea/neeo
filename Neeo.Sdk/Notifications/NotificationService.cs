@@ -51,7 +51,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         {
             MaxDegreeOfParallelism = Constants.MaxConcurrency,
             BoundedCapacity = Constants.MaxConcurrency,
-            CancellationToken = this._cancellationSource.Token
+            CancellationToken = this._cancellationSource.Token,
         });
     }
 
@@ -61,20 +61,23 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._actionBlock.Complete();
     }
 
-    public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken)
-    {
-        return this.SendNotificationAsync(adapter, notification, false, cancellationToken);
-    }
+    public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken) => this.SendNotificationAsync(
+        adapter,
+        notification,
+        false,
+        cancellationToken
+    );
 
-    public Task SendSensorNotificationAsync(IDeviceAdapter adapter,Notification notification,  CancellationToken cancellationToken)
-    {
-        return this.SendNotificationAsync(adapter, notification, true, cancellationToken);
-    }
+    public Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken) => this.SendNotificationAsync(
+        adapter,
+        notification,
+        true,
+        cancellationToken
+    );
 
-    private static (string, object) ExtractTypeAndData(Message message)
-    {
-        return message.Data is SensorData { SensorEventKey: { } eventKey, SensorValue: { } value } ? (eventKey, value) : (message.Type, message.Data);
-    }
+    private static (string, object) ExtractTypeAndData(Message message) => message.Data is SensorData { SensorEventKey: { } eventKey, SensorValue: { } value }
+        ? (eventKey, value)
+        : (message.Type, message.Data);
 
     private bool IsDuplicate(Message message)
     {
@@ -106,7 +109,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
     private async Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, bool isSensorNotification, CancellationToken cancellationToken)
     {
         (string deviceId, string component, object value) = notification;
-        if (deviceId is null || component is null || value is null)
+        if (deviceId == null || component == null || value == null)
         {
             this._logger.LogWarning("Invalid notification:{notification}.", notification);
             return;
@@ -118,9 +121,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         }
         Parallel.ForEach(keys, notificationKey =>
         {
-            Message message = isSensorNotification
-                ? new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value))
-                : new(notificationKey, value);
+            Message message = new(isSensorNotification ? Constants.DeviceSensorUpdateKey : notificationKey, isSensorNotification ? new SensorData(notificationKey, value) : value);
             if (!this._actionBlock.Post(message))
             {
                 this._logger.LogWarning("Failed to send notification:{message}", message);

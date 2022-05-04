@@ -1,6 +1,11 @@
 ﻿namespace Neeo.Drivers.Kodi.Models;
 
-public readonly record struct PlayerState(PlayState PlayState, string NowPlayingLabel, string NowPlayingDescription, string NowPlayingImage)
+public readonly record struct PlayerState(
+    PlayState PlayState, 
+    string NowPlayingLabel, 
+    string NowPlayingDescription, 
+    string NowPlayingImage
+)
 {
     internal static readonly PlayerState Defaults = new(PlayState.Stopped, "Nothing is playing now.", string.Empty, Images.Kodi);
 

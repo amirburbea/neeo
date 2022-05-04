@@ -13,7 +13,7 @@ internal partial class DeviceController
     [HttpGet("{adapterName}/discover")]
     public async Task<ActionResult<DiscoveredDevice[]>> DiscoverAsync(string adapterName)
     {
-        if (await this._database.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
             return this.NotFound();
         }
@@ -35,7 +35,7 @@ internal partial class DeviceController
     [HttpGet("{adapterName}/registered")]
     public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync(string adapterName)
     {
-        if (await this._database.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
             return this.NotFound();
         }
@@ -46,7 +46,7 @@ internal partial class DeviceController
     [HttpPost("{adapterName}/register")]
     public async Task<ActionResult> RegisterAsync(string adapterName, [FromBody] CredentialsPayload payload)
     {
-        if (await this._database.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
             return this.NotFound();
         }
