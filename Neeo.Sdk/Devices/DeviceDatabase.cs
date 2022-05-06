@@ -83,29 +83,22 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         );
     }
 
-    IEnumerable<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values.Select(static wrapper => wrapper.Adapter);
+    IEnumerable<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values.Select(static container => container.Adapter);
 
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken)
     {
-        if (this._adapters.GetValueOrDefault(adapterName ?? throw new ArgumentNullException(nameof(adapterName))) is not { } container)
-        {
-            return null;
-        }
-        if (!container.IsInitialized)
+        if (this._adapters.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container) && !container.IsInitialized)
         {
             await container.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
-        return container.Adapter;
+        return container?.Adapter;
     }
 
-    public DeviceAdapterModel? GetDeviceByAdapterName(string name)
-    {
-        return Array.FindIndex(this._devices, device => device.AdapterName == name) is int index and not -1 ? this._devices[index] : null;
-    }
+    public DeviceAdapterModel? GetDeviceByAdapterName(string name) => Array.Find(this._devices, device => device.AdapterName == name);
 
     public DeviceAdapterModel? GetDeviceById(int id)
     {
-        return id is >= 0 && id < this._devices.Length ? this._devices[id] : null;
+        return id is > -1 && id < this._devices.Length ? this._devices[id] : null;
     }
 
     public SearchEntry<DeviceAdapterModel>[] Search(string? query) => string.IsNullOrEmpty(query)
@@ -133,7 +126,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
-            if (this.Adapter.Initializer is not { } initializer)
+            if (this.Adapter is not { AdapterName: { } adapterName, DeviceName: { } deviceName, Initializer: { } initializer })
             {
                 return Task.CompletedTask;
             }
@@ -141,7 +134,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             {
                 return this._task;
             }
-            this._logger.LogInformation("Initializing adapter {deviceName} ({adapterName})", this.Adapter.DeviceName, this.Adapter.AdapterName);
+            this._logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", deviceName, adapterName);
             return InitializeAdapterAsync();
 
             async Task InitializeAdapterAsync()

@@ -4,34 +4,43 @@ using System.Runtime.CompilerServices;
 
 namespace Neeo.Sdk.Utilities;
 
-internal static class FlaggedEnumerations<T>
-    where T : struct, Enum
+internal static class FlaggedEnumerations
 {
-    private static readonly bool _isValidType = Enum.GetUnderlyingType(typeof(T)) == typeof(ulong);
-
-    public static IEnumerable<string> GetNames(T flaggedValue)
+    public static IEnumerable<string> GetNames<T>(T flaggedValue)
+        where T : struct, Enum
     {
-        if (!FlaggedEnumerations<T>._isValidType)
-        {
-            return Array.Empty<string>();
-        }
-        ulong value = Unsafe.As<T, ulong>(ref flaggedValue);
-        return (value & (value - 1ul)) == 0ul // Is this a single flag.
-           ? new[] { TextAttribute.GetText(flaggedValue) }
-           : ExtractFlags(value);
+        return EnumNames<T>.GetNames(flaggedValue);
+    }
 
-        static IEnumerable<string> ExtractFlags(ulong value)
+    private static class EnumNames<T>
+        where T : struct, Enum
+    {
+        private static readonly bool _isValidType = Enum.GetUnderlyingType(typeof(T)) == typeof(ulong);
+
+        public static IEnumerable<string> GetNames(T value)
         {
-            for (int bits = 0; bits < 64; bits++)
+            if (!EnumNames<T>._isValidType)
             {
-                ulong flag = 1ul << bits;
-                if (flag > value)
+                return Array.Empty<string>();
+            }
+            ulong numericValue = Unsafe.As<T, ulong>(ref value);
+            return (numericValue & (numericValue - 1ul)) == 0ul // Is this a single flag.
+               ? new[] { TextAttribute.GetText(value) }
+               : ExtractFlags(numericValue);
+
+            static IEnumerable<string> ExtractFlags(ulong value)
+            {
+                for (int bits = 0; bits < 64; bits++)
                 {
-                    yield break;
-                }
-                if ((value & flag) == flag)
-                {
-                    yield return TextAttribute.GetText(Unsafe.As<ulong, T>(ref flag));
+                    ulong flag = 1ul << bits;
+                    if (flag > value)
+                    {
+                        yield break;
+                    }
+                    if ((value & flag) == flag)
+                    {
+                        yield return TextAttribute.GetText(Unsafe.As<ulong, T>(ref flag));
+                    }
                 }
             }
         }

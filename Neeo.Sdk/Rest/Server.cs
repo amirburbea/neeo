@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -31,7 +32,7 @@ namespace Neeo.Sdk.Rest;
 internal static class Server
 {
     public static async Task<IHost> StartSdkAsync(
-        Brain brain,
+        IBrainInfo brain,
         IReadOnlyCollection<IDeviceBuilder> devices,
         string adapterName,
         IPAddress hostAddress,
@@ -64,11 +65,12 @@ internal static class Server
         }
     }
 
-    private static void ConfigureServices(IServiceCollection services, Brain brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
+    private static void ConfigureServices(IServiceCollection services, IBrainInfo brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
         .AddSingleton(brain)
         .AddSingleton(devices)
         .AddSingleton((SdkAdapterName)adapterName)
         .AddSingleton(Server.CreatePgpKeys()) // Keys are created at random at the start of the server.
+        .AddSingleton<HttpMessageHandler>(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
         .AddSingleton<IApiClient, ApiClient>()
         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
         .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()

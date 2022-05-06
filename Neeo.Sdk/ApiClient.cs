@@ -26,7 +26,8 @@ public interface IApiClient
     /// <param name="transform">The transformation to run on the data.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default);
+    Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+        where TData : notnull;
 
     /// <summary>
     /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
@@ -40,30 +41,35 @@ public interface IApiClient
     /// <param name="transform">The transformation to run on the data.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default);
+    Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+        where TBody : notnull
+        where TData : notnull;
 }
 
 internal sealed class ApiClient : IApiClient, IDisposable
 {
     private static readonly MediaTypeHeaderValue _jsonContentType = new("application/json");
 
-    private readonly HttpClient _httpClient = new(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
+    private readonly HttpClient _httpClient;
     private readonly ILogger<ApiClient> _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(Brain brain, ILogger<ApiClient> logger) => (this._uriPrefix, this._logger) = ($"http://{brain.ServiceEndPoint}", logger);
+    public ApiClient(IBrainInfo brain, HttpMessageHandler messageHandler, ILogger<ApiClient> logger)
+    {
+        (this._uriPrefix, this._httpClient, this._logger) = ($"http://{brain.ServiceEndPoint}", new(messageHandler), logger);
+    }
 
     public void Dispose() => this._httpClient.Dispose();
 
-    public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken) => this.FetchAsync(
-        path,
-        HttpMethod.Get,
-        default,
-        transform,
-        cancellationToken
-    );
+    public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+        where TData : notnull
+    {
+        return this.FetchAsync(path,HttpMethod.Get,default,transform,cancellationToken);
+    }
 
-    public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken)
+    public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+        where TBody : notnull
+        where TData : notnull
     {
         using MemoryStream stream = new();
         await JsonSerializer.SerializeAsync(stream, body, JsonSerialization.Options, cancellationToken).ConfigureAwait(false);
@@ -73,7 +79,12 @@ internal sealed class ApiClient : IApiClient, IDisposable
     }
 
     private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, HttpContent? content, Func<TData, TOutput> transform, CancellationToken cancellationToken)
+        where TData : notnull
     {
+        if (!path.StartsWith('/'))
+        {
+            throw new ArgumentException("Path must start with a forward slash (\"/\").", nameof(path));
+        }
         string uri = this._uriPrefix + path;
         this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
         using HttpRequestMessage request = new(method, uri) { Content = content };

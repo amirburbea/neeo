@@ -21,7 +21,7 @@ namespace Neeo.Sdk;
 /// <summary>
 /// Returns information about and contains methods for interacting with the NEEO Brain.
 /// </summary>
-public sealed class Brain : IAsyncDisposable
+public sealed class Brain : IAsyncDisposable, IBrainInfo
 {
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(15d);
     private static readonly Regex _versionPrefixRegex = new(@"^0\.(?<v>\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
@@ -224,4 +224,19 @@ public sealed class Brain : IAsyncDisposable
     {
         public const string ServiceName = "_neeo._tcp.local.";
     }
+}
+
+/// <summary>
+/// Minimal information about a NEEO Brain.
+/// </summary>
+internal interface IBrainInfo
+{
+    /// <summary>
+    /// The host name of the NEEO Brain.
+    /// </summary>
+    string HostName { get; }
+    /// <summary>
+    /// The IP Address and port on which the NEEO Brain Service is running.
+    /// </summary>
+    IPEndPoint ServiceEndPoint { get; }
 }

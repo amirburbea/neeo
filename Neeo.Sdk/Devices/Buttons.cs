@@ -379,7 +379,7 @@ public static class Button
     /// </summary>
     /// <param name="buttons">The (potentially flagged) <see cref="Buttons"/> value.</param>
     /// <returns>The collection of button names.</returns>
-    public static IEnumerable<string> GetNames(Buttons buttons) => FlaggedEnumerations<Buttons>.GetNames(buttons);
+    public static IEnumerable<string> GetNames(Buttons buttons) => FlaggedEnumerations.GetNames(buttons);
 
     /// <summary>
     /// Attempts to get the associated <see cref="Buttons"/> value for a button name.

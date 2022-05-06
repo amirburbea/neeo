@@ -11,12 +11,12 @@ namespace Neeo.Sdk.Rest;
 /// </summary>
 internal sealed class SdkRegistration : IHostedService
 {
-    private readonly Brain _brain;
+    private readonly IBrainInfo _brain;
     private readonly IApiClient _client;
     private readonly ISdkEnvironment _environment;
     private readonly ILogger<SdkRegistration> _logger;
 
-    public SdkRegistration(Brain brain, IApiClient client, ISdkEnvironment environment, ILogger<SdkRegistration> logger)
+    public SdkRegistration(IBrainInfo brain, IApiClient client, ISdkEnvironment environment, ILogger<SdkRegistration> logger)
     {
         (this._brain, this._client, this._environment, this._logger) = (brain, client, environment, logger);
     }
@@ -30,7 +30,7 @@ internal sealed class SdkRegistration : IHostedService
             {
                 throw new ApplicationException("Registration rejected.");
             }
-            this._logger.LogInformation("Server {name} registered on {brain} ({brainAddress}).", name, this._brain.HostName, this._brain.IPAddress);
+            this._logger.LogInformation("Server {name} registered on {brain} ({brainAddress}).", name, this._brain.HostName, this._brain.ServiceEndPoint.Address);
         }
         catch (Exception e)
         {
@@ -54,10 +54,14 @@ internal sealed class SdkRegistration : IHostedService
         }
     }
 
-    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) => this._client.PostAsync(
-        path,
-        body,
-        static (SuccessResponse response) => response.Success,
-        cancellationToken
-    );
+    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken)
+        where TBody : notnull
+    {
+        return this._client.PostAsync(
+            path,
+            body,
+            static (SuccessResponse response) => response.Success,
+            cancellationToken
+        );
+    }
 }

@@ -8,7 +8,7 @@ namespace Neeo.Sdk.Devices;
 /// <summary>
 /// A model for a device adapter.
 /// </summary>
-public readonly struct DeviceAdapterModel : IComparable<DeviceAdapterModel>
+public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
 {
     private readonly IDeviceAdapter _adapter;
 
@@ -86,5 +86,5 @@ public readonly struct DeviceAdapterModel : IComparable<DeviceAdapterModel>
     /// </summary>
     public DeviceType Type => this._adapter.Type;
 
-    int IComparable<DeviceAdapterModel>.CompareTo(DeviceAdapterModel other) => string.Compare(this.Name, other.Name, StringComparison.OrdinalIgnoreCase);
+    int IComparable<DeviceAdapterModel>.CompareTo(DeviceAdapterModel? other) => string.Compare(this.Name, other?.Name, StringComparison.OrdinalIgnoreCase);
 }

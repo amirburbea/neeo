@@ -85,7 +85,7 @@ public static class SmartApplicationButton
     /// </summary>
     /// <param name="buttons">The (potentially flagged) <see cref="SmartApplicationButtons"/> value.</param>
     /// <returns>The collection of button names.</returns>
-    public static IEnumerable<string> GetNames(SmartApplicationButtons buttons) => FlaggedEnumerations<SmartApplicationButtons>.GetNames(buttons);
+    public static IEnumerable<string> GetNames(SmartApplicationButtons buttons) => FlaggedEnumerations.GetNames(buttons);
 
     /// <summary>
     /// Attempts to get the associated <see cref="SmartApplicationButtons"/> value for a button name.

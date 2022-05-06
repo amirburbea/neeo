@@ -24,19 +24,19 @@ internal sealed class SubscriptionsNotifier : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        return Parallel.ForEachAsync(this._database.Adapters, cancellationToken, this.NotifySubscriptionsAsync);
+        return Parallel.ForEachAsync(this._database.Adapters, cancellationToken, NotifySubscriptionsAsync);
+
+        async ValueTask NotifySubscriptionsAsync(IDeviceAdapter adapter, CancellationToken cancellationToken)
+        {
+            if (adapter.GetFeature(ComponentType.Subscription) is not ISubscriptionFeature feature)
+            {
+                return;
+            }
+            this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
+            string path = string.Format(UrlPaths.SubscriptionsFormat, this._sdkAdapterName, adapter.AdapterName);
+            await this._client.GetAsync(path, (string[] deviceIds) => feature.DeviceListInitializer(deviceIds), cancellationToken).Unwrap().ConfigureAwait(false);
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    private async ValueTask NotifySubscriptionsAsync(IDeviceAdapter adapter, CancellationToken cancellationToken)
-    {
-        if (adapter.GetFeature(ComponentType.Subscription) is not ISubscriptionFeature feature)
-        {
-            return;
-        }
-        this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
-        string path = string.Format(UrlPaths.SubscriptionsFormat, this._sdkAdapterName, adapter.AdapterName);
-        await this._client.GetAsync(path, (string[] deviceIds) => feature.DeviceListInitializer(deviceIds), cancellationToken).Unwrap().ConfigureAwait(false);
-    }
 }
