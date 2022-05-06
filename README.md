@@ -28,7 +28,7 @@ While I realize this may cause an issue for some developers with extensive knowl
 
 ### Where are the unit tests?
 
-*There aren't any, just example device drivers. You can help by writing some. Open a PR.*
+*I've begun writing tests for the SDK (only) but there is much to be done. You can help by writing some. Open a PR.*
 
 ### I found a bug, what should I do?
 
