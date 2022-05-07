@@ -44,19 +44,14 @@ public sealed class ApiClientTests : IDisposable
     public void Should_Concatenate_Paths_Correctly(string path)
     {
         var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
-        _ = this._client.GetAsync(path, Identity<object>.Function);
-        Assert.Equal($"http://127.0.0.1:1234{path}", request.Value.RequestUri?.ToString());
+        _ = this._client.GetAsync(path, static (object obj) => obj);
+        Assert.Equal($"http://127.0.0.1:1234{path}", request.Value.RequestUri!.ToString());
     }
 
     [Fact]
-    public async Task Should_Throw_On_Path_Without_Preceding_Slash()
-    {
-        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() => this._client.GetAsync(
-            "path_without_preceding_slash",
-            Identity<object>.Function
-        )).ConfigureAwait(false);
-        Assert.Equal("path", exception.ParamName);
-    }
+    public Task Should_Throw_On_Path_Without_Preceding_Slash() => Assert.ThrowsAsync<ArgumentException>(
+        () => this._client.GetAsync("path_without_preceding_slash", static (object obj) => obj)
+    );
 
     [Theory]
     [InlineData("abcde", 5)]
@@ -70,13 +65,13 @@ public sealed class ApiClientTests : IDisposable
     }
 
     [Theory]
-    [InlineData("abcde", 5)]
-    [InlineData("", 0)]
-    [InlineData("1234", 4)]
-    public async Task Should_Transform_Response_Body_In_PostAsync(string response, int expectedOutput)
+    [InlineData("", "")]
+    [InlineData("abcde", "edcba")]
+    [InlineData("1234", "4321")]
+    public async Task Should_Transform_Response_Body_In_PostAsync(string response, string expectedOutput)
     {
         this.SetupResponse(_ => Task.FromResult(response));
-        int output = await this._client.PostAsync("/", string.Empty, static (string text) => text.Length);
+        string output = await this._client.PostAsync("/", string.Empty, static (string text) => new string(text.Reverse().ToArray()));
         Assert.Equal(expectedOutput, output);
     }
 
@@ -84,7 +79,7 @@ public sealed class ApiClientTests : IDisposable
     public void Should_Use_Http_Get_In_GetAsync()
     {
         var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
-        _ = this._client.GetAsync("/", Identity<object>.Function);
+        _ = this._client.GetAsync("/", static (object obj) => obj);
         Assert.Equal("GET", request.Value.Method.Method);
     }
 
@@ -93,7 +88,7 @@ public sealed class ApiClientTests : IDisposable
     {
         var body = new { A = "123" };
         var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
-        _ = this._client.PostAsync("/", body, Identity<object>.Function);
+        _ = this._client.PostAsync("/", body, static (object obj) => obj);
         Assert.Equal("POST", request.Value.Method.Method);
         Assert.NotNull(request.Value.Content);
         using StreamReader reader = new(request.Value.Content!.ReadAsStream());
@@ -109,10 +104,5 @@ public sealed class ApiClientTests : IDisposable
             .Setup(handler => handler.SendAsync(Capture.In(captured), It.IsAny<CancellationToken>()))
             .Returns<HttpRequestMessage, CancellationToken>(async (request, _) => new() { Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(await callback(request).ConfigureAwait(false), JsonSerialization.Options)) });
         return new(() => captured.Single());
-    }
-
-    private static class Identity<T>
-    {
-        public static Func<T, T> Function = x => x;
     }
 }
