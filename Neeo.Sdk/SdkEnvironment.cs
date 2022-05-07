@@ -18,11 +18,6 @@ public interface ISdkEnvironment
     /// The encoded SDK adapter name as registered on the NEEO Brain.
     /// </summary>
     string SdkAdapterName { get; }
-
-    /// <summary>
-    /// Deconstructs this instance.
-    /// </summary>
-    void Deconstruct(out string sdkAdapterName, out string hostAddress) => (sdkAdapterName, hostAddress) = (this.SdkAdapterName, this.HostAddress);
 }
 
 internal sealed class SdkEnvironment : ISdkEnvironment

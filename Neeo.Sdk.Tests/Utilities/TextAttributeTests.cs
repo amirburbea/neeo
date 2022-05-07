@@ -22,7 +22,7 @@ public sealed class TextAttributeTests
     [Theory]
     [InlineData("ONE")]
     [InlineData("TWO")]
-    public void GetEnumReturnsAssociatedEnumForAttributeText(string attributeText)
+    public void Should_Return_Associated_Enum_From_GetEnum_For_Attribute_Text(string attributeText)
     {
         bool tested = false;
         foreach (FieldInfo field in typeof(TestEnum).GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -38,23 +38,9 @@ public sealed class TextAttributeTests
     }
 
     [Theory]
-    [InlineData("Four")]
-    public void GetEnumReturnsByNameForValuesWithoutAttribute(string name)
-    {
-        TestEnum expected = Enum.Parse<TestEnum>(name);
-        Assert.Equal(expected, TextAttribute.GetEnum<TestEnum>(name));
-    }
-
-    [Fact]
-    public void GetEnumReturnsNullForInvalidInput()
-    {
-        Assert.Null(TextAttribute.GetEnum<TestEnum>("SOME_GARBAGE"));
-    }
-
-    [Theory]
     [InlineData(TestEnum.One)]
     [InlineData(TestEnum.Two)]
-    public void GetTextReturnsAssociatedAttributeText(TestEnum value)
+    public void Should_Return_Attribute_Text_From_GetText(TestEnum value)
     {
         string? expectedText = typeof(TestEnum).GetField(value.ToString(), BindingFlags.Public | BindingFlags.Static)?.GetCustomAttribute<TextAttribute>()?.Text;
         Assert.NotNull(expectedText); // Verify the test data was correct and we definitely have the attribute.
@@ -62,9 +48,23 @@ public sealed class TextAttributeTests
     }
 
     [Theory]
+    [InlineData("Four")]
+    public void Should_Return_Enum_By_Name_From_GetEnum_When_Missing_Attribute(string name)
+    {
+        TestEnum expected = Enum.Parse<TestEnum>(name);
+        Assert.Equal(expected, TextAttribute.GetEnum<TestEnum>(name));
+    }
+
+    [Fact]
+    public void Should_Return_Null_From_GetEnum_For_Invalid_Input()
+    {
+        Assert.Null(TextAttribute.GetEnum<TestEnum>("SOME_GARBAGE"));
+    }
+
+    [Theory]
     [InlineData(TestEnum.Four)]
     [InlineData(TestEnum.One | TestEnum.Two)]
-    public void GetTextReturnsToStringIfNoAttributeFound(TestEnum value)
+    public void Should_Return_ToString_From_GetText_When_Missing_Attribute(TestEnum value)
     {
         string expectedText = value.ToString();
         Assert.Equal(expectedText, TextAttribute.GetText(value));

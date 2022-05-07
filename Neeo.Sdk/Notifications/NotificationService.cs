@@ -75,13 +75,9 @@ internal sealed class NotificationService : INotificationService, IDisposable
         cancellationToken
     );
 
-    private static (string, object) ExtractTypeAndData(Message message) => message.Data is SensorData { SensorEventKey: { } eventKey, SensorValue: { } value }
-        ? (eventKey, value)
-        : (message.Type, message.Data);
-
     private bool IsDuplicate(Message message)
     {
-        (string key, object data) = NotificationService.ExtractTypeAndData(message);
+        (string key, object data) = message.ExtractTypeAndData();
         return this._cache.TryGet(key, out object? value) && value.Equals(data);
     }
 
@@ -111,15 +107,14 @@ internal sealed class NotificationService : INotificationService, IDisposable
         (string deviceId, string component, object value) = notification;
         if (deviceId == null || component == null || value == null)
         {
-            this._logger.LogWarning("Invalid notification:{notification}.", notification);
-            return;
+            throw new ArgumentException("Invalid notification data.", nameof(notification));
         }
         this._logger.LogInformation("Send notification:{notification}", notification);
         if (await this._notificationMapping.GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } keys)
         {
             return;
         }
-        Parallel.ForEach(keys, notificationKey =>
+        Parallel.ForEach(keys, new() { CancellationToken = cancellationToken }, notificationKey =>
         {
             Message message = new(isSensorNotification ? Constants.DeviceSensorUpdateKey : notificationKey, isSensorNotification ? new SensorData(notificationKey, value) : value);
             if (!this._actionBlock.Post(message))
@@ -131,7 +126,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
 
     private void UpdateCache(Message message)
     {
-        (string key, object data) = NotificationService.ExtractTypeAndData(message);
+        (string key, object data) = message.ExtractTypeAndData();
         this._cache.AddOrUpdate(key, data);
     }
 
@@ -142,7 +137,15 @@ internal sealed class NotificationService : INotificationService, IDisposable
         public const int MaxConcurrency = 20;
     }
 
-    private readonly record struct Message(string Type, object Data);
+    public readonly record struct Message(string Type, object Data)
+    {
+        public (string, object) ExtractTypeAndData()
+        {
+            return this.Data is SensorData { SensorEventKey: { } sensorKey, SensorValue: { } sensorValue }
+                ? (sensorKey, sensorValue)
+                : (this.Type, this.Data);
+        }
+    }
 
     private sealed record class SensorData(string SensorEventKey, object SensorValue);
 }

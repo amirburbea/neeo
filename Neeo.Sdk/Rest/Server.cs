@@ -32,7 +32,7 @@ namespace Neeo.Sdk.Rest;
 internal static class Server
 {
     public static async Task<IHost> StartSdkAsync(
-        IBrainInfo brain,
+        IBrain brain,
         IReadOnlyCollection<IDeviceBuilder> devices,
         string adapterName,
         IPAddress hostAddress,
@@ -65,7 +65,7 @@ internal static class Server
         }
     }
 
-    private static void ConfigureServices(IServiceCollection services, IBrainInfo brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
+    private static void ConfigureServices(IServiceCollection services, IBrain brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
         .AddSingleton(brain)
         .AddSingleton(devices)
         .AddSingleton((SdkAdapterName)adapterName)

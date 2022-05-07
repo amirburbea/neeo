@@ -22,12 +22,12 @@ public sealed class ApiClientTests : IDisposable
 
     public ApiClientTests()
     {
-        Mock<IBrainInfo> mockBrain = new();
+        Mock<IBrain> mockBrain = new();
         mockBrain.SetupGet(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
         this._mockMessageHandler = new();
         this._client = new(mockBrain.Object, this._mockMessageHandler.Object, NullLogger<ApiClient>.Instance);
-        /*Default implementation overriden in some tests.*/
-        this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
+        // Default.
+        this.SetupResponse(_ => Task.FromResult(new object()));
     }
 
     private interface IMessageHandlerMockedMethods
@@ -35,47 +35,26 @@ public sealed class ApiClientTests : IDisposable
         Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken);
     }
 
-    /// <summary>
-    /// Ensure SendAsync was called and returns the request message.
-    /// </summary>
-    private Func<HttpRequestMessage> VerifySend { get; set; } = () => throw new("Setup not completed.");
-
     public void Dispose() => this._client.Dispose();
-
-    [Theory]
-    [InlineData("abcde", 5)]
-    [InlineData("", 0)]
-    [InlineData("1234", 4)]
-    public async Task GetAsyncTransformsResponse(string response, int expectedOutput)
-    {
-        this.SetupResponse(_ => Task.FromResult(response));
-        int output = await this._client.GetAsync("/", static (string text) => text.Length);
-        Assert.Equal(expectedOutput, output);
-    }
-
-    [Fact]
-    public void GetAsyncUsesHttpMethodGet()
-    {
-        _ = this._client.GetAsync("/", Identity<object>.Function);
-        var request = this.VerifySend();
-        Assert.Equal("GET", request.Method.Method);
-    }
 
     [Theory]
     [InlineData("/")]
     [InlineData("/foo")]
     [InlineData("/foo/bar")]
-    public void PathsAreConcatenatedCorrectly(string path)
+    public void Should_Concatenate_Paths_Correctly(string path)
     {
+        var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
         _ = this._client.GetAsync(path, Identity<object>.Function);
-        var request = this.VerifySend();
-        Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri?.ToString());
+        Assert.Equal($"http://127.0.0.1:1234{path}", request.Value.RequestUri?.ToString());
     }
 
     [Fact]
-    public async Task PathThrowsIfDoesNotStartWithForwardSlash()
+    public async Task Should_Throw_On_Path_Without_Preceding_Slash()
     {
-        var exception = await Assert.ThrowsAsync<ArgumentException>(() => this._client.GetAsync("path_without_preceding_slash", Identity<object>.Function));
+        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() => this._client.GetAsync(
+            "path_without_preceding_slash",
+            Identity<object>.Function
+        )).ConfigureAwait(false);
         Assert.Equal("path", exception.ParamName);
     }
 
@@ -83,7 +62,18 @@ public sealed class ApiClientTests : IDisposable
     [InlineData("abcde", 5)]
     [InlineData("", 0)]
     [InlineData("1234", 4)]
-    public async Task PostAsyncTransformsResponse(string response, int expectedOutput)
+    public async Task Should_Transform_Response_Body_In_GetAsync(string response, int expectedOutput)
+    {
+        this.SetupResponse(_ => Task.FromResult(response));
+        int output = await this._client.GetAsync("/", static (string text) => text.Length);
+        Assert.Equal(expectedOutput, output);
+    }
+
+    [Theory]
+    [InlineData("abcde", 5)]
+    [InlineData("", 0)]
+    [InlineData("1234", 4)]
+    public async Task Should_Transform_Response_Body_In_PostAsync(string response, int expectedOutput)
     {
         this.SetupResponse(_ => Task.FromResult(response));
         int output = await this._client.PostAsync("/", string.Empty, static (string text) => text.Length);
@@ -91,18 +81,26 @@ public sealed class ApiClientTests : IDisposable
     }
 
     [Fact]
-    public void PostAsyncUsesHttpMethodPostWithCorrectBody()
+    public void Should_Use_Http_Get_In_GetAsync()
+    {
+        var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
+        _ = this._client.GetAsync("/", Identity<object>.Function);
+        Assert.Equal("GET", request.Value.Method.Method);
+    }
+
+    [Fact]
+    public void Should_Use_Http_Post_And_Serialize_Body_In_PostAsync()
     {
         var body = new { A = "123" };
+        var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
         _ = this._client.PostAsync("/", body, Identity<object>.Function);
-        var request = this.VerifySend();
-        Assert.Equal("POST", request.Method.Method);
-        Assert.NotNull(request.Content);
-        using StreamReader reader = new(request.Content!.ReadAsStream());
+        Assert.Equal("POST", request.Value.Method.Method);
+        Assert.NotNull(request.Value.Content);
+        using StreamReader reader = new(request.Value.Content!.ReadAsStream());
         Assert.Equal(JsonSerializer.Serialize(body, JsonSerialization.Options), reader.ReadToEnd());
     }
 
-    private void SetupResponse<T>(Func<HttpRequestMessage, Task<T>> callback)
+    private Lazy<HttpRequestMessage> SetupResponse<T>(Func<HttpRequestMessage, Task<T>> callback)
     {
         List<HttpRequestMessage> captured = new();
         this._mockMessageHandler
@@ -110,14 +108,7 @@ public sealed class ApiClientTests : IDisposable
             .As<IMessageHandlerMockedMethods>()
             .Setup(handler => handler.SendAsync(Capture.In(captured), It.IsAny<CancellationToken>()))
             .Returns<HttpRequestMessage, CancellationToken>(async (request, _) => new() { Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(await callback(request).ConfigureAwait(false), JsonSerialization.Options)) });
-        this.VerifySend = () =>
-        {
-            this._mockMessageHandler
-                .Protected()
-                .As<IMessageHandlerMockedMethods>()
-                .Verify(handler => handler.SendAsync(It.IsAny<HttpRequestMessage>(), It.IsAny<CancellationToken>()), Times.Once());
-            return captured.Single();
-        };
+        return new(() => captured.Single());
     }
 
     private static class Identity<T>

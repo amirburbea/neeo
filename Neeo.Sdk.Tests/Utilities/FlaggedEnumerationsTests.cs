@@ -38,7 +38,7 @@ public sealed class FlaggedEnumerationsTests
     }
 
     [Fact]
-    public void GetNamesReturnsNothingForEnumsNotBackedByUInt64()
+    public void Should_Return_Empty_Array_For_Enums_Not_UInt64_Based()
     {
         Assert.Equal(FlaggedEnumerations.GetNames(TestEnumInvalid.One | TestEnumInvalid.Two).ToArray(), Array.Empty<string>());
     }
@@ -47,7 +47,7 @@ public sealed class FlaggedEnumerationsTests
     [InlineData(TestEnum.One | TestEnum.Two, new[] { "ONE", "TWO" })]
     [InlineData(TestEnum.Four | TestEnum.One, new[] { "ONE", "FOUR" })]
     [InlineData(TestEnum.Four | TestEnum.Two | TestEnum.One, new[] { "ONE", "TWO", "FOUR" })]
-    public void GetNamesReturnsSequenceOfNamesInSortedOrderByValue(TestEnum value, string[] expectedOutput)
+    public void Should_Return_Names_Sorted_By_Value(TestEnum value, string[] expectedOutput)
     {
         Assert.Equal(expectedOutput, FlaggedEnumerations.GetNames(value).ToArray());
     }
@@ -57,7 +57,7 @@ public sealed class FlaggedEnumerationsTests
     [InlineData(TestEnum.Two)]
     [InlineData(TestEnum.Four)]
     [InlineData((TestEnum)0)]
-    public void GetNamesReturnsTextAttributeGetTextWhenNotFlaggedInput(TestEnum value)
+    public void Should_Return_Single_Value_When_Not_Flagged_Value(TestEnum value)
     {
         string expected = TextAttribute.GetText(value);
         Assert.Equal(expected, FlaggedEnumerations.GetNames(value).Single());

@@ -54,7 +54,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private readonly ILogger<ApiClient> _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(IBrainInfo brain, HttpMessageHandler messageHandler, ILogger<ApiClient> logger)
+    public ApiClient(IBrain brain, HttpMessageHandler messageHandler, ILogger<ApiClient> logger)
     {
         (this._uriPrefix, this._httpClient, this._logger) = ($"http://{brain.ServiceEndPoint}", new(messageHandler), logger);
     }

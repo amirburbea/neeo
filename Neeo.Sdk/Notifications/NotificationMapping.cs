@@ -44,7 +44,7 @@ internal sealed class NotificationMapping : INotificationMapping
         string cacheKey = string.Concat(adapter.AdapterName, "|", deviceId);
         if (!this._cache.TryGetValue(cacheKey, out EntryCache? entries))
         {
-            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(adapter.AdapterName, deviceId, cancellationToken).ConfigureAwait(false);
+            this._cache[cacheKey] = entries = new(await this.FetchEntriesAsync(adapter.AdapterName, deviceId, cancellationToken).ConfigureAwait(false));
         }
         if (entries.GetNotificationKeys(componentName) is { Length: not 0 } keys)
         {
@@ -55,13 +55,13 @@ internal sealed class NotificationMapping : INotificationMapping
         return Array.Empty<string>();
     }
 
-    private Task<EntryCache> FetchEntriesAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this._client.GetAsync(
+    private Task<Entry[]> FetchEntriesAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this._client.GetAsync(
         string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, adapterName, deviceId),
-        static (Entry[] entries) => new EntryCache(entries),
+        static (Entry[] entries) => entries,
         cancellationToken
     );
 
-    private readonly record struct Entry(string Name, string EventKey, string? Label);
+    public readonly record struct Entry(string EventKey, string Name, string? Label);
 
     private sealed record EntryCache(Entry[] Entries)
     {
