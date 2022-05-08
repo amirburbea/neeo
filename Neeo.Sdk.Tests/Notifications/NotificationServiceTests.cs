@@ -16,10 +16,11 @@ using Message = NotificationService.Message;
 public sealed class NotificationServiceTests : IDisposable
 {
     private readonly List<Message> _messages = new();
-    private readonly Mock<INotificationMapping> _mockNotificationMapping = new();
+    private readonly Mock<INotificationMapping> _mockNotificationMapping = new(MockBehavior.Strict);
     private readonly NotificationService _notificationService;
+
     /// <summary>
-    /// A task that completes when <see cref="ApiClient.PostAsync"/> is called, 
+    /// A task that completes when <see cref="ApiClient.PostAsync"/> is called,
     /// since ActionBlock runs in its own task scheduler.
     /// </summary>
     private readonly Task _postAsyncCompleted;
@@ -27,11 +28,11 @@ public sealed class NotificationServiceTests : IDisposable
     public NotificationServiceTests()
     {
         this.SetNotificationKeys(ValueTask.FromResult(new string[] { "key" }));
-        Mock<IApiClient> mockClient = new();
+        Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         TaskCompletionSource tcs = new();
         mockClient
             .Setup(client => client.PostAsync(UrlPaths.Notifications, Capture.In(this._messages), It.IsAny<Func<SuccessResponse, bool>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult(true))
+            .ReturnsAsync(true)
             .Callback(tcs.SetResult);
         this._postAsyncCompleted = tcs.Task;
         this._notificationService = new(mockClient.Object, this._mockNotificationMapping.Object, NullLogger<NotificationService>.Instance);
@@ -40,7 +41,7 @@ public sealed class NotificationServiceTests : IDisposable
     public void Dispose() => this._notificationService.Dispose();
 
     [Fact]
-    public async Task Should_Correctly_Send_Message_In_SendNotificationAsync()
+    public async Task SendNotificationAsync_should_send_correct_message()
     {
         Notification notification = new("deviceId", "component", "value");
         await this._notificationService.SendNotificationAsync(this.CreateDeviceAdapter(), notification, default).ConfigureAwait(false);
@@ -50,7 +51,14 @@ public sealed class NotificationServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Should_Correctly_Send_Message_In_SendSensorNotificationAsync()
+    public Task SendNotificationAsync_should_throw_if_property_is_null() => Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(
+        this.CreateDeviceAdapter(),
+        default,
+        default
+    ));
+
+    [Fact]
+    public async Task SendSensorNotificationAsync_should_send_correct_message()
     {
         Notification notification = new("deviceId", "component", "value");
         await this._notificationService.SendSensorNotificationAsync(this.CreateDeviceAdapter(), notification, default).ConfigureAwait(false);
@@ -60,33 +68,18 @@ public sealed class NotificationServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Should_Throw_From_SendNotificationAsync_If_Property_Is_Null()
-    {
-        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(
-            this.CreateDeviceAdapter(),
-            default,
-            default
-        )).ConfigureAwait(false);
-        Assert.Equal("notification", exception.ParamName);
-    }
-
-    [Fact]
-    public async Task Should_Throw_From_SendSensorNotificationAsync_If_Property_Is_Null()
-    {
-        ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendSensorNotificationAsync(
-            this.CreateDeviceAdapter(),
-            default,
-            default
-        )).ConfigureAwait(false);
-        Assert.Equal("notification", exception.ParamName);
-    }
+    public Task SendSensorNotificationAsync_should_throw_if_property_is_null() => Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendSensorNotificationAsync(
+        this.CreateDeviceAdapter(),
+        default,
+        default
+    ));
 
     private IDeviceAdapter CreateDeviceAdapter()
     {
         string adapterName = $"adapter{this._messages.Count}";
-        Mock<IDeviceAdapter> mockAdapter = new();
-        mockAdapter.SetupGet(adapter => adapter.AdapterName).Returns(adapterName);
-        mockAdapter.SetupGet(adapter => adapter.DeviceName).Returns(adapterName);
+        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
+        mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
+        mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
         return mockAdapter.Object;
     }
 

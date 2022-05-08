@@ -58,7 +58,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     private readonly DeviceAdapterModel[] _devices;
     private readonly INotificationService _notificationService;
 
-    public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> devices, INotificationService notificationService, ILogger<IDeviceDatabase> logger)
+    public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> devices, INotificationService notificationService, ILogger<DeviceDatabase> logger)
     {
         this._notificationService = notificationService;
         this._devices = new DeviceAdapterModel[devices.Count];
@@ -87,7 +87,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken)
     {
-        if (this._adapters.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container) && !container.IsInitialized)
+        if (this._adapters.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container))
         {
             await container.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -122,26 +122,24 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
         public IDeviceAdapter Adapter { get; }
 
-        public bool IsInitialized => this.Adapter.Initializer == null || this._task is { Status: TaskStatus.RanToCompletion };
-
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
-            if (this.Adapter is not { AdapterName: { } adapterName, DeviceName: { } deviceName, Initializer: { } initializer })
-            {
-                return Task.CompletedTask;
-            }
             if (this._task != null)
             {
                 return this._task;
             }
-            this._logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", deviceName, adapterName);
+            if (this.Adapter.Initializer == null)
+            {
+                return Task.CompletedTask;
+            }
+            this._logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", this.Adapter.DeviceName, this.Adapter.AdapterName);
             return InitializeAdapterAsync();
 
             async Task InitializeAdapterAsync()
             {
                 try
                 {
-                    await (this._task = initializer(cancellationToken)).ConfigureAwait(false);
+                    await (this._task = this.Adapter.Initializer(cancellationToken)).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {

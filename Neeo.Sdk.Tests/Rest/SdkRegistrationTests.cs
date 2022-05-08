@@ -20,27 +20,24 @@ public sealed class SdkRegistrationTests
 
     public SdkRegistrationTests()
     {
-        Mock<IBrain> mockBrain = new();
-        mockBrain.SetupGet(brain => brain.HostName).Returns(nameof(Brain));
-        mockBrain.SetupGet(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
-        Mock<IApiClient> mockApiClient = new();
+        Mock<IBrain> mockBrain = new(MockBehavior.Strict);
+        mockBrain.Setup(brain => brain.HostName).Returns(nameof(Brain));
+        mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
+        Mock<IApiClient> mockApiClient = new(MockBehavior.Strict);
         List<object> list = new();
-        mockApiClient.Setup(client => client.PostAsync(
-            Capture.With<string>(new(list.Add)),
-            Capture.With<object>(new(list.Add)),
-            It.IsAny<Func<SuccessResponse, bool>>(),
-            It.IsAny<CancellationToken>()
-        )).Returns(value: Task.FromResult(true));
+        mockApiClient
+            .Setup(client => client.PostAsync(Capture.With<string>(new(list.Add)), Capture.With<object>(new(list.Add)), It.IsAny<Func<SuccessResponse, bool>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         this._path = new(() => (string)list[0]);
         this._body = new(() => list[1]);
-        Mock<ISdkEnvironment> mockSdkEnvironment = new();
-        mockSdkEnvironment.SetupGet(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
-        mockSdkEnvironment.SetupGet(environment => environment.HostAddress).Returns(Constants.HostAddress);
+        Mock<ISdkEnvironment> mockSdkEnvironment = new(MockBehavior.Strict);
+        mockSdkEnvironment.Setup(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
+        mockSdkEnvironment.Setup(environment => environment.HostAddress).Returns(Constants.HostAddress);
         this._sdkRegistration = new(mockBrain.Object, mockApiClient.Object, mockSdkEnvironment.Object, NullLogger<SdkRegistration>.Instance);
     }
 
     [Fact]
-    public async Task Should_Register_Using_Correct_Parameters_During_StartAsync()
+    public async Task StartAsync_should_register_using_correct_parameters()
     {
         await this._sdkRegistration.StartAsync(default).ConfigureAwait(false);
         Assert.Equal(UrlPaths.RegisterServer, this._path.Value);
@@ -49,7 +46,7 @@ public sealed class SdkRegistrationTests
     }
 
     [Fact]
-    public async Task Should_Unregister_Using_Correct_Parameters_During_StopAsync()
+    public async Task StopAsync_should_unregister_using_correct_parameters()
     {
         await this._sdkRegistration.StopAsync(default).ConfigureAwait(false);
         Assert.Equal(UrlPaths.UnregisterServer, this._path.Value);

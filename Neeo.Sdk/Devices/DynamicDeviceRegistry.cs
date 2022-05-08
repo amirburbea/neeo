@@ -41,6 +41,10 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 
     public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken)
     {
+        if (rootAdapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
+        {
+            return default;
+        }
         string key = DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId);
         try
         {
@@ -54,7 +58,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         {
             this._lock.ExitReadLock();
         }
-        if (rootAdapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature ||
+        if (!feature.EnableDynamicDeviceBuilder ||
             await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not { Length: 1 } devices ||
             devices[0] is not { DeviceBuilder: { } builder })
         {
@@ -65,11 +69,10 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         return adapter;
     }
 
-    public void RegisterDiscoveredDevice(string rootAdapterName, string deviceId, IDeviceBuilder builder)
-    {
-        string key = DynamicDeviceRegistry.ComputeKey(rootAdapterName, deviceId);
-        this.RegisterDiscoveredDevice(key, builder.BuildAdapter());
-    }
+    public void RegisterDiscoveredDevice(string rootAdapterName, string deviceId, IDeviceBuilder builder) => this.RegisterDiscoveredDevice(
+        DynamicDeviceRegistry.ComputeKey(rootAdapterName, deviceId),
+        builder.BuildAdapter()
+    );
 
     private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
 

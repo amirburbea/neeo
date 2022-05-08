@@ -28,35 +28,33 @@ public sealed class NotificationMappingTests
 
     public NotificationMappingTests()
     {
-        Mock<ISdkEnvironment> mockEnvironment = new();
-        mockEnvironment.SetupGet(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
+        Mock<ISdkEnvironment> mockEnvironment = new(MockBehavior.Strict);
+        mockEnvironment.Setup(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
         List<string> paths = new();
-        Mock<IApiClient> mockClient = new();
-        mockClient.Setup(client => client.GetAsync(
-            Capture.In(paths),
-            It.IsAny<Func<Entry[], Entry[]>>(),
-            It.IsAny<CancellationToken>()
-        )).Returns(Task.FromResult(NotificationMappingTests._entries));
+        Mock<IApiClient> mockClient = new(MockBehavior.Strict);
+        mockClient
+            .Setup(client => client.GetAsync(Capture.In(paths), It.IsAny<Func<Entry[], Entry[]>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(NotificationMappingTests._entries);
         this._path = new(() => paths.Single());
         this._notificationMapping = new(mockClient.Object, mockEnvironment.Object, NullLogger<NotificationMapping>.Instance);
     }
 
     [Fact]
-    public async Task Should_Get_Keys_Of_Entries_Matching_Label_If_Not_Matched_By_Name()
+    public async Task Should_fall_back_to_get_keys_from_entries_by_label_when_not_matching_by_name()
     {
         var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2").ConfigureAwait(false);
         Assert.Equal(new[] { "key2", "key3" }, keys);
     }
 
     [Fact]
-    public async Task Should_Get_Keys_Of_Entries_Matching_Name()
+    public async Task Should_get_keys_from_entries_matching_by_name()
     {
         var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "name1").ConfigureAwait(false);
         Assert.Equal("key1", keys.Single());
     }
 
     [Fact]
-    public async Task Should_Make_Http_Request_To_Correct_Path()
+    public async Task Should_make_API_request_to_correct_path()
     {
         await this.GetNotificationKeysAsync("myAdapter", "myDevice", "myComponent").ConfigureAwait(false);
         Assert.Equal($"/v1/api/notificationkey/{Constants.SdkAdapterName}/myAdapter/myDevice", this._path.Value);
@@ -64,9 +62,9 @@ public sealed class NotificationMappingTests
 
     private ValueTask<string[]> GetNotificationKeysAsync(string adapterName, string deviceId, string componentName)
     {
-        Mock<IDeviceAdapter> mockAdapter = new();
-        mockAdapter.SetupGet(adapter => adapter.AdapterName).Returns(adapterName);
-        mockAdapter.SetupGet(adapter => adapter.DeviceName).Returns(adapterName);
+        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
+        mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
+        mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
         return this._notificationMapping.GetNotificationKeysAsync(mockAdapter.Object, deviceId, componentName, default);
     }
 

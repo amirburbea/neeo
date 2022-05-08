@@ -9,24 +9,24 @@ namespace Neeo.Sdk.Tests.Rest;
 
 public sealed class UriPrefixNotifierTest
 {
-    private readonly Mock<IDeviceDatabase> _mockDatabase = new();
+    private readonly Mock<IDeviceDatabase> _mockDatabase = new(MockBehavior.Strict);
     private readonly UriPrefixNotifier _uriPrefixNotifier;
 
     public UriPrefixNotifierTest()
     {
-        Mock<ISdkEnvironment> mockEnvironment = new();
-        mockEnvironment.SetupGet(environment => environment.HostAddress).Returns(Constants.HostAddress);
+        Mock<ISdkEnvironment> mockEnvironment = new(MockBehavior.Strict);
+        mockEnvironment.Setup(environment => environment.HostAddress).Returns(Constants.HostAddress);
         this._uriPrefixNotifier = new(this._mockDatabase.Object, mockEnvironment.Object);
     }
 
     [Fact]
-    public async Task Should_Notify_Correct_Uri_Prefix()
+    public async Task StartAsync_should_notify_correct_uri_prefix()
     {
-        Mock<IDeviceAdapter> mockAdapter = new();
-        this._mockDatabase.SetupGet(database => database.Adapters).Returns(new[] { mockAdapter.Object });
-        mockAdapter.SetupGet(adapter => adapter.AdapterName).Returns(nameof(mockAdapter));
+        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
+        this._mockDatabase.Setup(database => database.Adapters).Returns(new[] { mockAdapter.Object });
+        mockAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockAdapter));
         string? uriPrefix = default;
-        mockAdapter.SetupGet(adapter => adapter.UriPrefixCallback).Returns(SetUriPrefix);
+        mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(SetUriPrefix);
         await this._uriPrefixNotifier.StartAsync(default).ConfigureAwait(false);
         Assert.Equal($"{Constants.HostAddress}/device/{nameof(mockAdapter)}/custom/", uriPrefix);
 
@@ -38,11 +38,11 @@ public sealed class UriPrefixNotifierTest
     }
 
     [Fact]
-    public async Task Should_Notify_Multiple_Adapters_In_Parallel()
+    public async Task StartAsync_should_notify_multiple_adapters_in_parallel()
     {
-        Mock<IDeviceAdapter> mockAdapter1 = new();
-        Mock<IDeviceAdapter> mockAdapter2 = new();
-        this._mockDatabase.SetupGet(database => database.Adapters).Returns(new[] { mockAdapter1.Object, mockAdapter2.Object });
+        Mock<IDeviceAdapter> mockAdapter1 = new(MockBehavior.Strict);
+        Mock<IDeviceAdapter> mockAdapter2 = new(MockBehavior.Strict);
+        this._mockDatabase.Setup(database => database.Adapters).Returns(new[] { mockAdapter1.Object, mockAdapter2.Object });
         int[] threadIds = new int[2];
         SetUpMock(mockAdapter1, 0);
         SetUpMock(mockAdapter2, 1);
@@ -53,8 +53,8 @@ public sealed class UriPrefixNotifierTest
 
         void SetUpMock(Mock<IDeviceAdapter> mock, int index)
         {
-            mock.SetupGet(adapter => adapter.AdapterName).Returns($"adapter{index}");
-            mock.SetupGet(adapter => adapter.UriPrefixCallback).Returns(_ => SetUriPrefix(index));
+            mock.Setup(adapter => adapter.AdapterName).Returns($"adapter{index}");
+            mock.Setup(adapter => adapter.UriPrefixCallback).Returns(_ => SetUriPrefix(index));
         }
 
         async ValueTask SetUriPrefix(int index)
