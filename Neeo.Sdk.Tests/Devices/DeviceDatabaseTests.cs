@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Microsoft.Extensions.Logging.Abstractions;
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
@@ -11,5 +10,5 @@ public sealed class DeviceDatabaseTests
 {
     private readonly Mock<INotificationService> _mockNotificationService = new(MockBehavior.Strict);
 
-    private DeviceDatabase CreateDatabase(IReadOnlyCollection<IDeviceBuilder> devices) => new(devices, this._mockNotificationService.Object, NullLogger<DeviceDatabase>.Instance);
+    private DeviceDatabase CreateDatabase(params IDeviceBuilder[] devices) => new(devices, this._mockNotificationService.Object, NullLogger<DeviceDatabase>.Instance);
 }

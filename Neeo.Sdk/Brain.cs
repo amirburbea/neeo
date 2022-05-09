@@ -146,7 +146,7 @@ public sealed class Brain : IAsyncDisposable, IBrain
         this._host = await Server.StartSdkAsync(
             this,
             devices,
-            $"src-{UniqueNameGenerator.Generate(name ?? Dns.GetHostName())}",
+            $"src-{UniqueNameGenerator.Generate(name ?? this.HostName)}",
             hostIPAddress ?? await this.GetFallbackHostIPAddress(cancellationToken).ConfigureAwait(false),
             port,
             configureLogging,

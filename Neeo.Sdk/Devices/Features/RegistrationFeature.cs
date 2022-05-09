@@ -61,8 +61,8 @@ internal sealed class RegistrationFeature : IRegistrationFeature
         using MemoryStream inputStream = new(Encoding.ASCII.GetBytes(credentials));
         using ArmoredInputStream armoredInputStream = new(inputStream);
         PgpObjectFactory inputFactory = new(armoredInputStream);
-        PgpObject next = inputFactory.NextPgpObject() as PgpEncryptedDataList ?? inputFactory.NextPgpObject();
-        if (next is PgpEncryptedDataList { Count: > 0 } list && list[0] is PgpPublicKeyEncryptedData data)
+        PgpObject next = inputFactory.NextPgpObject() as PgpEncryptedDataList ?? inputFactory.NextPgpObject(); // There could be a wrapper.
+        if (next is PgpEncryptedDataList { Count: not 0 } list && list[0] is PgpPublicKeyEncryptedData data)
         {
             using Stream privateStream = data.GetDataStream(privateKey);
             PgpObjectFactory privateFactory = new(privateStream);

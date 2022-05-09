@@ -40,7 +40,7 @@ public sealed class FlaggedEnumerationsTests
     [Fact]
     public void GetNames_should_return_empty_array_for_enums_not_ulong_based()
     {
-        Assert.StrictEqual(FlaggedEnumerations.GetNames(TestEnumInvalid.One | TestEnumInvalid.Two).ToArray(), Array.Empty<string>());
+        Assert.Same(FlaggedEnumerations.GetNames(TestEnumInvalid.One | TestEnumInvalid.Two).ToArray(), Array.Empty<string>());
     }
 
     [Theory]

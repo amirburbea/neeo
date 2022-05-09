@@ -75,9 +75,8 @@ internal partial class DeviceController
                 // Static device component.
                 return (adapter, feature);
             }
-            // Check for a discovered device with `EnableDynamicDeviceBuilder` and that the dynamic device has a component with that name.
-            if (adapter.GetFeature(ComponentType.Discovery) is IDiscoveryFeature { EnableDynamicDeviceBuilder: true } &&
-                await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.HttpContext.RequestAborted) is { } dynamicDeviceAdapter &&
+            // Check for a discovered device with the name `deviceId` and has a component named `componentName`.
+            if (await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.HttpContext.RequestAborted) is { } dynamicDeviceAdapter &&
                 (feature = dynamicDeviceAdapter.GetFeature(componentName)) is not null)
             {
                 return (dynamicDeviceAdapter, feature);

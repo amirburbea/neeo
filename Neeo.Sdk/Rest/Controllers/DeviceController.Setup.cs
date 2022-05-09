@@ -17,17 +17,17 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        this._logger.LogInformation("Beginning discovery for {adapter}.", adapter.DeviceName);
+        this._logger.LogInformation("Beginning discovery for {adapter}...", adapter.DeviceName);
         DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken: this.HttpContext.RequestAborted);
         if (devices.Length != 0 && feature.EnableDynamicDeviceBuilder)
         {
-            Parallel.ForEach(devices, new() { CancellationToken = this.HttpContext.RequestAborted }, device =>
+            foreach (DiscoveredDevice device in devices)
             {
                 if (device.DeviceBuilder is { } builder)
                 {
-                    this._dynamicDevices.RegisterDiscoveredDevice(adapterName, device.Id, builder);
+                    this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, builder);
                 }
-            });
+            }
         }
         return devices;
     }

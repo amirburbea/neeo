@@ -41,19 +41,18 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
-        if (await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } results)
+        DiscoveredDevice[] devices = await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false);
+        if (devices is not { Length: 0 })
         {
-            return Array.Empty<DiscoveredDevice>();
+            this.Validate(devices);
         }
-        // Validate results first.
-        this.Validate(results);
-        return results;
+        return devices;
     }
 
-    private void Validate(DiscoveredDevice[] results)
+    private void Validate(DiscoveredDevice[] discoveredDevices)
     {
         HashSet<string> ids = new();
-        foreach ((string id, string name, _, _, IDeviceBuilder? device) in results)
+        foreach ((string id, string name, _, _, IDeviceBuilder? device) in discoveredDevices)
         {
             if (string.IsNullOrEmpty(id) || !ids.Add(id))
             {
@@ -65,10 +64,10 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
             }
             if (this.EnableDynamicDeviceBuilder == device is null)
             {
-                throw new InvalidOperationException(device is null
+                throw new InvalidOperationException($"{name}: " + (device is null
                     ? "EnableDynamicDeviceBuilder was specified but a device was not supplied."
                     : "EnableDynamicDeviceBuilder was not specified but a device was supplied."
-                );
+                ));
             }
         }
     }
