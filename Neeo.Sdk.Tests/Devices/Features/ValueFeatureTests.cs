@@ -29,7 +29,7 @@ public sealed class ValueFeatureTests
     {
         string deviceId = Guid.NewGuid().ToString();
         Mock<DeviceValueSetter<bool>> mockSetter = new();
-        mockSetter.Setup(setter => setter(deviceId, value)).Returns(Task.CompletedTask);
+        mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
         var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(), mockSetter.Object);
         await feature.SetValueAsync(deviceId, text).ConfigureAwait(false);
         mockSetter.Verify(setter => setter(deviceId, value), Times.Once());
@@ -43,7 +43,7 @@ public sealed class ValueFeatureTests
     {
         string deviceId = Guid.NewGuid().ToString();
         Mock<DeviceValueSetter<double>> mockSetter = new();
-        mockSetter.Setup(setter => setter(deviceId, value)).Returns(Task.CompletedTask);
+        mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<double>())).Returns(Task.CompletedTask);
         var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<double>>(), mockSetter.Object);
         await feature.SetValueAsync(deviceId, text).ConfigureAwait(false);
         mockSetter.Verify(setter => setter(deviceId, value), Times.Once());
