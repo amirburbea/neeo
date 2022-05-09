@@ -17,8 +17,10 @@ public sealed class ValueFeatureTests
     {
         Mock<DeviceValueGetter<bool>> mockGetter = new(MockBehavior.Strict);
         mockGetter.Setup(getter => getter(It.IsAny<string>())).ReturnsAsync(value);
+
         var feature = ValueFeature.Create(mockGetter.Object);
-        var response = await feature.GetValueAsync(string.Empty).ConfigureAwait(false);
+        var response = await feature.GetValueAsync(string.Empty);
+
         Assert.Same(BooleanBoxes.GetBox(value), response.Value);
     }
 
@@ -27,11 +29,13 @@ public sealed class ValueFeatureTests
     [InlineData(false, "false")]
     public async Task SetValueAsync_should_parse_boolean_values(bool value, string text)
     {
-        string deviceId = Guid.NewGuid().ToString();
-        Mock<DeviceValueSetter<bool>> mockSetter = new();
+        Mock<DeviceValueSetter<bool>> mockSetter = new(MockBehavior.Strict);
         mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(), mockSetter.Object);
-        await feature.SetValueAsync(deviceId, text).ConfigureAwait(false);
+
+        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict), mockSetter.Object);
+        string deviceId = Guid.NewGuid().ToString();
+        await feature.SetValueAsync(deviceId, text);
+
         mockSetter.Verify(setter => setter(deviceId, value), Times.Once());
     }
 
@@ -41,18 +45,21 @@ public sealed class ValueFeatureTests
     [InlineData(12345.0001, "00012345.00010000")]
     public async Task SetValueAsync_should_parse_double_values(double value, string text)
     {
-        string deviceId = Guid.NewGuid().ToString();
-        Mock<DeviceValueSetter<double>> mockSetter = new();
+        Mock<DeviceValueSetter<double>> mockSetter = new(MockBehavior.Strict);
         mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<double>())).Returns(Task.CompletedTask);
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<double>>(), mockSetter.Object);
-        await feature.SetValueAsync(deviceId, text).ConfigureAwait(false);
+
+        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<double>>(MockBehavior.Strict), mockSetter.Object);
+        string deviceId = Guid.NewGuid().ToString();
+        await feature.SetValueAsync(deviceId, text);
+
         mockSetter.Verify(setter => setter(deviceId, value), Times.Once());
     }
 
     [Fact]
-    public Task SetValueAsync_should_throw_when_no_setter()
+    public Task SetValueAsync_should_throw_when_created_without_setter()
     {
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>());
+        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict));
+
         return Assert.ThrowsAsync<NotSupportedException>(() => feature.SetValueAsync(string.Empty, string.Empty));
     }
 }

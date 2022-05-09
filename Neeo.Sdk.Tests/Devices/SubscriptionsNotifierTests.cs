@@ -28,7 +28,9 @@ public sealed class SubscriptionsNotifierTests
     {
         var adapter = this.CreateAdapter("adapter", true);
         this.SetAdapters(adapter);
-        await this._notifier.StartAsync(default).ConfigureAwait(false);
+
+        await this._notifier.StartAsync(default);
+
         Assert.Equal(Constants.GetAsyncCalled, adapter.SpecificName);
     }
 
@@ -38,7 +40,9 @@ public sealed class SubscriptionsNotifierTests
         var adapterWith = this.CreateAdapter("adapter1", true);
         var adapterWithout = this.CreateAdapter("adapter2", false);
         this.SetAdapters(adapterWith, adapterWithout);
-        await this._notifier.StartAsync(default).ConfigureAwait(false);
+
+        await this._notifier.StartAsync(default);
+
         Assert.Equal(Constants.GetAsyncCalled, adapterWith.SpecificName);
         Assert.Equal(Constants.GetAsyncNotCalled, adapterWithout.SpecificName);
     }

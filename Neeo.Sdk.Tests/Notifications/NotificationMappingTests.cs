@@ -42,21 +42,24 @@ public sealed class NotificationMappingTests
     [Fact]
     public async Task Should_fall_back_to_get_keys_from_entries_by_label_when_not_matching_by_name()
     {
-        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2").ConfigureAwait(false);
+        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
+
         Assert.Equal(new[] { "key2", "key3" }, keys);
     }
 
     [Fact]
     public async Task Should_get_keys_from_entries_matching_by_name()
     {
-        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "name1").ConfigureAwait(false);
+        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "name1");
+ 
         Assert.Equal("key1", keys.Single());
     }
 
     [Fact]
     public async Task Should_make_API_request_to_correct_path()
     {
-        await this.GetNotificationKeysAsync("myAdapter", "myDevice", "myComponent").ConfigureAwait(false);
+        await this.GetNotificationKeysAsync("myAdapter", "myDevice", "myComponent");
+
         Assert.Equal($"/v1/api/notificationkey/{Constants.SdkAdapterName}/myAdapter/myDevice", this._path.Value);
     }
 

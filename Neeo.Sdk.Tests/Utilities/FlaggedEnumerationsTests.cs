@@ -49,7 +49,10 @@ public sealed class FlaggedEnumerationsTests
     [InlineData(TestEnum.Four | TestEnum.Two | TestEnum.One, new[] { "ONE", "TWO", "FOUR" })]
     public void GetNames_should_return_names_sorted_by_value(TestEnum value, string[] expectedOutput)
     {
-        Assert.Equal(expectedOutput, FlaggedEnumerations.GetNames(value));
+        var names = FlaggedEnumerations.GetNames(value);
+
+        Assert.IsNotType<string[]>(names);
+        Assert.Equal(expectedOutput, names);
     }
 
     [Theory]
@@ -59,9 +62,9 @@ public sealed class FlaggedEnumerationsTests
     [InlineData((TestEnum)0)]
     public void GetNames_should_return_single_value_array_when_not_flagged_value(TestEnum value)
     {
-        string expected = TextAttribute.GetText(value);
         var names = FlaggedEnumerations.GetNames(value);
+
         Assert.IsType<string[]>(names);
-        Assert.Equal(expected, names.Single());
+        Assert.Equal(TextAttribute.GetText(value), names.Single());
     }
 }

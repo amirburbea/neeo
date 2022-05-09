@@ -41,8 +41,7 @@ public sealed class TextAttributeTests
     [InlineData("Four")]
     public void GetEnum_should_return_enum_by_name_when_missing_attribute(string name)
     {
-        TestEnum expected = Enum.Parse<TestEnum>(name);
-        Assert.Equal(expected, TextAttribute.GetEnum<TestEnum>(name));
+        Assert.Equal(Enum.Parse<TestEnum>(name), TextAttribute.GetEnum<TestEnum>(name));
     }
 
     [Fact]
@@ -57,6 +56,7 @@ public sealed class TextAttributeTests
     public void GetText_should_return_attribute_text(TestEnum value)
     {
         string? expectedText = typeof(TestEnum).GetField(value.ToString(), BindingFlags.Public | BindingFlags.Static)?.GetCustomAttribute<TextAttribute>()?.Text;
+
         Assert.NotNull(expectedText); // Verify the test data was correct and we definitely have the attribute.
         Assert.Equal(expectedText, TextAttribute.GetText(value));
     }
@@ -66,7 +66,6 @@ public sealed class TextAttributeTests
     [InlineData(TestEnum.One | TestEnum.Two)]
     public void GetText_should_return_ToString_when_missing_attribute(TestEnum value)
     {
-        string expectedText = value.ToString();
-        Assert.Equal(expectedText, TextAttribute.GetText(value));
+        Assert.Equal(value.ToString(), TextAttribute.GetText(value));
     }
 }

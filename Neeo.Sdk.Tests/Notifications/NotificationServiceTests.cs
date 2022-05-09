@@ -27,7 +27,7 @@ public sealed class NotificationServiceTests : IDisposable
 
     public NotificationServiceTests()
     {
-        this.SetNotificationKeys(ValueTask.FromResult(new string[] { "key" }));
+        this.SetNotificationKeys(ValueTask.FromResult(new[] { Constants.NotificationKey }));
         Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         TaskCompletionSource tcs = new();
         mockClient
@@ -43,11 +43,15 @@ public sealed class NotificationServiceTests : IDisposable
     [Fact]
     public async Task SendNotificationAsync_should_send_correct_message()
     {
-        Notification notification = new("deviceId", "component", "value");
-        await this._notificationService.SendNotificationAsync(this.CreateDeviceAdapter(), notification, default).ConfigureAwait(false);
-        Message message = await this.GetMessageAsync().ConfigureAwait(false);
-        Assert.Equal(("key", "value"), message.ExtractTypeAndData());
-        Assert.Equal("key", message.Type);
+        await this._notificationService.SendNotificationAsync(
+            this.CreateDeviceAdapter(),
+            new(Constants.DeviceId, Constants.ComponentName, Constants.Value),
+            default
+        );
+
+        Message message = await this.GetMessageAsync();
+        Assert.Equal((Constants.NotificationKey, Constants.Value), message.ExtractTypeAndData());
+        Assert.Equal(Constants.NotificationKey, message.Type);
     }
 
     [Fact]
@@ -60,9 +64,13 @@ public sealed class NotificationServiceTests : IDisposable
     [Fact]
     public async Task SendSensorNotificationAsync_should_send_correct_message()
     {
-        Notification notification = new("deviceId", "component", "value");
-        await this._notificationService.SendSensorNotificationAsync(this.CreateDeviceAdapter(), notification, default).ConfigureAwait(false);
-        Message message = await this.GetMessageAsync().ConfigureAwait(false);
+        await this._notificationService.SendSensorNotificationAsync(
+            this.CreateDeviceAdapter(),
+            new(Constants.DeviceId, Constants.ComponentName, Constants.Value),
+            default
+        );
+
+        Message message = await this.GetMessageAsync();
         Assert.Equal(("key", "value"), message.ExtractTypeAndData());
         Assert.Equal("DEVICE_SENSOR_UPDATE", message.Type);
     }
@@ -83,13 +91,17 @@ public sealed class NotificationServiceTests : IDisposable
         return mockAdapter.Object;
     }
 
-    private async Task<Message> GetMessageAsync()
-    {
-        await this._postAsyncCompleted.ConfigureAwait(false);
-        return this._messages.Single();
-    }
+    private Task<Message> GetMessageAsync() => this._postAsyncCompleted.ContinueWith(_ => this._messages.Single(), TaskContinuationOptions.ExecuteSynchronously);
 
     private void SetNotificationKeys(ValueTask<string[]> keys) => this._mockNotificationMapping
         .Setup(mapping => mapping.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
         .Returns(keys);
+
+    private static class Constants
+    {
+        public const string DeviceId = "deviceId";
+        public const string ComponentName = "component";
+        public const string Value = "value";
+        public const string NotificationKey = "key";
+    }
 }

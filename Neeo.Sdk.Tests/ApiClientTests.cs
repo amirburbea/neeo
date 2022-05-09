@@ -30,8 +30,6 @@ public sealed class ApiClientTests : IDisposable
             .Protected()
             .As<IMessageHandlerMockedMethods>()
             .Setup(handler => handler.Dispose(true));
-        // Default.
-        this.SetupResponse(_ => Task.FromResult(new object()));
     }
 
     private interface IMessageHandlerMockedMethods
@@ -49,16 +47,20 @@ public sealed class ApiClientTests : IDisposable
     [InlineData("1234", 4)]
     public async Task GetAsync_should_transform_response_body(string response, int expectedOutput)
     {
-        this.SetupResponse(_ => Task.FromResult(response));
+        this.SetupResponse(response);
+
         int output = await this._client.GetAsync("/", static (string text) => text.Length);
+
         Assert.Equal(expectedOutput, output);
     }
 
     [Fact]
     public void GetAsync_should_use_HTTP_GET()
     {
-        var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
-        _ = this._client.GetAsync("/", static (object obj) => obj);
+        var request = this.SetupResponse(new object());
+
+        _ = this._client.GetAsync("/", Mock.Of<Func<object, object>>());
+
         Assert.Equal("GET", request.Value.Method.Method);
     }
 
@@ -68,8 +70,10 @@ public sealed class ApiClientTests : IDisposable
     [InlineData("1234", "4321")]
     public async Task PostAsync_should_transform_response_body(string response, string expectedOutput)
     {
-        this.SetupResponse(_ => Task.FromResult(response));
+        this.SetupResponse(response);
+
         string output = await this._client.PostAsync("/", string.Empty, static (string text) => new string(text.Reverse().ToArray()));
+
         Assert.Equal(expectedOutput, output);
     }
 
@@ -77,8 +81,10 @@ public sealed class ApiClientTests : IDisposable
     public void PostAsync_should_use_HTTP_POST_and_serialize_body()
     {
         var body = new { A = "123" };
-        var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
-        _ = this._client.PostAsync("/", body, static (object obj) => obj);
+        var request = this.SetupResponse(new TaskCompletionSource<object>().Task);
+
+        _ = this._client.PostAsync("/", body, Mock.Of<Func<object, object>>());
+
         Assert.Equal("POST", request.Value.Method.Method);
         Assert.NotNull(request.Value.Content);
         using StreamReader reader = new(request.Value.Content!.ReadAsStream());
@@ -91,26 +97,30 @@ public sealed class ApiClientTests : IDisposable
     [InlineData("/foo/bar")]
     public void Requests_should_concatenate_paths_correctly(string path)
     {
-        var request = this.SetupResponse(_ => new TaskCompletionSource<object>().Task);
-        _ = this._client.GetAsync(path, static (object obj) => obj);
+        var request = this.SetupResponse(new object());
+
+        _ = this._client.GetAsync(path, Mock.Of<Func<object, object>>());
+
         Assert.Equal($"http://127.0.0.1:1234{path}", request.Value.RequestUri!.ToString());
     }
 
     [Fact]
     public Task Requests_should_throw_on_path_without_preceding_slash() => Assert.ThrowsAsync<ArgumentException>(
-        () => this._client.GetAsync("path_without_preceding_slash", static (object obj) => obj)
+        () => this._client.GetAsync("path_without_preceding_slash", Mock.Of<Func<object, object>>())
     );
 
-    private Lazy<HttpRequestMessage> SetupResponse<T>(Func<HttpRequestMessage, Task<T>> callback)
+    private Lazy<HttpRequestMessage> SetupResponse<T>(T value) => this.SetupResponse(Task.FromResult(value));
+
+    private Lazy<HttpRequestMessage> SetupResponse<T>(Task<T> task)
     {
         List<HttpRequestMessage> captured = new();
         this._mockMessageHandler
             .Protected()
             .As<IMessageHandlerMockedMethods>()
             .Setup(handler => handler.SendAsync(Capture.In(captured), It.IsAny<CancellationToken>()))
-            .Returns(async (HttpRequestMessage request, CancellationToken _) => new()
+            .Returns(async (HttpRequestMessage _, CancellationToken _) => new()
             {
-                Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(await callback(request).ConfigureAwait(false), JsonSerialization.Options))
+                Content = new StringContent(JsonSerializer.Serialize(await task, JsonSerialization.Options))
             });
         return new(() => captured.Single());
     }

@@ -39,7 +39,8 @@ public sealed class SdkRegistrationTests
     [Fact]
     public async Task StartAsync_should_register_using_correct_parameters()
     {
-        await this._sdkRegistration.StartAsync(default).ConfigureAwait(false);
+        await this._sdkRegistration.StartAsync(default);
+
         Assert.Equal(UrlPaths.RegisterServer, this._path.Value);
         string bodyJson = JsonSerializer.Serialize(this._body.Value, JsonSerialization.Options);
         Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\",\"baseUrl\":\"{Constants.HostAddress}\"}}", bodyJson);
@@ -48,7 +49,8 @@ public sealed class SdkRegistrationTests
     [Fact]
     public async Task StopAsync_should_unregister_using_correct_parameters()
     {
-        await this._sdkRegistration.StopAsync(default).ConfigureAwait(false);
+        await this._sdkRegistration.StopAsync(default);
+
         Assert.Equal(UrlPaths.UnregisterServer, this._path.Value);
         string bodyJson = JsonSerializer.Serialize(this._body.Value, JsonSerialization.Options);
         Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\"}}", bodyJson);

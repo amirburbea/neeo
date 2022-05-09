@@ -15,10 +15,12 @@ public sealed class FavoritesFeatureTests
     public async Task ExecuteAsync_should_pass_correct_arguments_to_handler(string favorite)
     {
         Mock<FavoriteHandler> mockFavoriteHandler = new(MockBehavior.Strict);
-        string deviceId = Guid.NewGuid().ToString();
-        mockFavoriteHandler.Setup(handler => handler(deviceId, favorite)).Returns(Task.CompletedTask);
+        mockFavoriteHandler.Setup(handler => handler(It.IsAny<string>(), It.IsAny<string>())).Returns(Task.CompletedTask);
+
         FavoritesFeature feature = new(mockFavoriteHandler.Object);
-        await feature.ExecuteAsync(deviceId, favorite).ConfigureAwait(false);
+        string deviceId = Guid.NewGuid().ToString();
+        await feature.ExecuteAsync(deviceId, favorite);
+
         mockFavoriteHandler.Verify(handler => handler(deviceId, favorite), Times.Once());
     }
 }

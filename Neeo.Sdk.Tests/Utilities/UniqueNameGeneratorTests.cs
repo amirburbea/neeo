@@ -12,6 +12,7 @@ public sealed class UniqueNameGeneratorTests
     public void Generate_should_create_consistent_output_per_input(string input, string expectedOutput)
     {
         const string prefix = "-"; // Defaults to hostname when not specified, but tests need to be runnable on other machines.
+
         Assert.Equal(expectedOutput, UniqueNameGenerator.Generate(input, prefix));
     }
 }

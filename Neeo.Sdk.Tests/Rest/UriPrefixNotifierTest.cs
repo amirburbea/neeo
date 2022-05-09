@@ -27,7 +27,9 @@ public sealed class UriPrefixNotifierTest
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockAdapter));
         string? uriPrefix = default;
         mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(SetUriPrefix);
-        await this._uriPrefixNotifier.StartAsync(default).ConfigureAwait(false);
+
+        await this._uriPrefixNotifier.StartAsync(default);
+
         Assert.Equal($"{Constants.HostAddress}/device/{nameof(mockAdapter)}/custom/", uriPrefix);
 
         ValueTask SetUriPrefix(string prefix)
@@ -46,7 +48,9 @@ public sealed class UriPrefixNotifierTest
         int[] threadIds = new int[2];
         SetUpMock(mockAdapter1, 0);
         SetUpMock(mockAdapter2, 1);
-        await this._uriPrefixNotifier.StartAsync(default).ConfigureAwait(false);
+
+        await this._uriPrefixNotifier.StartAsync(default);
+
         Assert.NotEqual(0, threadIds[0]);
         Assert.NotEqual(0, threadIds[1]);
         Assert.NotEqual(threadIds[0], threadIds[1]);
@@ -60,7 +64,7 @@ public sealed class UriPrefixNotifierTest
         async ValueTask SetUriPrefix(int index)
         {
             threadIds[index] = Environment.CurrentManagedThreadId;
-            await Task.Delay(1).ConfigureAwait(false);
+            await Task.Delay(1);
         }
     }
 
