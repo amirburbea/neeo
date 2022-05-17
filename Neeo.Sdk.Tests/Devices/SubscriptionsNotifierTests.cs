@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Utilities;
 using Xunit;
 
 namespace Neeo.Sdk.Tests.Devices;
@@ -26,7 +27,7 @@ public sealed class SubscriptionsNotifierTests
     [Fact]
     public async Task StartAsync_should_make_api_request_and_pass_result_to_adapter()
     {
-        var adapter = this.CreateAdapter("adapter", true);
+        var adapter = this.CreateAdapter("adapter", withSubscriptionFeature: true);
         this.SetAdapters(adapter);
 
         await this._notifier.StartAsync(default);
@@ -37,8 +38,8 @@ public sealed class SubscriptionsNotifierTests
     [Fact]
     public async Task StartAsync_should_only_make_api_request_on_adapters_with_subscription_support()
     {
-        var adapterWith = this.CreateAdapter("adapter1", true);
-        var adapterWithout = this.CreateAdapter("adapter2", false);
+        var adapterWith = this.CreateAdapter("with", withSubscriptionFeature: true);
+        var adapterWithout = this.CreateAdapter("without", withSubscriptionFeature: false);
         this.SetAdapters(adapterWith, adapterWithout);
 
         await this._notifier.StartAsync(default);

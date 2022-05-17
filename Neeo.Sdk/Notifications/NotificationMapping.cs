@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Notifications;
 

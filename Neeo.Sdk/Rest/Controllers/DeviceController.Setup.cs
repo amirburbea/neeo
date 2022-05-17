@@ -23,10 +23,11 @@ internal partial class DeviceController
         {
             foreach (DiscoveredDevice device in devices)
             {
-                if (device.DeviceBuilder is { } builder)
+                if (device.DeviceBuilder is not { } builder)
                 {
-                    this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, builder);
+                    continue;
                 }
+                this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, builder);
             }
         }
         return devices;

@@ -7,9 +7,8 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Utilities;
 
-namespace Neeo.Sdk;
+namespace Neeo.Sdk.Utilities;
 
 /// <summary>
 /// Brain REST API client.
@@ -64,7 +63,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
     public Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
         where TData : notnull
     {
-        return this.FetchAsync(path,HttpMethod.Get,default,transform,cancellationToken);
+        return this.FetchAsync(path, HttpMethod.Get, default, transform, cancellationToken);
     }
 
     public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)

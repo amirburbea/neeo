@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
+using Neeo.Sdk.Utilities;
 using Xunit;
 
 namespace Neeo.Sdk.Tests.Notifications;

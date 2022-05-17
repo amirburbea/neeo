@@ -32,26 +32,33 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
 {
     private readonly DiscoveryProcess _process;
 
-    public DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder)
+    public DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder = false)
     {
         (this._process, this.EnableDynamicDeviceBuilder) = (process ?? throw new ArgumentNullException(nameof(process)), enableDynamicDeviceBuilder);
     }
 
     public bool EnableDynamicDeviceBuilder { get; }
 
-    public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
+    public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default)
     {
-        DiscoveredDevice[] devices = await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false);
-        if (devices is not { Length: 0 })
+        if (await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } devices)
         {
-            this.Validate(devices);
+            return Array.Empty<DiscoveredDevice>();
         }
+        this.Validate(optionalDeviceId, devices);
         return devices;
     }
 
-    private void Validate(DiscoveredDevice[] discoveredDevices)
+    /// <summary>
+    /// Validate the array of discovered devices (with length not equal to zero).
+    /// </summary>
+    private void Validate(string? optionalDeviceId, DiscoveredDevice[] discoveredDevices)
     {
-        HashSet<string> ids = new();
+        if (optionalDeviceId != null && (discoveredDevices.Length != 1 || discoveredDevices[0].Id != optionalDeviceId))
+        {
+            throw new InvalidOperationException($"Discovery was to return at most one device with the id: {optionalDeviceId}");
+        }
+        HashSet<string> ids = new(discoveredDevices.Length);
         foreach ((string id, string name, _, _, IDeviceBuilder? device) in discoveredDevices)
         {
             if (string.IsNullOrEmpty(id) || !ids.Add(id))

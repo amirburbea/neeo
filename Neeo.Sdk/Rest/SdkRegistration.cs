@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest;
 
@@ -52,7 +53,8 @@ internal sealed class SdkRegistration : IHostedService
         }
     }
 
-    private Task PostAsync(string path, object body, CancellationToken cancellationToken)
+    private Task PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken)
+        where TBody : notnull
     {
         return this._client.PostAsync(path, body, static (SuccessResponse response) => response.Success, cancellationToken);
     }

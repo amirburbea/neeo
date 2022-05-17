@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -19,12 +17,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
-using Org.BouncyCastle.Bcpg;
-using Org.BouncyCastle.Bcpg.OpenPgp;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Generators;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Math;
+using Neeo.Sdk.Utilities;
 using Org.BouncyCastle.Security;
 
 namespace Neeo.Sdk.Rest;
@@ -69,7 +62,7 @@ internal static class Server
         .AddSingleton(brain)
         .AddSingleton(devices)
         .AddSingleton((SdkAdapterName)adapterName)
-        .AddSingleton(Server.CreatePgpKeys()) // Keys are created at random at the start of the server.
+        .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
         .AddSingleton<HttpMessageHandler>(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
         .AddSingleton<IApiClient, ApiClient>()
         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
@@ -109,19 +102,6 @@ internal static class Server
             }
         });
 
-    private static PgpKeyPair CreatePgpKeys()
-    {
-        byte[] randomBytes = RandomNumberGenerator.GetBytes(64);
-        char[] passphrase = Encoding.ASCII.GetChars(randomBytes);
-        SecureRandom random = new();
-        random.SetSeed(randomBytes);
-        RsaKeyPairGenerator generator = new();
-        generator.Init(new RsaKeyGenerationParameters(BigInteger.ValueOf(0x10001), random, 768, 8));
-        AsymmetricCipherKeyPair pair = generator.GenerateKeyPair();
-        PgpSecretKey secretKey = new(PgpSignature.DefaultCertification, PublicKeyAlgorithmTag.RsaGeneral, pair.Public, pair.Private, DateTime.Now, Dns.GetHostName(), SymmetricKeyAlgorithmTag.Aes256, passphrase, null, null, random);
-        return new(secretKey.PublicKey, secretKey.ExtractPrivateKey(passphrase));
-    }
-
     private static class Constants
     {
         public const int MaxRequestBodySize = 2 * 1024 * 1024;
@@ -132,5 +112,93 @@ internal static class Server
         public static readonly ControllerFeatureProvider Instance = new AssemblyControllerFeatureProvider();
 
         protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
+    }
+
+    private class SR : SecureRandom
+    {
+        public override byte[] GenerateSeed(int length)
+        {
+            return base.GenerateSeed(length);
+        }
+
+        public override int Next()
+        {
+            return base.Next();
+        }
+
+        public override int Next(int maxValue)
+        {
+            return base.Next(maxValue);
+        }
+
+        public override int Next(int minValue, int maxValue)
+        {
+            return base.Next(minValue, maxValue);
+        }
+
+        public override void NextBytes(byte[] buf)
+        {
+            base.NextBytes(buf);
+        }
+
+        public override void NextBytes(byte[] buf, int off, int len)
+        {
+            base.NextBytes(buf, off, len);
+        }
+
+        public override void NextBytes(Span<byte> buffer)
+        {
+            base.NextBytes(buffer);
+        }
+
+        public override double NextDouble()
+        {
+            return base.NextDouble();
+        }
+
+        public override int NextInt()
+        {
+            return base.NextInt();
+        }
+
+        public override long NextInt64()
+        {
+            return base.NextInt64();
+        }
+
+        public override long NextInt64(long maxValue)
+        {
+            return base.NextInt64(maxValue);
+        }
+
+        public override long NextInt64(long minValue, long maxValue)
+        {
+            return base.NextInt64(minValue, maxValue);
+        }
+
+        public override long NextLong()
+        {
+            return base.NextLong();
+        }
+
+        public override float NextSingle()
+        {
+            return base.NextSingle();
+        }
+
+        public override void SetSeed(byte[] seed)
+        {
+            base.SetSeed(seed);
+        }
+
+        public override void SetSeed(long seed)
+        {
+            base.SetSeed(seed);
+        }
+
+        protected override double Sample()
+        {
+            return base.Sample();
+        }
     }
 }

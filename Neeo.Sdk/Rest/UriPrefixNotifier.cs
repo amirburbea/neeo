@@ -19,13 +19,17 @@ internal sealed class UriPrefixNotifier : IHostedService
         (this._database, this._environment) = (database, environment);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken) => Parallel.ForEachAsync(this._database.Adapters, cancellationToken, async (adapter, _) =>
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (adapter.UriPrefixCallback is { } callback)
+        Parallel.ForEach(this._database.Adapters, new() { CancellationToken = cancellationToken }, adapter =>
         {
-            await callback($"{this._environment.HostAddress}/device/{adapter.AdapterName}/custom/").ConfigureAwait(false);
-        }
-    });
+            if (adapter.UriPrefixCallback is { } callback)
+            {
+                callback($"{this._environment.HostAddress}/device/{adapter.AdapterName}/custom/");
+            }
+        });
+        return Task.CompletedTask;
+    }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

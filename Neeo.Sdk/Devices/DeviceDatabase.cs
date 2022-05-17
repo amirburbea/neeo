@@ -53,7 +53,7 @@ public interface IDeviceDatabase
 
 internal sealed class DeviceDatabase : IDeviceDatabase
 {
-    private readonly Dictionary<string, DeviceAdapterContainer> _adapters;
+    private readonly Dictionary<string, DeviceAdapterContainer> _containers;
     private readonly TokenSearch<DeviceAdapterModel> _deviceIndex;
     private readonly DeviceAdapterModel[] _devices;
     private readonly INotificationService _notificationService;
@@ -62,13 +62,16 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     {
         this._notificationService = notificationService;
         this._devices = new DeviceAdapterModel[devices.Count];
-        this._adapters = new(this._devices.Length);
+        this._containers = new(this._devices.Length);
         foreach (IDeviceBuilder device in devices)
         {
             IDeviceAdapter adapter = device.BuildAdapter();
-            int id = this._adapters.Count;
+            int id = this._containers.Count;
             this._devices[id] = new(id, adapter);
-            this._adapters.Add(adapter.AdapterName, new(adapter, logger));
+            if (!this._containers.TryAdd(adapter.AdapterName, new(adapter, logger)))
+            {
+                throw new ArgumentException($"Adapter names must be unique. Adapter name {adapter.AdapterName} is reused at index {id}");
+            }
             if (device.NotifierCallback is { } callback)
             {
                 callback(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor));
@@ -83,11 +86,11 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         );
     }
 
-    IEnumerable<IDeviceAdapter> IDeviceDatabase.Adapters => this._adapters.Values.Select(static container => container.Adapter);
+    public IEnumerable<IDeviceAdapter> Adapters => this._containers.Values.Select(static container => container.Adapter);
 
-    public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken)
+    public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken = default)
     {
-        if (this._adapters.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container))
+        if (this._containers.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container))
         {
             await container.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }

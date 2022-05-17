@@ -39,7 +39,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 
     public DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) => this._logger = logger;
 
-    public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken)
+    public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken = default)
     {
         if (rootAdapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature)
         {

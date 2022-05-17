@@ -5,6 +5,7 @@ using System.Threading.Tasks.Dataflow;
 using BitFaster.Caching.Lru;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Notifications;
 

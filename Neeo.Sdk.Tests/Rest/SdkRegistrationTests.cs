@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Threading;
@@ -14,7 +15,7 @@ namespace Neeo.Sdk.Tests.Rest;
 
 public sealed class SdkRegistrationTests
 {
-    private readonly Lazy<object> _body;
+    private readonly Lazy<string> _body;
     private readonly Lazy<string> _path;
     private readonly SdkRegistration _sdkRegistration;
 
@@ -24,16 +25,25 @@ public sealed class SdkRegistrationTests
         mockBrain.Setup(brain => brain.HostName).Returns(nameof(Brain));
         mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
         Mock<IApiClient> mockApiClient = new(MockBehavior.Strict);
-        List<object> list = new();
+        List<string> path = new();
+        List<string> body = new();
+        // Each method sends an anonymous type as the post body so we must set up with It.IsAnyType.
+        // Capture is not compatible with It.IsAnyType so unlike the path we must capture the body within the returns method.
         mockApiClient
-            .Setup(client => client.PostAsync(Capture.With<string>(new(list.Add)), Capture.With<object>(new(list.Add)), It.IsAny<Func<SuccessResponse, bool>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-        this._path = new(() => (string)list[0]);
-        this._body = new(() => list[1]);
+            .Setup(client => client.PostAsync(Capture.In(path), It.IsAny<It.IsAnyType>(), It.IsAny<Func<SuccessResponse, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(valueFunction: new InvocationFunc(PostAsync));
+        this._path = new(path.Single);
+        this._body = new(body.Single);
         Mock<ISdkEnvironment> mockSdkEnvironment = new(MockBehavior.Strict);
         mockSdkEnvironment.Setup(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
         mockSdkEnvironment.Setup(environment => environment.HostAddress).Returns(Constants.HostAddress);
         this._sdkRegistration = new(mockBrain.Object, mockApiClient.Object, mockSdkEnvironment.Object, NullLogger<SdkRegistration>.Instance);
+
+        Task<bool> PostAsync(IInvocation invocation)
+        {
+            body.Add(JsonSerializer.Serialize(invocation.Arguments[1], JsonSerialization.Options));
+            return Task.FromResult(true);
+        }
     }
 
     [Fact]
@@ -42,8 +52,7 @@ public sealed class SdkRegistrationTests
         await this._sdkRegistration.StartAsync(default);
 
         Assert.Equal(UrlPaths.RegisterServer, this._path.Value);
-        string bodyJson = JsonSerializer.Serialize(this._body.Value, JsonSerialization.Options);
-        Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\",\"baseUrl\":\"{Constants.HostAddress}\"}}", bodyJson);
+        Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\",\"baseUrl\":\"{Constants.HostAddress}\"}}", this._body.Value);
     }
 
     [Fact]
@@ -52,8 +61,7 @@ public sealed class SdkRegistrationTests
         await this._sdkRegistration.StopAsync(default);
 
         Assert.Equal(UrlPaths.UnregisterServer, this._path.Value);
-        string bodyJson = JsonSerializer.Serialize(this._body.Value, JsonSerialization.Options);
-        Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\"}}", bodyJson);
+        Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\"}}", this._body.Value);
     }
 
     private class Constants

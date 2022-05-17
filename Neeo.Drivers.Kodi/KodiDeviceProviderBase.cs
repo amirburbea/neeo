@@ -103,7 +103,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddPowerStateSensor(this.GetIsPoweredOnAsync)
-        .EnableDeviceRoute(this.SetUriPrefixAsync, static (_, path) => KodiDeviceProviderBase.HandleDeviceRouteAsync(path))
+        .EnableDeviceRoute(this.SetUriPrefix, static (_, path) => KodiDeviceProviderBase.HandleDeviceRouteAsync(path))
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
@@ -581,11 +581,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         }
     }
 
-    private ValueTask SetUriPrefixAsync(string prefix)
-    {
-        this._uriPrefix = prefix;
-        return ValueTask.CompletedTask;
-    }
+    private void SetUriPrefix(string prefix) => this._uriPrefix = prefix;
 
     private readonly struct EmbeddedImages
     {
