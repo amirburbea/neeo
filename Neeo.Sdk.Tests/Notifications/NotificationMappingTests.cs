@@ -34,26 +34,26 @@ public sealed class NotificationMappingTests
         List<string> paths = new();
         Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         mockClient
-            .Setup(client => client.GetAsync(Capture.In(paths), It.IsAny<Func<Entry[], Entry[]>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(NotificationMappingTests._entries);
+            .Setup(client => client.GetAsync(Capture.In(paths), It.IsAny<Func<Entry[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
+            .ReturnsTransformOf(NotificationMappingTests._entries);
         this._path = new(() => paths.Single());
         this._notificationMapping = new(mockClient.Object, mockEnvironment.Object, NullLogger<NotificationMapping>.Instance);
-    }
-
-    [Fact]
-    public async Task Should_fall_back_to_get_keys_from_entries_by_label_when_not_matching_by_name()
-    {
-        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
-
-        Assert.Equal(new[] { "key2", "key3" }, keys);
     }
 
     [Fact]
     public async Task Should_get_keys_from_entries_matching_by_name()
     {
         var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "name1");
- 
+
         Assert.Equal("key1", keys.Single());
+    }
+
+    [Fact]
+    public async Task Should_get_keys_via_fallback_to_label_when_not_matching_by_name()
+    {
+        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
+
+        Assert.Equal(new[] { "key2", "key3" }, keys);
     }
 
     [Fact]

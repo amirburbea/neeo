@@ -71,14 +71,14 @@ public sealed class SubscriptionsNotifierTests
                 .Setup(feature => feature.DeviceListInitializer)
                 .Returns(DeviceSubscriptionHandler);
             this._mockClient
-                .Setup(client => client.GetAsync(path, It.IsAny<Func<string[], Task>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((string _, Func<string[], Task> transform, CancellationToken _) => transform(ids));
+                .Setup(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
+                .ReturnsTransformOf(ids);
             return mockFeature.Object;
 
             Task DeviceSubscriptionHandler(string[] deviceIds)
             {
                 Assert.Same(deviceIds, ids);
-                this._mockClient.Verify(client => client.GetAsync(path, It.IsAny<Func<string[], Task>>(), It.IsAny<CancellationToken>()), Times.Once());
+                this._mockClient.Verify(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()), Times.Once());
                 mockAdapter.Setup(adapter => adapter.SpecificName).Returns(Constants.GetAsyncCalled);
                 return Task.CompletedTask;
             }

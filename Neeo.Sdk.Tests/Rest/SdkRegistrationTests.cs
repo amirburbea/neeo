@@ -30,20 +30,15 @@ public sealed class SdkRegistrationTests
         // Each method sends an anonymous type as the post body so we must set up with It.IsAnyType.
         // Capture is not compatible with It.IsAnyType so unlike the path we must capture the body within the returns method.
         mockApiClient
-            .Setup(client => client.PostAsync(Capture.In(path), It.IsAny<It.IsAnyType>(), It.IsAny<Func<SuccessResponse, bool>>(), It.IsAny<CancellationToken>()))
-            .Returns(valueFunction: new InvocationFunc(PostAsync));
+            .Setup(client => client.PostAsync(Capture.In(path), It.IsAny<It.IsAnyType>(), It.IsAny<Func<SuccessResponse, It.IsAnyType>>(), It.IsAny<CancellationToken>()))
+            .ReturnsTransformOf(new SuccessResponse(true))
+            .Callback(new InvocationAction(invocation => body.Add(JsonSerializer.Serialize(invocation.Arguments[1], JsonSerialization.Options))));
         this._path = new(path.Single);
         this._body = new(body.Single);
         Mock<ISdkEnvironment> mockSdkEnvironment = new(MockBehavior.Strict);
         mockSdkEnvironment.Setup(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
         mockSdkEnvironment.Setup(environment => environment.HostAddress).Returns(Constants.HostAddress);
         this._sdkRegistration = new(mockBrain.Object, mockApiClient.Object, mockSdkEnvironment.Object, NullLogger<SdkRegistration>.Instance);
-
-        Task<bool> PostAsync(IInvocation invocation)
-        {
-            body.Add(JsonSerializer.Serialize(invocation.Arguments[1], JsonSerialization.Options));
-            return Task.FromResult(true);
-        }
     }
 
     [Fact]

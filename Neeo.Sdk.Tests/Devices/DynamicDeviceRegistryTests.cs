@@ -17,26 +17,17 @@ public sealed class DynamicDeviceRegistryTests
     [Fact]
     public async Task GetDiscoveredDeviceAsync_should_attempt_discovery_when_not_found()
     {
-        Mock<IDeviceAdapter> mockRootAdapter = new(MockBehavior.Strict);
-        mockRootAdapter.Setup(adapter => adapter.AdapterName).Returns("adapter");
-        Mock<IDiscoveryFeature> mockFeature = new(MockBehavior.Strict);
-        mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(true);
-        mockFeature.Setup(feature => feature.DiscoverAsync("id", It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<DiscoveredDevice>());
-        mockRootAdapter.Setup(adapter => adapter.GetFeature(ComponentType.Discovery)).Returns(mockFeature.Object);
+        var (mockRootAdapter, mockFeature) = CreateRootAdapter(discovery: true, enableDynamicDeviceBuilder: true);
 
         await this._dynamicDeviceRegistry.GetDiscoveredDeviceAsync(mockRootAdapter.Object, "id");
 
-        mockFeature.Verify(feature => feature.DiscoverAsync("id", It.IsAny<CancellationToken>()));
+        mockFeature!.Verify(feature => feature.DiscoverAsync("id", It.IsAny<CancellationToken>()), Times.Once());
     }
 
     [Fact]
     public async Task GetDiscoveredDeviceAsync_should_get_previously_registered_device()
     {
-        Mock<IDeviceAdapter> mockRootAdapter = new(MockBehavior.Strict);
-        mockRootAdapter.Setup(adapter => adapter.AdapterName).Returns("adapter");
-        Mock<IDiscoveryFeature> mockFeature = new(MockBehavior.Strict);
-        mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(true);
-        mockRootAdapter.Setup(adapter => adapter.GetFeature(ComponentType.Discovery)).Returns(mockFeature.Object);
+        var (mockRootAdapter, _) = CreateRootAdapter(discovery: true, enableDynamicDeviceBuilder: true);
         Mock<IDeviceAdapter> mockDynamicAdapter = new(MockBehavior.Strict);
         mockDynamicAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockDynamicAdapter));
         mockDynamicAdapter.Setup(adapter => adapter.DeviceCapabilities).Returns(new[] { DeviceCapability.DynamicDevice });
@@ -52,8 +43,7 @@ public sealed class DynamicDeviceRegistryTests
     [Fact]
     public void RegisterDiscoveredDevice_should_throw_if_adapter_does_not_support_discovery()
     {
-        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
-        mockAdapter.Setup(adapter => adapter.GetFeature(ComponentType.Discovery)).Returns(value: null);
+        var (mockAdapter, _) = CreateRootAdapter(discovery: false);
 
         Assert.Throws<ArgumentException>(() => this._dynamicDeviceRegistry.RegisterDiscoveredDevice(mockAdapter.Object, "id", Mock.Of<IDeviceBuilder>()));
     }
@@ -61,10 +51,7 @@ public sealed class DynamicDeviceRegistryTests
     [Fact]
     public void RegisterDiscoveredDevice_should_throw_if_adapter_supports_discovery_but_not_EnableDynamicDeviceBuilder()
     {
-        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
-        Mock<IDiscoveryFeature> mockFeature = new(MockBehavior.Strict);
-        mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(false);
-        mockAdapter.Setup(adapter => adapter.GetFeature(ComponentType.Discovery)).Returns(mockFeature.Object);
+        var (mockAdapter, _) = CreateRootAdapter(discovery: true, enableDynamicDeviceBuilder: false);
 
         Assert.Throws<ArgumentException>(() => this._dynamicDeviceRegistry.RegisterDiscoveredDevice(mockAdapter.Object, "id", Mock.Of<IDeviceBuilder>()));
     }
@@ -72,11 +59,7 @@ public sealed class DynamicDeviceRegistryTests
     [Fact]
     public void RegisterDiscoveredDevice_should_throw_if_not_DeviceCapability_DynamicDevice()
     {
-        Mock<IDeviceAdapter> mockRootAdapter = new(MockBehavior.Strict);
-        mockRootAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockRootAdapter));
-        Mock<IDiscoveryFeature> mockFeature = new(MockBehavior.Strict);
-        mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(true);
-        mockRootAdapter.Setup(adapter => adapter.GetFeature(ComponentType.Discovery)).Returns(mockFeature.Object);
+        var (mockRootAdapter, _) = CreateRootAdapter(discovery: true, enableDynamicDeviceBuilder: true);
         Mock<IDeviceAdapter> mockDynamicAdapter = new(MockBehavior.Strict);
         mockDynamicAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockDynamicAdapter));
         mockDynamicAdapter.Setup(adapter => adapter.DeviceCapabilities).Returns(Array.Empty<DeviceCapability>());
@@ -84,5 +67,24 @@ public sealed class DynamicDeviceRegistryTests
         mockDeviceBuilder.Setup(device => device.BuildAdapter()).Returns(mockDynamicAdapter.Object);
 
         Assert.Throws<ArgumentException>(() => this._dynamicDeviceRegistry.RegisterDiscoveredDevice(mockRootAdapter.Object, "id", mockDeviceBuilder.Object));
+    }
+
+    private static (Mock<IDeviceAdapter>, Mock<IDiscoveryFeature>?) CreateRootAdapter(bool discovery = false, bool enableDynamicDeviceBuilder = false)
+    {
+        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
+        mockAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockAdapter));
+        Mock<IDiscoveryFeature>? mockFeature;
+        if (discovery)
+        {
+            mockFeature = new(MockBehavior.Strict);
+            mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(enableDynamicDeviceBuilder);
+            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<DiscoveredDevice>());
+        }
+        else
+        {
+            mockFeature = null;
+        }
+        mockAdapter.Setup(adapter => adapter.GetFeature(ComponentType.Discovery)).Returns(mockFeature?.Object);
+        return (mockAdapter, mockFeature);
     }
 }

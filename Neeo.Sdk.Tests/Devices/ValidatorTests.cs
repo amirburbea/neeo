@@ -10,14 +10,15 @@ public sealed class ValidatorTests
     public void ValidateDelay_should_throw_if_greater_than_60000()
     {
         Assert.Throws<ArgumentException>(() => Validator.ValidateDelay(60001));
-        Assert.Null(Validator.ValidateDelay(null));
+        Assert.Equal(60000, Validator.ValidateDelay(60000));
     }
 
     [Fact]
     public void ValidateDelay_should_throw_if_negative()
     {
         Assert.Throws<ArgumentException>(() => Validator.ValidateDelay(-400));
-        Assert.Equal(1000, Validator.ValidateDelay(1000));
+        Assert.Equal(0, Validator.ValidateDelay(0));
+        Assert.Null(Validator.ValidateDelay(default));
     }
 
     [Fact]
@@ -39,8 +40,7 @@ public sealed class ValidatorTests
         Assert.Throws<ArgumentException>(() => Validator.ValidateRange(double.NegativeInfinity, 0d));
         Assert.Throws<ArgumentException>(() => Validator.ValidateRange(0d, double.PositiveInfinity));
         Assert.Throws<ArgumentException>(() => Validator.ValidateRange(double.PositiveInfinity, 0d));
-        double low = 0d;
-        double high = 1d;
+        var (low, high) = (0d, 1.5d);
         Assert.True(Validator.ValidateRange(low, high) is { Length: 2 } range && range[0] == low && range[1] == high);
     }
 
