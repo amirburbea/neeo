@@ -63,7 +63,7 @@ internal static class Server
         .AddSingleton(devices)
         .AddSingleton((SdkAdapterName)adapterName)
         .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
-        .AddSingleton<HttpMessageHandler>(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
+        .AddSingleton<HttpMessageHandler>(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
         .AddSingleton<IApiClient, ApiClient>()
         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
         .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
@@ -112,93 +112,5 @@ internal static class Server
         public static readonly ControllerFeatureProvider Instance = new AssemblyControllerFeatureProvider();
 
         protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
-    }
-
-    private class SR : SecureRandom
-    {
-        public override byte[] GenerateSeed(int length)
-        {
-            return base.GenerateSeed(length);
-        }
-
-        public override int Next()
-        {
-            return base.Next();
-        }
-
-        public override int Next(int maxValue)
-        {
-            return base.Next(maxValue);
-        }
-
-        public override int Next(int minValue, int maxValue)
-        {
-            return base.Next(minValue, maxValue);
-        }
-
-        public override void NextBytes(byte[] buf)
-        {
-            base.NextBytes(buf);
-        }
-
-        public override void NextBytes(byte[] buf, int off, int len)
-        {
-            base.NextBytes(buf, off, len);
-        }
-
-        public override void NextBytes(Span<byte> buffer)
-        {
-            base.NextBytes(buffer);
-        }
-
-        public override double NextDouble()
-        {
-            return base.NextDouble();
-        }
-
-        public override int NextInt()
-        {
-            return base.NextInt();
-        }
-
-        public override long NextInt64()
-        {
-            return base.NextInt64();
-        }
-
-        public override long NextInt64(long maxValue)
-        {
-            return base.NextInt64(maxValue);
-        }
-
-        public override long NextInt64(long minValue, long maxValue)
-        {
-            return base.NextInt64(minValue, maxValue);
-        }
-
-        public override long NextLong()
-        {
-            return base.NextLong();
-        }
-
-        public override float NextSingle()
-        {
-            return base.NextSingle();
-        }
-
-        public override void SetSeed(byte[] seed)
-        {
-            base.SetSeed(seed);
-        }
-
-        public override void SetSeed(long seed)
-        {
-            base.SetSeed(seed);
-        }
-
-        protected override double Sample()
-        {
-            return base.Sample();
-        }
     }
 }
