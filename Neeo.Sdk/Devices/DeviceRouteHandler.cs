@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,5 +13,6 @@ namespace Neeo.Sdk.Devices;
 /// </summary>
 /// <param name="request">The current HTTP request.</param>
 /// <param name="path">The path substring (the substring of the true path after the URI prefix returned via a <see cref="UriPrefixCallback"/>).</param>
+/// <param name="cancellationToken">Token to monitor for cancelled requests.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task<ActionResult> DeviceRouteHandler(HttpRequest request, string path);
+public delegate Task<ActionResult> DeviceRouteHandler(HttpRequest request, string path, CancellationToken cancellationToken);

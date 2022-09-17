@@ -11,9 +11,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Client;
-using MQTTnet.Client.Connecting;
-using MQTTnet.Client.Disconnecting;
-using MQTTnet.Client.Options;
 using MQTTnet.Exceptions;
 using Neeo.Sdk.Utilities;
 
@@ -302,12 +299,12 @@ public sealed class HisenseTV : IDisposable
 
     private sealed class Connection : IDisposable
     {
-        private static readonly IMqttClientFactory _clientFactory = new MqttFactory();
+        private static readonly MqttFactory _clientFactory = new();
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
         private readonly IMqttClient _client;
         private readonly ILogger _logger;
 
-        private readonly IMqttClientOptions _options;
+        private readonly MqttClientOptions _options;
 
         public Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, string clientIdPrefix)
         {
@@ -317,7 +314,7 @@ public sealed class HisenseTV : IDisposable
                 .WithClientId(Uri.EscapeDataString($"{clientIdPrefix}-{macAddress}"))
                 .WithTcpServer(ipAddress.ToString(), 36669)
                 .WithCredentials("hisenseservice", "multimqttservice")
-                .WithCommunicationTimeout(TimeSpan.FromMilliseconds(750))
+                .WithTimeout(TimeSpan.FromMilliseconds(750))
                 .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
                 .WithTls(parameters: new() { UseTls = true, AllowUntrustedCertificates = true, IgnoreCertificateChainErrors = true, IgnoreCertificateRevocationErrors = true })
                 .Build();
@@ -411,14 +408,15 @@ public sealed class HisenseTV : IDisposable
             this._logger.LogInformation("Sending message '{payload}' to topic '{topic}'.", payload, topic);
             if (!waitForNextMessage)
             {
-                await this._client.PublishAsync(topic, payload).ConfigureAwait(false);
+
+                await PublishAsync().ConfigureAwait(false);
                 return (string.Empty, string.Empty);
             }
             TaskCompletionSource<(string, string)> taskCompletionSource = new();
             try
             {
                 this.MessageReceived += OnMessageReceived;
-                await this._client.PublishAsync(topic, payload).ConfigureAwait(false);
+                await PublishAsync().ConfigureAwait(false);
                 return await taskCompletionSource.Task.ConfigureAwait(false);
             }
             finally
@@ -427,6 +425,8 @@ public sealed class HisenseTV : IDisposable
             }
 
             void OnMessageReceived(object? sender, DataEventArgs<(string, string)> e) => taskCompletionSource.TrySetResult(e.Data);
+
+            Task PublishAsync() => this._client.PublishAsync(new() { Topic = topic, Payload = Encoding.UTF8.GetBytes(payload) });
         }
 
         public async Task<bool> TryConnectAsync(CancellationToken cancellationToken)
@@ -435,9 +435,9 @@ public sealed class HisenseTV : IDisposable
             {
                 if (await this._client.ConnectAsync(this._options, cancellationToken).ConfigureAwait(false) is { ResultCode: MqttClientConnectResultCode.Success })
                 {
-                    this._client.UseApplicationMessageReceivedHandler(this.OnMessageReceived);
-                    this._client.UseDisconnectedHandler(this.OnDisconnected);
-                    await this._client.SubscribeAsync("/remoteapp/mobile/#").ConfigureAwait(false);
+                    this._client.ApplicationMessageReceivedAsync += this.OnMessageReceived;
+                    this._client.DisconnectedAsync += this.OnDisconnected;
+                    await this._client.SubscribeAsync("/remoteapp/mobile/#", cancellationToken: cancellationToken).ConfigureAwait(false);
                     return true;
                 }
             }

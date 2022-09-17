@@ -17,8 +17,7 @@ public sealed class KodiHostedService : IHostedService
     private readonly IConfiguration _configuration;
     private readonly IDeviceProvider[] _deviceProviders;
     private readonly ILogger _logger;
-
-    private Brain? _brain;
+    private ISdkEnvironment? _environment;
 
     public KodiHostedService(
         IConfiguration configuration,
@@ -32,36 +31,33 @@ public sealed class KodiHostedService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        // You can set environment variable DOTNET_NEEO_BRAIN to an IPv4 address to skip discovery and use the specified brain.
-        Brain? brain;
-        if (this._configuration["NEEO_BRAIN"] is { } text && IPAddress.TryParse(text, out IPAddress? ipAddress))
+        if (await this.GetBrainAsync(cancellationToken).ConfigureAwait(false) is not { } brain)
         {
-            brain = new(ipAddress);
+            this._applicationLifetime.StopApplication();
+            return;
         }
-        else
-        {
-            this._logger.LogInformation("Discovering Brain...");
-            if ((brain = await Brain.DiscoverOneAsync(cancellationToken: cancellationToken).ConfigureAwait(false)) is null)
-            {
-                this._logger.LogError("Failed to resolve brain!");
-                this._applicationLifetime.StopApplication();
-                return;
-            }
-        }
-        ISdkEnvironment environment = await brain.StartServerAsync(
+        this._environment = await brain.StartServerAsync(
             this._deviceProviders,
             configureLogging: static (_, builder) => builder.ClearProviders().AddSimpleConsole(options => options.SingleLine = true),
             cancellationToken: cancellationToken
         ).ConfigureAwait(false);
-        this._brain = brain;
-        this._logger.LogInformation("Listening on {address}...", environment.HostAddress);
+        this._logger.LogInformation("Listening on {address}...", this._environment.HostAddress);
     }
 
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public Task StopAsync(CancellationToken cancellationToken) => this._environment?.StopAsync(cancellationToken) ?? Task.CompletedTask;
+
+    private async ValueTask<Brain?> GetBrainAsync(CancellationToken cancellationToken)
     {
-        if (Interlocked.Exchange(ref this._brain, default) is { } brain)
+        if (this._configuration["NEEO_BRAIN"] is { } text && IPAddress.TryParse(text, out IPAddress? ipAddress))
         {
-            await brain.StopServerAsync(cancellationToken).ConfigureAwait(false);
+            return new(ipAddress);
         }
+        this._logger.LogInformation("Discovering Brain...");
+        if (await Brain.DiscoverOneAsync(cancellationToken: cancellationToken).ConfigureAwait(false) is { } brain)
+        {
+            return brain;
+        }
+        this._logger.LogError("Failed to resolve brain!");
+        return null;
     }
 }

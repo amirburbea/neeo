@@ -68,8 +68,8 @@ public sealed class SubscriptionsNotifierTests
             string[] ids = Array.ConvertAll(RandomNumberGenerator.GetBytes(5), static b => b.ToString());
             Mock<ISubscriptionFeature> mockFeature = new(MockBehavior.Strict);
             mockFeature
-                .Setup(feature => feature.DeviceListInitializer)
-                .Returns(DeviceSubscriptionHandler);
+                .Setup(feature => feature.InitializeDeviceListAsync(It.IsAny<string[]>()))
+                .Returns((string[] deviceIds) => DeviceSubscriptionHandler(deviceIds));
             this._mockClient
                 .Setup(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
                 .ReturnsTransformOf(ids);

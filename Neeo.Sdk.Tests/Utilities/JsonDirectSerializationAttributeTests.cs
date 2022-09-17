@@ -9,14 +9,14 @@ public sealed class JsonDirectSerializationAttributeTests
     [Fact]
     public void Should_serialize_as_GetType_with_attribute()
     {
-        string text = JsonSerializer.Serialize<IWithAttribute>(Foo.Instance, JsonSerialization.Options);
+        string text = JsonSerializer.Serialize((IWithAttribute)Foo.Instance, JsonSerialization.Options);
         Assert.Equal("{\"name\":\"Foo\"}", text);
     }
 
     [Fact]
     public void Should_serialize_as_T_without_attribute()
     {
-        string text = JsonSerializer.Serialize<IWithoutAttribute>(Foo.Instance, JsonSerialization.Options);
+        string text = JsonSerializer.Serialize((IWithoutAttribute)Foo.Instance, JsonSerialization.Options);
         Assert.Equal("{}", text);
     }
 

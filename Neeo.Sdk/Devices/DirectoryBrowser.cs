@@ -9,4 +9,4 @@ namespace Neeo.Sdk.Devices;
 /// <param name="deviceId">The identifier of the device.</param>
 /// <param name="list">The list builder.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DirectoryBrowser(string deviceId, IListBuilder list);
+public delegate Task DirectoryBrowser(string deviceId, ListBuilder list);

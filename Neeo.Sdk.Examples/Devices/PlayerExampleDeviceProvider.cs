@@ -151,12 +151,12 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             return Enum.TryParse(actionIdentifier, out Pet pet) ? this.ChangeTrackAsync(deviceId, pet) : Task.CompletedTask;
         }
 
-        Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, IListBuilder builder)
+        Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder)
         {
             return Task.CompletedTask;
         }
 
-        public Task PopulateRootDirectoryAsync(string deviceId, IListBuilder builder)
+        public Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder)
         {
             if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
             {

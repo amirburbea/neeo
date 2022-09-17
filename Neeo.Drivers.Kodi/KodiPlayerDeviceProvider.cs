@@ -41,9 +41,9 @@ public sealed class KodiPlayerDeviceProvider : KodiDeviceProviderBase, IPlayerWi
 
     Task IPlayerWidgetController.HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier) => this.HandleDirectoryActionAsync(deviceId, actionIdentifier);
 
-    Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, IListBuilder builder) => this.PopulateQueueDirectoryAsync(deviceId, builder);
+    Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder) => this.PopulateQueueDirectoryAsync(deviceId, builder);
 
-    Task IPlayerWidgetController.PopulateRootDirectoryAsync(string deviceId, IListBuilder builder) => this.PopulateRootDirectoryAsync(deviceId, builder);
+    Task IPlayerWidgetController.PopulateRootDirectoryAsync(string deviceId, ListBuilder builder) => this.PopulateRootDirectoryAsync(deviceId, builder);
 
     public async Task SetIsMutedAsync(string deviceId, bool isMuted)
     {

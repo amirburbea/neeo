@@ -10,7 +10,6 @@ namespace Neeo.Sdk.Examples.Devices;
 
 public class FileBrowserExampleDeviceProvider : IDeviceProvider
 {
-
     public FileBrowserExampleDeviceProvider()
     {
         const string deviceName = "File Browser Example";
@@ -24,7 +23,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static Task Browse(string deviceId, IListBuilder builder)
+    private static Task Browse(string deviceId, ListBuilder builder)
     {
         int offset = builder.Parameters.Offset ?? 0;
         int limit = builder.Parameters.Limit;

@@ -65,7 +65,7 @@ internal sealed class DeviceNotifier : IDeviceNotifier
 
     public DeviceNotifier(IDeviceAdapter adapter, INotificationService notificationService, bool supportsPowerNotifications)
     {
-        (this._adapter, this._notificationService, this.SupportsPowerNotifications) = (adapter, notificationService,  supportsPowerNotifications);
+        (this._adapter, this._notificationService, this.SupportsPowerNotifications) = (adapter, notificationService, supportsPowerNotifications);
     }
 
     public bool SupportsPowerNotifications { get; }

@@ -77,7 +77,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private async Task BrowseApps(string deviceId, IListBuilder list)
+    private async Task BrowseApps(string deviceId, ListBuilder list)
     {
         if (this._tv is not { } tv)
         {

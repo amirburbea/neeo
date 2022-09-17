@@ -1,13 +1,13 @@
 ﻿namespace Neeo.Sdk.Devices.Lists;
 
 /// <summary>
-/// Metadata relating to an <see cref="IListBuilder"/>.
+/// Metadata relating to an <see cref="ListBuilder"/>.
 /// </summary>
 public readonly struct ListMetadata
 {
-    private readonly IListBuilder _list;
+    private readonly ListBuilder _list;
 
-    internal ListMetadata(IListBuilder list, ListPageInfo current, ListPageInfo? previous, ListPageInfo? next)
+    internal ListMetadata(ListBuilder list, ListPageInfo current, ListPageInfo? previous, ListPageInfo? next)
     {
         (this._list, this.Current, this.Previous, this.Next) = (list, current, previous, next);
     }

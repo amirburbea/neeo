@@ -17,7 +17,7 @@ public interface IDirectoryFeature : IFeature
     /// <param name="deviceId">The device identifier.</param>
     /// <param name="parameters">The parameters relating to the directory to browse and an offset and limit if applicable.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<IListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters);
+    Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters);
 
     /// <summary>
     /// Handle a request by a user to perform an action in a directory such as opening a file.
@@ -41,7 +41,7 @@ internal sealed class DirectoryFeature : IDirectoryFeature
         this._identifier = identifier;
     }
 
-    public async Task<IListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters)
+    public async Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters)
     {
         ListBuilder builder = new(string.IsNullOrEmpty(parameters.BrowseIdentifier) && !string.IsNullOrEmpty(this._identifier) ? parameters with { BrowseIdentifier = this._identifier } : parameters);
         await this._browser(deviceId, builder).ConfigureAwait(false);

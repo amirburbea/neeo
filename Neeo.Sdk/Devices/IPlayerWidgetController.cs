@@ -31,9 +31,9 @@ public interface IPlayerWidgetController
 
     Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier);
 
-    Task PopulateQueueDirectoryAsync(string deviceId, IListBuilder builder);
+    Task PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder);
 
-    Task PopulateRootDirectoryAsync(string deviceId, IListBuilder builder);
+    Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder);
 
     Task SetIsMutedAsync(string deviceId, bool isMuted);
 

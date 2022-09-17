@@ -21,32 +21,32 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
 {
     private static readonly Dictionary<Buttons, Func<KodiClient, Task>> _buttonFunctions = new()
     {
-        [Buttons.Back] = static client => client.SendInputCommandAsync(InputCommand.Back),
-        [Buttons.CursorDown] = static client => client.SendInputCommandAsync(InputCommand.Down),
-        [Buttons.CursorEnter] = static client => client.SendInputCommandAsync(InputCommand.Select),
-        [Buttons.CursorLeft] = static client => client.SendInputCommandAsync(InputCommand.Left),
-        [Buttons.CursorRight] = static client => client.SendInputCommandAsync(InputCommand.Right),
-        [Buttons.CursorUp] = static client => client.SendInputCommandAsync(InputCommand.Up),
-        [Buttons.Digit0] = static client => client.SendInputCommandAsync(InputCommand.Number0),
-        [Buttons.Digit1] = static client => client.SendInputCommandAsync(InputCommand.Number1),
-        [Buttons.Digit2] = static client => client.SendInputCommandAsync(InputCommand.Number2),
-        [Buttons.Digit3] = static client => client.SendInputCommandAsync(InputCommand.Number3),
-        [Buttons.Digit4] = static client => client.SendInputCommandAsync(InputCommand.Number4),
-        [Buttons.Digit5] = static client => client.SendInputCommandAsync(InputCommand.Number5),
-        [Buttons.Digit6] = static client => client.SendInputCommandAsync(InputCommand.Number6),
-        [Buttons.Digit7] = static client => client.SendInputCommandAsync(InputCommand.Number7),
-        [Buttons.Digit8] = static client => client.SendInputCommandAsync(InputCommand.Number8),
-        [Buttons.Digit9] = static client => client.SendInputCommandAsync(InputCommand.Number9),
-        [Buttons.Language] = static client => client.SendInputCommandAsync(InputCommand.Language),
-        [Buttons.Menu] = static client => client.SendInputCommandAsync(InputCommand.Menu),
-        [Buttons.MuteToggle] = static client => client.SendInputCommandAsync(InputCommand.MuteToggle),
-        [Buttons.Pause] = static client => client.SendInputCommandAsync(InputCommand.Pause),
-        [Buttons.Play] = static client => client.SendInputCommandAsync(InputCommand.Play),
-        [Buttons.PlayToggle] = static client => client.SendInputCommandAsync(InputCommand.Pause),
-        [Buttons.PlayPauseToggle] = static client => client.SendInputCommandAsync(InputCommand.Pause),
-        [Buttons.Stop] = static client => client.SendInputCommandAsync(InputCommand.Stop),
-        [Buttons.VolumeDown] = static client => client.SendInputCommandAsync(InputCommand.VolumeDown),
-        [Buttons.VolumeUp] = static client => client.SendInputCommandAsync(InputCommand.VolumeUp),
+        [Buttons.Back] = client => client.SendInputCommandAsync(InputCommand.Back),
+        [Buttons.CursorDown] = client => client.SendInputCommandAsync(InputCommand.Down),
+        [Buttons.CursorEnter] = client => client.SendInputCommandAsync(InputCommand.Select),
+        [Buttons.CursorLeft] = client => client.SendInputCommandAsync(InputCommand.Left),
+        [Buttons.CursorRight] = client => client.SendInputCommandAsync(InputCommand.Right),
+        [Buttons.CursorUp] = client => client.SendInputCommandAsync(InputCommand.Up),
+        [Buttons.Digit0] = client => client.SendInputCommandAsync(InputCommand.Number0),
+        [Buttons.Digit1] = client => client.SendInputCommandAsync(InputCommand.Number1),
+        [Buttons.Digit2] = client => client.SendInputCommandAsync(InputCommand.Number2),
+        [Buttons.Digit3] = client => client.SendInputCommandAsync(InputCommand.Number3),
+        [Buttons.Digit4] = client => client.SendInputCommandAsync(InputCommand.Number4),
+        [Buttons.Digit5] = client => client.SendInputCommandAsync(InputCommand.Number5),
+        [Buttons.Digit6] = client => client.SendInputCommandAsync(InputCommand.Number6),
+        [Buttons.Digit7] = client => client.SendInputCommandAsync(InputCommand.Number7),
+        [Buttons.Digit8] = client => client.SendInputCommandAsync(InputCommand.Number8),
+        [Buttons.Digit9] = client => client.SendInputCommandAsync(InputCommand.Number9),
+        [Buttons.Language] = client => client.SendInputCommandAsync(InputCommand.Language),
+        [Buttons.Menu] = client => client.SendInputCommandAsync(InputCommand.Menu),
+        [Buttons.MuteToggle] = client => client.SendInputCommandAsync(InputCommand.MuteToggle),
+        [Buttons.Pause] = client => client.SendInputCommandAsync(InputCommand.Pause),
+        [Buttons.Play] = client => client.SendInputCommandAsync(InputCommand.Play),
+        [Buttons.PlayToggle] = client => client.SendInputCommandAsync(InputCommand.Pause),
+        [Buttons.PlayPauseToggle] = client => client.SendInputCommandAsync(InputCommand.Pause),
+        [Buttons.Stop] = client => client.SendInputCommandAsync(InputCommand.Stop),
+        [Buttons.VolumeDown] = client => client.SendInputCommandAsync(InputCommand.VolumeDown),
+        [Buttons.VolumeUp] = client => client.SendInputCommandAsync(InputCommand.VolumeUp),
     };
 
     private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
@@ -103,7 +103,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddPowerStateSensor(this.GetIsPoweredOnAsync)
-        .EnableDeviceRoute(this.SetUriPrefix, static (_, path) => KodiDeviceProviderBase.HandleDeviceRouteAsync(path))
+        .EnableDeviceRoute(this.SetUriPrefix, static (_, path, _) => KodiDeviceProviderBase.HandleDeviceRouteAsync(path))
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
@@ -166,7 +166,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         }
     }
 
-    protected async Task PopulateQueueDirectoryAsync(string deviceId, IListBuilder builder)
+    protected async Task PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder)
     {
         if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
         {
@@ -178,7 +178,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         throw new NotImplementedException();
     }
 
-    protected async Task PopulateRootDirectoryAsync(string deviceId, IListBuilder builder)
+    protected async Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder)
     {
         if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
         {
@@ -283,13 +283,13 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         }
     }
 
-    private static async Task PopulateAlbumLibraryAsync(KodiClient client, IListBuilder builder, int offset, int limit)
+    private static async Task PopulateAlbumLibraryAsync(KodiClient client, ListBuilder builder, int offset, int limit)
     {
         int end = offset + limit;
         (int total, AlbumInfo[] albums) = await client.GetAlbumsAsync(offset, end).ConfigureAwait(false);
     }
 
-    private static async Task PopulateEpisodesLibraryAsync(KodiClient client, IListBuilder builder, int offset, int limit, int? tvShowId = default, string? tvShowLabel = default)
+    private static async Task PopulateEpisodesLibraryAsync(KodiClient client, ListBuilder builder, int offset, int limit, int? tvShowId = default, string? tvShowLabel = default)
     {
         int end = offset + limit;
         (int total, EpisodeInfo[] episodes) = await client.GetEpisodesAsync(offset, end, tvShowId).ConfigureAwait(false);
@@ -299,7 +299,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
             {
                 builder.AddHeader(tvShowLabel);
             }
-            builder.AddButtonRow(new ListButton("Library", ".root", inverse: true, uiAction: ListUIAction.GoToRoot), new ListButton("Close", ".close", inverse: true, uiAction: ListUIAction.Close));
+            builder.AddButtonRow(new("Library", ".root", inverse: true, uiAction: ListUIAction.GoToRoot), new("Close", ".close", inverse: true, uiAction: ListUIAction.Close));
         }
         foreach (EpisodeInfo episode in episodes)
         {
@@ -308,14 +308,14 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         builder.SetTotalMatchingItems(total);
     }
 
-    private static void PopulateLibraryRoot(IListBuilder list, EmbeddedImages images) => list
+    private static void PopulateLibraryRoot(ListBuilder list, EmbeddedImages images) => list
         .AddTileRow(new ListTile(Images.Kodi))
         .AddEntry(new("Movies", thumbnailUri: images.Movie, browseIdentifier: ".movies"))
         .AddEntry(new("Music", thumbnailUri: images.Music, browseIdentifier: ".music"))
         .AddEntry(new("TV Shows", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows"))
         .AddEntry(new("PVR", thumbnailUri: images.Pvr, browseIdentifier: ".pvr"));
 
-    private static async Task PopulateMoviesLibraryAsync(KodiClient client, IListBuilder builder, int offset, int limit, Filter? filter = default)
+    private static async Task PopulateMoviesLibraryAsync(KodiClient client, ListBuilder builder, int offset, int limit, Filter? filter = default)
     {
         int end = offset + limit;
         (int total, VideoInfo[] videos) = await client.GetMoviesAsync(offset, end, filter).ConfigureAwait(false);
@@ -323,7 +323,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         {
             builder
                 .AddHeader(id == ".movies" ? "Movies" : $"Movies ({id[8..]})")
-                .AddButtonRow(new ListButton("Library", ".root", inverse: true, uiAction: ListUIAction.GoToRoot), new ListButton("Close", ".close", inverse: true, uiAction: ListUIAction.Close));
+                .AddButtonRow(new("Library", ".root", inverse: true, uiAction: ListUIAction.GoToRoot), new("Close", ".close", inverse: true, uiAction: ListUIAction.Close));
         }
         foreach (VideoInfo video in videos)
         {
@@ -332,7 +332,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         builder.SetTotalMatchingItems(total);
     }
 
-    private static void PopulateMoviesLibraryRoot(IListBuilder list, EmbeddedImages images) => list
+    private static void PopulateMoviesLibraryRoot(ListBuilder list, EmbeddedImages images) => list
         .AddHeader("Movies")
         .AddEntry(new("Movies", thumbnailUri: images.Movie, browseIdentifier: ".movies.movies"))
         .AddEntry(new("Movies - In Progress", thumbnailUri: images.Movie, browseIdentifier: ".movies.inprogress"))
@@ -340,18 +340,18 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         .AddEntry(new("Movies - Watched", thumbnailUri: images.Movie, browseIdentifier: ".movies.watched"))
         .AddEntry(new("Movies - Recent", thumbnailUri: images.Movie, browseIdentifier: ".movies.recent"));
 
-    private static void PopulateMusicLibraryRoot(IListBuilder list, EmbeddedImages images) => list
+    private static void PopulateMusicLibraryRoot(ListBuilder list, EmbeddedImages images) => list
         .AddHeader("Music")
         .AddEntry(new("Albums", thumbnailUri: images.Music, browseIdentifier: ".music.albums"))
         .AddEntry(new("Albums - Recent", thumbnailUri: images.Music, browseIdentifier: ".music.albums.recent"))
         .AddEntry(new("Artists", thumbnailUri: images.Music, browseIdentifier: ".music.artists"));
 
-    private static void PopulatePvrLibraryRoot(IListBuilder list, EmbeddedImages images) => list
+    private static void PopulatePvrLibraryRoot(ListBuilder list, EmbeddedImages images) => list
         .AddHeader("PVR")
         .AddEntry(new("TV Channels", thumbnailUri: images.Pvr, browseIdentifier: ".pvr.tvchannels"))
         .AddEntry(new("Radio Stations", thumbnailUri: images.Pvr, browseIdentifier: ".pvr.radiostations"));
 
-    private static async Task PopulateTVShowsLibraryAsync(KodiClient client, IListBuilder builder, int offset, int limit, Filter? filter = default)
+    private static async Task PopulateTVShowsLibraryAsync(KodiClient client, ListBuilder builder, int offset, int limit, Filter? filter = default)
     {
         int end = offset + limit;
         (int total, TVShowInfo[] shows) = await client.GetTVShowsAsync(offset, end, filter).ConfigureAwait(false);
@@ -359,7 +359,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         {
             builder
                 .AddHeader(id == ".tvshows" ? "TV Shows" : $"TV Shows ({id[9..]})")
-                .AddButtonRow(new ListButton("Library", ".root", inverse: true, uiAction: ListUIAction.GoToRoot), new ListButton("Close", ".close", inverse: true, uiAction: ListUIAction.Close));
+                .AddButtonRow(new("Library", ".root", inverse: true, uiAction: ListUIAction.GoToRoot), new("Close", ".close", inverse: true, uiAction: ListUIAction.Close));
         }
         foreach (TVShowInfo show in shows)
         {
@@ -368,7 +368,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         builder.SetTotalMatchingItems(total);
     }
 
-    private static void PopulateTVShowsLibraryRoot(IListBuilder list, EmbeddedImages images) => list
+    private static void PopulateTVShowsLibraryRoot(ListBuilder list, EmbeddedImages images) => list
             .AddHeader("TV Shows")
         .AddEntry(new("TV Shows", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.tvshows"))
         .AddEntry(new("TV Shows - Recent", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.recent"));

@@ -26,11 +26,7 @@ internal sealed class SdkRegistration : IHostedService
     {
         try
         {
-            await this.PostAsync(
-                UrlPaths.RegisterServer, 
-                new { Name = this._environment.SdkAdapterName, BaseUrl = this._environment.HostAddress },
-                cancellationToken
-            ).ConfigureAwait(false);
+            await this.PostAsync(UrlPaths.RegisterServer, new { Name = this._environment.SdkAdapterName, BaseUrl = this._environment.HostAddress }, cancellationToken).ConfigureAwait(false);
             this._logger.LogInformation("Server {name} registered on {brain} ({brainAddress}).", this._environment.SdkAdapterName, this._brain.HostName, this._brain.ServiceEndPoint.Address);
         }
         catch (Exception e)

@@ -19,13 +19,28 @@ using Zeroconf;
 namespace Neeo.Sdk;
 
 /// <summary>
+/// Minimal information about a NEEO Brain.
+/// </summary>
+internal interface IBrain
+{
+    /// <summary>
+    /// The host name of the NEEO Brain.
+    /// </summary>
+    string HostName { get; }
+
+    /// <summary>
+    /// The IP Address and port on which the NEEO Brain Service is running.
+    /// </summary>
+    IPEndPoint ServiceEndPoint { get; }
+}
+
+/// <summary>
 /// Returns information about and contains methods for interacting with the NEEO Brain.
 /// </summary>
-public sealed class Brain : IAsyncDisposable, IBrain
+public sealed class Brain : IBrain
 {
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(15d);
     private static readonly Regex _versionPrefixRegex = new(@"^0\.(?<v>\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
-    private IHost? _host;
 
     /// <summary>
     /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
@@ -40,7 +55,7 @@ public sealed class Brain : IAsyncDisposable, IBrain
         {
             throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress));
         }
-        if (Brain._versionPrefixRegex.Match(version) is not { Success: true } match || int.Parse(match.Groups["v"].Value, CultureInfo.InvariantCulture) < 50)
+        if (Brain._versionPrefixRegex.Match(version) is not { Success: true, Groups: { } groups } || int.Parse(groups["v"].Value, CultureInfo.InvariantCulture) < 50)
         {
             throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
         }
@@ -71,9 +86,9 @@ public sealed class Brain : IAsyncDisposable, IBrain
     {
         IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brain._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
         Brain[] brains = new Brain[hosts.Count];
-        for (int i = 0; i < brains.Length; i++)
+        for (int index = 0; index < brains.Length; index++)
         {
-            brains[i] = Brain.CreateBrain(hosts[i]);
+            brains[index] = Brain.CreateBrain(hosts[index]);
         }
         return brains;
     }
@@ -107,16 +122,36 @@ public sealed class Brain : IAsyncDisposable, IBrain
         }
     }
 
-    async ValueTask IAsyncDisposable.DisposeAsync() => await this.StopServerAsync().ConfigureAwait(false);
+    private static Brain CreateBrain(IZeroconfHost host)
+    {
+        IService service = host.Services.Values.First();
+        IReadOnlyDictionary<string, string> properties = service.Properties[0];
+        return new(IPAddress.Parse(host.IPAddress), service.Port, $"{properties["hon"]}.local", properties["rel"]);
+    }
 
+    private static class Constants
+    {
+        public const string ServiceName = "_neeo._tcp.local.";
+    }
+}
+
+/// <summary>
+///
+/// </summary>
+public static class BrainMethods
+{
     /// <summary>
     /// Opens the default browser to the Brain WebUI.
     /// </summary>
-    public void OpenWebUI() => Process.Start(startInfo: new($"http://{this.IPAddress}:3200/eui") { UseShellExecute = true })!.Dispose();
+    /// <param name="brain">The NEEO Brain.</param>
+    public static void OpenWebUI(this Brain brain) => Process.Start(
+        startInfo: new($"http://{(brain ?? throw new ArgumentNullException(nameof(brain))).IPAddress}:3200/eui") { UseShellExecute = true }
+    )!.Dispose();
 
     /// <summary>
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
+    /// <param name="brain">The NEEO Brain.</param>
     /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
     /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
     /// <param name="hostIPAddress">
@@ -126,7 +161,8 @@ public sealed class Brain : IAsyncDisposable, IBrain
     /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public async Task<ISdkEnvironment> StartServerAsync(
+    public static async Task<ISdkEnvironment> StartServerAsync(
+        this Brain brain,
         IDeviceBuilder[] devices,
         string? name = default,
         IPAddress? hostIPAddress = null,
@@ -139,25 +175,22 @@ public sealed class Brain : IAsyncDisposable, IBrain
         {
             throw new ArgumentException("At least one device is required.", nameof(devices));
         }
-        if (this._host is not null)
-        {
-            throw new InvalidOperationException("Server is already running.");
-        }
-        this._host = await Server.StartSdkAsync(
-            this,
+        IHost host = await Server.StartSdkAsync(
+            brain ?? throw new ArgumentNullException(nameof(brain)),
             devices,
-            $"src-{UniqueNameGenerator.Generate(name ?? this.HostName)}",
-            hostIPAddress ?? await this.GetFallbackHostIPAddress(cancellationToken).ConfigureAwait(false),
+            $"src-{UniqueNameGenerator.Generate(name ?? brain.HostName)}",
+            hostIPAddress ?? await brain.GetFallbackHostIPAddressAsync(cancellationToken).ConfigureAwait(false),
             port,
             configureLogging,
             cancellationToken
         ).ConfigureAwait(false);
-        return this._host.Services.GetRequiredService<ISdkEnvironment>();
+        return host.Services.GetRequiredService<ISdkEnvironment>();
     }
 
     /// <summary>
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
+    /// <param name="brain">The NEEO Brain.</param>
     /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
     /// <param name="providers">An array of device providers from which to register devices with the NEEO Brain.</param>
     /// <param name="hostIPAddress">
@@ -167,7 +200,8 @@ public sealed class Brain : IAsyncDisposable, IBrain
     /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public Task<ISdkEnvironment> StartServerAsync(
+    public static Task<ISdkEnvironment> StartServerAsync(
+        this Brain brain,
         IDeviceProvider[] providers,
         string? name = default,
         IPAddress? hostIPAddress = null,
@@ -180,7 +214,7 @@ public sealed class Brain : IAsyncDisposable, IBrain
         {
             throw new ArgumentException("At least one device is required.", nameof(providers));
         }
-        return this.StartServerAsync(
+        return brain.StartServerAsync(
             Array.ConvertAll(providers, static provider => provider.DeviceBuilder),
             name,
             hostIPAddress,
@@ -190,54 +224,15 @@ public sealed class Brain : IAsyncDisposable, IBrain
         );
     }
 
-    /// <summary>
-    /// Asynchronously stops the SDK integration server and unregisters it from the NEEO Brain.
-    /// </summary>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public async Task StopServerAsync(CancellationToken cancellationToken = default)
+    internal static async ValueTask<IPAddress> GetFallbackHostIPAddressAsync(this Brain brain, CancellationToken cancellationToken)
     {
-        using IHost? host = Interlocked.Exchange(ref this._host, default);
-        await (host?.StopAsync(cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
-    }
-
-    private static Brain CreateBrain(IZeroconfHost host)
-    {
-        IService service = host.Services.Values.First();
-        IReadOnlyDictionary<string, string> properties = service.Properties[0];
-        return new(IPAddress.Parse(host.IPAddress), service.Port, $"{properties["hon"]}.local", properties["rel"]);
-    }
-
-    private async ValueTask<IPAddress> GetFallbackHostIPAddress(CancellationToken cancellationToken)
-    {
-        if (IPAddress.IsLoopback(this.IPAddress))
+        if (IPAddress.IsLoopback(brain.IPAddress))
         {
-            return this.IPAddress;
+            return brain.IPAddress;
         }
         IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-        return Array.IndexOf(addresses, this.IPAddress) != -1 || Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is not { } address
+        return Array.IndexOf(addresses, brain.IPAddress) != -1 || Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is not { } address
             ? IPAddress.Loopback // If the Brain is running locally, we can just use localhost.
             : address;
     }
-
-    private static class Constants
-    {
-        public const string ServiceName = "_neeo._tcp.local.";
-    }
-}
-
-/// <summary>
-/// Minimal information about a NEEO Brain.
-/// </summary>
-internal interface IBrain
-{
-    /// <summary>
-    /// The host name of the NEEO Brain.
-    /// </summary>
-    string HostName { get; }
-
-    /// <summary>
-    /// The IP Address and port on which the NEEO Brain Service is running.
-    /// </summary>
-    IPEndPoint ServiceEndPoint { get; }
 }
