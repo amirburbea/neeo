@@ -11,7 +11,7 @@ namespace Neeo.Sdk.Tests;
 
 internal static class ApiClientMockMethods
 {
-    private static readonly MethodInfo _fromResultMethod = typeof(Task).GetMethod("FromResult", BindingFlags.Static | BindingFlags.Public)!;
+    private static readonly MethodInfo _fromResultMethod = typeof(Task).GetMethod(nameof(Task.FromResult), BindingFlags.Static | BindingFlags.Public)!;
     private static readonly ConcurrentDictionary<Type, Func<Delegate, object, Task>> _functionCache = new();
 
     public static IReturnsResult<IApiClient> ReturnsTransformOf(this ISetup<IApiClient, Task<It.IsAnyType>> setup, object data) => setup.Returns(new InvocationFunc(invocation =>
