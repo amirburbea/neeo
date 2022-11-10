@@ -1,4 +1,6 @@
-﻿namespace Neeo.Sdk.Devices.Components;
+﻿using Neeo.Sdk.Utilities;
+
+namespace Neeo.Sdk.Devices.Components;
 
 /// <summary>
 /// Describes a device sensor.
@@ -16,4 +18,21 @@ internal sealed record class SensorComponent(
     string Label,
     string Path,
     ISensorDetails Sensor
-) : Component(ComponentType.Sensor, Name, Label, Path), ISensorComponent;
+) : Component(ComponentType.Sensor, Name, Label, Path), ISensorComponent
+{
+    public const string ComponentSuffix = "_SENSOR";
+}
+
+/// <summary>
+/// Describes the details of a sensor.
+/// </summary>
+[JsonDirectSerialization<ISensorDetails>]
+public interface ISensorDetails
+{
+    /// <summary>
+    /// Gets the type of the sensor.
+    /// </summary>
+    SensorType Type { get; }
+}
+
+internal record class SensorDetails(SensorType Type) : ISensorDetails;

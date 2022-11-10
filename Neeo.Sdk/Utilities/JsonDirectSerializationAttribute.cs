@@ -7,20 +7,20 @@ namespace Neeo.Sdk.Utilities;
 /// <summary>
 /// Specifies that objects of a specified base type should directly be serialized as their implemented types.
 /// </summary>
-internal sealed class JsonDirectSerializationAttribute : JsonConverterAttribute
+/// <typeparam name="T">
+/// A type for which to create a JSON converter, such that objects of this type should directly be serialized as their implemented types.
+/// </typeparam>
+internal sealed class JsonDirectSerializationAttribute<T> : JsonConverterAttribute
 {
     /// <summary>
-    /// Creates a new instance of the <see cref="JsonDirectSerializationAttribute" />.
+    /// Creates a new instance of the <see cref="JsonDirectSerializationAttribute&lt;T&gt;" />.
     /// </summary>
-    /// <param name="baseType">
-    /// A type for which to create a JSON converter, such that objects of this type should directly be serialized as their implemented types.
-    /// </param>
-    public JsonDirectSerializationAttribute(Type baseType)
-        : base(typeof(Converter<>).MakeGenericType(baseType))
+    public JsonDirectSerializationAttribute()
+        : base(typeof(Converter))
     {
     }
 
-    private sealed class Converter<T> : JsonConverter<T>
+    private sealed class Converter : JsonConverter<T>
     {
         public override T? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => throw new NotSupportedException();
 

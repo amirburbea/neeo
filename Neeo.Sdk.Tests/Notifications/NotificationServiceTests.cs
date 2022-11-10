@@ -47,8 +47,7 @@ public sealed class NotificationServiceTests : IDisposable
     {
         await this._notificationService.SendNotificationAsync(
             this.CreateDeviceAdapter(),
-            new(Constants.DeviceId, Constants.ComponentName, Constants.Value),
-            default
+            new(Constants.DeviceId, Constants.ComponentName, Constants.Value)
         );
 
         Message message = await this.GetMessageAsync();
@@ -59,7 +58,6 @@ public sealed class NotificationServiceTests : IDisposable
     [Fact]
     public Task SendNotificationAsync_should_throw_if_property_is_null() => Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(
             this.CreateDeviceAdapter(),
-            default,
             default
         ));
 
@@ -68,8 +66,7 @@ public sealed class NotificationServiceTests : IDisposable
     {
         await this._notificationService.SendSensorNotificationAsync(
             this.CreateDeviceAdapter(),
-            new(Constants.DeviceId, Constants.ComponentName, Constants.Value),
-            default
+            new(Constants.DeviceId, Constants.ComponentName, Constants.Value)
         );
 
         Message message = await this.GetMessageAsync();
@@ -80,8 +77,7 @@ public sealed class NotificationServiceTests : IDisposable
     [Fact]
     public Task SendSensorNotificationAsync_should_throw_if_property_is_null() => Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendSensorNotificationAsync(
                     this.CreateDeviceAdapter(),
-                    notification: new(),
-                    default
+                    notification: new()
                 ));
 
     private IDeviceAdapter CreateDeviceAdapter()

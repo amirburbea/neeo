@@ -62,14 +62,14 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._actionBlock.Complete();
     }
 
-    public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken) => this.SendNotificationAsync(
+    public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.SendNotificationAsync(
         adapter,
         notification,
         false,
         cancellationToken
     );
 
-    public Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken) => this.SendNotificationAsync(
+    public Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.SendNotificationAsync(
         adapter,
         notification,
         true,

@@ -1039,7 +1039,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             return new(name, Uri.EscapeDataString(label ?? string.Empty), pathPrefix + name, GetSensorName(name));
         }
 
-        static string GetSensorName(string name) => name.EndsWith(SensorDetails.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorDetails.ComponentSuffix);
+        static string GetSensorName(string name) => name.EndsWith(SensorComponent.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorComponent.ComponentSuffix);
 
         static bool RequiresDiscovery(DeviceCapability capability) => capability is DeviceCapability.BridgeDevice or DeviceCapability.AddAnotherDevice or DeviceCapability.RegisterUserAccount;
     }

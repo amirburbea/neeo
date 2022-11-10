@@ -5,7 +5,7 @@ namespace Neeo.Sdk.Devices.Lists;
 /// <summary>
 /// Interface for a list item.
 /// </summary>
-[JsonDirectSerialization(typeof(IListItem))]
+[JsonDirectSerialization<IListItem>]
 public interface IListItem
 {
     /// <summary>

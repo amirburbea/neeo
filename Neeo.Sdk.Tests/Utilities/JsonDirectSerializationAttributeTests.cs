@@ -30,7 +30,7 @@ public sealed class JsonDirectSerializationAttributeTests
     /// <summary>
     /// Empty interface with attribute will serialize as the object type.
     /// </summary>
-    [JsonDirectSerialization(typeof(IWithAttribute))]
+    [JsonDirectSerialization<IWithAttribute>]
     private interface IWithAttribute
     {
     }
