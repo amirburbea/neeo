@@ -98,10 +98,9 @@ public static partial class NetworkMethods
         public int dwType;
     }
 
-    private static class NativeMethods
+    private static partial class NativeMethods
     {
-        [DllImport("IpHlpApi.dll")]
-        [return: MarshalAs(UnmanagedType.U4)]
-        public static extern int GetIpNetTable(IntPtr pIpNetTable, [MarshalAs(UnmanagedType.U4)] ref int pdwSize, bool bOrder);
+        [LibraryImport("iphlpapi.dll")]
+        public static partial int GetIpNetTable(IntPtr pIpNetTable, ref int pdwSize, [MarshalAs(UnmanagedType.Bool)] bool bOrder);
     }
 }

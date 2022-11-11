@@ -17,7 +17,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
 
-public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
+public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposable
 {
     private static readonly Dictionary<Buttons, Func<KodiClient, Task>> _buttonFunctions = new()
     {
@@ -50,7 +50,6 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
     };
 
     private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
-    private static readonly Regex _identifierRegex = new(@"^(?<key>[a-z]+)[:](?<id>[\d]+)([:](?<suffix>.+))?$", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(5d);
 
     private readonly KodiClientManager _clientManager;
@@ -373,7 +372,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
         .AddEntry(new("TV Shows", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.tvshows"))
         .AddEntry(new("TV Shows - Recent", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.recent"));
 
-    private static Identifier? TryTranslate(string identifier) => KodiDeviceProviderBase._identifierRegex.Match(identifier) is { Success: true } match
+    private static Identifier? TryTranslate(string identifier) => KodiDeviceProviderBase.IdentifierRegex().Match(identifier) is { Success: true } match
         ? new(match.Groups["key"].Value, int.Parse(match.Groups["id"].Value), match.Groups["suffix"].Value ?? string.Empty)
         : null;
 
@@ -610,4 +609,7 @@ public abstract class KodiDeviceProviderBase : IDeviceProvider, IDisposable
     }
 
     private readonly record struct Identifier(string Key, int Value, string Suffix);
+
+    [GeneratedRegex("^(?<key>[a-z]+)[:](?<id>[\\d]+)([:](?<suffix>.+))?$", RegexOptions.ExplicitCapture | RegexOptions.Compiled)]
+    private static partial Regex IdentifierRegex();
 }

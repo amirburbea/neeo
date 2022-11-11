@@ -37,10 +37,9 @@ internal interface IBrain
 /// <summary>
 /// Returns information about and contains methods for interacting with the NEEO Brain.
 /// </summary>
-public sealed class Brain : IBrain
+public sealed partial class Brain : IBrain
 {
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(15d);
-    private static readonly Regex _versionPrefixRegex = new(@"^0\.(?<v>\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
 
     /// <summary>
     /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
@@ -55,7 +54,7 @@ public sealed class Brain : IBrain
         {
             throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress));
         }
-        if (Brain._versionPrefixRegex.Match(version) is not { Success: true, Groups: { } groups } || int.Parse(groups["v"].Value, CultureInfo.InvariantCulture) < 50)
+        if (Brain.VersionPrefixRegex().Match(version) is not { Success: true, Groups: { } groups } || double.Parse(groups["v"].Value, CultureInfo.InvariantCulture) < 0.5d)
         {
             throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
         }
@@ -128,6 +127,9 @@ public sealed class Brain : IBrain
         IReadOnlyDictionary<string, string> properties = service.Properties[0];
         return new(IPAddress.Parse(host.IPAddress), service.Port, $"{properties["hon"]}.local", properties["rel"]);
     }
+
+    [GeneratedRegex(@"^(?<v>\d+\.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]
+    private static partial Regex VersionPrefixRegex();
 
     private static class Constants
     {
