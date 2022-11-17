@@ -316,7 +316,7 @@ public sealed class HisenseTV : IDisposable
                 .WithCredentials("hisenseservice", "multimqttservice")
                 .WithTimeout(TimeSpan.FromMilliseconds(750))
                 .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-                .WithTls(parameters: new() { UseTls = true, AllowUntrustedCertificates = true, IgnoreCertificateChainErrors = true, IgnoreCertificateRevocationErrors = true })
+                .WithTls(parameters: new() { UseTls = true, CertificateValidationHandler = _ => true })
                 .Build();
         }
 
