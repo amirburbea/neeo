@@ -54,7 +54,7 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
     /// </summary>
     private void Validate(string? optionalDeviceId, DiscoveredDevice[] discoveredDevices)
     {
-        if (optionalDeviceId != null && (discoveredDevices.Length != 1 || discoveredDevices[0].Id != optionalDeviceId))
+        if (optionalDeviceId != null && (discoveredDevices is not [{ Id: string deviceId }] || deviceId != optionalDeviceId))
         {
             throw new InvalidOperationException($"Discovery was to return at most one device with the id: {optionalDeviceId}");
         }

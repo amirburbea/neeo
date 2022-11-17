@@ -113,11 +113,10 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     private async Task InitializeDeviceList(string[] deviceIds)
     {
         this._logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceList), string.Join(',', deviceIds));
-        if (deviceIds.Length != 1)
+        if (deviceIds is not [{ } macAddress])
         {
             return;
         }
-        string macAddress = deviceIds[0];
         if (await HisenseTV.TryCreate(PhysicalAddress.Parse(macAddress), this._logger, connectionRequired: false).ConfigureAwait(false) is not { } tv)
         {
             this._logger.LogError("Failed to recreate TV based on mac address {macAddress}.", macAddress);

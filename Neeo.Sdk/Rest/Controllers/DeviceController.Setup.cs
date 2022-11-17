@@ -26,7 +26,7 @@ internal partial class DeviceController
         }
         if (feature.EnableDynamicDeviceBuilder)
         {
-            Parallel.ForEach(devices, new() { CancellationToken = cancellationToken }, (device) => this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, device.DeviceBuilder!));
+            Parallel.ForEach(devices, new() { CancellationToken = cancellationToken }, device => this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, device.DeviceBuilder!));
         }
         return devices;
     }

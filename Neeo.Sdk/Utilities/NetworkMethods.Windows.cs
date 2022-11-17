@@ -51,7 +51,7 @@ public static partial class NetworkMethods
             Marshal.FreeCoTaskMem(rawTable);
         }
 
-        static bool IsMulticast(IPAddress address) => address.GetAddressBytes()[0] is not < 224 and not > 239;
+        static bool IsMulticast(IPAddress address) => address.GetAddressBytes() is [not < 224 and not > 239, ..];
     }
 
     /// <summary>

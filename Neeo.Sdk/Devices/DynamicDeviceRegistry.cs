@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -33,7 +34,7 @@ public interface IDynamicDeviceRegistry
 
 internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 {
-    private readonly Dictionary<string, IDeviceAdapter> _discoveredDevices = new();
+    private readonly ConcurrentDictionary<string, IDeviceAdapter> _discoveredDevices = new();
     private readonly ReaderWriterLockSlim _lock = new();
     private readonly ILogger<DynamicDeviceRegistry> _logger;
 
@@ -58,7 +59,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         {
             this._lock.ExitReadLock();
         }
-        if (await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not { Length: 1 } devices || devices[0] is not { DeviceBuilder: { } builder })
+        if (await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not [{ DeviceBuilder: { } builder }])
         {
             return default;
         }
@@ -91,7 +92,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         try
         {
             this._lock.EnterWriteLock();
-            this._discoveredDevices.Add(key, device);
+            this._discoveredDevices.TryAdd(key, device);
             count = this._discoveredDevices.Count;
         }
         finally

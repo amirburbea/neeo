@@ -96,7 +96,7 @@ internal sealed class NotificationMapping : INotificationMapping
                         keys.Add(entry.EventKey);
                     }
                 }
-                return keys.Count == 1 ? new[] { keys[0] } : keys.Distinct().ToArray();
+                return keys is [string key] ? new[] { key } : keys.Distinct().ToArray();
 
                 bool Match(Entry entry) => componentName == projection(entry);
             }
