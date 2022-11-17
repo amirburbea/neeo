@@ -110,7 +110,7 @@ public sealed class ApiClientTests : IDisposable
     private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)
     {
         List<HttpRequestMessage> captured = new();
-        List<string> requestBody = new();
+        string? requestBody = default;
         this._mockMessageHandler
             .Protected()
             .As<IMessageHandlerMockedMethods>()
@@ -119,14 +119,14 @@ public sealed class ApiClientTests : IDisposable
             {
                 if (request.Content is { } content)
                 {
-                    requestBody.Add(await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    requestBody = await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 }
                 return new()
                 {
                     Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options))
                 };
             });
-        return new(() => (captured.Single(), requestBody is [string body, ..] ? body : default));
+        return new(() => (captured.Single(), requestBody));
     }
 
     internal static class IdentityFunction
