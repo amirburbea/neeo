@@ -126,7 +126,7 @@ public sealed class ApiClientTests : IDisposable
                     Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options))
                 };
             });
-        return new(() => (captured.Single(),  requestBody is [string body,..] ? body: default));
+        return new(() => (captured.Single(), requestBody is [string body, ..] ? body : default));
     }
 
     internal static class IdentityFunction
