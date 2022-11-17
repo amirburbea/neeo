@@ -10,15 +10,21 @@ public sealed class ValidatorTests
     public void ValidateDelay_should_throw_if_greater_than_60000()
     {
         Assert.Throws<ArgumentException>(() => Validator.ValidateDelay(60001));
-        Assert.Equal(60000, Validator.ValidateDelay(60000));
     }
 
     [Fact]
     public void ValidateDelay_should_throw_if_negative()
     {
         Assert.Throws<ArgumentException>(() => Validator.ValidateDelay(-400));
+    }
+
+    [Fact]
+    public void ValidateDelay_should_return_value_if_null_or_between_0_and_60000()
+    {
+        Assert.Null(Validator.ValidateDelay(null));
         Assert.Equal(0, Validator.ValidateDelay(0));
-        Assert.Null(Validator.ValidateDelay(default));
+        Assert.Equal(400, Validator.ValidateDelay(400));
+        Assert.Equal(60000, Validator.ValidateDelay(60000));
     }
 
     [Fact]
@@ -26,9 +32,21 @@ public sealed class ValidatorTests
     {
         Assert.Throws<ArgumentException>(() => Validator.ValidateNotNegative(-400));
         Assert.Throws<ArgumentException>(() => Validator.ValidateNotNegative((int?)-400));
+    }
+
+    [Fact]
+    public void ValidateNotNegative_should_return_value_if_null_or_not_negative()
+    {
+        Assert.Null(Validator.ValidateNotNegative(default(int?)));
         Assert.Equal(20, Validator.ValidateNotNegative(20));
         Assert.Equal((int?)10, Validator.ValidateNotNegative((int?)10));
-        Assert.Null(Validator.ValidateNotNegative(default(int?)));
+    }
+
+    [Fact]
+    public void ValidateRange_should_throw_if_low_is_less_than_or_equal_to_high()
+    {
+        Assert.Throws<ArgumentException>(() => Validator.ValidateRange(0d, -1d));
+        Assert.Throws<ArgumentException>(() => Validator.ValidateRange(0d, 0d));
     }
 
     [Fact]
@@ -40,29 +58,32 @@ public sealed class ValidatorTests
         Assert.Throws<ArgumentException>(() => Validator.ValidateRange(double.NegativeInfinity, 0d));
         Assert.Throws<ArgumentException>(() => Validator.ValidateRange(0d, double.PositiveInfinity));
         Assert.Throws<ArgumentException>(() => Validator.ValidateRange(double.PositiveInfinity, 0d));
-        var (low, high) = (0d, 1.5d);
-        Assert.True(Validator.ValidateRange(low, high) is { Length: 2 } range && range[0] == low && range[1] == high);
     }
 
     [Fact]
-    public void ValidateRange_should_throw_if_low_is_less_than_high()
+    public void ValidateRange_returns_array_of_low_and_high_when_low_is_less_than_high()
     {
-        Assert.Throws<ArgumentException>(() => Validator.ValidateRange(0d, -1d));
-        Assert.True(Validator.ValidateRange(10d, 11d) is { Length: 2 } range && range[0] == 10d && range[1] == 11d);
+        Assert.True(Validator.ValidateRange(0d, 0.1d) is [0d, 0.1d]);
+        Assert.True(Validator.ValidateRange(0d, 100d) is [0d, 100d]);
     }
 
     [Fact]
-    public void ValidateText_should_throw_if_length_less_than_minLength_or_greater_than_maxLength()
+    public void ValidateText_should_throw_if_length_not_between_minLength_and_maxLength()
     {
         Assert.Throws<ArgumentException>(() => Validator.ValidateText("abc", minLength: 4));
         Assert.Throws<ArgumentException>(() => Validator.ValidateText("abc", maxLength: 2));
-        Assert.Equal("abc", Validator.ValidateText("abc"));
     }
 
     [Fact]
     public void ValidateText_should_throw_if_null_and_not_allowNull()
     {
         Assert.Throws<ArgumentException>(() => Validator.ValidateText(null, allowNull: false));
+    }
+
+    [Fact]
+    public void ValidateText_should_return_value_if_in_length_constraints_or_null_and_allowNull()
+    {
+        Assert.Equal("abc", Validator.ValidateText("abc"));
         Assert.Null(Validator.ValidateText(null, allowNull: true));
     }
 }

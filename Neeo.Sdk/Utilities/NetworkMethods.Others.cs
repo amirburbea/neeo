@@ -21,6 +21,6 @@ public static partial class NetworkMethods
         process.WaitForExit();
     }
 
-    [GeneratedRegex("^\\? \\((?<ip>(\\d+\\.){3}\\d+)\\).+(?<mac>([a-f\\d]{2}:){5}[a-f\\d]{2})", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture, "en-US")]
+    [GeneratedRegex("^\\? \\((?<ip>(\\d+\\.){3}\\d+)\\).+(?<mac>([a-f\\d]{2}:){5}[a-f\\d]{2})", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture)]
     private static partial Regex ArpLineRegex();
 }

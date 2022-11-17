@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace Neeo.Sdk.Utilities;
@@ -46,26 +47,17 @@ public sealed class TextAttribute : Attribute
     private static class EnumMapping<T>
         where T : struct, Enum
     {
-        private static readonly Dictionary<string, T> _fromText = new();
-        private static readonly Dictionary<T, string> _toText = new();
+        private static readonly Dictionary<string, T> _fromText = new(
+            from value in Enum.GetValues<T>()
+            let name = Enum.GetName(value)
+            where name is { }
+            let text = typeof(T).GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetCustomAttribute<TextAttribute>()?.Text ?? name
+            select KeyValuePair.Create(text, value)
+        );
 
-        static EnumMapping()
-        {
-            T[] values = Enum.GetValues<T>();
-            Dictionary<string, T> fromText = new(values.Length);
-            Dictionary<T, string> toText = new(values.Length);
-            foreach (T value in values)
-            {
-                if (Enum.GetName(value) is not { } name)
-                {
-                    continue;
-                }
-                string text = typeof(T).GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetCustomAttribute<TextAttribute>()?.Text ?? name;
-                fromText.Add(text, value);
-                toText.Add(value, text);
-            }
-            (EnumMapping<T>._fromText, EnumMapping<T>._toText) = (fromText, toText);
-        }
+        private static readonly Dictionary<T, string> _toText = new(
+            EnumMapping<T>._fromText.Select(pair => KeyValuePair.Create(pair.Value, pair.Key))
+        );
 
         public static T? GetEnum(string text) => EnumMapping<T>._fromText.TryGetValue(text, out T value) ? value : default(T?);
 

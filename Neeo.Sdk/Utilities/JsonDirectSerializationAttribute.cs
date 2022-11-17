@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Neeo.Sdk.Utilities;
 
@@ -11,6 +12,7 @@ namespace Neeo.Sdk.Utilities;
 /// A type for which to create a JSON converter, such that objects of this type should directly be serialized as their implemented types.
 /// </typeparam>
 internal sealed class JsonDirectSerializationAttribute<T> : JsonConverterAttribute
+    where T : notnull
 {
     /// <summary>
     /// Creates a new instance of the <see cref="JsonDirectSerializationAttribute&lt;T&gt;" />.
@@ -27,7 +29,7 @@ internal sealed class JsonDirectSerializationAttribute<T> : JsonConverterAttribu
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options) => JsonSerializer.Serialize(
             writer,
             value,
-            value?.GetType() ?? typeof(object),
+            value.GetType(),
             options
         );
     }

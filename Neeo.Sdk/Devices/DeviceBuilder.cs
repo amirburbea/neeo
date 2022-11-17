@@ -228,7 +228,15 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddFavoriteHandler(FavoriteHandler handler);
 
-    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string>? getter = default, string? uri = default);
+    /// <summary>
+    /// Adds an image to the device.
+    /// </summary>
+    /// <param name="name">The name of the image to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="size">The size of the image.</param>
+    /// <param name="getter">A callback to get the URI of the image.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string>? getter);
 
     IDeviceBuilder AddPlayerWidget(IPlayerWidgetController controller);
 
@@ -406,10 +414,8 @@ public interface IDeviceBuilder
     IDeviceBuilder SetSpecificName(string? specificName);
 }
 
-internal sealed class DeviceBuilder : IDeviceBuilder
+internal sealed partial class DeviceBuilder : IDeviceBuilder
 {
-    private static readonly Regex _digitRegex = new(@"^DIGIT \d$", RegexOptions.Compiled);
-
     private readonly List<string> _additionalSearchTokens = new();
     private readonly Dictionary<string, ButtonParameters> _buttons = new();
     private readonly HashSet<DeviceCharacteristic> _characteristics = new();
@@ -519,9 +525,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         string name,
         string? label,
         ImageSize size,
-        DeviceValueGetter<string>? getter,
-        string? uri
-    ) => this.AddImageUrl(name, label, size, getter, uri);
+        DeviceValueGetter<string>? getter
+    ) => this.AddImageUrl(name, label, size, getter);
 
     IDeviceBuilder IDeviceBuilder.AddPlayerWidget(IPlayerWidgetController controller) => this.AddPlayerWidget(controller);
 
@@ -657,7 +662,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
         this._hasInput |= name.StartsWith(DeviceBuilderConstants.InputPrefix);
-        this._digitCount += DeviceBuilder._digitRegex.IsMatch(name) ? 1 : 0;
+        this._digitCount += DeviceBuilder.DigitRegex().IsMatch(name) ? 1 : 0;
         return this;
     }
 
@@ -717,19 +722,13 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string>? getter, string? uri)
+    private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter)
     {
         ImageUrlParameters parameters = new(
             Validator.ValidateText(name),
             Validator.ValidateText(label, allowNull: true),
-            ValueFeature.Create((getter, uri) switch
-            {
-                (null, null) => throw new InvalidOperationException($"Either {nameof(uri)} or {nameof(getter)} must be specified."),
-                (null, { }) => _ => Task.FromResult(uri),
-                ({ }, _) => getter
-            }),
-            size,
-            uri
+            ValueFeature.Create(getter),
+            size
         );
         if (!this._imageUrls.TryAdd(name, parameters))
         {
@@ -904,10 +903,10 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.String)), valueFeature);
             AddComponentAndRouteHandler(BuildTextLabel(pathPrefix, name, label, isLabelVisible), valueFeature);
         }
-        foreach ((string name, string? label, ValueFeature valueFeature, ImageSize size, string? uri) in this._imageUrls.Values)
+        foreach ((string name, string? label, ValueFeature valueFeature, ImageSize size) in this._imageUrls.Values)
         {
             AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.String)), valueFeature);
-            AddComponentAndRouteHandler(BuildImageUrl(pathPrefix, name, label, size, uri), valueFeature);
+            AddComponentAndRouteHandler(BuildImageUrl(pathPrefix, name, label, size), valueFeature);
         }
         foreach (DirectoryParameters parameters in this._directories.Values)
         {
@@ -918,8 +917,8 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             AddComponentAndRouteHandler(
                 parameters switch
                 {
-                    RangeSensorParameters rsd => BuildSensor(pathPrefix, rsd.Name, rsd.Label, new RangeSensorDetails(rsd.Range, Uri.EscapeDataString(rsd.Unit))),
                     { Type: SensorType.Power } => BuildPowerSensor(pathPrefix),
+                    RangeSensorParameters rsd => BuildSensor(pathPrefix, rsd.Name, rsd.Label, new RangeSensorDetails(rsd.Range, Uri.EscapeDataString(rsd.Unit))),
                     _ => BuildSensor(pathPrefix, parameters.Name, parameters.Label, new(parameters.Type))
                 },
                 parameters.ValueFeature
@@ -999,10 +998,10 @@ internal sealed class DeviceBuilder : IDeviceBuilder
             return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, role);
         }
 
-        static ImageUrlComponent BuildImageUrl(string pathPrefix, string imageName, string? label, ImageSize size, string? uri)
+        static ImageUrlComponent BuildImageUrl(string pathPrefix, string imageName, string? label, ImageSize size)
         {
             string name = Uri.EscapeDataString(imageName);
-            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, uri, size, GetSensorName(name));
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, size, GetSensorName(name));
         }
 
         static SensorComponent BuildPowerSensor(string pathPrefix)
@@ -1154,6 +1153,9 @@ internal sealed class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
+    [GeneratedRegex(@"^DIGIT \d$", RegexOptions.Compiled)]
+    private static partial Regex DigitRegex();
+
     private sealed record ButtonParameters(string Name, string? Label) : ParametersBase(Name, Label);
 
     private readonly record struct Credentials([property: JsonPropertyName("username")] string UserName, string Password);
@@ -1166,7 +1168,7 @@ internal sealed class DeviceBuilder : IDeviceBuilder
 
     private sealed record DirectoryParameters(string Name, string? Label, DirectoryRole? Role, DirectoryFeature Feature) : ParametersBase(Name, Label);
 
-    private sealed record ImageUrlParameters(string Name, string? Label, ValueFeature Feature, ImageSize Size, String? Uri) : ParametersBase(Name, Label);
+    private sealed record ImageUrlParameters(string Name, string? Label, ValueFeature Feature, ImageSize Size) : ParametersBase(Name, Label);
 
     private abstract record ParametersBase(string Name, string? Label);
 

@@ -36,7 +36,7 @@ public sealed class KodiClientManager : IDisposable
         async void OnHostDiscovered(IZeroconfHost host)
         {
             IPAddress ipAddress = IPAddress.Parse(host.IPAddress);
-            if (this.Clients.Any(client => client.IPAddress.Equals(ipAddress)))
+            if (this.Clients.Any(ipAddress.Equals))
             {
                 return;
             }

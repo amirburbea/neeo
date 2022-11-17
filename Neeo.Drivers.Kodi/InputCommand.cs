@@ -131,9 +131,14 @@ public enum InputCommand
 [AttributeUsage(AttributeTargets.Field)]
 internal sealed class InputCommandAttribute : Attribute
 {
-    public static readonly IReadOnlyDictionary<InputCommand, InputCommandAttribute> Attributes = typeof(InputCommand)
-        .GetFields(BindingFlags.Static | BindingFlags.Public)
-        .ToDictionary(field => (InputCommand)field.GetValue(null)!, field => field.GetCustomAttribute<InputCommandAttribute>()!);
+    private static readonly Dictionary<InputCommand, InputCommandAttribute> _attributes = new(
+        from field in typeof(InputCommand).GetFields(BindingFlags.Static | BindingFlags.Public)
+        let attribute = field.GetCustomAttribute<InputCommandAttribute>()
+        where attribute != null
+        select KeyValuePair.Create((InputCommand)field.GetValue(null)!, attribute)
+    );
+
+    public static InputCommandAttribute? GetAttribute(InputCommand command) => InputCommandAttribute._attributes.GetValueOrDefault(command);
 
     public InputCommandAttribute(string method, string? action = default)
     {

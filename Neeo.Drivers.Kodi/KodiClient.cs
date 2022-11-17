@@ -128,7 +128,7 @@ public sealed class KodiClient : IDisposable
     );
 
     public Task<bool> GetBooleanAsync(string boolean) => this.SendMessageAsync(
-            "Xbmc.GetInfoBooleans",
+        "Xbmc.GetInfoBooleans",
         new { booleans = new[] { boolean } },
         (JsonElement element) => element.GetProperty(boolean).GetBoolean()
     );
@@ -156,7 +156,7 @@ public sealed class KodiClient : IDisposable
     public Task<PlayerDescriptor[]> GetPlayersAsync() => this.SendMessageAsync("Player.GetPlayers", static (PlayerDescriptor[] players) => players);
 
     public Task<QueryData<TVShowInfo>> GetTVShowsAsync(int start = 0, int end = -1, Filter? filter = default) => this.SendMessageAsync(
-            "VideoLibrary.GetTVShows",
+        "VideoLibrary.GetTVShows",
         new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = TVShowInfo.Fields, Filter = filter },
         static (TVShowsListResult result) => QueryData.Create(result.Limits.Total, result.TVShows)
     );
@@ -169,7 +169,7 @@ public sealed class KodiClient : IDisposable
 
     public async Task<bool> SendInputCommandAsync(InputCommand command)
     {
-        if (InputCommandAttribute.Attributes.GetValueOrDefault(command) is not { } attribute)
+        if (InputCommandAttribute.GetAttribute(command) is not { } attribute)
         {
             return false;
         }
@@ -194,9 +194,9 @@ public sealed class KodiClient : IDisposable
         static bool IsCursorCommand(InputCommand command) => command is InputCommand.Right or InputCommand.Left or InputCommand.Up or InputCommand.Down or InputCommand.Select;
     }
 
-    public async Task<int> SetVolumeAsync(int volume) => this.Volume = volume is < 0 or > 100
-        ? throw new ArgumentOutOfRangeException(nameof(volume))
-        : await this.SendMessageAsync("Application.SetVolume", new { volume }, static (int volume) => volume).ConfigureAwait(false);
+    public async Task<int> SetVolumeAsync(int volume) => this.Volume = volume is >= 0 and <= 100
+        ? await this.SendMessageAsync("Application.SetVolume", new { volume }, static (int volume) => volume).ConfigureAwait(false)
+        : throw new ArgumentOutOfRangeException(nameof(volume));
 
     public Task<bool> ShowNotificationAsync(
         string title,
@@ -316,13 +316,13 @@ public sealed class KodiClient : IDisposable
             {
                 this.Error?.Invoke(this, errorMessage);
             }
-            else if (response.Id is { } id && this._taskSources.TryRemove(id, out TaskCompletionSource<JsonElement>? taskSource) && response.Result is { } element)
+            else if (response is { Id: { } id } && this._taskSources.TryRemove(id, out TaskCompletionSource<JsonElement>? taskSource) && response.Result is { } element)
             {
                 taskSource.TrySetResult(element);
             }
-            else if (response.Method is { } method && response.Parameters is { } parameters)
+            else if (response is { Method: { } method, Parameters.Data: { } responseData })
             {
-                this.ProcessIncomingMessage(response.Method, parameters.Data);
+                this.ProcessIncomingMessage(method, responseData);
             }
         }
     }
@@ -380,7 +380,7 @@ public sealed class KodiClient : IDisposable
                picture.Label,
                parameters.Item.File ?? parameters.Item.ToString(),
                this.GetImageUrl(picture.Thumbnail)
-           ),
+            ),
             ItemType.Episode when element.Deserialize<EpisodeInfo>(KodiClient.SerializerOptions) is { } episode => CreatePlayerState(episode),
             ItemType.Song when element.Deserialize<SongInfo>(KodiClient.SerializerOptions) is { } song => CreatePlayerState(song),
             _ when element.Deserialize<VideoInfo>(KodiClient.SerializerOptions) is { } video => CreatePlayerState(video),
@@ -437,9 +437,11 @@ public sealed class KodiClient : IDisposable
         if (this._webSocket is not { State: WebSocketState.Open } webSocket)
         {
             _ = this.ConnectAsync();
-            return Task.FromCanceled<TResult>(new(true));
+            return CreateCancelledTask();
         }
         return SendRequestAsync();
+
+        static Task<TResult> CreateCancelledTask() => Task.FromCanceled<TResult>(new(true));
 
         async Task<TResult> SendRequestAsync()
         {
@@ -451,7 +453,7 @@ public sealed class KodiClient : IDisposable
             if (!source.Task.Equals(await Task.WhenAny(source.Task, Task.Delay(2500)).ConfigureAwait(false)))
             {
                 Debug.WriteLine("Something went wrong...");
-                return await Task.FromCanceled<TResult>(new(true)).ConfigureAwait(false);
+                return await CreateCancelledTask().ConfigureAwait(false);
             }
             JsonElement element = await source.Task.ConfigureAwait(false);
             TPayload payload;
