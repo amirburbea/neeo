@@ -13,10 +13,7 @@ public sealed class WebOSClient : IDisposable
     private Task<bool>? _connectTask;
     private ClientWebSocket? _webSocket;
 
-    public WebOSClient(IPAddress ipAddress)
-    {
-        this.IPAddress = ipAddress;
-    }
+    public WebOSClient(IPAddress ipAddress) => this.IPAddress = ipAddress;
 
     public event EventHandler? Connected;
 

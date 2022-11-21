@@ -464,7 +464,7 @@ public sealed class HisenseTV : IDisposable
         private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             string topic = e.ApplicationMessage.Topic;
-            string payload = e.ApplicationMessage.Payload == null ? String.Empty : Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+            string payload = e.ApplicationMessage.Payload is { } bytes ? Encoding.UTF8.GetString(bytes) : String.Empty;
             this._logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
             this.MessageReceived?.Invoke(this, new((topic, payload)));
             switch (topic)
