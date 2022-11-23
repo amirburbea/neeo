@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 
 namespace Neeo.Drivers.WebOS;
 
@@ -9,26 +7,41 @@ public enum App
 {
     Amazon,
 
+    [App("com.apple.appletv")]
+    AppleTV,
+
     [App("com.webos.app.browser")]
     Browser,
 
     [App("com.disney.disneyplus-prod")]
     Disney,
 
+    [App("com.dolby.lgapp")]
+    DolbyAccess,
+
     [App("com.hbo.hbomax")]
     HboMax,
+
+    [App("com.webos.app.homeconnect")]
+    HomeDashboard,
 
     Netflix,
 
     [App("com.palm.app.settings")]
     Settings,
 
+    [App("spotify-beehive")]
+    Spotify,
+
+    [App("com.webos.app.discovery")]
+    Store,
+
     [App("youtube.leanback.v4")]
     YouTube,
 }
 
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-internal sealed class AppAttribute : Attribute
+internal sealed class AppAttribute : Attribute, INameAttribute
 {
     public AppAttribute(string name) => this.Name = name;
 
@@ -37,13 +50,7 @@ internal sealed class AppAttribute : Attribute
 
 public static class AppName
 {
-    private static readonly Dictionary<App, string> _names = new(
-        from field in typeof(App).GetFields(BindingFlags.Static | BindingFlags.Public)
-        select KeyValuePair.Create(
-            (App)field.GetValue(null)!,
-            field.GetCustomAttribute<AppAttribute>()?.Name ?? field.Name.ToLowerInvariant()
-        )
-    );
+    private static readonly IReadOnlyDictionary<App, string> _names = NameDictionary.Generate<App, AppAttribute>();
 
     public static string Of(App app) => AppName._names[app];
 }

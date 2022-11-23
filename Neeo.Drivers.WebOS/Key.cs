@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 
 namespace Neeo.Drivers.WebOS;
 
@@ -80,22 +78,18 @@ public enum Key
 }
 
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-internal sealed class KeyAttribute : Attribute
+internal sealed class KeyAttribute : Attribute, INameAttribute
 {
     public KeyAttribute(string key) => this.Key = key;
 
     public string Key { get; }
+
+    string INameAttribute.Name => this.Key;
 }
 
 public static class KeyName
 {
-    private static readonly Dictionary<Key, string> _names = new(
-        from field in typeof(Key).GetFields(BindingFlags.Static | BindingFlags.Public)
-        select KeyValuePair.Create(
-            (Key)field.GetValue(null)!,
-            field.GetCustomAttribute<AppAttribute>()?.Name ?? field.Name.ToLowerInvariant()
-        )
-    );
+    private static readonly IReadOnlyDictionary<Key, string> _names = NameDictionary.Generate<Key, KeyAttribute>();
 
     public static string Of(Key key) => KeyName._names[key];
 }
