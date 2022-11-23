@@ -3,4 +3,6 @@
 public interface IState
 {
     StateType Type { get; }
+
+    string ToString();
 }

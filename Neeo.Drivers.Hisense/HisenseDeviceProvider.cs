@@ -102,7 +102,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     private async Task<string> GetStateAsync(string deviceId)
     {
         return this._tv is { } tv && await tv.GetStateAsync().ConfigureAwait(false) is { } state
-            ? state.ToString()!
+            ? state.ToString()
             : string.Empty;
     }
 
@@ -190,9 +190,9 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             this.SetTV(tv, state);
         }
-        return (tv = this._tv) is not null
-            ? new[] { new DiscoveredDevice(tv.MacAddress.ToString(), $"Hisense TV ({tv.MacAddress})", true) }
-            : Array.Empty<DiscoveredDevice>();
+        return (tv = this._tv) is null
+            ? Array.Empty<DiscoveredDevice>()
+            : new DiscoveredDevice[] { new(tv.MacAddress.ToString(), $"Hisense TV ({tv.MacAddress})", true) };
     }
 
     private async Task<bool> QueryIsRegistered()
@@ -244,17 +244,12 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         tv.Disconnected += this.TV_Disconnected;
         tv.Connected += this.TV_Connected;
         tv.StateChanged += this.TV_StateChanged;
-        if (this._notifier is not { } notifier)
+        if (this._notifier is not { } notifier || state is null)
         {
             return;
         }
         string deviceId = tv.MacAddress.ToString();
-        List<Task> list = new();
-        if (state != null)
-        {
-            list.Add(notifier.SendNotificationAsync(deviceId, state.ToString()!, deviceId));
-        }
-        await Task.WhenAll(list).ConfigureAwait(false);
+        await notifier.SendNotificationAsync(deviceId, state.ToString(), deviceId).ConfigureAwait(false);
     }
 
     private async Task SetVolumeAsync(string deviceId, double value)
@@ -287,7 +282,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     {
         if (this._notifier is { } notifier && this._tv is { } tv)
         {
-            await notifier.SendNotificationAsync("STATE", e.Data.ToString()!, tv.MacAddress.ToString()).ConfigureAwait(false);
+            await notifier.SendNotificationAsync("STATE", e.Data.ToString(), tv.MacAddress.ToString()).ConfigureAwait(false);
         }
     }
 

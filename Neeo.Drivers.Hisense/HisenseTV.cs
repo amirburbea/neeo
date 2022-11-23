@@ -342,10 +342,9 @@ public sealed class HisenseTV : IDisposable
 
         public async Task ChangeSourceAsync(string name)
         {
-            SourceInfo[] sources = await this.GetSourcesAsync().ConfigureAwait(false);
-            if (Array.FindIndex(sources, source => source.Name == name) is int index and >= 0)
+            if (Array.Find(await this.GetSourcesAsync().ConfigureAwait(false), source => source.Name == name) is { } source)
             {
-                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "changesource"), sources[index], waitForNextMessage: false).ConfigureAwait(false);
+                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "changesource"), source, waitForNextMessage: false).ConfigureAwait(false);
             }
         }
 
@@ -358,7 +357,7 @@ public sealed class HisenseTV : IDisposable
 
         public void Dispose()
         {
-            this._logger.LogInformation("Disposing {clientId}.", this._client.Options.ClientId);
+            this._logger.LogInformation("Disposing {clientId}.", this._options.ClientId);
             this._client.Dispose();
         }
 
@@ -388,16 +387,17 @@ public sealed class HisenseTV : IDisposable
 
         public async Task LaunchAppAsync(string name)
         {
-            AppInfo[] apps = await this.GetAppsAsync().ConfigureAwait(false);
-            if (Array.FindIndex(apps, app => string.Equals(app.Name, name, StringComparison.OrdinalIgnoreCase)) is int index and not -1)
+            if (Array.Find(await this.GetAppsAsync().ConfigureAwait(false), app => string.Equals(app.Name, name, StringComparison.OrdinalIgnoreCase)) is { } app)
             {
-                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "launchapp"), apps[index]).ConfigureAwait(false);
+                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "launchapp"), app).ConfigureAwait(false);
             }
         }
 
         public Task SendKeyAsync(string key) => this.SendMessageAsync(this.GetPublishTopic("remote_service", "sendkey"), key, waitForNextMessage: false);
 
-        public async Task<(string, string)> SendMessageAsync(string topic, object? body = default, bool waitForNextMessage = true)
+        public Task<(string, string)> SendMessageAsync(string topic, bool waitForNextMessage = true) => this.SendMessageAsync(topic, default(object), waitForNextMessage);
+
+        public async Task<(string, string)> SendMessageAsync<TBody>(string topic, TBody? body, bool waitForNextMessage = true)
         {
             string payload = body switch
             {
@@ -408,7 +408,6 @@ public sealed class HisenseTV : IDisposable
             this._logger.LogInformation("Sending message '{payload}' to topic '{topic}'.", payload, topic);
             if (!waitForNextMessage)
             {
-
                 await PublishAsync().ConfigureAwait(false);
                 return (string.Empty, string.Empty);
             }
@@ -450,9 +449,9 @@ public sealed class HisenseTV : IDisposable
 
         private static int TranslateVolumePayload(string payload) => JsonSerializer.Deserialize<VolumeData>(payload, Connection._jsonOptions).Value;
 
-        private string GetDataTopic(string service, string action) => $"/remoteapp/mobile/{this._client.Options.ClientId}/{service}/data/{action}";
+        private string GetDataTopic(string service, string action) => $"/remoteapp/mobile/{this._options.ClientId}/{service}/data/{action}";
 
-        private string GetPublishTopic(string service, string action) => $"/remoteapp/tv/{service}/{this._client.Options.ClientId}/actions/{action}";
+        private string GetPublishTopic(string service, string action) => $"/remoteapp/tv/{service}/{this._options.ClientId}/actions/{action}";
 
         private Task OnDisconnected(MqttClientDisconnectedEventArgs e)
         {
@@ -464,7 +463,7 @@ public sealed class HisenseTV : IDisposable
         private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             string topic = e.ApplicationMessage.Topic;
-            string payload = e.ApplicationMessage.Payload is { } bytes ? Encoding.UTF8.GetString(bytes) : String.Empty;
+            string payload = e.ApplicationMessage.Payload is { } bytes ? Encoding.UTF8.GetString(bytes) : string.Empty;
             this._logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
             this.MessageReceived?.Invoke(this, new((topic, payload)));
             switch (topic)
@@ -472,9 +471,11 @@ public sealed class HisenseTV : IDisposable
                 case BroadcastTopics.Sleep:
                     this.Sleep?.Invoke(this, EventArgs.Empty);
                     break;
+
                 case BroadcastTopics.VolumeChange:
                     this.VolumeChanged?.Invoke(this, new(Connection.TranslateVolumePayload(payload)));
                     break;
+
                 case BroadcastTopics.Launcher:
                 case BroadcastTopics.Settings:
                 case BroadcastTopics.State:
@@ -490,15 +491,17 @@ public sealed class HisenseTV : IDisposable
             {
                 case BroadcastTopics.Launcher:
                     return new State(StateType.Launcher);
+
                 case BroadcastTopics.Settings:
                     return new State(StateType.Settings);
+
                 case BroadcastTopics.State:
                     StateData data = JsonSerializer.Deserialize<StateData>(payload, Connection._jsonOptions);
                     return data.Type switch
                     {
                         "livetv" => new State(StateType.LiveTV),
                         "sourceswitch" => new State(StateType.SourceSwitch),
-                        "app" => new AppState(new(data.Name!, data.Url!, false)),
+                        "app" => new AppState(new(data.Name!, data.Url!)),
                         _ => throw new ApplicationException($"Unexpected payload: {payload}"),
                     };
             }
