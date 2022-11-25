@@ -9,7 +9,7 @@ namespace Neeo.Drivers.WebOS;
 
 internal static partial class MessageEncryption
 {
-    private static readonly byte[] _emptyIV = new byte[16];
+    private static readonly byte[] _emptyIV = new byte[Constants.IVLength];
 
     private static readonly byte[] _salt =
     {
@@ -46,8 +46,8 @@ internal static partial class MessageEncryption
             return output;
         }
 
-        byte[] iv = DecryptBytes(encrypted.AsSpan(0, 16));
-        byte[] decrypted = DecryptBytes(encrypted.AsSpan(16), iv);
+        byte[] iv = DecryptBytes(encrypted.AsSpan(0, Constants.IVLength));
+        byte[] decrypted = DecryptBytes(encrypted.AsSpan(Constants.IVLength), iv);
         int index = decrypted.AsSpan().IndexOf((byte)'\n');
         return Encoding.UTF8.GetString(index == -1 ? decrypted : decrypted.AsSpan(0, index));
     }
@@ -79,7 +79,7 @@ internal static partial class MessageEncryption
             const int messageBlockSize = 16;
             if (message.IndexOf('\r') != -1)
             {
-                throw new ArgumentException("message must not include the message terminator character \\r.", nameof(message));
+                throw new ArgumentException("Invalid message (must not include the message terminator character \\r).", nameof(message));
             }
             message += '\r';
             if (message.Length % messageBlockSize == 0)
@@ -94,10 +94,9 @@ internal static partial class MessageEncryption
             return message;
         }
 
-        byte[] iv = RandomNumberGenerator.GetBytes(16);
+        byte[] iv = RandomNumberGenerator.GetBytes(Constants.IVLength);
         byte[] encryptedIV = EncryptBytes(iv);
-        string preparedMessage = PrepareMessage(message);
-        byte[] encryptedData = EncryptBytes(Encoding.UTF8.GetBytes(preparedMessage), iv);
+        byte[] encryptedData = EncryptBytes(Encoding.UTF8.GetBytes(PrepareMessage(message)), iv);
         byte[] output = new byte[encryptedIV.Length + encryptedData.Length];
         encryptedIV.AsSpan().CopyTo(output);
         encryptedData.AsSpan().CopyTo(output.AsSpan(encryptedIV.Length));
@@ -118,4 +117,9 @@ internal static partial class MessageEncryption
 
     [GeneratedRegex(@"^[A-Za-z0-9]{8}$")]
     private static partial Regex KeyCodeRegex();
+
+    private static class Constants
+    {
+        public const int IVLength = 16;
+    }
 }

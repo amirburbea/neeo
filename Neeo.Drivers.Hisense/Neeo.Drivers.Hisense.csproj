@@ -9,6 +9,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="rcm_certchain_pem.cer" />
+    <None Remove="rcm_pem_privkey.pkcs8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Certificates\rcm_certchain_pem.cer" />
+    <EmbeddedResource Include="Certificates\rcm_pem_privkey.pkcs8" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MQTTnet" Version="4.1.2.350" />
   </ItemGroup>
 

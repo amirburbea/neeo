@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -20,16 +23,18 @@ public sealed class HisenseTV : IDisposable
 {
     private readonly string _clientIdPrefix;
     private readonly ILogger _logger;
+    private readonly bool _useCertificates;
 
     private Connection? _connection;
     private bool _isDisposed;
     private PeriodicTimer? _reconnectTimer;
 
-    private HisenseTV(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, string? clientIdPrefix)
+    private HisenseTV(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
     {
         this.IPAddress = ipAddress;
         this.MacAddress = macAddress;
         this._logger = logger;
+        this._useCertificates = useCertificates;
         this._clientIdPrefix = clientIdPrefix ?? Dns.GetHostName();
     }
 
@@ -49,7 +54,7 @@ public sealed class HisenseTV : IDisposable
 
     public PhysicalAddress MacAddress { get; }
 
-    public static async Task<HisenseTV[]> DiscoverAsync(ILogger logger, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
+    public static async Task<HisenseTV[]> DiscoverAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
         ConcurrentBag<HisenseTV> bag = new();
         await Task.WhenAll(
@@ -58,7 +63,7 @@ public sealed class HisenseTV : IDisposable
                 try
                 {
                     (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
-                    if (await HisenseTV.TryCreate(ipAddress, macAddress, logger, true, clientIdPrefix, cancellationToken).ConfigureAwait(false) is { } tv)
+                    if (await HisenseTV.TryCreate(ipAddress, macAddress, logger, true, useCertificates, clientIdPrefix, cancellationToken).ConfigureAwait(false) is { } tv)
                     {
                         bag.Add(tv);
                     }
@@ -72,7 +77,7 @@ public sealed class HisenseTV : IDisposable
         return bag.ToArray();
     }
 
-    public static Task<HisenseTV?> DiscoverOneAsync(ILogger logger, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
+    public static Task<HisenseTV?> DiscoverOneAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
         TaskCompletionSource<HisenseTV?> taskCompletionSource = new();
         cancellationToken.Register(() => taskCompletionSource.TrySetCanceled(cancellationToken));
@@ -90,7 +95,7 @@ public sealed class HisenseTV : IDisposable
                         try
                         {
                             (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
-                            if (await HisenseTV.TryCreate(ipAddress, macAddress, logger, true, clientIdPrefix, cts.Token).ConfigureAwait(false) is { } tv)
+                            if (await HisenseTV.TryCreate(ipAddress, macAddress, logger, true, useCertificates, clientIdPrefix, cts.Token).ConfigureAwait(false) is { } tv)
                             {
                                 taskCompletionSource.TrySetResult(tv);
                                 cts.Cancel();
@@ -111,10 +116,10 @@ public sealed class HisenseTV : IDisposable
         }
     }
 
-    public static Task<HisenseTV?> TryCreate(PhysicalAddress macAddress, ILogger logger, bool connectionRequired = false, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
+    public static Task<HisenseTV?> TryCreateAsync(PhysicalAddress macAddress, ILogger logger, bool connectionRequired = false, bool useCertificates = false, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
         return NetworkMethods.GetNetworkDevices().Where(pair => pair.Value.Equals(macAddress)).Select(static pair => pair.Key).FirstOrDefault() is { } ipAddress
-            ? HisenseTV.TryCreate(ipAddress, macAddress, logger, connectionRequired, clientIdPrefix, cancellationToken)
+            ? HisenseTV.TryCreate(ipAddress, macAddress, logger, connectionRequired, useCertificates, clientIdPrefix, cancellationToken)
             : Task.FromResult(default(HisenseTV));
     }
 
@@ -213,9 +218,9 @@ public sealed class HisenseTV : IDisposable
         await (this._connection?.SendKeyAsync(key) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
-    private static async Task<HisenseTV?> TryCreate(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool connectionRequired, string? clientIdPrefix, CancellationToken cancellationToken)
+    private static async Task<HisenseTV?> TryCreate(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool connectionRequired, bool useCertificates, string? clientIdPrefix, CancellationToken cancellationToken)
     {
-        HisenseTV tv = new(ipAddress, macAddress, logger, clientIdPrefix);
+        HisenseTV tv = new(ipAddress, macAddress, logger, useCertificates, clientIdPrefix);
         if (await tv.TryConnectAsync(cancellationToken).ConfigureAwait(false))
         {
             return tv;
@@ -278,7 +283,7 @@ public sealed class HisenseTV : IDisposable
         {
             throw new ObjectDisposedException(this.GetType().FullName);
         }
-        Connection connection = new(this.IPAddress, this.MacAddress, this._logger, this._clientIdPrefix);
+        Connection connection = new(this.IPAddress, this.MacAddress, this._logger, this._useCertificates, this._clientIdPrefix);
         if (!await connection.TryConnectAsync(cancellationToken).ConfigureAwait(false) || this._isDisposed)
         {
             connection.Dispose();
@@ -306,7 +311,7 @@ public sealed class HisenseTV : IDisposable
 
         private readonly MqttClientOptions _options;
 
-        public Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, string clientIdPrefix)
+        public Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix)
         {
             this._client = Connection._clientFactory.CreateMqttClient();
             this._logger = logger;
@@ -316,7 +321,15 @@ public sealed class HisenseTV : IDisposable
                 .WithCredentials("hisenseservice", "multimqttservice")
                 .WithTimeout(TimeSpan.FromMilliseconds(750))
                 .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-                .WithTls(parameters: new() { UseTls = true, CertificateValidationHandler = _ => true })
+                .WithTls(parameters =>
+                {
+                    parameters.UseTls = true;
+                    parameters.CertificateValidationHandler = _ => true;
+                    if (useCertificates)
+                    {
+                        parameters.Certificates = new[] { Connection.LoadCertificate() };
+                    }
+                })
                 .Build();
         }
 
@@ -445,6 +458,15 @@ public sealed class HisenseTV : IDisposable
                 // Do nothing.
             }
             return false;
+        }
+
+        private static X509Certificate LoadCertificate()
+        {
+            using Stream certificateStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(HisenseTV).Namespace}.Certificates.rcm_certchain_pem.cer")!;
+            using StreamReader certificateReader = new(certificateStream);
+            using Stream privateKeyStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(HisenseTV).Namespace}.Certificates.rcm_pem_privkey.pkcs8")!;
+            using StreamReader privateKeyReader = new(privateKeyStream);
+            return X509Certificate2.CreateFromPem(certPem: certificateReader.ReadToEnd(), keyPem: privateKeyReader.ReadToEnd());
         }
 
         private static int TranslateVolumePayload(string payload) => JsonSerializer.Deserialize<VolumeData>(payload, Connection._jsonOptions).Value;

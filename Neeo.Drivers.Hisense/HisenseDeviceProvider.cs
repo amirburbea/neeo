@@ -6,8 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Hisense;
@@ -46,6 +46,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         { Buttons.VolumeUp, RemoteKey.VolumeUp },
     };
 
+    private readonly Lazy<IDeviceBuilder> _deviceBuilder;
     private readonly ILogger _logger;
     private HisenseTV[] _candidates = Array.Empty<HisenseTV>();
     private bool _connected;
@@ -55,7 +56,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     public HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
     {
         this._logger = logger;
-        this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.TV)
+        this._deviceBuilder = new(() => Device.Create(Constants.DeviceName, DeviceType.TV)
             .SetManufacturer(Constants.Manufacturer)
             .SetSpecificName($"{Constants.Manufacturer} {Constants.DeviceName}")
             .AddButtonHandler(this.OnButtonPressed)
@@ -72,10 +73,10 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
             .AddTextLabel("VOLUME-LABEL", "Volume", async (_) => (await this.GetVolumeAsync(_).ConfigureAwait(false)).ToString())
             .AddTextLabel("STATE", "State", this.GetStateAsync)
             .EnableDiscovery("Discovering TV...", "Ensure your TV is on and IP control is enabled.", this.PerformDiscoveryAsync)
-            .EnableRegistration("Registering TV...", "Enter the code showing on your TV. If no code is displayed, hit back and try again (after verifying the TV is on).", this.QueryIsRegistered, this.Register);
+            .EnableRegistration("Registering TV...", "Enter the code showing on your TV. If no code is displayed, hit back and try again (after verifying the TV is on).", this.QueryIsRegistered, this.Register)); ;
     }
 
-    public IDeviceBuilder DeviceBuilder { get; }
+    public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
 
     private async Task BrowseApps(string deviceId, ListBuilder list)
     {
@@ -97,6 +98,8 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         }
     }
 
+    private string ClientIdPrefix() => Constants.DeviceName.Replace(' ', '_');
+
     private Task<bool> GetPowerState(string deviceId) => Task.FromResult(this._tv != null && this._connected);
 
     private async Task<string> GetStateAsync(string deviceId)
@@ -117,7 +120,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return;
         }
-        if (await HisenseTV.TryCreate(PhysicalAddress.Parse(macAddress), this._logger, connectionRequired: false).ConfigureAwait(false) is not { } tv)
+        if (await HisenseTV.TryCreateAsync(PhysicalAddress.Parse(macAddress), this._logger, useCertificates: true, clientIdPrefix: this.ClientIdPrefix()).ConfigureAwait(false) is not { } tv)
         {
             this._logger.LogError("Failed to recreate TV based on mac address {macAddress}.", macAddress);
             return;
@@ -185,7 +188,14 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     private async Task<DiscoveredDevice[]> PerformDiscoveryAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
         if (this._tv == null && optionalDeviceId != null &&
-            await HisenseTV.TryCreate(PhysicalAddress.Parse(optionalDeviceId), this._logger, connectionRequired: true, cancellationToken: cancellationToken).ConfigureAwait(false) is { } tv &&
+            await HisenseTV.TryCreateAsync(
+                PhysicalAddress.Parse(optionalDeviceId),
+                this._logger,
+                connectionRequired: true,
+                useCertificates: true,
+                clientIdPrefix: this.ClientIdPrefix(),
+                cancellationToken: cancellationToken
+            ).ConfigureAwait(false) is { } tv &&
             await tv.GetStateAsync(cancellationToken).ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired } state)
         {
             this.SetTV(tv, state);
@@ -201,7 +211,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return await tv.GetStateAsync().ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired };
         }
-        HisenseTV[] tvs = await HisenseTV.DiscoverAsync(this._logger).ConfigureAwait(false);
+        HisenseTV[] tvs = await HisenseTV.DiscoverAsync(this._logger, useCertificates: true, clientIdPrefix: this.ClientIdPrefix()).ConfigureAwait(false);
         if (tvs.Length == 1 && await (tv = tvs[0]).GetStateAsync().ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired } state)
         {
             this.SetTV(tv, state);
