@@ -73,7 +73,13 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
             .AddTextLabel("VOLUME-LABEL", "Volume", async (_) => (await this.GetVolumeAsync(_).ConfigureAwait(false)).ToString())
             .AddTextLabel("STATE", "State", this.GetStateAsync)
             .EnableDiscovery("Discovering TV...", "Ensure your TV is on and IP control is enabled.", this.PerformDiscoveryAsync)
-            .EnableRegistration("Registering TV...", "Enter the code showing on your TV. If no code is displayed, hit back and try again (after verifying the TV is on).", this.QueryIsRegistered, this.Register)); ;
+            .EnableRegistration(
+                "Registering TV...", 
+                "Enter the code showing on your TV. If no code is displayed, try 0000 or hit back and try again (after verifying the TV is on).", 
+                this.QueryIsRegistered, 
+                this.Register
+            )
+        );
     }
 
     public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
@@ -220,6 +226,11 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
 
     private async Task<RegistrationResult> Register(string code)
     {
+        if (code == "0000" && await this.QueryIsRegistered().ConfigureAwait(false))
+        {
+
+            return RegistrationResult.Success;
+        }
         HisenseTV[] tvs = this._tv is { } tv ? new[] { tv } : this._candidates;
         for (int index = 0; index < tvs.Length; index++)
         {
