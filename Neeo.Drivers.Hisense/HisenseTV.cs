@@ -225,13 +225,13 @@ public sealed class HisenseTV : IDisposable
         {
             return tv;
         }
-        if (!connectionRequired)
+        if (connectionRequired)
         {
-            tv.StartReconnectTimer();
-            return tv;
+            tv.Dispose();
+            return null;
         }
-        tv.Dispose();
-        return default;
+        tv.StartReconnectTimer();
+        return tv;
     }
 
     private void Connection_Disconnected(object? sender, EventArgs e)
