@@ -98,8 +98,6 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         }
     }
 
-    private string ClientIdPrefix() => Constants.DeviceName.Replace(' ', '_');
-
     private Task<bool> GetPowerState(string deviceId) => Task.FromResult(this._tv != null && this._connected);
 
     private async Task<string> GetStateAsync(string deviceId)
@@ -120,7 +118,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return;
         }
-        if (await HisenseTV.TryCreateAsync(PhysicalAddress.Parse(macAddress), this._logger, useCertificates: true, clientIdPrefix: this.ClientIdPrefix()).ConfigureAwait(false) is not { } tv)
+        if (await HisenseTV.TryCreateAsync(PhysicalAddress.Parse(macAddress), this._logger, useCertificates: true).ConfigureAwait(false) is not { } tv)
         {
             this._logger.LogError("Failed to recreate TV based on mac address {macAddress}.", macAddress);
             return;
@@ -193,7 +191,6 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
                 this._logger,
                 connectionRequired: true,
                 useCertificates: true,
-                clientIdPrefix: this.ClientIdPrefix(),
                 cancellationToken: cancellationToken
             ).ConfigureAwait(false) is { } tv &&
             await tv.GetStateAsync(cancellationToken).ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired } state)
@@ -211,7 +208,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return await tv.GetStateAsync().ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired };
         }
-        HisenseTV[] tvs = await HisenseTV.DiscoverAsync(this._logger, useCertificates: true, clientIdPrefix: this.ClientIdPrefix()).ConfigureAwait(false);
+        HisenseTV[] tvs = await HisenseTV.DiscoverAsync(this._logger, useCertificates: true).ConfigureAwait(false);
         if (tvs.Length == 1 && await (tv = tvs[0]).GetStateAsync().ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired } state)
         {
             this.SetTV(tv, state);
