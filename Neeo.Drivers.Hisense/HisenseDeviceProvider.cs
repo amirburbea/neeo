@@ -228,7 +228,6 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     {
         if (code == "0000" && await this.QueryIsRegistered().ConfigureAwait(false))
         {
-
             return RegistrationResult.Success;
         }
         HisenseTV[] tvs = this._tv is { } tv ? new[] { tv } : this._candidates;
