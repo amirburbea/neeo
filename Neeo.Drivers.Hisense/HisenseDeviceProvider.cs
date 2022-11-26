@@ -74,15 +74,24 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
             .AddTextLabel("STATE", "State", this.GetStateAsync)
             .EnableDiscovery("Discovering TV...", "Ensure your TV is on and IP control is enabled.", this.PerformDiscoveryAsync)
             .EnableRegistration(
-                "Registering TV...", 
-                "Enter the code showing on your TV. If no code is displayed, try 0000 or hit back and try again (after verifying the TV is on).", 
-                this.QueryIsRegistered, 
+                "Registering TV...",
+                "Enter the code showing on your TV. If no code is displayed, try 0000 or hit back and try again (after verifying the TV is on).",
+                this.QueryIsRegistered,
                 this.Register
             )
         );
     }
 
     public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
+
+    private static Task<IState?> AuthenticatedStateAsync(HisenseTV tv, string? code = null)
+    {
+        return code == null
+            ? tv.GetStateAsync().ContinueWith(task => AuthenticatedState(task.Result), TaskContinuationOptions.ExecuteSynchronously)
+            : tv.AuthenticateAsync(code).ContinueWith(task => AuthenticatedState(task.Result), TaskContinuationOptions.ExecuteSynchronously);
+
+        static IState? AuthenticatedState(IState? state) => state is { Type: not StateType.AuthenticationRequired } ? state : default;
+    }
 
     private async Task BrowseApps(string deviceId, ListBuilder list)
     {
@@ -199,7 +208,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
                 useCertificates: true,
                 cancellationToken: cancellationToken
             ).ConfigureAwait(false) is { } tv &&
-            await tv.GetStateAsync(cancellationToken).ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired } state)
+            await HisenseDeviceProvider.AuthenticatedStateAsync(tv).ConfigureAwait(false) is { } state)
         {
             this.SetTV(tv, state);
         }
@@ -212,10 +221,10 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     {
         if (this._tv is { } tv)
         {
-            return await tv.GetStateAsync().ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired };
+            return await HisenseDeviceProvider.AuthenticatedStateAsync(tv).ConfigureAwait(false) is not null;
         }
         HisenseTV[] tvs = await HisenseTV.DiscoverAsync(this._logger, useCertificates: true).ConfigureAwait(false);
-        if (tvs.Length == 1 && await (tv = tvs[0]).GetStateAsync().ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired } state)
+        if (tvs.Length == 1 && await HisenseDeviceProvider.AuthenticatedStateAsync(tv = tvs[0]).ConfigureAwait(false) is { } state)
         {
             this.SetTV(tv, state);
             return true;
@@ -230,19 +239,22 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return RegistrationResult.Success;
         }
-        HisenseTV[] tvs = this._tv is { } tv ? new[] { tv } : this._candidates;
-        for (int index = 0; index < tvs.Length; index++)
+        HisenseTV[] candidates = this._tv is { } tv ? new[] { tv } : this._candidates;
+        for (int index = 0; index < candidates.Length; index++)
         {
-            HisenseTV candidate = tvs[index];
-            if (await candidate.AuthenticateAsync(code).ConfigureAwait(false) is { Type: not StateType.AuthenticationRequired } state)
+            HisenseTV candidate = candidates[index];
+            if (await HisenseDeviceProvider.AuthenticatedStateAsync(candidate, code).ConfigureAwait(false) is { } state)
             {
                 this.SetTV(candidate, state);
-                // Dispose of the other candidates.
-                for (int other = 0; other < tvs.Length; other++)
+                if (candidates.Length != 1)
                 {
-                    if (other != index)
+                    // Dispose of the other candidates.
+                    for (int other = 0; other < candidates.Length; other++)
                     {
-                        tvs[other].Dispose();
+                        if (other != index)
+                        {
+                            candidates[other].Dispose();
+                        }
                     }
                 }
                 return RegistrationResult.Success;
