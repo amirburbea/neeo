@@ -34,14 +34,18 @@ public static class WakeOnLan
         {
             throw new ArgumentException("Invalid MAC address.", nameof(macAddress));
         }
-        const int length = 102;
-        using IMemoryOwner<byte> magicPacket = MemoryPool<byte>.Shared.Rent(length);
+        using IMemoryOwner<byte> magicPacket = MemoryPool<byte>.Shared.Rent(Constants.Length);
         magicPacket.Memory.Span[0..6].Fill(byte.MaxValue);
-        for (int position = addressBytes.Length; position < length; position += addressBytes.Length)
+        for (int index = 1; index <= 16; index++)
         {
-            addressBytes.CopyTo(magicPacket.Memory[position..]);
+            addressBytes.CopyTo(magicPacket.Memory[(index * 6)..]);
         }
         using UdpClient client = new();
-        await client.SendAsync(magicPacket.Memory[0..length], new(IPAddress.Broadcast, 9), cancellationToken).ConfigureAwait(false);
+        await client.SendAsync(magicPacket.Memory[0..Constants.Length], new(IPAddress.Broadcast, 9), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static class Constants
+    {
+        public const int Length = 6 + 16 * 6;
     }
 }

@@ -47,6 +47,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     };
 
     private readonly Lazy<IDeviceBuilder> _deviceBuilder;
+    private readonly HashSet<string> _deviceIds = new();
     private readonly ILogger _logger;
     private HisenseTV[] _candidates = Array.Empty<HisenseTV>();
     private bool _connected;
@@ -129,6 +130,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     private async Task InitializeDeviceList(string[] deviceIds)
     {
         this._logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceList), string.Join(',', deviceIds));
+        Array.ForEach(deviceIds, deviceId => this._deviceIds.Add(deviceId));
         if (deviceIds is not [{ } macAddress])
         {
             return;
@@ -180,10 +182,15 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         };
     }
 
-    private Task OnDeviceAdded(string deviceId) => Task.CompletedTask;
+    private Task OnDeviceAdded(string deviceId)
+    {
+        this._deviceIds.Add(deviceId);
+        return Task.CompletedTask;
+    }
 
     private Task OnDeviceRemoved(string deviceId)
     {
+        this._deviceIds.Remove(deviceId);
         if (this._tv == null)
         {
             return Task.CompletedTask;
@@ -278,7 +285,10 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
             return;
         }
         string deviceId = tv.MacAddress.ToString();
-        await notifier.SendNotificationAsync(deviceId, state.ToString(), deviceId).ConfigureAwait(false);
+        if (this._deviceIds.Contains(deviceId))
+        {
+            await notifier.SendNotificationAsync(deviceId, state.ToString(), deviceId).ConfigureAwait(false);
+        }
     }
 
     private async Task SetVolumeAsync(string deviceId, double value)
