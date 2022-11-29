@@ -111,21 +111,21 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
         string? IPlayerWidgetController.RootDirectoryLabel { get; }
 
-        public Task<string> GetCoverArtAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.CoverArt, deviceId);
+        public Task<string> GetCoverArtAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.CoverArt);
 
-        public Task<string> GetDescriptionAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.Description, deviceId);
+        public Task<string> GetDescriptionAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.Description);
 
-        public Task<bool> GetIsMutedAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Mute, deviceId);
+        public Task<bool> GetIsMutedAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Mute);
 
-        public Task<bool> GetIsPlayingAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Playing, deviceId);
+        public Task<bool> GetIsPlayingAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Playing);
 
-        public Task<bool> GetRepeatAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Repeat, deviceId);
+        public Task<bool> GetRepeatAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Repeat);
 
-        public Task<bool> GetShuffleAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Shuffle, deviceId);
+        public Task<bool> GetShuffleAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Shuffle);
 
-        public Task<string> GetTitleAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.Title, deviceId);
+        public Task<string> GetTitleAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.Title);
 
-        public Task<double> GetVolumeAsync(string deviceId) => this.GetValueAsync<double>(PlayerKey.Volume, deviceId);
+        public Task<double> GetVolumeAsync(string deviceId) => this.GetValueAsync<double>(PlayerKey.Volume);
 
         public Task HandleButtonAsync(string deviceId, string button) => Button.TryResolve(button) switch
         {
@@ -178,15 +178,15 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             return Task.CompletedTask;
         }
 
-        public Task SetIsMutedAsync(string deviceId, bool isMuted) => this.SetValueAsync(PlayerKey.Mute, deviceId, BooleanBoxes.GetBox(isMuted));
+        public Task SetIsMutedAsync(string deviceId, bool isMuted) => this.SetValueAsync(PlayerKey.Mute, BooleanBoxes.GetBox(isMuted));
 
-        public Task SetIsPlayingAsync(string deviceId, bool isPlaying) => this.SetValueAsync(PlayerKey.Playing, deviceId, BooleanBoxes.GetBox(isPlaying));
+        public Task SetIsPlayingAsync(string deviceId, bool isPlaying) => this.SetValueAsync(PlayerKey.Playing, BooleanBoxes.GetBox(isPlaying));
 
-        public Task SetRepeatAsync(string deviceId, bool repeat) => this.SetValueAsync(PlayerKey.Repeat, deviceId, BooleanBoxes.GetBox(repeat));
+        public Task SetRepeatAsync(string deviceId, bool repeat) => this.SetValueAsync(PlayerKey.Repeat, BooleanBoxes.GetBox(repeat));
 
-        public Task SetShuffleAsync(string deviceId, bool shuffle) => this.SetValueAsync(PlayerKey.Shuffle, deviceId, BooleanBoxes.GetBox(shuffle));
+        public Task SetShuffleAsync(string deviceId, bool shuffle) => this.SetValueAsync(PlayerKey.Shuffle, BooleanBoxes.GetBox(shuffle));
 
-        public Task SetVolumeAsync(string deviceId, double volume) => this.SetValueAsync(PlayerKey.Volume, deviceId, volume);
+        public Task SetVolumeAsync(string deviceId, double volume) => this.SetValueAsync(PlayerKey.Volume, volume);
 
         private Task ChangeTrackAsync(string deviceId, Pet pet) => (int)pet switch
         {
@@ -194,28 +194,28 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             int value when value >= Pets.Length => this.ChangeTrackAsync(deviceId, 0), // Did we add 1 to the last value? Go to 0.
             _ => Task.WhenAll(
                 Task.FromResult(this._service.Pet = pet),
-                this.SetCoverArtAsync(deviceId, GetCoverArt(pet)),
-                this.SetTitleAsync(deviceId, GetTitle(pet)),
-                this.SetDescriptionAsync(deviceId, GetDescription(pet))
+                this.SetCoverArtAsync(GetCoverArt(pet)),
+                this.SetTitleAsync(GetTitle(pet)),
+                this.SetDescriptionAsync(GetDescription(pet))
             )
         };
 
-        private Task<TValue> GetValueAsync<TValue>(PlayerKey key, string deviceId)
+        private Task<TValue> GetValueAsync<TValue>(PlayerKey key)
         {
-            this._logger.LogInformation("Getting component state {deviceId} {key}", deviceId, key);
+            this._logger.LogInformation("Getting component state {key}", key);
             return Task.FromResult(this._service.GetValue<TValue>(key));
         }
 
-        private Task SetCoverArtAsync(string deviceId, string coverArt) => this.SetValueAsync(PlayerKey.CoverArt, deviceId, coverArt);
+        private Task SetCoverArtAsync(string coverArt) => this.SetValueAsync(PlayerKey.CoverArt, coverArt);
 
-        private Task SetDescriptionAsync(string deviceId, string description) => this.SetValueAsync(PlayerKey.Description, deviceId, description);
+        private Task SetDescriptionAsync(string description) => this.SetValueAsync(PlayerKey.Description, description);
 
-        private Task SetTitleAsync(string deviceId, string title) => this.SetValueAsync(PlayerKey.Title, deviceId, title);
+        private Task SetTitleAsync(string title) => this.SetValueAsync(PlayerKey.Title, title);
 
-        private async Task SetValueAsync(PlayerKey key, string deviceId, object value)
+        private async Task SetValueAsync(PlayerKey key, object value)
         {
-            this._logger.LogInformation("Setting component {deviceId} {key} to {value}", deviceId, key, value);
-            await this.Notifier.SendNotificationAsync(TextAttribute.GetText(key), value, deviceId).ConfigureAwait(false);
+            this._logger.LogInformation("Setting component {key} to {value}", key, value);
+            await this.Notifier.SendNotificationAsync(TextAttribute.GetText(key), value).ConfigureAwait(false);
             this._service.SetValue(key, value);
         }
 
