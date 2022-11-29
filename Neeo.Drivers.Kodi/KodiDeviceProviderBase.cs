@@ -40,10 +40,12 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         [Buttons.Language] = client => client.SendInputCommandAsync(InputCommand.Language),
         [Buttons.Menu] = client => client.SendInputCommandAsync(InputCommand.Menu),
         [Buttons.MuteToggle] = client => client.SendInputCommandAsync(InputCommand.MuteToggle),
+        [Buttons.NextTrack] = client => client.SendGoToCommandAsync(next: true),
         [Buttons.Pause] = client => client.SendInputCommandAsync(InputCommand.Pause),
         [Buttons.Play] = client => client.SendInputCommandAsync(InputCommand.Play),
         [Buttons.PlayToggle] = client => client.SendInputCommandAsync(InputCommand.Pause),
         [Buttons.PlayPauseToggle] = client => client.SendInputCommandAsync(InputCommand.Pause),
+        [Buttons.PreviousTrack] = client => client.SendGoToCommandAsync(next: false),
         [Buttons.Stop] = client => client.SendInputCommandAsync(InputCommand.Stop),
         [Buttons.VolumeDown] = client => client.SendInputCommandAsync(InputCommand.VolumeDown),
         [Buttons.VolumeUp] = client => client.SendInputCommandAsync(InputCommand.VolumeUp),
@@ -102,66 +104,63 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddPowerStateSensor(this.GetIsPoweredOnAsync)
-        .EnableDeviceRoute(this.SetUriPrefix, static (_, path, _) => KodiDeviceProviderBase.HandleDeviceRouteAsync(path))
+        .EnableDeviceRoute(this.SetUriPrefix, static (_, path, _) => Task.FromResult(KodiDeviceProviderBase.HandleDeviceRoute(path)))
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
-        .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
-        .RegisterInitializer(this.InitializeAsync);
-
-    protected Task<TData> GetClientDataAsync<TData>(string deviceId, Func<KodiClient, TData> projection, TData defaults)
-    {
-        return Task.FromResult(GetClientData());
-
-        TData GetClientData() => this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client)
-            ? defaults
-            : projection(client);
-    }
+        .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
+        .RegisterInitializer(this._clientManager.InitializeAsync);
 
     protected KodiClient? GetClientOrDefault(string deviceId) => this._clientManager.GetClientOrDefault(deviceId);
 
-    protected Task<string> GetCoverArtAsync(string deviceId) => this.GetClientDataAsync(
+    protected Task<TValue> GetClientValueAsync<TValue>(
+        string deviceId,
+        Func<KodiClient, TValue> projection,
+        TValue defaultValue
+    ) => Task.FromResult(this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) ? projection(client) : defaultValue);
+
+    protected Task<string> GetCoverArtAsync(string deviceId) => this.GetClientValueAsync(
         deviceId,
-        static client => client.PlayerState.NowPlayingImage,
+        client => client.PlayerState.NowPlayingImage,
         string.Empty
     );
 
-    protected Task<string> GetDescriptionAsync(string deviceId) => this.GetClientDataAsync(
+    protected Task<string> GetDescriptionAsync(string deviceId) => this.GetClientValueAsync(
         deviceId,
-        static client => client.PlayerState.NowPlayingDescription,
+        client => client.PlayerState.NowPlayingDescription,
         string.Empty
     );
 
     protected virtual string GetDisplayName(KodiClient client) => client.DisplayName;
 
-    protected Task<bool> GetIsMutedAsync(string deviceId) => this.GetClientDataAsync(
+    protected Task<bool> GetIsMutedAsync(string deviceId) => this.GetClientValueAsync(
         deviceId,
-        static client => client.IsMuted,
+        client => client.IsMuted,
         default
     );
 
-    protected Task<bool> GetIsPlayingAsync(string deviceId) => this.GetClientDataAsync(
+    protected Task<bool> GetIsPlayingAsync(string deviceId) => this.GetClientValueAsync(
         deviceId,
-        static client => client.PlayerState.PlayState == PlayState.Playing,
+        client => client.PlayerState.PlayState == PlayState.Playing,
         default
     );
 
-    protected Task<string> GetTitleAsync(string deviceId) => this.GetClientDataAsync(
+    protected Task<string> GetTitleAsync(string deviceId) => this.GetClientValueAsync(
         deviceId,
-        static client => client.PlayerState.NowPlayingLabel,
+        client => client.PlayerState.NowPlayingLabel,
         string.Empty
     );
 
-    protected Task<double> GetVolumeAsync(string deviceId) => this.GetClientDataAsync(
+    protected Task<double> GetVolumeAsync(string deviceId) => this.GetClientValueAsync(
         deviceId,
-        static client => (double)client.Volume,
+        client => (double)client.Volume,
         default
     );
 
     protected async Task HandleDirectoryActionAsync(string deviceId, string actionIdentifier)
     {
-        if (this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) && KodiDeviceProviderBase.TryTranslate(actionIdentifier) is { } pair)
+        if (this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) && KodiDeviceProviderBase.TryTranslate(actionIdentifier) is { Key: { } key, Value: { } value })
         {
-            await client.OpenFileAsync(pair.Key, pair.Value).ConfigureAwait(false);
+            await client.OpenFileAsync(key, value).ConfigureAwait(false);
         }
     }
 
@@ -192,54 +191,51 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             case "":
                 KodiDeviceProviderBase.PopulateLibraryRoot(builder, images);
-                return;
+                break;
             case ".movies":
                 KodiDeviceProviderBase.PopulateMoviesLibraryRoot(builder, images);
-                return;
+                break;
             case ".movies.movies":
                 await KodiDeviceProviderBase.PopulateMoviesLibraryAsync(client, builder, offset, limit).ConfigureAwait(false);
-                return;
+                break;
             case ".movies.inprogress":
                 await KodiDeviceProviderBase.PopulateMoviesLibraryAsync(client, builder, offset, limit, new("inprogress", "true")).ConfigureAwait(false);
-                return;
+                break;
             case ".movies.unwatched":
                 await KodiDeviceProviderBase.PopulateMoviesLibraryAsync(client, builder, offset, limit, new("playcount", "0")).ConfigureAwait(false);
-                return;
+                break;
             case ".movies.watched":
                 await KodiDeviceProviderBase.PopulateMoviesLibraryAsync(client, builder, offset, limit, new("playcount", "0", FilterOperator.GreaterThan)).ConfigureAwait(false);
-                return;
+                break;
             case ".movies.recent":
                 break;
             case ".music":
                 KodiDeviceProviderBase.PopulateMusicLibraryRoot(builder, images);
-                return;
+                break;
             case ".music.albums":
-
             case ".music.albums.recent":
             case ".music.artists":
                 break;
             case ".tvshows":
                 KodiDeviceProviderBase.PopulateTVShowsLibraryRoot(builder, images);
-                return;
+                break;
             case ".tvshows.tvshows":
                 await KodiDeviceProviderBase.PopulateTVShowsLibraryAsync(client, builder, offset, limit).ConfigureAwait(false);
-                return;
+                break;
             case ".tvshows.recent":
                 break;
             case ".pvr":
                 KodiDeviceProviderBase.PopulatePvrLibraryRoot(builder, images);
-                return;
+                break;
             case ".pvr.tvchannels":
             case ".pvr.radiostations":
                 break;
-        }
-        if (KodiDeviceProviderBase.TryTranslate(identifier) is not { Key: string key, Value: int value, Suffix: string suffix })
-        {
-            return;
-        }
-        if (key == "tvshowid")
-        {
-            await KodiDeviceProviderBase.PopulateEpisodesLibraryAsync(client, builder, offset, limit, value, suffix).ConfigureAwait(false);
+            default:
+                if (KodiDeviceProviderBase.TryTranslate(identifier) is { Key: "tvshowid", Value: int value, Suffix: { } suffix })
+                {
+                    await KodiDeviceProviderBase.PopulateEpisodesLibraryAsync(client, builder, offset, limit, value, suffix).ConfigureAwait(false);
+                }
+                break;
         }
     }
 
@@ -267,20 +263,18 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         ? contentType
         : "application/octet-stream";
 
-    private static Task<ActionResult> HandleDeviceRouteAsync(string path)
+    private static ActionResult HandleDeviceRoute(string path)
     {
-        return Task.FromResult(HandleDeviceRoute(path));
-
-        static ActionResult HandleDeviceRoute(string path)
+        if (Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(KodiClient).Namespace}.Images.{path.Replace('/', '.')}") is not { } stream)
         {
-            if (Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(KodiClient).Namespace}.Images.{path.Replace('/', '.')}") is not { } stream)
-            {
-                return new NotFoundResult();
-            }
-            string fileDownloadName = path.LastIndexOf('/') is int index and not -1 ? path[(index + 1)..] : path;
-            return new FileStreamResult(stream, KodiDeviceProviderBase.GetContentType(fileDownloadName)) { FileDownloadName = fileDownloadName };
+            return new NotFoundResult();
         }
+        string fileDownloadName = path.LastIndexOf('/') is int index and not -1 ? path[(index + 1)..] : path;
+        return new FileStreamResult(stream, KodiDeviceProviderBase.GetContentType(fileDownloadName)) { FileDownloadName = fileDownloadName };
     }
+
+    [GeneratedRegex("^(?<key>[a-z]+)[:](?<id>[\\d]+)([:](?<suffix>.+))?$", RegexOptions.ExplicitCapture | RegexOptions.Compiled)]
+    private static partial Regex IdentifierRegex();
 
     private static async Task PopulateAlbumLibraryAsync(KodiClient client, ListBuilder builder, int offset, int limit)
     {
@@ -368,12 +362,12 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     private static void PopulateTVShowsLibraryRoot(ListBuilder list, EmbeddedImages images) => list
-            .AddHeader("TV Shows")
+        .AddHeader("TV Shows")
         .AddEntry(new("TV Shows", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.tvshows"))
         .AddEntry(new("TV Shows - Recent", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.recent"));
 
-    private static Identifier? TryTranslate(string identifier) => KodiDeviceProviderBase.IdentifierRegex().Match(identifier) is { Success: true } match
-        ? new(match.Groups["key"].Value, int.Parse(match.Groups["id"].Value), match.Groups["suffix"].Value ?? string.Empty)
+    private static Identifier? TryTranslate(string identifier) => KodiDeviceProviderBase.IdentifierRegex().Match(identifier) is { Success: true, Groups: { } groups }
+        ? new(groups["key"].Value, int.Parse(groups["id"].Value), groups["suffix"].Value ?? string.Empty)
         : null;
 
     private void AddDeviceId(string deviceId)
@@ -457,9 +451,10 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private async void ClientManager_ClientDiscovered(object? sender, DataEventArgs<KodiClient> e)
     {
         KodiClient client = e.Data;
-        if (this.HasDeviceId(client.MacAddress.ToString()))
+        string deviceId = client.MacAddress.ToString();
+        if (this.HasDeviceId(deviceId))
         {
-            await this.OnDeviceAdded(client).ConfigureAwait(false);
+            await this.OnClientConnectedAsync(client).ConfigureAwait(false);
         }
     }
 
@@ -525,9 +520,22 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private Task InitializeAsync(CancellationToken cancellationToken) => this._clientManager.InitializeAsync(cancellationToken);
-
-    private Task InitializeDeviceList(string[] deviceIds) => deviceIds.Length == 0 ? Task.CompletedTask : Task.WhenAll(Array.ConvertAll(deviceIds, this.OnDeviceAdded));
+    private async Task InitializeDeviceListAsync(string[] deviceIds)
+    {
+        await this._clientManager.InitializeAsync().ConfigureAwait(false);
+        if (deviceIds.Length == 0)
+        {
+            return;
+        }
+        foreach (string deviceId in deviceIds)
+        {
+            await this.OnDeviceAddedAsync(deviceId).ConfigureAwait(false);
+            if (this.IsClientReady(deviceId) && this._notifier is { } notifier)
+            {
+                await notifier.SendPowerNotificationAsync(true, deviceId).ConfigureAwait(false);
+            }
+        }
+    }
 
     private bool IsClientReady(string deviceId) => this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client);
 
@@ -535,16 +543,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private Task NotifyDisconnectedAsync(KodiClient client) => client.ShowNotificationAsync("NEEO", $"Disconnected from {this._deviceName}", Images.Neeo);
 
-    private async Task OnDeviceAdded(string deviceId)
-    {
-        this.AddDeviceId(deviceId);
-        if (this.GetClientOrDefault(deviceId) is { } client)
-        {
-            await this.OnDeviceAdded(client).ConfigureAwait(false);
-        }
-    }
-
-    private async Task OnDeviceAdded(KodiClient client)
+    private async Task OnClientConnectedAsync(KodiClient client)
     {
         this.AttachEventHandlers(client);
         if (KodiDeviceProviderBase.IsClientReady(client))
@@ -553,7 +552,16 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private async Task OnDeviceRemoved(string deviceId)
+    private async Task OnDeviceAddedAsync(string deviceId)
+    {
+        this.AddDeviceId(deviceId);
+        if (this.GetClientOrDefault(deviceId) is { } client)
+        {
+            await this.OnClientConnectedAsync(client).ConfigureAwait(false);
+        }
+    }
+
+    private async Task OnDeviceRemovedAsync(string deviceId)
     {
         this.RemoveDeviceId(deviceId);
         if (this.GetClientOrDefault(deviceId) is not { } client)
@@ -609,7 +617,4 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     private readonly record struct Identifier(string Key, int Value, string Suffix);
-
-    [GeneratedRegex("^(?<key>[a-z]+)[:](?<id>[\\d]+)([:](?<suffix>.+))?$", RegexOptions.ExplicitCapture | RegexOptions.Compiled)]
-    private static partial Regex IdentifierRegex();
 }

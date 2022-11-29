@@ -15,8 +15,7 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     internal DeviceAdapterModel(int id, IDeviceAdapter adapter)
     {
         this.Id = id;
-        this._adapter = adapter;
-        this.Device = new(adapter);
+        this.Info = new(this._adapter = adapter);
         this.Tokens = string.Join(' ', adapter.Tokens);
     }
 
@@ -31,10 +30,6 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     [JsonPropertyName("capabilities")]
     public IReadOnlyCollection<IComponent> Components => this._adapter.Components;
 
-    /// <summary>
-    /// Identifying information about the device.
-    /// </summary>
-    public DeviceInfo Device { get; }
 
     /// <summary>
     /// Gets the collection of unique capabilities of the device.
@@ -55,6 +50,12 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     /// Gets the device identifier.
     /// </summary>
     public int Id { get; }
+
+    /// <summary>
+    /// Identifying information about the device.
+    /// </summary>
+    [JsonPropertyName("device")]
+    public DeviceInfo Info { get; }
 
     /// <summary>
     /// Gets the device manufacturer.

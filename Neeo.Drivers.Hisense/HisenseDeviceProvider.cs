@@ -94,6 +94,8 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         static IState? AuthenticatedState(IState? state) => state is { Type: not StateType.AuthenticationRequired } ? state : default;
     }
 
+    private static Task NotifyStateAsync(IDeviceNotifier notifier, HisenseTV tv, IState state) => notifier.SendNotificationAsync("STATE", state.ToString(), tv.MacAddress.ToString());
+
     private async Task BrowseApps(string deviceId, ListBuilder list)
     {
         if (this._tv is not { } tv)
@@ -102,6 +104,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         }
         list.AddTileRow(new ListTile("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png"));
         AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync().ConfigureAwait(false), static app => !app.IsUninstalled);
+        Array.Sort(apps, (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
         (_, int limit, int? offset) = list.Parameters;
         if (offset is > 0 && limit < apps.Length)
         {
@@ -280,14 +283,15 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         tv.Disconnected += this.TV_Disconnected;
         tv.Connected += this.TV_Connected;
         tv.StateChanged += this.TV_StateChanged;
-        if (this._notifier is not { } notifier || state is null)
+        string deviceId;
+        if (!this._connected || this._notifier is not { } notifier || !this._deviceIds.Contains(deviceId = tv.MacAddress.ToString()))
         {
             return;
         }
-        string deviceId = tv.MacAddress.ToString();
-        if (this._deviceIds.Contains(deviceId))
+        await notifier.SendPowerNotificationAsync(true, deviceId).ConfigureAwait(false);
+        if (state != null)
         {
-            await notifier.SendNotificationAsync(deviceId, state.ToString(), deviceId).ConfigureAwait(false);
+            await HisenseDeviceProvider.NotifyStateAsync(notifier, tv, state).ConfigureAwait(false);
         }
     }
 
@@ -301,33 +305,35 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
 
     private async void TV_Connected(object? sender, EventArgs e)
     {
-        if (this._tv is { } tv && this._notifier is { } notifier && !this._connected)
+        if (this._tv is not { } tv || this._notifier is not { } notifier || this._connected)
         {
-            this._connected = true;
-            await notifier.SendPowerNotificationAsync(true, tv.MacAddress.ToString()).ConfigureAwait(false);
+            return;
         }
+        this._connected = true;
+        await notifier.SendPowerNotificationAsync(true, tv.MacAddress.ToString()).ConfigureAwait(false);
     }
 
     private async void TV_Disconnected(object? sender, EventArgs e)
     {
-        if (this._tv is { } tv && this._notifier is { } notifier && this._connected)
+        if (this._tv is not { } tv || this._notifier is not { } notifier || !this._connected)
         {
-            this._connected = false;
-            await notifier.SendPowerNotificationAsync(false, tv.MacAddress.ToString()).ConfigureAwait(false);
+            return;
         }
+        this._connected = false;
+        await notifier.SendPowerNotificationAsync(false, tv.MacAddress.ToString()).ConfigureAwait(false);
     }
 
     private async void TV_StateChanged(object? sender, DataEventArgs<IState> e)
     {
-        if (this._notifier is { } notifier && this._tv is { } tv)
+        if (this._tv is { } tv && this._notifier is { } notifier)
         {
-            await notifier.SendNotificationAsync("STATE", e.Data.ToString(), tv.MacAddress.ToString()).ConfigureAwait(false);
+            await HisenseDeviceProvider.NotifyStateAsync(notifier, tv, e.Data).ConfigureAwait(false);
         }
     }
 
     private async void TV_VolumeChanged(object? sender, DataEventArgs<int> e)
     {
-        if (this._notifier is not { } notifier || this._tv is not { } tv)
+        if (this._tv is not { } tv || this._notifier is not { } notifier)
         {
             return;
         }
@@ -335,7 +341,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         await Task.WhenAll(
             notifier.SendNotificationAsync("VOLUME", (double)e.Data, deviceId),
             notifier.SendNotificationAsync("VOLUME-LABEL", e.Data.ToString(), deviceId)
-        );
+        ).ConfigureAwait(false);
     }
 
     private readonly record struct DeviceTuple(IPAddress IPAddress, PhysicalAddress MacAddress);

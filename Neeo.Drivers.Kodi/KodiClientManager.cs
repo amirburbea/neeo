@@ -15,11 +15,11 @@ namespace Neeo.Drivers.Kodi;
 public sealed class KodiClientManager : IDisposable
 {
     private readonly ConcurrentDictionary<string, KodiClient> _clients = new();
-    private readonly ILogger<KodiClientManager> _logger;
+    private readonly ILogger<KodiClient> _logger;
     private PeriodicTimer? _discoveryTimer;
     private Task? _initializationTask;
 
-    public KodiClientManager(ILogger<KodiClientManager> logger) => this._logger = logger;
+    public KodiClientManager(ILogger<KodiClient> logger) => this._logger = logger;
 
     public event EventHandler<DataEventArgs<KodiClient>>? ClientDiscovered;
 
@@ -29,19 +29,23 @@ public sealed class KodiClientManager : IDisposable
 
     public Task DiscoverAsync(int scanTime, Func<KodiClient, bool>? considerDiscoveryComplete, CancellationToken cancellationToken = default)
     {
-        CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        return ZeroconfResolver.ResolveAsync(Constants.HttpServiceName, TimeSpan.FromMilliseconds(scanTime), callback: OnHostDiscovered, cancellationToken: source.Token);
+        CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        return ZeroconfResolver.ResolveAsync(
+            Constants.HttpServiceName, 
+            TimeSpan.FromMilliseconds(scanTime), 
+            callback: OnHostDiscovered, 
+            cancellationToken: cts.Token
+        );
 
         async void OnHostDiscovered(IZeroconfHost host)
         {
             IPAddress ipAddress = IPAddress.Parse(host.IPAddress);
-            if (this.Clients.Any(ipAddress.Equals))
+            if (this.Clients.Select(static client => client.IPAddress).Any(ipAddress.Equals))
             {
                 return;
             }
             this._logger.LogInformation("Found client ({name}) at IP address {ip}.", host.DisplayName, host.IPAddress);
-            KodiClient client = new(host.DisplayName, ipAddress, host.Services.First().Value.Port);
+            KodiClient client = new(host.DisplayName, ipAddress, host.Services.First().Value.Port, this._logger);
             if (!await client.ConnectAsync(cancellationToken).ConfigureAwait(false) || client.MacAddress.Equals(PhysicalAddress.None))
             {
                 this._logger.LogWarning("Something went wrong, ignoring client at {ip}.", client.IPAddress);
@@ -52,7 +56,7 @@ public sealed class KodiClientManager : IDisposable
             this.ClientDiscovered?.Invoke(this, client);
             if (considerDiscoveryComplete != null && considerDiscoveryComplete(client))
             {
-                source.Cancel();
+                cts.Cancel();
             }
         }
     }
@@ -61,7 +65,7 @@ public sealed class KodiClientManager : IDisposable
 
     public KodiClient? GetClientOrDefault(string id) => this._clients.GetValueOrDefault(id);
 
-    public Task InitializeAsync(CancellationToken cancellationToken)
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         return this._initializationTask ??= InitializeDiscoveryAsync();
 

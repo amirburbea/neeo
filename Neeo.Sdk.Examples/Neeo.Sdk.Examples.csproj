@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj" />
+    <ProjectReference Include="..\Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj" />
     <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
   </ItemGroup>
 

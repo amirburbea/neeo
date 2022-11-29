@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Hisense;
+using Neeo.Drivers.Kodi;
 using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Examples;
@@ -16,6 +17,7 @@ public static class Program
     {
         Assembly.GetExecutingAssembly(),
         typeof(HisenseDeviceProvider).Assembly,
+        typeof(KodiDeviceProviderBase).Assembly,
     };
 
     private static async Task Main()
@@ -30,7 +32,9 @@ public static class Program
 
         static void ConfigureServices(IServiceCollection services)
         {
-            services.AddHostedService<ExampleSdkService>();
+            services
+                .AddHostedService<ExampleSdkService>()
+                .AddSingleton<KodiClientManager>();
             // Finds all device examples and registers them.
             foreach (Type type in Program._assemblies.Distinct().SelectMany(static assembly => assembly.GetTypes()))
             {

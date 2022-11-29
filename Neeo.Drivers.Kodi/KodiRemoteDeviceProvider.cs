@@ -30,5 +30,4 @@ public sealed class KodiRemoteDeviceProvider : KodiDeviceProviderBase
         .AddButton("INPUT KODI", "Kodi");
 
     protected override string GetDisplayName(KodiClient client) => $"{client.DisplayName} - Remote";
-
 }

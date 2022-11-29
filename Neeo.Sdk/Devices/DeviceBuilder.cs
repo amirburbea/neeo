@@ -236,8 +236,16 @@ public interface IDeviceBuilder
     /// <param name="size">The size of the image.</param>
     /// <param name="getter">A callback to get the URI of the image.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string>? getter);
+    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter);
 
+    /// <summary>
+    /// Adds support for the player widget to the device.
+    /// </summary>
+    /// <param name="controller">A controller for widget interactions.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    /// <remarks>
+    /// Note that this is only supported for <see cref="DeviceType.MediaPlayer" /> or <see cref="DeviceType.MusicPlayer" /> or <see cref="DeviceType.VideoOnDemand" />.
+    /// </remarks>
     IDeviceBuilder AddPlayerWidget(IPlayerWidgetController controller);
 
     /// <summary>
@@ -247,7 +255,7 @@ public interface IDeviceBuilder
     /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
     /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
     /// </summary>
-    /// <param name="sensor">A sensor callback that can be used to determine if the device is on or off.</param>
+    /// <param name="sensor">A callback that can be used to determine if the device is on or off.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
@@ -270,6 +278,14 @@ public interface IDeviceBuilder
     /// <see cref="AddButtonHandler"/>.</remarks>
     IDeviceBuilder AddSmartApplicationButton(SmartApplicationButtons buttons);
 
+    /// <summary>
+    /// Adds a boolean toggle switch to the device.
+    /// </summary>
+    /// <param name="name">The name of the switch to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback to get the value of the toggle switch.</param>
+    /// <param name="setter">A callback to set the value of the toggle switch.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
     IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool? isLabelVisible = default);
@@ -525,7 +541,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         string name,
         string? label,
         ImageSize size,
-        DeviceValueGetter<string>? getter
+        DeviceValueGetter<string> getter
     ) => this.AddImageUrl(name, label, size, getter);
 
     IDeviceBuilder IDeviceBuilder.AddPlayerWidget(IPlayerWidgetController controller) => this.AddPlayerWidget(controller);

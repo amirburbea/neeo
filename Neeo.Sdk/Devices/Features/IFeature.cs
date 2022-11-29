@@ -12,7 +12,7 @@ public interface IFeature
 }
 
 /// <summary>
-/// Types of features for NEEO device adapters.
+/// Types of features for NEEO device drivers.
 /// </summary>
 public enum FeatureType
 {
