@@ -48,6 +48,8 @@ public sealed class HisenseTV : IDisposable
 
     public event EventHandler<DataEventArgs<int>>? VolumeChanged;
 
+    public string DeviceId => this.MacAddress.ToString();
+
     public IPAddress IPAddress { get; }
 
     public bool IsConnected => this._connection != null && this._connection.IsConnected;

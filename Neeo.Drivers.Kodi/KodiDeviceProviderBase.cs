@@ -108,7 +108,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
-        .RegisterInitializer(this._clientManager.InitializeAsync);
+        .RegisterInitializer(cancellationToken => this._clientManager.InitializeAsync(cancellationToken: cancellationToken));
 
     protected KodiClient? GetClientOrDefault(string deviceId) => this._clientManager.GetClientOrDefault(deviceId);
 
@@ -399,7 +399,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
             return;
         }
         await Task.WhenAll(
-            notifier.SendPowerNotificationAsync(true, client.MacAddress.ToString()),
+            notifier.SendPowerNotificationAsync(true, client.DeviceId),
             this.NotifyConnectedAsync(client)
         ).ConfigureAwait(false);
     }
@@ -408,19 +408,18 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     {
         if (sender is KodiClient client && this._notifier is { } notifier)
         {
-            await notifier.SendPowerNotificationAsync(false, client.MacAddress.ToString()).ConfigureAwait(false);
+            await notifier.SendPowerNotificationAsync(false, client.DeviceId).ConfigureAwait(false);
         }
     }
 
-    private void Client_Error(object? sender, DataEventArgs<string> e) => this._logger.LogWarning("Client {deviceId} error encountered: {error}.", ((KodiClient)sender!).MacAddress, e.Data);
+    private void Client_Error(object? sender, DataEventArgs<string> e) => this._logger.LogWarning("Client {deviceId} error encountered: {error}.", ((KodiClient)sender!).DeviceId, e.Data);
 
     private async void Client_PlayerStateChanged(object? sender, DataEventArgs<PlayerState> e)
     {
-        if (sender is not KodiClient client || this._notifier is not { } notifier)
+        if (sender is not KodiClient { DeviceId: { } deviceId } || this._notifier is not { } notifier)
         {
             return;
         }
-        string deviceId = client.MacAddress.ToString();
         List<Task> tasks = new();
         switch (e.Data.PlayState)
         {
@@ -435,30 +434,30 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
                 tasks.Add(notifier.SendNotificationAsync("COVER_ART_SENSOR", e.Data.NowPlayingImage, deviceId));
                 break;
         }
-        await Task.WhenAll(tasks).ConfigureAwait(false);
+        if (tasks.Count != 0)
+        {
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
     }
 
     private async void Client_VolumeChanged(object? sender, DataEventArgs<int> e)
     {
-        if (sender is not KodiClient client || this._notifier is not { } notifier)
+        if (sender is KodiClient { DeviceId: { } deviceId } && this._notifier is { } notifier)
         {
-            return;
+            await notifier.SendNotificationAsync("VOLUME_SENSOR", e.Data, deviceId).ConfigureAwait(false);
         }
-        string deviceId = client.MacAddress.ToString();
-        await notifier.SendNotificationAsync("VOLUME_SENSOR", e.Data, deviceId).ConfigureAwait(false);
     }
 
     private async void ClientManager_ClientDiscovered(object? sender, DataEventArgs<KodiClient> e)
     {
         KodiClient client = e.Data;
-        string deviceId = client.MacAddress.ToString();
-        if (this.HasDeviceId(deviceId))
+        if (this.HasDeviceId(client.DeviceId))
         {
             await this.OnClientConnectedAsync(client).ConfigureAwait(false);
         }
     }
 
-    private DiscoveredDevice CreateDiscoveredDevice(KodiClient client) => new(client.MacAddress.ToString(), this.GetDisplayName(client), client.IsConnected);
+    private DiscoveredDevice CreateDiscoveredDevice(KodiClient client) => new(client.DeviceId, this.GetDisplayName(client), client.IsConnected);
 
     private void DetachEventHandlers(KodiClient client)
     {
@@ -475,7 +474,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return new[] { this.CreateDiscoveredDevice(client) };
         }
-        await this._clientManager.DiscoverAsync(1000, client => client.MacAddress.ToString() == deviceId, cancellationToken).ConfigureAwait(false);
+        await this._clientManager.DiscoverAsync(1000, client => client.DeviceId == deviceId, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(deviceId))
         {
             return this._clientManager.Clients.Select(this.CreateDiscoveredDevice).ToArray();
@@ -522,7 +521,8 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private async Task InitializeDeviceListAsync(string[] deviceIds)
     {
-        await this._clientManager.InitializeAsync().ConfigureAwait(false);
+
+        await this._clientManager.InitializeAsync(deviceId: deviceIds is [{ } id] ? id : null).ConfigureAwait(false);
         if (deviceIds.Length == 0)
         {
             return;

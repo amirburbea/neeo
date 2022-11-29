@@ -31,9 +31,9 @@ public sealed class KodiClientManager : IDisposable
     {
         CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         return ZeroconfResolver.ResolveAsync(
-            Constants.HttpServiceName, 
-            TimeSpan.FromMilliseconds(scanTime), 
-            callback: OnHostDiscovered, 
+            Constants.HttpServiceName,
+            TimeSpan.FromMilliseconds(scanTime),
+            callback: OnHostDiscovered,
             cancellationToken: cts.Token
         );
 
@@ -52,7 +52,7 @@ public sealed class KodiClientManager : IDisposable
                 client.Dispose();
                 return;
             }
-            this._clients[client.MacAddress.ToString()] = client;
+            this._clients[client.DeviceId] = client;
             this.ClientDiscovered?.Invoke(this, client);
             if (considerDiscoveryComplete != null && considerDiscoveryComplete(client))
             {
@@ -65,7 +65,7 @@ public sealed class KodiClientManager : IDisposable
 
     public KodiClient? GetClientOrDefault(string id) => this._clients.GetValueOrDefault(id);
 
-    public Task InitializeAsync(CancellationToken cancellationToken = default)
+    public Task InitializeAsync(string? deviceId = default, CancellationToken cancellationToken = default)
     {
         return this._initializationTask ??= InitializeDiscoveryAsync();
 
@@ -73,8 +73,8 @@ public sealed class KodiClientManager : IDisposable
         {
             try
             {
-                // Use a short initial window.
-                await this.DiscoverAsync(2000, static _ => true, cancellationToken).ConfigureAwait(false);
+                // Use a short initial window, consider initialization complete if a device is discovered.
+                await this.DiscoverAsync(2000, client => deviceId is null || deviceId == client.DeviceId, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

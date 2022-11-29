@@ -53,6 +53,8 @@ public sealed class KodiClient : IDisposable
 
     private event EventHandler? Disposed;
 
+    public string DeviceId => this.MacAddress.ToString();
+
     public string DisplayName { get; }
 
     public IPAddress IPAddress { get; }
