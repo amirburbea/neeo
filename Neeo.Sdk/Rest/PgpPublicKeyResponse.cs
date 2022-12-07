@@ -1,5 +1,25 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.IO;
+using System.Text.Json.Serialization;
+using Org.BouncyCastle.Bcpg;
+using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Neeo.Sdk.Rest;
 
-internal sealed record class PgpPublicKeyResponse([property: JsonPropertyName("publickey")] string PublicKey);
+internal sealed class PgpPublicKeyResponse
+{
+    public PgpPublicKeyResponse(PgpKeyPair pgpKeys)
+    {
+        using Stream outputStream = new MemoryStream();
+        using (ArmoredOutputStream armoredStream = new(outputStream))
+        {
+            armoredStream.SetHeader(ArmoredOutputStream.HeaderVersion, default);
+            pgpKeys.PublicKey.Encode(armoredStream);
+        }
+        outputStream.Seek(0L, SeekOrigin.Begin);
+        using StreamReader reader = new(outputStream);
+        this.PublicKey = reader.ReadToEnd();
+    }
+
+    [JsonPropertyName("publickey")]
+    public string PublicKey { get; }
+}

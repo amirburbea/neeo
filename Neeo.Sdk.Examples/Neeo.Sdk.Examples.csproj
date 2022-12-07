@@ -1,10 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>11.0</LangVersion>
+	<EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -14,9 +15,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj" />
-    <ProjectReference Include="..\Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj" />
-    <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
+	<ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj">
+		<Private>false</Private>
+		<ExcludeAssets>runtime</ExcludeAssets>
+	</ProjectReference>
   </ItemGroup>
 
 </Project>

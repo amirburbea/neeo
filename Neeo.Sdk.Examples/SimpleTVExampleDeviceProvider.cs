@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public class SimpleTVExampleDeviceProvider : IDeviceProvider
 {

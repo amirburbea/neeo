@@ -1,0 +1,11 @@
+﻿{
+  "profiles": {
+    "Neeo.Sdk.Server": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

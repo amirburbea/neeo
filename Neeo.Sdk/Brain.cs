@@ -58,7 +58,7 @@ public sealed partial class Brain : IBrain
         {
             throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
         }
-        (this.ServiceEndPoint, this.HostName) = (new(ipAddress, servicePort), hostName ?? ipAddress.ToString());
+        (this.ServiceEndPoint, this.HostName, this.Version) = (new(ipAddress, servicePort), hostName ?? ipAddress.ToString(), version);
     }
 
     /// <summary>
@@ -77,6 +77,11 @@ public sealed partial class Brain : IBrain
     public IPEndPoint ServiceEndPoint { get; }
 
     /// <summary>
+    /// The firmware version of the NEEO Brain. Defaulted to <c>0.50.0</c> when unspecified.
+    /// </summary>
+    public string Version { get; }
+
+    /// <summary>
     /// Discovers all <see cref="Brain"/>s on the network.
     /// </summary>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
@@ -84,23 +89,24 @@ public sealed partial class Brain : IBrain
     public static async Task<Brain[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brain._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
-        Brain[] brains = new Brain[hosts.Count];
-        for (int index = 0; index < brains.Length; index++)
-        {
-            brains[index] = Brain.CreateBrain(hosts[index]);
-        }
-        return brains;
+        return hosts.Count == 0 ? Array.Empty<Brain>() : hosts.Select(Brain.CreateBrain).ToArray();
     }
 
     /// <summary>
-    /// Discovers the first <see cref="Brain"/> on the network matching the specified
-    /// <paramref name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the first
-    /// <see cref="Brain"/> discovered.
+    /// Discovers a <see cref="Brain"/> on the network, and returns the first <see cref="Brain"/> discovered (or <c>null</c> if not found).
+    /// </summary>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
+    public static Task<Brain?> DiscoverOneAsync(CancellationToken cancellationToken = default) => Brain.DiscoverOneAsync(null, cancellationToken);
+
+    /// <summary>
+    /// Discovers the first <see cref="Brain"/> on the network matching the specified <paramref name="predicate"/>
+    /// if provided. If no <paramref name="predicate"/> is provided, returns the first <see cref="Brain"/> discovered  (or <c>null</c> if not found).
     /// </summary>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="predicate">Optional predicate that must be matched by the Brain (if not <see langword="null"/>).</param>
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
-    public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
+    public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate, CancellationToken cancellationToken = default)
     {
         TaskCompletionSource<Brain?> brainTaskSource = new();
         cancellationToken.Register(() => brainTaskSource.TrySetCanceled(cancellationToken));
@@ -138,7 +144,7 @@ public sealed partial class Brain : IBrain
 }
 
 /// <summary>
-///
+/// Extension methods for <see cref="Brain"/> instances.
 /// </summary>
 public static class BrainMethods
 {
@@ -177,16 +183,28 @@ public static class BrainMethods
         {
             throw new ArgumentException("At least one device is required.", nameof(devices));
         }
-        IHost host = await Server.StartSdkAsync(
+        IHost host = await IntegrationServer.StartAsync(
             brain ?? throw new ArgumentNullException(nameof(brain)),
             devices,
             $"src-{UniqueNameGenerator.Generate(name ?? brain.HostName)}",
-            hostIPAddress ?? await brain.GetFallbackHostIPAddressAsync(cancellationToken).ConfigureAwait(false),
+            hostIPAddress ?? await GetFallbackHostIPAddressAsync().ConfigureAwait(false),
             port,
             configureLogging,
             cancellationToken
         ).ConfigureAwait(false);
         return host.Services.GetRequiredService<ISdkEnvironment>();
+
+        async ValueTask<IPAddress> GetFallbackHostIPAddressAsync()
+        {
+            if (IPAddress.IsLoopback(brain.IPAddress))
+            {
+                return brain.IPAddress;
+            }
+            IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
+            return Array.IndexOf(addresses, brain.IPAddress) != -1 || Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is not { } address
+                ? IPAddress.Loopback // If the Brain is running locally, we can just use localhost.
+                : address;
+        }
     }
 
     /// <summary>
@@ -224,17 +242,5 @@ public static class BrainMethods
             configureLogging,
             cancellationToken
         );
-    }
-
-    internal static async ValueTask<IPAddress> GetFallbackHostIPAddressAsync(this Brain brain, CancellationToken cancellationToken)
-    {
-        if (IPAddress.IsLoopback(brain.IPAddress))
-        {
-            return brain.IPAddress;
-        }
-        IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-        return Array.IndexOf(addresses, brain.IPAddress) != -1 || Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is not { } address
-            ? IPAddress.Loopback // If the Brain is running locally, we can just use localhost.
-            : address;
     }
 }

@@ -178,6 +178,15 @@ public interface IDeviceBuilder
     IDeviceBuilder AddAdditionalSearchTokens(IEnumerable<string> tokens);
 
     /// <summary>
+    /// Add a smart application button (or bitwise combination of buttons) to the device.
+    /// </summary>
+    /// <param name="buttons">The button (or bitwise combination of buttons) to add.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    /// <remarks>Note that adding buttons to the device requires defining a button handler via
+    /// <see cref="AddButtonHandler"/>.</remarks>
+    IDeviceBuilder AddApplicationButton(ApplicationButtons buttons);
+
+    /// <summary>
     /// Add a button to the device.
     /// </summary>
     /// <param name="name">The name of the button to add.</param>
@@ -268,15 +277,6 @@ public interface IDeviceBuilder
     IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter);
 
     IDeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow = 0d, double rangeHigh = 100d, string unit = "%");
-
-    /// <summary>
-    /// Add a smart application button (or bitwise combination of buttons) to the device.
-    /// </summary>
-    /// <param name="buttons">The button (or bitwise combination of buttons) to add.</param>
-    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    /// <remarks>Note that adding buttons to the device requires defining a button handler via
-    /// <see cref="AddButtonHandler"/>.</remarks>
-    IDeviceBuilder AddSmartApplicationButton(SmartApplicationButtons buttons);
 
     /// <summary>
     /// Adds a boolean toggle switch to the device.
@@ -516,6 +516,8 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.AddAdditionalSearchTokens(IEnumerable<string> tokens) => this.AddAdditionalSearchTokens(tokens);
 
+    IDeviceBuilder IDeviceBuilder.AddApplicationButton(ApplicationButtons button) => this.AddApplicationButton(button);
+
     IDeviceBuilder IDeviceBuilder.AddButton(string name, string? label) => this.AddButton(name, label);
 
     IDeviceBuilder IDeviceBuilder.AddButton(Buttons button) => this.AddButton(button);
@@ -584,8 +586,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         double rangeHigh,
         string unit
     ) => this.AddSlider(name, label, getter, setter, rangeLow, rangeHigh, unit);
-
-    IDeviceBuilder IDeviceBuilder.AddSmartApplicationButton(SmartApplicationButtons button) => this.AddSmartApplicationButton(button);
 
     IDeviceBuilder IDeviceBuilder.AddSwitch(
         string name,
@@ -661,11 +661,19 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
 
+    [GeneratedRegex(@"^DIGIT \d$", RegexOptions.Compiled)]
+    private static partial Regex DigitRegex();
+
     private DeviceBuilder AddAdditionalSearchTokens(IEnumerable<string> tokens)
     {
         this._additionalSearchTokens.AddRange(tokens ?? throw new ArgumentNullException(nameof(tokens)));
         return this;
     }
+
+    private DeviceBuilder AddApplicationButton(ApplicationButtons buttons) => ApplicationButton.GetNames(buttons).Aggregate(
+        this,
+        static (builder, name) => builder.AddButton(name)
+    );
 
     private DeviceBuilder AddButton(string name, string? label = default)
     {
@@ -846,11 +854,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         }
         return this;
     }
-
-    private DeviceBuilder AddSmartApplicationButton(SmartApplicationButtons buttons) => SmartApplicationButton.GetNames(buttons).Aggregate(
-        this,
-        static (builder, name) => builder.AddButton(name)
-    );
 
     private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
     {
@@ -1168,9 +1171,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         this.SpecificName = Validator.ValidateText(specificName, allowNull: true);
         return this;
     }
-
-    [GeneratedRegex(@"^DIGIT \d$", RegexOptions.Compiled)]
-    private static partial Regex DigitRegex();
 
     private sealed record ButtonParameters(string Name, string? Label) : ParametersBase(Name, Label);
 

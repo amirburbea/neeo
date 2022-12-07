@@ -7,7 +7,7 @@ using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Lists;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 {
@@ -89,7 +89,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             this.SetValue(PlayerKey.Description, GetDescription(Pet.Kitten));
         }
 
-        public Pet Pet { get; set; } = Pet.Kitten;
+        public Pet Pet { get; set; } 
 
         public TValue GetValue<TValue>(PlayerKey key) => (TValue)this._dictionary[TextAttribute.GetText(key)];
 

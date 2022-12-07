@@ -47,7 +47,7 @@ internal sealed class TokenSearch<T>
             maxScore = Math.Max(score, maxScore);
             list.Add(new(item) { Score = score });
         }
-        return TokenSearch<T>.Normalize(list, maxScore, this._searchProperties).OrderBy(x => x);
+        return TokenSearch<T>.Normalize(list, maxScore, this._searchProperties).OrderBy(x => x, SearchEntryComparer<T>.Default);
     }
 
     /// <summary>

@@ -11,9 +11,9 @@ using Org.BouncyCastle.Security;
 
 namespace Neeo.Sdk.Utilities;
 
-internal static class PgpKeyPairGenerator
+internal static class PgpKeysGenerator
 {
-    public static PgpKeyPair CreatePgpKeys(string? id = default)
+    public static PgpKeyPair CreatePgpKeyPair(string? id = default)
     {
         byte[] randomBytes = RandomNumberGenerator.GetBytes(64);
         char[] passphrase = Encoding.ASCII.GetChars(randomBytes);

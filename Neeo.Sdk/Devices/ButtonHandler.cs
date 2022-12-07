@@ -14,6 +14,6 @@ namespace Neeo.Sdk.Devices;
 /// <br />
 /// a. <see cref="Button.TryResolve"/> may be able to translate the button name into a <see cref="Buttons"/> enumerated value.
 /// <br />
-/// b. <see cref="SmartApplicationButton.TryResolve"/> may be able to translate the button name into a <see cref="SmartApplicationButtons"/> enumerated value.
+/// b. <see cref="ApplicationButton.TryResolve"/> may be able to translate the button name into a <see cref="ApplicationButtons"/> enumerated value.
 /// </remarks>
 public delegate Task ButtonHandler(string deviceId, string buttonName);

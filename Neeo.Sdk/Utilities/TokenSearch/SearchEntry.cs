@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Neeo.Sdk.Utilities.TokenSearch;
 
-public sealed class SearchEntry<T> : IComparable<SearchEntry<T>>
+public sealed class SearchEntry<T>
     where T : notnull, IComparable<T>
 {
     internal SearchEntry(T item) => this.Item = item;
@@ -15,15 +16,17 @@ public sealed class SearchEntry<T> : IComparable<SearchEntry<T>>
     public double MaxScore { get; internal set; }
 
     public double Score { get; internal set; }
+}
 
-    /// <summary>
-    /// Compares the current instance with another object of the same type and returns
-    /// an integer that indicates whether the current instance precedes, follows, or
-    /// occurs in the same position in the sort order as the other object.
-    /// </summary>
-    public int CompareTo(SearchEntry<T>? other) => other is not null
-        ? this.Score.CompareTo(other.Score) is int scoreComparison and not 0
+internal sealed class SearchEntryComparer<T> : Comparer<SearchEntry<T>>
+    where T : notnull, IComparable<T>
+{
+    public new static readonly SearchEntryComparer<T> Default = new();
+
+    public override int Compare(SearchEntry<T>? x, SearchEntry<T>? y)
+    {
+        return x!.Score.CompareTo(y!.Score) is int scoreComparison and not 0
             ? scoreComparison
-            : this.Item.CompareTo(other.Item)
-        : -1;
+            : x.Item.CompareTo(y.Item);
+    }
 }

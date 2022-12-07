@@ -1,9 +1,8 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Setup;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public class SecurityCodeExampleDeviceProvider : IDeviceProvider
 {
@@ -13,26 +12,26 @@ public class SecurityCodeExampleDeviceProvider : IDeviceProvider
     {
         this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.Accessory)
             .SetSpecificName(Constants.DeviceName)
-            .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, this.DiscoverAsync)
-            .EnableRegistration(Constants.RegistrationHeaderText, Constants.RegistrationDescription, this.QueryIsRegisteredAsync, this.RegisterAsync)
-            .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelTextAsync);
+            .AddTextLabel(Constants.TextLabelName, "Logged In", deviceId => Task.FromResult(this.GetLabelText(deviceId)))
+            .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, delegate { return Task.FromResult(DiscoverDevices()); })
+            .EnableRegistration(
+                Constants.RegistrationHeaderText,
+                Constants.RegistrationDescription,
+                () => Task.FromResult(this._isRegistered),
+                securityCode => Task.FromResult(this.Register(securityCode))
+            );
     }
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(new[] { new DiscoveredDevice("code-device", "Security Code Device", true) });
-    }
+    private static DiscoveredDevice[] DiscoverDevices() => new DiscoveredDevice[] { new("code-device", "Security Code Device", true) };
 
-    private Task<string> GetLabelTextAsync(string deviceId) => Task.FromResult($"{deviceId} {(this._isRegistered ? "successfully" : "not")} registered");
+    private string GetLabelText(string deviceId) => $"{deviceId} {(this._isRegistered ? "successfully" : "not")} registered";
 
-    private Task<bool> QueryIsRegisteredAsync() => Task.FromResult(this._isRegistered);
-
-    private Task<RegistrationResult> RegisterAsync(string securityCode)
+    private RegistrationResult Register(string securityCode)
     {
         this._isRegistered = securityCode == Constants.TheAnswer;
-        return Task.FromResult(this._isRegistered ? RegistrationResult.Success : RegistrationResult.Failed("You entered an incorrect security code."));
+        return this._isRegistered ? RegistrationResult.Success : RegistrationResult.Failed("You entered an incorrect security code.");
     }
 
     private static class Constants
