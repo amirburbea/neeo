@@ -12,56 +12,73 @@ using Zeroconf;
 
 namespace Neeo.Drivers.Kodi;
 
+[Service(typeof(KodiClientManager))]
 public sealed class KodiClientManager : IDisposable
 {
+    private readonly KodiClientFactory _clientFactory;
     private readonly ConcurrentDictionary<string, KodiClient> _clients = new();
-    private readonly ILogger<KodiClient> _logger;
+    private readonly ILogger<KodiClientManager> _logger;
     private PeriodicTimer? _discoveryTimer;
     private Task? _initializationTask;
 
-    public KodiClientManager(ILogger<KodiClient> logger) => this._logger = logger;
+    public KodiClientManager(KodiClientFactory clientFactory, ILogger<KodiClientManager> logger)
+    {
+        (this._clientFactory, this._logger) = (clientFactory, logger);
+    }
 
     public event EventHandler<DataEventArgs<KodiClient>>? ClientDiscovered;
 
     public IEnumerable<KodiClient> Clients => this._clients.Values;
 
-    public Task DiscoverAsync(int scanTime = 5000, CancellationToken cancellationToken = default) => this.DiscoverAsync(scanTime, default, cancellationToken);
-
-    public Task DiscoverAsync(int scanTime, Func<KodiClient, bool>? considerDiscoveryComplete, CancellationToken cancellationToken = default)
+    public async Task DiscoverAsync(int scanTime = 5000, Func<KodiClient, bool>? completionTest = default, CancellationToken cancellationToken = default)
     {
         CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        return ZeroconfResolver.ResolveAsync(
-            Constants.HttpServiceName,
-            TimeSpan.FromMilliseconds(scanTime),
-            callback: OnHostDiscovered,
-            cancellationToken: cts.Token
-        );
+        try
+        {
+            await ZeroconfResolver.ResolveAsync(
+                Constants.HttpServiceName,
+                TimeSpan.FromMilliseconds(scanTime),
+                callback: OnHostDiscovered,
+                cancellationToken: cts.Token
+            );
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
 
         async void OnHostDiscovered(IZeroconfHost host)
         {
             IPAddress ipAddress = IPAddress.Parse(host.IPAddress);
-            if (this.Clients.Select(static client => client.IPAddress).Any(ipAddress.Equals))
+            if (this._clients.Values.Any(client => client.IPAddress.Equals(ipAddress)))
             {
+                // IP address previously discovered.
                 return;
             }
-            this._logger.LogInformation("Found client ({name}) at IP address {ip}.", host.DisplayName, host.IPAddress);
-            KodiClient client = new(host.DisplayName, ipAddress, host.Services.First().Value.Port, this._logger);
+            this._logger.LogInformation("Found client ({name}) at IP address {ip}.", host.DisplayName, ipAddress);
+            KodiClient client = this._clientFactory.CreateClient(host.DisplayName, ipAddress, host.Services.First().Value.Port);
             if (!await client.ConnectAsync(cancellationToken).ConfigureAwait(false) || client.MacAddress.Equals(PhysicalAddress.None))
             {
-                this._logger.LogWarning("Something went wrong, ignoring client at {ip}.", client.IPAddress);
+                this._logger.LogWarning("Something went wrong, ignoring client at {ip}.", ipAddress);
                 client.Dispose();
                 return;
             }
-            this._clients[client.DeviceId] = client;
-            this.ClientDiscovered?.Invoke(this, client);
-            if (considerDiscoveryComplete != null && considerDiscoveryComplete(client))
+            this.OnClientDiscovered(client);
+            if (completionTest != null && completionTest.Invoke(client))
             {
                 cts.Cancel();
             }
         }
     }
 
-    public void Dispose() => Interlocked.Exchange(ref this._discoveryTimer, default)?.Dispose();
+    public void Dispose()
+    {
+        Interlocked.Exchange(ref this._discoveryTimer, default)?.Dispose();
+        foreach (KodiClient client in this._clients.Values)
+        {
+            client.Dispose();
+        }
+    }
 
     public KodiClient? GetClientOrDefault(string id) => this._clients.GetValueOrDefault(id);
 
@@ -74,7 +91,7 @@ public sealed class KodiClientManager : IDisposable
             try
             {
                 // Use a short initial window, consider initialization complete if a device is discovered.
-                await this.DiscoverAsync(2000, client => deviceId is null || deviceId == client.DeviceId, cancellationToken).ConfigureAwait(false);
+                await this.DiscoverAsync(2000, client => (deviceId ?? client.DeviceId) == client.DeviceId, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -101,6 +118,12 @@ public sealed class KodiClientManager : IDisposable
         {
             // This is expected when the class gets disposed.
         }
+    }
+
+    private void OnClientDiscovered(KodiClient client)
+    {
+        this._clients[client.DeviceId] = client;
+        this.ClientDiscovered?.Invoke(this, client);
     }
 
     private static class Constants

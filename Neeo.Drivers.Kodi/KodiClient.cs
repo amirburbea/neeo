@@ -30,6 +30,7 @@ public sealed class KodiClient : IDisposable
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
     private bool _isMuted;
+    private PhysicalAddress _macAddress = PhysicalAddress.None;
     private PlayerState _playerState = PlayerState.Defaults;
     private int _volume;
     private ClientWebSocket? _webSocket;
@@ -53,7 +54,7 @@ public sealed class KodiClient : IDisposable
 
     private event EventHandler? Disposed;
 
-    public string DeviceId => this.MacAddress.ToString();
+    public string DeviceId { get; private set; } = string.Empty;
 
     public string DisplayName { get; }
 
@@ -69,7 +70,11 @@ public sealed class KodiClient : IDisposable
         private set => this.SetValue(ref this._isMuted, value, this.IsMutedChanged);
     }
 
-    public PhysicalAddress MacAddress { get; private set; } = PhysicalAddress.None;
+    public PhysicalAddress MacAddress
+    {
+        get => this._macAddress;
+        private set => this.DeviceId = (this._macAddress = value).ToString();
+    }
 
     public PlayerState PlayerState
     {
@@ -159,7 +164,7 @@ public sealed class KodiClient : IDisposable
         (MoviesListResult result) => QueryData.Create(result.Limits.Total, result.Movies)
     );
 
-    public Task<PlayerDescriptor[]> GetPlayersAsync() => this.SendMessageAsync("Player.GetPlayers", (PlayerDescriptor[] players) => players);
+    public Task<PlayerDescriptor[]> GetPlayersAsync() => this.SendMessageAsync("Player.GetPlayers", default, Identity<PlayerDescriptor[]>.Projection);
 
     public Task<QueryData<TVShowInfo>> GetTVShowsAsync(int start = 0, int end = -1, Filter? filter = default) => this.SendMessageAsync(
         "VideoLibrary.GetTVShows",
@@ -169,14 +174,12 @@ public sealed class KodiClient : IDisposable
 
     public Task<bool> OpenFileAsync(string key, int id) => this.SendMessageAsync(
         "Player.Open",
-        new { Item = new Dictionary<string, int>(1) { { key, id } } },
-        (string result) => result == "OK"
+        new { Item = new Dictionary<string, int>(1) { { key, id } } }
     );
 
     public Task<bool> SendGoToCommandAsync(bool next) => this.SendMessageAsync(
         "Player.GoTo",
-        new { playerid = 1, to = next ? "next" : "previous" },
-        (string result) => result == "OK"
+        new { playerid = 1, to = next ? "next" : "previous" }
     );
 
     public async Task<bool> SendInputCommandAsync(InputCommand command)
@@ -185,7 +188,7 @@ public sealed class KodiClient : IDisposable
         {
             return false;
         }
-        bool sent = await this.SendMessageAsync(attribute.Method, attribute.Action == null ? null : new { attribute.Action }, (string result) => result == "OK").ConfigureAwait(false);
+        bool sent = await this.SendMessageAsync(attribute.Method, attribute.Action == null ? null : new { attribute.Action }).ConfigureAwait(false);
         if (!sent || !IsCursorCommand(command) || await this.GetCurrentWindowIdAsync().ConfigureAwait(false) != 12005 || await this.GetBooleanAsync("VideoPlayer.HasMenu").ConfigureAwait(false))
         {
             return sent;
@@ -209,7 +212,7 @@ public sealed class KodiClient : IDisposable
     }
 
     public async Task<int> SetVolumeAsync(int volume) => this.Volume = volume is >= 0 and <= 100
-        ? await this.SendMessageAsync("Application.SetVolume", new { volume }, (int volume) => volume).ConfigureAwait(false)
+        ? await this.SendMessageAsync("Application.SetVolume", new { volume }, Identity<int>.Projection).ConfigureAwait(false)
         : throw new ArgumentOutOfRangeException(nameof(volume));
 
     public Task<bool> ShowNotificationAsync(
@@ -217,7 +220,7 @@ public sealed class KodiClient : IDisposable
         string message,
         string? image = default,
         int displayTime = 5000
-    ) => this.SendMessageAsync("GUI.ShowNotification", new Notification(title, message, image, displayTime), (string result) => result == "OK");
+    ) => this.SendMessageAsync("GUI.ShowNotification", new KodiNotification(title, message, image, displayTime));
 
     private void CancelOutstanding()
     {
@@ -258,7 +261,7 @@ public sealed class KodiClient : IDisposable
     private Task<VolumeInfo> GetVolumeAsync() => this.SendMessageAsync(
         "Application.GetProperties",
         new { Properties = new[] { "muted", "volume" } },
-        (VolumeInfo info) => info
+        Identity<VolumeInfo>.Projection
     );
 
     private async Task MessageLoop()
@@ -435,10 +438,10 @@ public sealed class KodiClient : IDisposable
         this.IsMuted = muted;
     }
 
-    private Task<TResult> SendMessageAsync<TPayload, TResult>(string method, Func<TPayload, TResult> transform) => this.SendMessageAsync(
+    private Task<bool> SendMessageAsync(string method, object? parameters = default) => this.SendMessageAsync(
         method,
-        default,
-        transform
+        parameters,
+        (string result) => result == "OK"
     );
 
     private Task<TResult> SendMessageAsync<TPayload, TResult>(string method, object? parameters, Func<TPayload, TResult> transform)
@@ -536,6 +539,13 @@ public sealed class KodiClient : IDisposable
         JsonElement? Result = default
     );
 
+    private readonly record struct KodiNotification(
+        string Title,
+        string Message,
+        string? Image,
+        [property: JsonPropertyName("displaytime")] int DisplayTime
+    );
+
     private readonly record struct Limits(
         int Start,
         int End,
@@ -545,13 +555,6 @@ public sealed class KodiClient : IDisposable
     private readonly record struct MoviesListResult(
         Limits Limits,
         VideoInfo[] Movies
-    );
-
-    private readonly record struct Notification(
-        string Title,
-        string Message,
-        string? Image,
-        [property: JsonPropertyName("displaytime")] int DisplayTime
     );
 
     private readonly record struct PictureInfo(

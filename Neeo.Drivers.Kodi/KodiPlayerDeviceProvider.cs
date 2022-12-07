@@ -34,10 +34,7 @@ public sealed class KodiPlayerDeviceProvider : KodiDeviceProviderBase, IPlayerWi
 
     Task<double> IPlayerWidgetController.GetVolumeAsync(string deviceId) => this.GetVolumeAsync(deviceId);
 
-    public Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier)
-    {
-        throw new System.NotImplementedException();
-    }
+    public Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier) => this.HandleDirectoryActionAsync(deviceId, actionIdentifier);
 
     Task IPlayerWidgetController.HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier) => this.HandleDirectoryActionAsync(deviceId, actionIdentifier);
 
@@ -47,7 +44,7 @@ public sealed class KodiPlayerDeviceProvider : KodiDeviceProviderBase, IPlayerWi
 
     public async Task SetIsMutedAsync(string deviceId, bool isMuted)
     {
-        if (this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) && client.IsMuted != isMuted)
+        if (this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) && isMuted != client.IsMuted)
         {
             await client.SendInputCommandAsync(InputCommand.MuteToggle).ConfigureAwait(false);
         }

@@ -19,7 +19,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Hisense;
 
-public sealed class HisenseTV : IDisposable
+public sealed class Television : IDisposable
 {
     private readonly string _clientIdPrefix;
     private readonly ILogger _logger;
@@ -29,7 +29,7 @@ public sealed class HisenseTV : IDisposable
     private bool _isDisposed;
     private PeriodicTimer? _reconnectTimer;
 
-    private HisenseTV(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
+    private Television(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
     {
         this.IPAddress = ipAddress;
         this.MacAddress = macAddress;
@@ -56,16 +56,16 @@ public sealed class HisenseTV : IDisposable
 
     public PhysicalAddress MacAddress { get; }
 
-    public static async Task<HisenseTV[]> DiscoverAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
+    public static async Task<Television[]> DiscoverAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
-        ConcurrentBag<HisenseTV> bag = new();
+        ConcurrentBag<Television> bag = new();
         await Task.WhenAll(
             NetworkMethods.GetNetworkDevices().Select(async pair =>
             {
                 try
                 {
                     (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
-                    if (await HisenseTV.TryCreate(ipAddress, macAddress, logger, true, useCertificates, clientIdPrefix, cancellationToken).ConfigureAwait(false) is { } tv)
+                    if (await Television.TryCreate(ipAddress, macAddress, logger, true, useCertificates, clientIdPrefix, cancellationToken).ConfigureAwait(false) is { } tv)
                     {
                         bag.Add(tv);
                     }
@@ -79,9 +79,9 @@ public sealed class HisenseTV : IDisposable
         return bag.ToArray();
     }
 
-    public static Task<HisenseTV?> DiscoverOneAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
+    public static Task<Television?> DiscoverOneAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
-        TaskCompletionSource<HisenseTV?> taskCompletionSource = new();
+        TaskCompletionSource<Television?> taskCompletionSource = new();
         cancellationToken.Register(() => taskCompletionSource.TrySetCanceled(cancellationToken));
         ThreadPool.QueueUserWorkItem(_ => DiscoverOneAsync());
         return taskCompletionSource.Task;
@@ -97,7 +97,7 @@ public sealed class HisenseTV : IDisposable
                         try
                         {
                             (IPAddress ipAddress, PhysicalAddress macAddress) = pair;
-                            if (await HisenseTV.TryCreate(ipAddress, macAddress, logger, true, useCertificates, clientIdPrefix, cts.Token).ConfigureAwait(false) is { } tv)
+                            if (await Television.TryCreate(ipAddress, macAddress, logger, true, useCertificates, clientIdPrefix, cts.Token).ConfigureAwait(false) is { } tv)
                             {
                                 taskCompletionSource.TrySetResult(tv);
                                 cts.Cancel();
@@ -118,11 +118,11 @@ public sealed class HisenseTV : IDisposable
         }
     }
 
-    public static Task<HisenseTV?> TryCreateAsync(PhysicalAddress macAddress, ILogger logger, bool connectionRequired = false, bool useCertificates = false, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
+    public static Task<Television?> TryCreateAsync(PhysicalAddress macAddress, ILogger logger, bool connectionRequired = false, bool useCertificates = false, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
         return NetworkMethods.GetNetworkDevices().Where(pair => pair.Value.Equals(macAddress)).Select(static pair => pair.Key).FirstOrDefault() is { } ipAddress
-            ? HisenseTV.TryCreate(ipAddress, macAddress, logger, connectionRequired, useCertificates, clientIdPrefix, cancellationToken)
-            : Task.FromResult(default(HisenseTV));
+            ? Television.TryCreate(ipAddress, macAddress, logger, connectionRequired, useCertificates, clientIdPrefix, cancellationToken)
+            : Task.FromResult(default(Television));
     }
 
     public Task<IState> AuthenticateAsync(string code)
@@ -220,9 +220,9 @@ public sealed class HisenseTV : IDisposable
         await (this._connection?.SendKeyAsync(key) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
-    private static async Task<HisenseTV?> TryCreate(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool connectionRequired, bool useCertificates, string? clientIdPrefix, CancellationToken cancellationToken)
+    private static async Task<Television?> TryCreate(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool connectionRequired, bool useCertificates, string? clientIdPrefix, CancellationToken cancellationToken)
     {
-        HisenseTV tv = new(ipAddress, macAddress, logger, useCertificates, clientIdPrefix);
+        Television tv = new(ipAddress, macAddress, logger, useCertificates, clientIdPrefix);
         if (await tv.TryConnectAsync(cancellationToken).ConfigureAwait(false))
         {
             return tv;
@@ -464,9 +464,9 @@ public sealed class HisenseTV : IDisposable
 
         private static X509Certificate LoadCertificate()
         {
-            using Stream certificateStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(HisenseTV).Namespace}.Certificates.rcm_certchain_pem.cer")!;
+            using Stream certificateStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(Television).Namespace}.Certificates.rcm_certchain_pem.cer")!;
             using StreamReader certificateReader = new(certificateStream);
-            using Stream privateKeyStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(HisenseTV).Namespace}.Certificates.rcm_pem_privkey.pkcs8")!;
+            using Stream privateKeyStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(Television).Namespace}.Certificates.rcm_pem_privkey.pkcs8")!;
             using StreamReader privateKeyReader = new(privateKeyStream);
             return X509Certificate2.CreateFromPem(certPem: certificateReader.ReadToEnd(), keyPem: privateKeyReader.ReadToEnd());
         }

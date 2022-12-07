@@ -17,7 +17,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
 
-public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposable
+public abstract partial class KodiDeviceProviderBase : IDeviceProvider
 {
     private static readonly Dictionary<Buttons, Func<KodiClient, Task>> _buttonFunctions = new()
     {
@@ -75,12 +75,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
-
-    public virtual void Dispose()
-    {
-        this._clientManager.Dispose();
-        GC.SuppressFinalize(this);
-    }
 
     protected static bool IsClientReady(KodiClient client)
     {
@@ -519,21 +513,18 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private async Task InitializeDeviceListAsync(string[] deviceIds)
+    private Task InitializeDeviceListAsync(string[] deviceIds)
     {
-
-        await this._clientManager.InitializeAsync(deviceId: deviceIds is [{ } id] ? id : null).ConfigureAwait(false);
-        if (deviceIds.Length == 0)
+        if (deviceIds.Length != 0)
         {
-            return;
+            _ = InitializeAsync();
         }
-        foreach (string deviceId in deviceIds)
+        return Task.CompletedTask;
+
+        async Task InitializeAsync()
         {
-            await this.OnDeviceAddedAsync(deviceId).ConfigureAwait(false);
-            if (this.IsClientReady(deviceId) && this._notifier is { } notifier)
-            {
-                await notifier.SendPowerNotificationAsync(true, deviceId).ConfigureAwait(false);
-            }
+            await this._clientManager.InitializeAsync(deviceIds is [{ } id] ? id : null).ConfigureAwait(false);
+            await Parallel.ForEachAsync(deviceIds, (deviceId, _) => new(this.OnDeviceAddedAsync(deviceId))).ConfigureAwait(false);
         }
     }
 
@@ -546,10 +537,16 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private async Task OnClientConnectedAsync(KodiClient client)
     {
         this.AttachEventHandlers(client);
-        if (KodiDeviceProviderBase.IsClientReady(client))
+        if (!KodiDeviceProviderBase.IsClientReady(client))
         {
-            await this.NotifyConnectedAsync(client).ConfigureAwait(false);
+            return;
         }
+        await this.NotifyConnectedAsync(client).ConfigureAwait(false);
+        if (this._notifier is not { } notifier)
+        {
+            return;
+        }
+        await notifier.SendPowerNotificationAsync(true, client.DeviceId);
     }
 
     private async Task OnDeviceAddedAsync(string deviceId)

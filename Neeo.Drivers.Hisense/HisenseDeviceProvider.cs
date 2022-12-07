@@ -16,76 +16,69 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
 {
     private static readonly Dictionary<Buttons, RemoteKey> _remoteKeys = new()
     {
-        { Buttons.Back, RemoteKey.Back },
-        { Buttons.CursorDown, RemoteKey.Down },
-        { Buttons.CursorEnter, RemoteKey.OK },
-        { Buttons.CursorLeft, RemoteKey.Left },
-        { Buttons.CursorRight, RemoteKey.Right },
-        { Buttons.CursorUp, RemoteKey.Up },
-        { Buttons.Digit0, RemoteKey.Digit0 },
-        { Buttons.Digit1, RemoteKey.Digit1 },
-        { Buttons.Digit2, RemoteKey.Digit2 },
-        { Buttons.Digit3, RemoteKey.Digit3 },
-        { Buttons.Digit4, RemoteKey.Digit4 },
-        { Buttons.Digit5, RemoteKey.Digit5 },
-        { Buttons.Digit6, RemoteKey.Digit6 },
-        { Buttons.Digit7, RemoteKey.Digit7 },
-        { Buttons.Digit8, RemoteKey.Digit8 },
-        { Buttons.Digit9, RemoteKey.Digit9 },
-        { Buttons.Forward, RemoteKey.FastForward },
-        { Buttons.Home, RemoteKey.Home },
-        { Buttons.InputToggle, RemoteKey.InputToggle },
-        { Buttons.Menu, RemoteKey.Menu },
-        { Buttons.MuteToggle, RemoteKey.MuteToggle },
-        { Buttons.Pause, RemoteKey.Pause },
-        { Buttons.PowerOff, RemoteKey.Power },
-        { Buttons.Play, RemoteKey.Play },
-        { Buttons.Reverse, RemoteKey.Rewind },
-        { Buttons.Stop, RemoteKey.Stop },
-        { Buttons.VolumeDown, RemoteKey.VolumeDown },
-        { Buttons.VolumeUp, RemoteKey.VolumeUp },
+        [Buttons.Back] = RemoteKey.Back,
+        [Buttons.CursorDown] = RemoteKey.Down,
+        [Buttons.CursorEnter] = RemoteKey.OK,
+        [Buttons.CursorLeft] = RemoteKey.Left,
+        [Buttons.CursorRight] = RemoteKey.Right,
+        [Buttons.CursorUp] = RemoteKey.Up,
+        [Buttons.Digit0] = RemoteKey.Digit0,
+        [Buttons.Digit1] = RemoteKey.Digit1,
+        [Buttons.Digit2] = RemoteKey.Digit2,
+        [Buttons.Digit3] = RemoteKey.Digit3,
+        [Buttons.Digit4] = RemoteKey.Digit4,
+        [Buttons.Digit5] = RemoteKey.Digit5,
+        [Buttons.Digit6] = RemoteKey.Digit6,
+        [Buttons.Digit7] = RemoteKey.Digit7,
+        [Buttons.Digit8] = RemoteKey.Digit8,
+        [Buttons.Digit9] = RemoteKey.Digit9,
+        [Buttons.Forward] = RemoteKey.FastForward,
+        [Buttons.Home] = RemoteKey.Home,
+        [Buttons.InputToggle] = RemoteKey.InputToggle,
+        [Buttons.Menu] = RemoteKey.Menu,
+        [Buttons.MuteToggle] = RemoteKey.MuteToggle,
+        [Buttons.Pause] = RemoteKey.Pause,
+        [Buttons.PowerOff] = RemoteKey.Power,
+        [Buttons.Play] = RemoteKey.Play,
+        [Buttons.Reverse] = RemoteKey.Rewind,
+        [Buttons.Stop] = RemoteKey.Stop,
+        [Buttons.VolumeDown] = RemoteKey.VolumeDown,
+        [Buttons.VolumeUp] = RemoteKey.VolumeUp,
     };
 
-    private readonly Lazy<IDeviceBuilder> _deviceBuilder;
     private readonly HashSet<string> _deviceIds = new();
     private readonly ILogger _logger;
-    private HisenseTV[] _candidates = Array.Empty<HisenseTV>();
+    private Television[] _candidates = Array.Empty<Television>();
     private bool _connected;
     private IDeviceNotifier? _notifier;
-    private HisenseTV? _tv;
+    private Television? _tv;
 
     public HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
     {
         this._logger = logger;
-        this._deviceBuilder = new(() => Device.Create(Constants.DeviceName, DeviceType.TV)
+        this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.TV)
             .SetManufacturer(Constants.Manufacturer)
             .SetSpecificName($"{Constants.Manufacturer} {Constants.DeviceName}")
             .AddButtonHandler(this.OnButtonPressed)
             .AddButtonGroup(ButtonGroups.Power | ButtonGroups.MenuAndBack | ButtonGroups.ControlPad | ButtonGroups.Volume | ButtonGroups.ChannelZapper | ButtonGroups.Transport | ButtonGroups.TransportSearch | ButtonGroups.NumberPad)
             .AddButton(Buttons.InputHdmi1 | Buttons.InputHdmi2 | Buttons.InputHdmi3 | Buttons.InputHdmi4 | Buttons.InputToggle)
-            .AddSmartApplicationButton(SmartApplicationButtons.Amazon | SmartApplicationButtons.GooglePlay | SmartApplicationButtons.Netflix | SmartApplicationButtons.YouTube)
+            .AddApplicationButton(ApplicationButtons.Amazon | ApplicationButtons.GooglePlay | ApplicationButtons.Netflix | ApplicationButtons.YouTube)
             .AddButton(Buttons.Home)
             .AddButton("HBOMAX", "HBO Max")
             .AddDirectory("Apps", default, DirectoryRole.Root, this.BrowseApps, this.LaunchApp)
             .AddPowerStateSensor(this.GetPowerState)
-            .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
+            .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
             .EnableNotifications(notifier => this._notifier = notifier)
             .AddSlider("VOLUME", null, this.GetVolumeAsync, this.SetVolumeAsync)
             .AddTextLabel("VOLUME-LABEL", "Volume", async (_) => (await this.GetVolumeAsync(_).ConfigureAwait(false)).ToString())
             .AddTextLabel("STATE", "State", this.GetStateAsync)
             .EnableDiscovery("Discovering TV...", "Ensure your TV is on and IP control is enabled.", this.PerformDiscoveryAsync)
-            .EnableRegistration(
-                "Registering TV...",
-                "Enter the code showing on your TV. If no code is displayed, try 0000 or hit back and try again (after verifying the TV is on).",
-                this.QueryIsRegistered,
-                this.Register
-            )
-        );
+            .EnableRegistration("Registering TV...", "Enter the code showing on your TV. If no code is displayed, try 0000 or hit back and try again (after verifying the TV is on).", this.QueryIsRegistered, this.Register);
     }
 
-    public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
+    public IDeviceBuilder DeviceBuilder { get; }
 
-    private static Task<IState?> AuthenticatedStateAsync(HisenseTV tv, string? code = null)
+    private static Task<IState?> AuthenticatedStateAsync(Television tv, string? code = null)
     {
         return code == null
             ? tv.GetStateAsync().ContinueWith(task => AuthenticatedState(task.Result), TaskContinuationOptions.ExecuteSynchronously)
@@ -94,7 +87,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         static IState? AuthenticatedState(IState? state) => state is { Type: not StateType.AuthenticationRequired } ? state : default;
     }
 
-    private static Task NotifyStateAsync(IDeviceNotifier notifier, HisenseTV tv, IState state) => notifier.SendNotificationAsync("STATE", state.ToString(), tv.DeviceId);
+    private static Task NotifyStateAsync(IDeviceNotifier notifier, Television tv, IState state) => notifier.SendNotificationAsync("STATE", state.ToString(), tv.DeviceId);
 
     private async Task BrowseApps(string deviceId, ListBuilder list)
     {
@@ -130,15 +123,15 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         ? await tv.GetVolumeAsync().ConfigureAwait(false)
         : 0d;
 
-    private async Task InitializeDeviceList(string[] deviceIds)
+    private async Task InitializeDeviceListAsync(string[] deviceIds)
     {
-        this._logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceList), string.Join(',', deviceIds));
+        this._logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceListAsync), string.Join(',', deviceIds));
         Array.ForEach(deviceIds, deviceId => this._deviceIds.Add(deviceId));
-        if (deviceIds is not [{ } macAddress])
+        if (deviceIds is not [{ } macAddress,..])
         {
             return;
         }
-        if (await HisenseTV.TryCreateAsync(PhysicalAddress.Parse(macAddress), this._logger, useCertificates: true).ConfigureAwait(false) is not { } tv)
+        if (await Television.TryCreateAsync(PhysicalAddress.Parse(macAddress), this._logger, useCertificates: true).ConfigureAwait(false) is not { } tv)
         {
             this._logger.LogError("Failed to recreate TV based on mac address {macAddress}.", macAddress);
             return;
@@ -167,14 +160,14 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
                 _ => Task.CompletedTask
             };
         }
-        if (SmartApplicationButton.TryResolve(buttonName) is { } smartButton)
+        if (ApplicationButton.TryResolve(buttonName) is { } smartButton)
         {
             return smartButton switch
             {
-                SmartApplicationButtons.Netflix => tv.LaunchAppAsync("Netflix"),
-                SmartApplicationButtons.YouTube => tv.LaunchAppAsync("YouTube"),
-                SmartApplicationButtons.GooglePlay => tv.LaunchAppAsync("Play Store"),
-                SmartApplicationButtons.Amazon => tv.LaunchAppAsync("Prime Video"),
+                ApplicationButtons.Netflix => tv.LaunchAppAsync("Netflix"),
+                ApplicationButtons.YouTube => tv.LaunchAppAsync("YouTube"),
+                ApplicationButtons.GooglePlay => tv.LaunchAppAsync("Play Store"),
+                ApplicationButtons.Amazon => tv.LaunchAppAsync("Prime Video"),
                 _ => Task.CompletedTask
             };
         }
@@ -185,20 +178,20 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         };
     }
 
-    private Task OnDeviceAdded(string deviceId)
+    private Task OnDeviceAddedAsync(string deviceId)
     {
         this._deviceIds.Add(deviceId);
         return Task.CompletedTask;
     }
 
-    private Task OnDeviceRemoved(string deviceId)
+    private Task OnDeviceRemovedAsync(string deviceId)
     {
         this._deviceIds.Remove(deviceId);
         if (this._tv == null)
         {
             return Task.CompletedTask;
         }
-        using HisenseTV tv = Interlocked.Exchange(ref this._tv, null);
+        using Television tv = Interlocked.Exchange(ref this._tv, null);
         tv.VolumeChanged -= this.TV_VolumeChanged;
         tv.Sleep -= this.TV_Disconnected;
         tv.Disconnected -= this.TV_Disconnected;
@@ -211,7 +204,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     private async Task<DiscoveredDevice[]> PerformDiscoveryAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
         if (this._tv == null && optionalDeviceId != null &&
-            await HisenseTV.TryCreateAsync(
+            await Television.TryCreateAsync(
                 PhysicalAddress.Parse(optionalDeviceId),
                 this._logger,
                 connectionRequired: true,
@@ -233,7 +226,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return await HisenseDeviceProvider.AuthenticatedStateAsync(tv).ConfigureAwait(false) is not null;
         }
-        HisenseTV[] tvs = await HisenseTV.DiscoverAsync(this._logger, useCertificates: true).ConfigureAwait(false);
+        Television[] tvs = await Television.DiscoverAsync(this._logger, useCertificates: true).ConfigureAwait(false);
         if (tvs.Length == 1 && await HisenseDeviceProvider.AuthenticatedStateAsync(tv = tvs[0]).ConfigureAwait(false) is { } state)
         {
             this.SetTV(tv, state);
@@ -249,10 +242,10 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return RegistrationResult.Success;
         }
-        HisenseTV[] candidates = this._tv is { } tv ? new[] { tv } : this._candidates;
+        Television[] candidates = this._tv is { } tv ? new[] { tv } : this._candidates;
         for (int index = 0; index < candidates.Length; index++)
         {
-            HisenseTV candidate = candidates[index];
+            Television candidate = candidates[index];
             if (await HisenseDeviceProvider.AuthenticatedStateAsync(candidate, code).ConfigureAwait(false) is { } state)
             {
                 this.SetTV(candidate, state);
@@ -273,7 +266,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         return RegistrationResult.Failed("Passcode was either incorrect or you took too long.");
     }
 
-    private async void SetTV(HisenseTV tv, IState? state = default)
+    private async void SetTV(Television tv, IState? state = default)
     {
         this._logger.LogInformation("Setting TV to {ipAddress}.", tv.IPAddress);
         this._tv = tv;
