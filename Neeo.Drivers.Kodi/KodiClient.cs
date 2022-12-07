@@ -33,7 +33,7 @@ public sealed class KodiClient : IDisposable
     private PhysicalAddress _macAddress = PhysicalAddress.None;
     private PlayerState _playerState = PlayerState.Defaults;
     private int _volume;
-    private ClientWebSocket? _webSocket;
+    private WebSocket? _webSocket;
 
     public KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger)
     {
@@ -51,8 +51,6 @@ public sealed class KodiClient : IDisposable
     public event EventHandler<DataEventArgs<PlayerState>>? PlayerStateChanged;
 
     public event EventHandler<DataEventArgs<int>>? VolumeChanged;
-
-    private event EventHandler? Disposed;
 
     public string DeviceId { get; private set; } = string.Empty;
 
@@ -124,12 +122,7 @@ public sealed class KodiClient : IDisposable
     public void Dispose()
     {
         this.CleanUp();
-        if (this.IsDisposed)
-        {
-            return;
-        }
         this.IsDisposed = true;
-        this.Disposed?.Invoke(this, EventArgs.Empty);
     }
 
     public Task<QueryData<AlbumInfo>> GetAlbumsAsync(int start = 0, int end = -1, int? artistId = default) => this.SendMessageAsync(
