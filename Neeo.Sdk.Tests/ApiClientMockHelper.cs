@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Threading.Tasks;
 using Moq;
 using Moq.Language.Flow;
@@ -11,43 +11,42 @@ namespace Neeo.Sdk.Tests;
 
 internal static class ApiClientMockMethods
 {
-    private static readonly MethodInfo _fromResultMethod = typeof(Task).GetMethod(nameof(Task.FromResult), BindingFlags.Static | BindingFlags.Public)!;
-    private static readonly ConcurrentDictionary<Type, Func<Delegate, object, Task>> _functionCache = new();
+    private static readonly ConcurrentDictionary<Type, Delegate> _functionCache = new();
 
     /// <summary>
-    /// Mock the <see cref="ApiClient"/> method such that it will act as though <paramref name="serverResponse"/> was the response of the REST call, then invoke
-    /// the supplied transform (from the call to Post/Get) and return that to the caller.
+    /// Rather than mocking the result of <see cref="IApiClient.GetAsync"/> or <see cref="IApiClient.PostAsync"/>, which requires awareness of the generic transform
+    /// function passed in (as the second to last argument), mock the <see cref="IApiClient"/> method such that it will act as though <paramref name="serverResponse"/>
+    /// was the response of the REST call, by simply passing it to the supplied transform argument (from the call to Post/Get) and returns the result to the caller
+    /// wrapped within a call to <see cref="Task.FromResult"/>.
     /// </summary>
-    public static IReturnsResult<IApiClient> ReturnsTransformOf(this ISetup<IApiClient, Task<It.IsAnyType>> setup, object serverResponse) => setup.Returns(new InvocationFunc(invocation =>
+    public static IReturnsResult<IApiClient> ReturnsTransformOf<TResponse>(this ISetup<IApiClient, Task<It.IsAnyType>> setup, [DisallowNull] TResponse serverResponse) => setup.Returns(new InvocationFunc(invocation =>
     {
         Delegate transform = (Delegate)invocation.Arguments[invocation.Arguments.Count - 2];
-        return ApiClientMockMethods._functionCache.GetOrAdd(transform.GetType(), ApiClientMockMethods.CreateFunction)(transform, serverResponse);
+        Func<Delegate, TResponse, Task> function = (Func<Delegate, TResponse, Task>)ApiClientMockMethods._functionCache.GetOrAdd(transform.GetType(), ApiClientMockMethods.CreateFunction);
+        return function(transform, serverResponse);
     }));
 
-    private static Func<Delegate, object, Task> CreateFunction(Type transformType)
+    private static Delegate CreateFunction(Type transformType)
     {
         Type[] typeArguments = transformType.GetGenericArguments();
-        ParameterExpression transform = Expression.Parameter(typeof(Delegate));
-        ParameterExpression response = Expression.Parameter(typeof(object));
-        return Expression.Lambda<Func<Delegate, object, Task>>(
-            Expression.Convert(
-                Expression.Call(
-                    ApiClientMockMethods._fromResultMethod.MakeGenericMethod(typeArguments[1]),
-                    Expression.Invoke(
-                        Expression.Convert(
-                            transform,
-                            transformType
-                        ),
-                        Expression.Convert(
-                            response,
-                            typeArguments[0]
-                        )
-                    )
-                ),
-                typeof(Task)
+        ParameterExpression transform = Expression.Parameter(typeof(Delegate), nameof(transform));
+        ParameterExpression response = Expression.Parameter(typeArguments[0], nameof(response));
+        LambdaExpression lambda = Expression.Lambda(
+            Expression.Call(
+                typeof(Task),
+                nameof(Task.FromResult),
+                new[] { typeArguments[1] },
+                Expression.Invoke(
+                    Expression.Convert(
+                        transform,
+                        transformType
+                    ),
+                    response
+                )
             ),
             transform,
             response
-        ).Compile();
+        );
+        return lambda.Compile();
     }
 }

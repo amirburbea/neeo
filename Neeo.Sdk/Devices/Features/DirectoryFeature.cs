@@ -31,20 +31,24 @@ public interface IDirectoryFeature : IFeature
 internal sealed class DirectoryFeature : IDirectoryFeature
 {
     private readonly DirectoryActionHandler _actionHandler;
-    private readonly DirectoryBrowser _browser;
     private readonly string? _identifier;
+    private readonly DirectoryPopulator _populator;
 
-    public DirectoryFeature(DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? identifier = default)
+    public DirectoryFeature(DirectoryPopulator populator, DirectoryActionHandler actionHandler, string? identifier = default)
     {
-        this._browser = browser ?? throw new ArgumentNullException(nameof(browser));
+        this._populator = populator ?? throw new ArgumentNullException(nameof(populator));
         this._actionHandler = actionHandler ?? throw new ArgumentNullException(nameof(actionHandler));
         this._identifier = identifier;
     }
 
     public async Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters)
     {
-        ListBuilder builder = new(string.IsNullOrEmpty(parameters.BrowseIdentifier) && !string.IsNullOrEmpty(this._identifier) ? parameters with { BrowseIdentifier = this._identifier } : parameters);
-        await this._browser(deviceId, builder).ConfigureAwait(false);
+        ListBuilder builder = new(
+            string.IsNullOrEmpty(parameters.BrowseIdentifier) && !string.IsNullOrEmpty(this._identifier)
+                ? parameters with { BrowseIdentifier = this._identifier }
+                : parameters
+        );
+        await this._populator(deviceId, builder).ConfigureAwait(false);
         return builder;
     }
 

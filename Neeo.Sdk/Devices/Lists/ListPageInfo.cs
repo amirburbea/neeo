@@ -7,11 +7,7 @@ public readonly struct ListPageInfo
 {
     private readonly ListBuilder _list;
 
-    internal ListPageInfo(ListBuilder list, int offset)
-    {
-        this._list = list;
-        this.Offset = offset;
-    }
+    internal ListPageInfo(ListBuilder list, int offset) => (this._list, this.Offset) = (list, offset);
 
     /// <summary>
     /// Gets the browse identifier.

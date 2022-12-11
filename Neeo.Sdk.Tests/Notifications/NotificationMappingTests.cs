@@ -43,7 +43,7 @@ public sealed class NotificationMappingTests
     [Fact]
     public async Task Should_get_keys_from_entries_matching_by_name()
     {
-        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "name1");
+        string[] keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "name1");
 
         Assert.Equal("key1", keys.Single());
     }
@@ -51,7 +51,7 @@ public sealed class NotificationMappingTests
     [Fact]
     public async Task Should_get_keys_via_fallback_to_label_when_not_matching_by_name()
     {
-        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
+        string[] keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
 
         Assert.Equal(new[] { "key2", "key3" }, keys);
     }

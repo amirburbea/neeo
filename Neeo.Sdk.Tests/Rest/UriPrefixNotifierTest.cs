@@ -1,7 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Moq;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Rest;
@@ -17,54 +14,25 @@ public sealed class UriPrefixNotifierTest
     public UriPrefixNotifierTest()
     {
         Mock<ISdkEnvironment> mockEnvironment = new(MockBehavior.Strict);
-        mockEnvironment.Setup(environment => environment.HostAddress).Returns(Constants.HostAddress);
+        mockEnvironment.Setup(environment => environment.HostAddress).Returns("http://localhost");
         this._uriPrefixNotifier = new(this._mockDatabase.Object, mockEnvironment.Object);
     }
 
     [Fact]
     public async Task StartAsync_should_notify_correct_uri_prefix()
     {
-        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
-        mockAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockAdapter));
+        Mock<IDeviceAdapter> mockDevice = new(MockBehavior.Strict);
+        mockDevice.Setup(adapter => adapter.AdapterName).Returns(nameof(mockDevice));
         string? uriPrefix = default;
-        mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(prefix=>uriPrefix=prefix);
-        this._mockDatabase.Setup(database => database.Adapters).Returns(new[] { mockAdapter.Object });
-
-        await this._uriPrefixNotifier.StartAsync(default);
-
-        Assert.Equal($"{Constants.HostAddress}/device/{nameof(mockAdapter)}/custom/", uriPrefix);
-    }
-
-    [Fact]
-    public async Task StartAsync_should_notify_multiple_adapters_in_parallel()
-    {
-        const int count = 4;
-        IDeviceAdapter[] adapters = new IDeviceAdapter[count];
-        int[] threadIds = new int[count];
-        for (int index = 0; index < count; index++)
+        mockDevice.Setup(adapter => adapter.UriPrefixCallback).Returns(prefix =>
         {
-            Mock<IDeviceAdapter> mockAdapter = new();
-            mockAdapter.Setup(adapter => adapter.AdapterName).Returns($"adapter{index}");
-            int arrayIndex = index; // Capturing `index` causes issues.
-            mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(_ => SetUriPrefix(arrayIndex));
-            adapters[index] = mockAdapter.Object;
-        }
-        this._mockDatabase.Setup(database => database.Adapters).Returns(adapters);
+            uriPrefix = prefix;
+            return ValueTask.CompletedTask;
+        });
+        this._mockDatabase.Setup(database => database.Adapters).Returns(new[] { mockDevice.Object });
 
-        await this._uriPrefixNotifier.StartAsync(default);
+        await this._uriPrefixNotifier.StartAsync();
 
-        Assert.Equal(count, threadIds.Distinct().Count());
-        Assert.DoesNotContain(0, threadIds);
-
-        void SetUriPrefix(int index)
-        {
-            Thread.Sleep(100);
-            threadIds[index] = Environment.CurrentManagedThreadId;
-        }
-    }
-
-    private static class Constants
-    {
-        public const string HostAddress = "http://host";
+        Assert.Equal("http://localhost/device/mockDevice/custom/", uriPrefix);
     }
 }

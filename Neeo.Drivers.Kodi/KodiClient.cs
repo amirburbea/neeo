@@ -204,6 +204,8 @@ public sealed class KodiClient : IDisposable
         static bool IsCursorCommand(InputCommand command) => command is InputCommand.Right or InputCommand.Left or InputCommand.Up or InputCommand.Down or InputCommand.Select;
     }
 
+    public Task<bool> SetMuteAsync(bool mute) => this.SendMessageAsync("Application.SetMute", new { mute }, Identity<bool>.Projection);
+
     public async Task<int> SetVolumeAsync(int volume) => this.Volume = volume is >= 0 and <= 100
         ? await this.SendMessageAsync("Application.SetVolume", new { volume }, Identity<int>.Projection).ConfigureAwait(false)
         : throw new ArgumentOutOfRangeException(nameof(volume));

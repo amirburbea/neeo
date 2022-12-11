@@ -27,10 +27,10 @@ public sealed class SubscriptionsNotifierTests
     [Fact]
     public async Task StartAsync_should_make_api_request_and_pass_result_to_adapter()
     {
-        var adapter = this.CreateAdapter("adapter", withSubscriptionFeature: true);
+        IDeviceAdapter adapter = this.CreateAdapter("adapter", withSubscriptionFeature: true);
         this.SetAdapters(adapter);
 
-        await this._notifier.StartAsync(default);
+        await this._notifier.StartAsync();
 
         Assert.Equal(Constants.GetAsyncCalled, adapter.SpecificName);
     }
@@ -38,11 +38,11 @@ public sealed class SubscriptionsNotifierTests
     [Fact]
     public async Task StartAsync_should_only_make_api_request_on_adapters_with_subscription_support()
     {
-        var adapterWith = this.CreateAdapter("with", withSubscriptionFeature: true);
-        var adapterWithout = this.CreateAdapter("without", withSubscriptionFeature: false);
+        IDeviceAdapter adapterWith = this.CreateAdapter("with", withSubscriptionFeature: true);
+        IDeviceAdapter adapterWithout = this.CreateAdapter("without", withSubscriptionFeature: false);
         this.SetAdapters(adapterWith, adapterWithout);
 
-        await this._notifier.StartAsync(default);
+        await this._notifier.StartAsync();
 
         Assert.Equal(Constants.GetAsyncCalled, adapterWith.SpecificName);
         Assert.Equal(Constants.GetAsyncNotCalled, adapterWithout.SpecificName);
@@ -51,7 +51,7 @@ public sealed class SubscriptionsNotifierTests
     private IDeviceAdapter CreateAdapter(string adapterName, bool withSubscriptionFeature = false)
     {
         Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
-        mockAdapter.Setup(adapter => adapter.Manufacturer).Returns("NEEO");
+        mockAdapter.Setup(adapter => adapter.Manufacturer).Returns(nameof(Neeo));
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.SpecificName).Returns(Constants.GetAsyncNotCalled);
@@ -64,18 +64,18 @@ public sealed class SubscriptionsNotifierTests
             {
                 return default;
             }
-            string path = string.Format(UrlPaths.SubscriptionsFormat, Constants.SdkAdapterName, adapterName);
-            string[] ids = Array.ConvertAll(RandomNumberGenerator.GetBytes(5), static b => b.ToString());
             Mock<ISubscriptionFeature> mockFeature = new(MockBehavior.Strict);
-            mockFeature
-                .Setup(feature => feature.InitializeDeviceListAsync(It.IsAny<string[]>()))
-                .Returns((string[] deviceIds) => DeviceSubscriptionHandler(deviceIds));
+            string path = string.Format(UrlPaths.SubscriptionsFormat, Constants.SdkAdapterName, adapterName);
+            string[] ids = Array.ConvertAll(RandomNumberGenerator.GetBytes(5), static b => char.ToString((char)b));
             this._mockClient
                 .Setup(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
                 .ReturnsTransformOf(ids);
+            mockFeature
+                .Setup(feature => feature.InitializeDeviceListAsync(It.IsAny<string[]>()))
+                .Returns(InitializeDeviceListAsync);            
             return mockFeature.Object;
 
-            Task DeviceSubscriptionHandler(string[] deviceIds)
+            Task InitializeDeviceListAsync(string[] deviceIds)
             {
                 Assert.Same(deviceIds, ids);
                 this._mockClient.Verify(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()), Times.Once());

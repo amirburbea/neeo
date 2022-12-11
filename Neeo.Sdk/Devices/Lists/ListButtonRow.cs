@@ -1,13 +1,17 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Neeo.Sdk.Devices.Lists;
 
-public sealed class ListButtonRow : IListItem
+/// <summary>
+/// A row of <see cref="ListButton"/> buttons.
+/// </summary>
+public sealed class ListButtonRow
 {
-    internal ListButtonRow(IEnumerable<ListButton> buttons) => this.Buttons = buttons.ToArray();
+    internal ListButtonRow(ListButton[] buttons) => this.Buttons = buttons ?? throw new ArgumentNullException(nameof(buttons));
 
+    /// <summary>
+    /// Gets the collection of buttons in the row.
+    /// </summary>
     public IReadOnlyCollection<ListButton> Buttons { get; }
-
-    ListItemType IListItem.Type => ListItemType.ButtonRow;
 }

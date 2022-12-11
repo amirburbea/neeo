@@ -3,7 +3,7 @@
 /// <summary>
 /// Represents a list header row.
 /// </summary>
-public sealed class ListHeader : IListItem
+public sealed class ListHeader
 {
     internal ListHeader(string title) => this.Title = Validator.ValidateText(title, maxLength: 255);
 
@@ -16,6 +16,4 @@ public sealed class ListHeader : IListItem
     /// The title for the list header.
     /// </summary>
     public string Title { get; }
-
-    ListItemType IListItem.Type => ListItemType.Header;
 }

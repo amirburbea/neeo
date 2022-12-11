@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Neeo.Sdk.Devices;
@@ -19,17 +20,11 @@ internal sealed class UriPrefixNotifier : IHostedService
         (this._database, this._environment) = (database, environment);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
-    {
-        Parallel.ForEach(this._database.Adapters, new() { CancellationToken = cancellationToken }, adapter =>
-        {
-            if (adapter.UriPrefixCallback is { } callback)
-            {
-                callback($"{this._environment.HostAddress}/device/{adapter.AdapterName}/custom/");
-            }
-        });
-        return Task.CompletedTask;
-    }
+    public Task StartAsync(CancellationToken cancellationToken = default) => Parallel.ForEachAsync(
+        this._database.Adapters.Where(adapter => adapter.UriPrefixCallback != null),
+        cancellationToken,
+        (adapter, _) => adapter.UriPrefixCallback!($"{this._environment.HostAddress}/device/{adapter.AdapterName}/custom/")
+    );
 
     Task IHostedService.StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

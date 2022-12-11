@@ -75,7 +75,7 @@ public static class Program
         }
         services
             .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
-            .AddHostedService<Worker>();
+            .AddHostedService<SdkService>();
     }
 
     private sealed class LoadContext : AssemblyLoadContext

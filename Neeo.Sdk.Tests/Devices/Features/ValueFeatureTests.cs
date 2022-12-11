@@ -18,8 +18,8 @@ public sealed class ValueFeatureTests
         Mock<DeviceValueGetter<bool>> mockGetter = new(MockBehavior.Strict);
         mockGetter.Setup(getter => getter(It.IsAny<string>())).ReturnsAsync(value);
 
-        var feature = ValueFeature.Create(mockGetter.Object);
-        var response = await feature.GetValueAsync(string.Empty);
+        ValueFeature feature = ValueFeature.Create(mockGetter.Object);
+        ValueResponse response = await feature.GetValueAsync(string.Empty);
 
         Assert.Same(BooleanBoxes.GetBox(value), response.Value);
     }
@@ -32,7 +32,7 @@ public sealed class ValueFeatureTests
         Mock<DeviceValueSetter<bool>> mockSetter = new(MockBehavior.Strict);
         mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
 
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict), mockSetter.Object);
+        ValueFeature feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict), mockSetter.Object);
         string deviceId = Guid.NewGuid().ToString();
         await feature.SetValueAsync(deviceId, text);
 
@@ -48,7 +48,7 @@ public sealed class ValueFeatureTests
         Mock<DeviceValueSetter<double>> mockSetter = new(MockBehavior.Strict);
         mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<double>())).Returns(Task.CompletedTask);
 
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<double>>(MockBehavior.Strict), mockSetter.Object);
+        ValueFeature feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<double>>(MockBehavior.Strict), mockSetter.Object);
         string deviceId = Guid.NewGuid().ToString();
         await feature.SetValueAsync(deviceId, text);
 
@@ -58,7 +58,7 @@ public sealed class ValueFeatureTests
     [Fact]
     public Task SetValueAsync_should_throw_when_created_without_setter()
     {
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict));
+        ValueFeature feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict));
 
         return Assert.ThrowsAsync<NotSupportedException>(() => feature.SetValueAsync(string.Empty, string.Empty));
     }

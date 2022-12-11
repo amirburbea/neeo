@@ -11,6 +11,24 @@ namespace Neeo.Sdk.Tests.Devices.Features;
 public sealed class DiscoveryFeatureTests
 {
     [Fact]
+    public async Task DiscoverAsync_should_validate_DeviceBuilder_is_null_if_not_EnableDynamicDeviceBuilder()
+    {
+        DiscoveredDevice deviceWithBuilder = new("id", "", DeviceBuilder: Device.Create("abc", DeviceType.Accessory));
+        DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithBuilder }), enableDynamicDeviceBuilder: false);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
+    }
+
+    [Fact]
+    public async Task DiscoverAsync_should_validate_DeviceBuilder_not_null_if_EnableDynamicDeviceBuilder()
+    {
+        DiscoveredDevice deviceWithoutBuilder = new("id", "");
+        DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithoutBuilder }), enableDynamicDeviceBuilder: true);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
+    }
+
+    [Fact]
     public async Task DiscoverAsync_should_validate_id_not_null_or_empty()
     {
         DiscoveredDevice deviceWithNullId = new(null!, "name");
@@ -33,24 +51,6 @@ public sealed class DiscoveryFeatureTests
     {
         DiscoveredDevice deviceWithEmptyName = new("id", "");
         DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithEmptyName }));
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
-    }
-
-    [Fact]
-    public async Task DiscoverAsync_should_validate_DeviceBuilder_is_null_if_not_EnableDynamicDeviceBuilder()
-    {
-        DiscoveredDevice deviceWithBuilder = new("id", "", DeviceBuilder: Device.Create("abc", DeviceType.Accessory));
-        DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithBuilder }), enableDynamicDeviceBuilder: false);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
-    }
-
-    [Fact]
-    public async Task DiscoverAsync_should_validate_DeviceBuilder_not_null_if_EnableDynamicDeviceBuilder()
-    {
-        DiscoveredDevice deviceWithoutBuilder = new("id", "");
-        DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithoutBuilder }), enableDynamicDeviceBuilder: true);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
     }

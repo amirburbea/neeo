@@ -1,6 +1,5 @@
 using System;
 using System.Net;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -13,28 +12,28 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapterName}/discover")]
-    public async Task<ActionResult<DiscoveredDevice[]>> DiscoverAsync(string adapterName, CancellationToken cancellationToken)
+    public async Task<ActionResult<DiscoveredDevice[]>> DiscoverAsync(string adapterName)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
             return this.NotFound();
         }
         this._logger.LogInformation("Beginning discovery for {adapter}...", adapter.DeviceName);
-        if (await feature.DiscoverAsync(cancellationToken: cancellationToken) is not { Length: > 0 } devices)
+        if (await feature.DiscoverAsync(cancellationToken: this.CancellationToken) is not { Length: > 0 } devices)
         {
             return Array.Empty<DiscoveredDevice>();
         }
         if (feature.EnableDynamicDeviceBuilder)
         {
-            Parallel.ForEach(devices, new() { CancellationToken = cancellationToken }, device => this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, device.DeviceBuilder!));
+            Parallel.ForEach(devices, new() { CancellationToken = this.CancellationToken }, device => this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, device.DeviceBuilder!));
         }
         return devices;
     }
 
     [HttpGet("{adapterName}/registered")]
-    public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync(string adapterName, CancellationToken cancellationToken)
+    public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync(string adapterName)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
             return this.NotFound();
         }
@@ -43,9 +42,9 @@ internal partial class DeviceController
     }
 
     [HttpPost("{adapterName}/register")]
-    public async Task<ActionResult> RegisterAsync(string adapterName, [FromBody] CredentialsPayload payload, CancellationToken cancellationToken)
+    public async Task<ActionResult> RegisterAsync(string adapterName, [FromBody] CredentialsPayload payload)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
             return this.NotFound();
         }

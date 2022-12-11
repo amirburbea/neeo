@@ -228,7 +228,17 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic);
 
-    IDeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DirectoryBrowser populator, DirectoryActionHandler actionHandler, string? identifier = default);
+    /// <summary>
+    /// Adds a directory to the device.
+    /// </summary>
+    /// <param name="name">The name of the directory to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="role"></param>
+    /// <param name="populator">A callback to asynchronously populate the directory.</param>
+    /// <param name="actionHandler"></param>
+    /// <param name="identifier"></param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DirectoryPopulator populator, DirectoryActionHandler actionHandler, string? identifier = default);
 
     /// <summary>
     /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
@@ -288,7 +298,15 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
-    IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool? isLabelVisible = default);
+    /// <summary>
+    /// Adds a text label to the device.
+    /// </summary>
+    /// <param name="name">The name of the switch to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback to get the contents of the text label.</param>
+    /// <param name="isLabelVisible">A value (defaulted to <see langword="true"/>) indicating whether or not to display the text label.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool isLabelVisible = true);
 
     /// <summary>
     /// Builds a device adapter based on this instance.
@@ -484,7 +502,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     public DeviceInitializer? Initializer { get; private set; }
 
-    public string Manufacturer { get; private set; } = "NEEO";
+    public string Manufacturer { get; private set; } = nameof(Neeo);
 
     public string Name { get; }
 
@@ -532,7 +550,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         string name,
         string? label,
         DirectoryRole? role,
-        DirectoryBrowser populator,
+        DirectoryPopulator populator,
         DirectoryActionHandler actionHandler,
         string? identifier
     ) => this.AddDirectory(name, label, role, populator, actionHandler, identifier);
@@ -598,7 +616,8 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
        string name,
        string? label,
        DeviceValueGetter<string> getter,
-       bool? isLabelVisible) => this.AddTextLabel(name, label, getter, isLabelVisible);
+       bool isLabelVisible
+    ) => this.AddTextLabel(name, label, getter, isLabelVisible);
 
     IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
 
@@ -713,7 +732,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? identifier = default)
+    private DeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DirectoryPopulator populator, DirectoryActionHandler actionHandler, string? identifier = default)
     {
         if (role.HasValue && Interlocked.Exchange(ref this._roles, this._roles | (int)role.Value) == this._roles)
         {
@@ -723,7 +742,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
            Validator.ValidateText(name),
            Validator.ValidateText(label, allowNull: true),
            role,
-           new(browser, actionHandler, identifier)
+           new(populator, actionHandler, identifier)
         );
         if (!this._directories.TryAdd(name, parameters))
         {
@@ -869,7 +888,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool? isLabelVisible)
+    private DeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool isLabelVisible)
     {
         TextLabelParameters parameters = new(
             Validator.ValidateText(name),
@@ -917,7 +936,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
             AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.Binary)), valueFeature);
             AddComponentAndRouteHandler(BuildSwitch(pathPrefix, name, label), valueFeature);
         }
-        foreach ((string name, string? label, ValueFeature valueFeature, bool? isLabelVisible) in this._textLabels.Values)
+        foreach ((string name, string? label, ValueFeature valueFeature, bool isLabelVisible) in this._textLabels.Values)
         {
             AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.String)), valueFeature);
             AddComponentAndRouteHandler(BuildTextLabel(pathPrefix, name, label, isLabelVisible), valueFeature);
@@ -1033,7 +1052,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
             return component with { Name = Constants.PowerSensorName, Path = pathPrefix + Constants.PowerSensorName };
         }
 
-        static TextLabelComponent BuildTextLabel(string pathPrefix, string labelName, string? label, bool? isLabelVisible)
+        static TextLabelComponent BuildTextLabel(string pathPrefix, string labelName, string? label, bool isLabelVisible)
         {
             string name = Uri.EscapeDataString(labelName);
             return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, isLabelVisible, GetSensorName(name));
@@ -1198,5 +1217,5 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     private sealed record SwitchParameters(string Name, string? Label, ValueFeature Feature) : ParametersBase(Name, Label);
 
-    private sealed record TextLabelParameters(string Name, string? Label, ValueFeature Feature, bool? IsLabelVisible) : ParametersBase(Name, Label);
+    private sealed record TextLabelParameters(string Name, string? Label, ValueFeature Feature, bool IsLabelVisible) : ParametersBase(Name, Label);
 }

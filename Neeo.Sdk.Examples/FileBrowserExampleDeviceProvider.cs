@@ -50,7 +50,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                     builder
                         .AddHeader(title)
                         .AddTileRow(new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy"), new("https://neeo-sdk.neeo.io/kitten.jpg", "kitten"))
-                        .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
+                        .AddInfoItem("Click me!", "These pics are cute, right?", "INFO-OK")
                         .AddButtonRow(new("Reload", "RELOAD", inverse: false, uiAction: ListUIAction.Reload), new("BACK", "BACKONE", inverse: true, uiAction: ListUIAction.GoBack), new("ROOT", "BACKTOROOT", inverse: true, uiAction: ListUIAction.GoToRoot));
                 }
                 foreach (ListEntry entry in array[offset..Math.Min(offset + limit, array.Length)])
@@ -61,7 +61,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             }
             catch (Exception e)
             {
-                builder.AddInfoItem(new("Error Occurred", e.Message, "Close", "I Don't Care"));
+                builder.AddInfoItem("Error Occurred", e.Message);
             }
         }
         return Task.CompletedTask;
@@ -78,7 +78,6 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                 label: fullPath.Replace('\\', '/'),
                 browseIdentifier: isDirectory ? fullPath : null,
                 actionIdentifier: isDirectory ? null : fullPath,
-                isQueueable: isDirectory ? null : true,
                 thumbnailUri: isDirectory ? "https://neeo-sdk.neeo.io/folder.jpg" : "https://neeo-sdk.neeo.io/file.jpg"
             );
         }

@@ -11,8 +11,11 @@ public sealed class ListTile : ClickableListItemBase
     /// <param name="thumbnailUri">The URI of the thumbnail to associate with the tile.</param>
     /// <param name="actionIdentifier">The (optional) action identifier.</param>
     /// <param name="uiAction">The (optional) action list UI action.</param>
-    public ListTile(string thumbnailUri, string? actionIdentifier = default, ListUIAction? uiAction = default)
-        : base(actionIdentifier, uiAction)
+    public ListTile(
+        string thumbnailUri, 
+        string? actionIdentifier = default, 
+        ListUIAction? uiAction = default
+    ) : base(actionIdentifier, uiAction)
     {
         this.ThumbnailUri = thumbnailUri;
     }

@@ -11,8 +11,8 @@ public sealed class KodiRemoteDeviceProvider : KodiDeviceProviderBase
     }
 
     protected override IDeviceBuilder CreateDevice() => base.CreateDevice()
-        .AddTextLabel("TITLE", "Now Playing Title", this.GetTitleAsync, isLabelVisible: true)
-        .AddTextLabel("DESCRIPTION", "Now Playing Description", this.GetDescriptionAsync, isLabelVisible: true)
+        .AddTextLabel("TITLE", "Now Playing Title", this.GetTitleAsync)
+        .AddTextLabel("DESCRIPTION", "Now Playing Description", this.GetDescriptionAsync)
         .AddImageUrl("COVER_ART", "Cover Art", ImageSize.Large, this.GetCoverArtAsync)
         .AddSensor("PLAYING_SENSOR", default, this.GetIsPlayingAsync)
         .AddButtonGroup(ButtonGroups.Power | ButtonGroups.ChannelZapper | ButtonGroups.Transport | ButtonGroups.Volume | ButtonGroups.NumberPad | ButtonGroups.ControlPad | ButtonGroups.MenuAndBack)

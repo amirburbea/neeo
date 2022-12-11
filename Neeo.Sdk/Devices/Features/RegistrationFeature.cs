@@ -62,7 +62,7 @@ internal sealed class RegistrationFeature : IRegistrationFeature
         using ArmoredInputStream armoredInputStream = new(inputStream);
         PgpObjectFactory inputFactory = new(armoredInputStream);
         PgpObject next = inputFactory.NextPgpObject() as PgpEncryptedDataList ?? inputFactory.NextPgpObject(); // There could be a wrapper.
-        if (next is PgpEncryptedDataList { Count: not 0 } list && list[0] is PgpPublicKeyEncryptedData data)
+        if (next is PgpEncryptedDataList and [PgpPublicKeyEncryptedData data,..])
         {
             using Stream privateStream = data.GetDataStream(privateKey);
             PgpObjectFactory privateFactory = new(privateStream);

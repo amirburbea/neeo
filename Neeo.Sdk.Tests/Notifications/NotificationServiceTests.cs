@@ -33,8 +33,8 @@ public sealed class NotificationServiceTests : IDisposable
         Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         TaskCompletionSource tcs = new();
         mockClient
-            .Setup(client => client.PostAsync(UrlPaths.Notifications, Capture.In(this._messages), It.IsAny<Func<SuccessResponse, It.IsAnyType>>(), It.IsAny<CancellationToken>()))
-            .ReturnsTransformOf(new SuccessResponse(true))
+            .Setup(client => client.PostAsync(UrlPaths.Notifications, Capture.In(this._messages), It.IsAny<Func<SuccessResponse, bool>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true)
             .Callback(tcs.SetResult);
         this._postAsyncCompleted = tcs.Task;
         this._notificationService = new(mockClient.Object, this._mockNotificationMapping.Object, NullLogger<NotificationService>.Instance);
@@ -57,9 +57,9 @@ public sealed class NotificationServiceTests : IDisposable
 
     [Fact]
     public Task SendNotificationAsync_should_throw_if_property_is_null() => Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(
-            this.CreateDeviceAdapter(),
-            default
-        ));
+        this.CreateDeviceAdapter(),
+        default
+    ));
 
     [Fact]
     public async Task SendSensorNotificationAsync_should_send_correct_message()
@@ -76,9 +76,9 @@ public sealed class NotificationServiceTests : IDisposable
 
     [Fact]
     public Task SendSensorNotificationAsync_should_throw_if_property_is_null() => Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendSensorNotificationAsync(
-                    this.CreateDeviceAdapter(),
-                    notification: new()
-                ));
+        this.CreateDeviceAdapter(),
+        notification: new()
+    ));
 
     private IDeviceAdapter CreateDeviceAdapter()
     {
@@ -89,7 +89,11 @@ public sealed class NotificationServiceTests : IDisposable
         return mockAdapter.Object;
     }
 
-    private Task<Message> GetMessageAsync() => this._postAsyncCompleted.ContinueWith(_ => this._messages.Single(), TaskContinuationOptions.ExecuteSynchronously);
+    private async Task<Message> GetMessageAsync()
+    {
+        await this._postAsyncCompleted.ConfigureAwait(false);
+        return this._messages.Single();
+    }
 
     private void SetNotificationKeys(ValueTask<string[]> keys) => this._mockNotificationMapping
         .Setup(mapping => mapping.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))

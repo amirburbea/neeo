@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -13,9 +12,9 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapterName}/{componentName}/{deviceId}")]
-    public async Task<ActionResult> GetValueAsync(string adapterName, string componentName, string deviceId, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetValueAsync(string adapterName, string componentName, string deviceId)
     {
-        if (await this.TryResolveAsync(adapterName, componentName, deviceId, cancellationToken) is not ({ } adapter, { } feature))
+        if (await this.TryResolveAsync(adapterName, componentName, deviceId) is not ({ } adapter, { } feature))
         {
             return this.NotFound();
         }
@@ -29,9 +28,9 @@ internal partial class DeviceController
     }
 
     [HttpPost("{adapterName}/{componentName}/{deviceId}")]
-    public async Task<ActionResult> GetValueAsync(string adapterName, string componentName, string deviceId, [FromBody] JsonElement parameters, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetValueAsync(string adapterName, string componentName, string deviceId, [FromBody] JsonElement parameters)
     {
-        if (await this.TryResolveAsync(adapterName, componentName, deviceId, cancellationToken) is not ({ } adapter, { } feature))
+        if (await this.TryResolveAsync(adapterName, componentName, deviceId) is not ({ } adapter, { } feature))
         {
             return this.NotFound();
         }
@@ -45,9 +44,9 @@ internal partial class DeviceController
     }
 
     [HttpPost("{adapterName}/{componentName}/{deviceId}/action")]
-    public async Task<ActionResult<SuccessResponse>> PerformActionAsync(string adapterName, string componentName, string deviceId, [FromBody] DirectoryAction action, CancellationToken cancellationToken)
+    public async Task<ActionResult<SuccessResponse>> PerformActionAsync(string adapterName, string componentName, string deviceId, [FromBody] DirectoryAction action)
     {
-        if (await this.TryResolveAsync(adapterName, componentName, deviceId, cancellationToken) is not ({ } adapter, IDirectoryFeature directoryFeature))
+        if (await this.TryResolveAsync(adapterName, componentName, deviceId) is not ({ } adapter, IDirectoryFeature directoryFeature))
         {
             return this.NotFound();
         }
@@ -56,9 +55,9 @@ internal partial class DeviceController
     }
 
     [HttpGet("{adapterName}/{componentName}/{deviceId}/{value}")]
-    public async Task<ActionResult<SuccessResponse>> SetValueAsync(string adapterName, string componentName, string deviceId, string value, CancellationToken cancellationToken)
+    public async Task<ActionResult<SuccessResponse>> SetValueAsync(string adapterName, string componentName, string deviceId, string value)
     {
-        if (await this.TryResolveAsync(adapterName, componentName, deviceId, cancellationToken) is not ({ } adapter, IValueFeature valueFeature))
+        if (await this.TryResolveAsync(adapterName, componentName, deviceId) is not ({ } adapter, IValueFeature valueFeature))
         {
             return this.NotFound();
         }
@@ -66,9 +65,9 @@ internal partial class DeviceController
         return await valueFeature.SetValueAsync(deviceId, value);
     }
 
-    private async ValueTask<(IDeviceAdapter, IFeature)> TryResolveAsync(string adapterName, string componentName, string deviceId, CancellationToken cancellationToken)
+    private async ValueTask<(IDeviceAdapter, IFeature)> TryResolveAsync(string adapterName, string componentName, string deviceId)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter)
         {
             return default;
         }
@@ -78,7 +77,7 @@ internal partial class DeviceController
             return (adapter, feature);
         }
         // Check for a discovered device with the name `deviceId` and has a component named `componentName`.
-        if (await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, cancellationToken) is { } dynamicAdapter && dynamicAdapter.GetFeature(componentName) is { } dynamicFeature)
+        if (await this._dynamicDevices.GetDiscoveredDeviceAsync(adapter, deviceId, this.CancellationToken) is { } dynamicAdapter && dynamicAdapter.GetFeature(componentName) is { } dynamicFeature)
         {
             return (dynamicAdapter, dynamicFeature);
         }

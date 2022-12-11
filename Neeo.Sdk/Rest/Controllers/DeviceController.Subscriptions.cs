@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -11,33 +10,31 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapterName}/subscribe/{deviceId}/{_}")]
-    public Task<ActionResult> SubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this.HandleSubscriptionsAsync(
+    public Task<ActionResult> SubscribeAsync(string adapterName, string deviceId) => this.HandleSubscriptionActionAsync(
         adapterName,
         deviceId,
-        static feature => feature.OnDeviceAdded,
-        nameof(this.SubscribeAsync),
-        cancellationToken
+        static (feature, deviceId) => feature.OnDeviceAddedAsync(deviceId),
+        nameof(this.SubscribeAsync)
     );
 
     [HttpGet("{adapterName}/unsubscribe/{deviceId}")]
-    public Task<ActionResult> UnsubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this.HandleSubscriptionsAsync(
+    public Task<ActionResult> UnsubscribeAsync(string adapterName, string deviceId) => this.HandleSubscriptionActionAsync(
         adapterName,
         deviceId,
-        static feature => feature.OnDeviceRemoved,
-        nameof(this.UnsubscribeAsync),
-        cancellationToken
+        static (feature, deviceId) => feature.OnDeviceRemovedAsync(deviceId),
+        nameof(this.UnsubscribeAsync)
     );
 
-    private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, DeviceSubscriptionHandler> handlerProjection, string methodName, CancellationToken cancellationToken)
+    private async Task<ActionResult> HandleSubscriptionActionAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, string, Task> featureProjection, string methodName)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
+        if (await this.GetAdapterAsync(adapterName) is not { } adapter)
         {
             return this.NotFound();
         }
         this._logger.LogInformation("{method} {adapter}:{deviceId}.", methodName, adapter.DeviceName, deviceId);
-        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature && handlerProjection(feature) is { } subscriptionHandler)
+        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
-            await subscriptionHandler(deviceId);
+            await featureProjection(feature, deviceId);
         }
         return this.Ok();
     }

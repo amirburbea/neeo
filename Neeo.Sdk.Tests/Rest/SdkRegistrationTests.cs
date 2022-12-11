@@ -28,10 +28,10 @@ public sealed class SdkRegistrationTests
         List<string> path = new();
         List<string> body = new();
         // Each method sends an anonymous type as the post body so we must set up with It.IsAnyType.
-        // Capture is not compatible with It.IsAnyType so unlike the path we must capture the body within the returns method.
+        // Capture is not compatible with It.IsAnyType so unlike the path we must capture the body within an InvocationAction.
         mockApiClient
-            .Setup(client => client.PostAsync(Capture.In(path), It.IsAny<It.IsAnyType>(), It.IsAny<Func<SuccessResponse, It.IsAnyType>>(), It.IsAny<CancellationToken>()))
-            .ReturnsTransformOf(new SuccessResponse(true))
+            .Setup(client => client.PostAsync(Capture.In(path), It.IsAny<It.IsAnyType>(), It.IsAny<Func<SuccessResponse, bool>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true)
             .Callback(new InvocationAction(invocation => body.Add(JsonSerializer.Serialize(invocation.Arguments[1], JsonSerialization.Options))));
         this._path = new(path.Single);
         this._body = new(body.Single);
@@ -61,7 +61,7 @@ public sealed class SdkRegistrationTests
 
     private class Constants
     {
-        public const string HostAddress = "http://192.168.1.1:123";
+        public const string HostAddress = "http://localhost";
         public const string SdkAdapterName = nameof(SdkRegistrationTests);
     }
 }

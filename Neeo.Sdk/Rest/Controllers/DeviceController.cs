@@ -20,5 +20,7 @@ internal sealed partial class DeviceController : ControllerBase
         (this._database, this._dynamicDevices, this._privateKey, this._logger) = (database, dynamicDevices, pgpKeys.PrivateKey, logger);
     }
 
-    private ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken) => this._database.GetAdapterAsync(adapterName, cancellationToken);
+    private CancellationToken CancellationToken => this.HttpContext.RequestAborted;
+
+    private ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName) => this._database.GetAdapterAsync(adapterName, this.CancellationToken);
 }

@@ -39,7 +39,7 @@ public class SecurityCodeExampleDeviceProvider : IDeviceProvider
         public const string DeviceName = "Security Code Example";
         public const string DiscoveryDescription = "This example device shows the use of security code registration and discovery.";
         public const string DiscoveryHeaderText = "NEEO SDK Example Registration via Security Code";
-        public const string RegistrationDescription = "What is the answer to the Ultimate Question of Life, The Universe, and Everything?";
+        public const string RegistrationDescription = "What is the answer to the Ultimate Question of Life, The Universe, and Everything? (Enter 42 to continue)";
         public const string RegistrationHeaderText = "Enter Security Code";
         public const string TextLabelName = "text-label";
         public const string TheAnswer = "42";

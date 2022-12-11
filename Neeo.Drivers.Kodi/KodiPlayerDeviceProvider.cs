@@ -42,21 +42,15 @@ public sealed class KodiPlayerDeviceProvider : KodiDeviceProviderBase, IPlayerWi
 
     Task IPlayerWidgetController.PopulateRootDirectoryAsync(string deviceId, ListBuilder builder) => this.PopulateRootDirectoryAsync(deviceId, builder);
 
-    public async Task SetIsMutedAsync(string deviceId, bool isMuted)
-    {
-        if (this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) && isMuted != client.IsMuted)
-        {
-            await client.SendInputCommandAsync(InputCommand.MuteToggle).ConfigureAwait(false);
-        }
-    }
+    public Task SetIsMutedAsync(string deviceId, bool isMuted) => this.PerformClientActionAsync(
+        deviceId,
+        client => client.SetMuteAsync(isMuted)
+    );
 
-    public async Task SetIsPlayingAsync(string deviceId, bool value)
-    {
-        if (this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client))
-        {
-            await client.SendInputCommandAsync(value ? InputCommand.Play : InputCommand.Pause).ConfigureAwait(false);
-        }
-    }
+    public Task SetIsPlayingAsync(string deviceId, bool value) => this.PerformClientActionAsync(
+        deviceId,
+        client => client.SendInputCommandAsync(value ? InputCommand.Play : InputCommand.Pause)
+    );
 
     Task IPlayerWidgetController.SetRepeatAsync(string deviceId, bool repeat) => Task.CompletedTask;
 

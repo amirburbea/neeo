@@ -11,17 +11,17 @@ using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Server;
 
-public sealed class Worker : IHostedService
+public sealed class SdkService : IHostedService
 {
     private readonly IConfiguration _configuration;
-    private readonly ILogger<Worker> _logger;
+    private readonly ILogger<SdkService> _logger;
     private readonly IDeviceProvider[] _providers;
     private ISdkEnvironment? _environment;
 
-    public Worker(
+    public SdkService(
         IEnumerable<IDeviceProvider> providers,
         IConfiguration configuration,
-        ILogger<Worker> logger
+        ILogger<SdkService> logger
     ) => (this._configuration, this._logger, this._providers) = (configuration, logger, providers as IDeviceProvider[] ?? providers.ToArray());
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -42,11 +42,16 @@ public sealed class Worker : IHostedService
         }
         this._logger.LogInformation("Using brain at {endpoint}...", brain.ServiceEndPoint);
         this._environment = await brain.StartServerAsync(this._providers, name: this._configuration.GetValue<string>("ServerName"), cancellationToken: cancellationToken).ConfigureAwait(false);
-        this._logger.LogInformation("Started server at host address {address}...", this._environment.HostAddress);
+        this._logger.LogInformation("Started server at address {address}...", this._environment.HostAddress);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await (this._environment?.StopAsync(cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
+        if (this._environment is not { } environment)
+        {
+            return;
+        }
+        this._logger.LogInformation("Stopping server at address {address}...", environment.HostAddress);
+        await environment.StopAsync(cancellationToken).ConfigureAwait(false);
     }
 }

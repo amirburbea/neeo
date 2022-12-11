@@ -16,14 +16,14 @@ namespace Neeo.Sdk.Tests.Utilities;
 
 public sealed class ApiClientTests : IDisposable
 {
-    private readonly ApiClient _client;
+    private readonly ApiClient _apiClient;
     private readonly Mock<HttpMessageHandler> _mockMessageHandler = new(MockBehavior.Strict);
 
     public ApiClientTests()
     {
         Mock<IBrain> mockBrain = new(MockBehavior.Strict);
         mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
-        this._client = new(mockBrain.Object, this._mockMessageHandler.Object, NullLogger<ApiClient>.Instance);
+        this._apiClient = new(mockBrain.Object, this._mockMessageHandler.Object, NullLogger<ApiClient>.Instance);
         // Required in strict mocks.
         this._mockMessageHandler
             .Protected()
@@ -38,7 +38,7 @@ public sealed class ApiClientTests : IDisposable
         Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken);
     }
 
-    public void Dispose() => this._client.Dispose();
+    public void Dispose() => this._apiClient.Dispose();
 
     [Theory]
     [InlineData("abcde")]
@@ -48,18 +48,18 @@ public sealed class ApiClientTests : IDisposable
     {
         this.SetupJsonResponse(data);
 
-        Assert.Equal(data.Length, await this._client.GetAsync("/", static (string text) => text.Length));
+        Assert.Equal(data.Length, await this._apiClient.GetAsync("/", static (string text) => text.Length));
     }
 
     [Fact]
     public async Task GetAsync_should_use_HTTP_GET()
     {
-        var lazy = this.SetupJsonResponse(new object());
+        Lazy<(HttpRequestMessage, string?)> lazy = this.SetupJsonResponse(new object());
 
-        await this._client.GetAsync("/", IdentityFunction.For<object>());
+        await this._apiClient.GetAsync("/", Identity<object>.Projection);
 
         var (request, requestBody) = lazy.Value;
-        Assert.Equal("GET", request.Method.Method);
+        Assert.Equal(HttpMethod.Get, request.Method);
         Assert.Null(requestBody);
     }
 
@@ -69,21 +69,21 @@ public sealed class ApiClientTests : IDisposable
     [InlineData("1234")]
     public async Task PostAsync_should_transform_response_body(string data)
     {
-        this.SetupJsonResponse(data);
+        _ = this.SetupJsonResponse(data);
 
-        Assert.Equal(data.Length, await this._client.PostAsync("/", body: new object(), static (string text) => text.Length));
+        Assert.Equal(data.Length, await this._apiClient.PostAsync("/", body: new object(), static (string text) => text.Length));
     }
 
     [Fact]
     public void PostAsync_should_use_HTTP_POST_and_serialize_body()
     {
-        var body = new { A = "123" };
-        var lazy = this.SetupJsonResponse(new object());
+        Lazy<(HttpRequestMessage, string?)> lazy = this.SetupJsonResponse(new object());
 
-        _ = this._client.PostAsync("/", body, IdentityFunction.For<object>());
+        var body = new { A = "123" };
+        _ = this._apiClient.PostAsync("/", body, Identity<object>.Projection);
 
         var (request, requestBody) = lazy.Value;
-        Assert.Equal("POST", request.Method.Method);
+        Assert.Equal(HttpMethod.Post, request.Method);
         Assert.NotNull(requestBody);
         Assert.Equal(JsonSerializer.Serialize(body, JsonSerialization.Options), requestBody);
     }
@@ -94,9 +94,9 @@ public sealed class ApiClientTests : IDisposable
     [InlineData("/foo/bar")]
     public void Requests_should_concatenate_paths_correctly(string path)
     {
-        var lazy = this.SetupJsonResponse(new object());
+        Lazy<(HttpRequestMessage, string?)> lazy = this.SetupJsonResponse(new object());
 
-        _ = this._client.GetAsync(path, IdentityFunction.For<object>());
+        _ = this._apiClient.GetAsync(path, Identity<object>.Projection);
 
         var (request, _) = lazy.Value;
         Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri!.ToString());
@@ -104,7 +104,7 @@ public sealed class ApiClientTests : IDisposable
 
     [Fact]
     public Task Requests_should_throw_on_path_without_preceding_slash() => Assert.ThrowsAsync<ArgumentException>(
-        () => this._client.GetAsync("path_without_preceding_slash", IdentityFunction.For<object>())
+        () => this._apiClient.GetAsync("path_without_preceding_slash", Identity<object>.Projection)
     );
 
     private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)
@@ -127,18 +127,5 @@ public sealed class ApiClientTests : IDisposable
                 };
             });
         return new(() => (captured.Single(), requestBody));
-    }
-
-    internal static class IdentityFunction
-    {
-        /// <summary>
-        /// Gets an identity function for items of type <typeparamref name="TItem"/>.
-        /// </summary>
-        public static Func<TItem, TItem> For<TItem>() => Identity<TItem>.Function;
-
-        private static class Identity<TItem>
-        {
-            public static readonly Func<TItem, TItem> Function = item => item;
-        }
     }
 }

@@ -23,14 +23,14 @@ internal sealed class SubscriptionsNotifier : IHostedService
         (this._database, this._client, this._logger, this._sdkAdapterName) = (database, client, logger, environment.SdkAdapterName);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken = default)
     {
         return Parallel.ForEachAsync(this._database.Adapters, cancellationToken, NotifySubscriptionsAsync);
 
         async ValueTask NotifySubscriptionsAsync(IDeviceAdapter adapter, CancellationToken cancellationToken)
         {
             if (adapter.GetFeature(ComponentType.Subscription) is not ISubscriptionFeature feature)
-            { 
+            {
                 return;
             }
             this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
