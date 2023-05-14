@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
+using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Devices.Setup;
 

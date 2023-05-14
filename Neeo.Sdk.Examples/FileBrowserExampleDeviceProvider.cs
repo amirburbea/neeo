@@ -50,10 +50,10 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                     builder
                         .AddHeader(title)
                         .AddTileRow(new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy"), new("https://neeo-sdk.neeo.io/kitten.jpg", "kitten"))
-                        .AddInfoItem("Click me!", "These pics are cute, right?", "INFO-OK")
+                        .AddInfoItem(new("Click me!", "These pics are cute, right?", "INFO-OK", affirmativeButtonText: "Absolutely!", negativeButtonText: "I disagree!"))
                         .AddButtonRow(new("Reload", "RELOAD", inverse: false, uiAction: ListUIAction.Reload), new("BACK", "BACKONE", inverse: true, uiAction: ListUIAction.GoBack), new("ROOT", "BACKTOROOT", inverse: true, uiAction: ListUIAction.GoToRoot));
                 }
-                foreach (ListEntry entry in array[offset..Math.Min(offset + limit, array.Length)])
+                foreach (ListEntry entry in array.AsSpan(offset, Math.Min(offset + limit, array.Length)))
                 {
                     builder.AddEntry(entry);
                 }
@@ -61,7 +61,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             }
             catch (Exception e)
             {
-                builder.AddInfoItem("Error Occurred", e.Message);
+                builder.AddInfoItem(new("Error Occurred", e.Message));
             }
         }
         return Task.CompletedTask;

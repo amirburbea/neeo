@@ -19,7 +19,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Drivers", "Drivers", "{BF10
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk.Tests", "Neeo.Sdk.Tests\Neeo.Sdk.Tests.csproj", "{CCF5E399-C17D-4276-8A8F-A8DF304466A3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neeo.Sdk.Server", "Neeo.Sdk.Server\Neeo.Sdk.Server.csproj", "{6E66A1E2-D66F-4E65-96A7-98F7A98F521A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk.Server", "Neeo.Sdk.Server\Neeo.Sdk.Server.csproj", "{6E66A1E2-D66F-4E65-96A7-98F7A98F521A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{51A97C8E-B87E-457D-847B-729487D88527}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices.Components;
 
 /// <summary>
 /// An enumeration of NEEO component types.

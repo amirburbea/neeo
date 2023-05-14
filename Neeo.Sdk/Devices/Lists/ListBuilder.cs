@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
 namespace Neeo.Sdk.Devices.Lists;
@@ -16,8 +17,8 @@ public sealed class ListBuilder
     internal ListBuilder(BrowseParameters parameters)
     {
         (this.BrowseIdentifier, int limit, int? offset) = this.Parameters = parameters;
+        this._limit = limit is > 0 and < Constants.MaxItems ? limit : Constants.MaxItems;
         this.Offset = offset is int index and > 0 ? index : 0;
-        this._limit = limit is > 0 and <= Constants.MaxItems ? limit : Constants.MaxItems;
         this.Items = this._items.AsReadOnly();
         this.BuildMetadata();
     }
@@ -67,13 +68,26 @@ public sealed class ListBuilder
     /// <returns><see cref="ListBuilder"/> for chaining.</returns>
     public ListBuilder AddButtonRow(params ListButton[] buttons) => this.AddItem(new ListButtonRow(buttons));
 
-    public ListBuilder AddEntry(ListEntry entry) => this.AddItem(entry ?? throw new ArgumentNullException(nameof(entry)));
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="entry"></param>
+    /// <returns><see cref="ListBuilder"/> for chaining.</returns>
+    public ListBuilder AddEntry(ListEntry entry) => this.AddItem(entry);
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="title"></param>
+    /// <returns><see cref="ListBuilder"/> for chaining.</returns>
     public ListBuilder AddHeader(string title) => this.AddItem(new ListHeader(title));
 
-    public ListBuilder AddInfoItem(string title, string text, string? actionIdentifier = default) => this.AddInfoItem(new(title, text, actionIdentifier));
-
-    public ListBuilder AddInfoItem(ListInfoItem item) => this.AddItem(item ?? throw new ArgumentNullException(nameof(item)));
+    /// <summary>
+    /// Adds an info item to the list which when clicked displays a dialog.
+    /// </summary>
+    /// <param name="item">The item to add.</param>
+    /// <returns><see cref="ListBuilder"/> for chaining.</returns>
+    public ListBuilder AddInfoItem(ListInfoItem item) => this.AddItem(item);
 
     /// <summary>
     /// Adds a row of image tiles to the list.
@@ -106,8 +120,9 @@ public sealed class ListBuilder
         return this;
     }
 
-    private ListBuilder AddItem(object item)
+    private ListBuilder AddItem(object item, [CallerArgumentExpression(nameof(item))] string argumentName = "")
     {
+        ArgumentNullException.ThrowIfNull(item, argumentName);
         this._items.Add(item);
         this.BuildMetadata();
         return this;

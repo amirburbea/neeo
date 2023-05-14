@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
+using System.Text.Json.Serialization;
 
 namespace Neeo.Sdk.Utilities.TokenSearch;
 
@@ -14,15 +14,28 @@ namespace Neeo.Sdk.Utilities.TokenSearch;
 internal sealed class TokenSearch<T>
     where T : notnull, IComparable<T>
 {
-    public static readonly Func<T, string, object?> GetItemValue = TokenSearch<T>.CreateGetItemValue();
-
     private readonly T[] _items;
-    private readonly string[] _searchProperties;
+    private readonly Func<T, object?[]> _itemValues;
+    private readonly double _threshold;
 
-    public TokenSearch(T[] items, params string[] searchProperties)
+    public TokenSearch(T[] items, double threshold = 0.7, params Expression<Func<T, object>>[] projections)
     {
         this._items = items;
-        this._searchProperties = searchProperties;
+        this._threshold = threshold;
+        if (projections is not { Length: > 0 })
+        {
+            throw new ArgumentNullException(nameof(projections));
+        }
+        ParameterExpression item = Expression.Parameter(typeof(T), nameof(item));
+        Visitor visitor = new(item);
+        Expression<Func<T, object?[]>> lambdaExpression = Expression.Lambda<Func<T, object?[]>>(
+            Expression.NewArrayInit(
+                typeof(object),
+                projections.Select(projection => visitor.Visit(projection.Body))
+            ),
+            item
+        );
+        this._itemValues = lambdaExpression.Compile();
     }
 
     public IEnumerable<SearchEntry<T>> Search(string query)
@@ -32,90 +45,61 @@ internal sealed class TokenSearch<T>
             .Distinct()
             .Take(5)
             .ToArray();
-        List<SearchEntry<T>> list = new();
         int maxScore = 0;
+        Dictionary<T, int> scores = new();
         foreach (T item in this._items)
         {
-            IEnumerable<string> dataTokens = this._searchProperties == null
-                  ? new[] { item.ToString() ?? string.Empty }
-                  : this._searchProperties.Select(property => TokenSearch<T>.GetItemValue(item, property)?.ToString() ?? string.Empty);
-            int score = dataTokens.Sum(dataToken => searchTokens.Sum(searchToken => TokenSearch<T>.Score(dataToken, searchToken)));
-            if (score <= 0)
+            int score = this._itemValues(item)
+                .Select(value => value?.ToString())
+                .OfType<string>()
+                .Where(text => text.Length > 0)
+                .Sum(text => searchTokens.Sum(searchToken => Score(text, searchToken)));
+            if (score == 0)
             {
                 continue;
             }
             maxScore = Math.Max(score, maxScore);
-            list.Add(new(item) { Score = score });
+            scores[item] = score;
         }
-        return TokenSearch<T>.Normalize(list, maxScore, this._searchProperties).OrderBy(x => x, SearchEntryComparer<T>.Default);
-    }
+        return CreateEntries()
+            .OrderBy(entry => entry.Score)
+            .ThenBy(entry => entry.Item);
 
-    /// <summary>
-    /// Create a function such that when given an item and property name
-    /// returns the value of the property.
-    /// </summary>
-    /// <returns>The created function.</returns>
-    private static Func<T, string, object?> CreateGetItemValue()
-    {
-        ParameterExpression itemParameter = Expression.Parameter(typeof(T));
-        ParameterExpression nameParameter = Expression.Parameter(typeof(string));
-        return Expression.Lambda<Func<T, string, object?>>(
-            Expression.Switch(
-                nameParameter,
-                Expression.Default(typeof(object)),
-                Array.ConvertAll(
-                    typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy),
-                    property => Expression.SwitchCase(
-                        Expression.Convert(
-                            Expression.Property(
-                                itemParameter,
-                                property
-                            ),
-                            typeof(object)
-                        ),
-                        Expression.Constant(property.Name)
-                    )
-                )
-            ),
-            itemParameter,
-            nameParameter
-        ).Compile();
-    }
-
-    private static IEnumerable<SearchEntry<T>> Normalize(IEnumerable<SearchEntry<T>> entries, int maxScore, string[] searchProperties)
-    {
-        double normalizedScore = 1d / maxScore;
-        HashSet<string> hashSet = new(StringComparer.OrdinalIgnoreCase);
-        foreach (SearchEntry<T> entry in entries)
+        IEnumerable<SearchEntry<T>> CreateEntries()
         {
-            entry.Score = 1d - entry.Score * normalizedScore;
-            entry.MaxScore = maxScore;
-            if (entry.Score <= 0.5 & hashSet.Add(string.Join(' ', searchProperties.Select(property => TokenSearch<T>.GetItemValue(entry.Item, property)))))
+            double normalizedScore = 1d / maxScore;
+            HashSet<string> hashSet = new(StringComparer.OrdinalIgnoreCase);
+            foreach ((T item, int score) in scores)
             {
-                yield return entry;
+                double itemScore = 1d - score * normalizedScore;
+                if (itemScore <= this._threshold & hashSet.Add(string.Join('|', this._itemValues(item))))
+                {
+                    yield return new(item, itemScore, maxScore);
+                }
             }
         }
+
+        static int Score(string text, string searchToken) => text.IndexOf(searchToken, StringComparison.OrdinalIgnoreCase) switch
+        {
+            // Token not found.
+            -1 => 0,
+            // Token is at beginning but not an exact match.
+            0 when searchToken.Length != text.Length => 2,
+            // Token is an exact match.
+            0 => 6,
+            // Token is not at the beginning.
+            _ => 1,
+        };
     }
 
-    private static int Score(string text, string searchToken)
+    private sealed class Visitor : ExpressionVisitor
     {
-        int index = text.IndexOf(searchToken, StringComparison.OrdinalIgnoreCase);
-        if (index == -1)
-        {
-            return 0;
-        }
-        if (searchToken.Length < 2)
-        {
-            return 1;
-        }
-        if (text == searchToken)
-        {
-            return 6;
-        }
-        if (index == 0)
-        {
-            return 2;
-        }
-        return 1;
+        private readonly ParameterExpression _parameter;
+
+        public Visitor(ParameterExpression parameter) => this._parameter = parameter;
+
+        protected override Expression VisitParameter(ParameterExpression _) => this._parameter;
     }
 }
+
+public record struct SearchEntry<T>(T Item, double Score, int MaxScore);

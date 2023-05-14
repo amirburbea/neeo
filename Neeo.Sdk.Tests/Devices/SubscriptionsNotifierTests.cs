@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
+using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Utilities;
 using Xunit;

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Notifications;
+using Neeo.Sdk.Utilities;
 using Neeo.Sdk.Utilities.TokenSearch;
 
 namespace Neeo.Sdk.Devices;
@@ -58,31 +59,32 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     private readonly DeviceAdapterModel[] _devices;
     private readonly INotificationService _notificationService;
 
-    public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> devices, INotificationService notificationService, ILogger<DeviceDatabase> logger)
+    public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> devices, IDeviceFactory deviceFactory, INotificationService notificationService, ILogger<DeviceDatabase> logger)
     {
         this._notificationService = notificationService;
         this._devices = new DeviceAdapterModel[devices.Count];
         this._containers = new(this._devices.Length);
-        foreach (IDeviceBuilder device in devices)
+        foreach (IDeviceBuilder builder in devices)
         {
-            IDeviceAdapter adapter = device.BuildAdapter();
+            IDeviceAdapter adapter = deviceFactory.BuildDevice(builder);
             int id = this._containers.Count;
             this._devices[id] = new(id, adapter);
             if (!this._containers.TryAdd(adapter.AdapterName, new(adapter, logger)))
             {
                 throw new ArgumentException($"Adapter names must be unique. Adapter name {adapter.AdapterName} is reused at index {id}");
             }
-            if (device.NotifierCallback is { } callback)
+            if (builder.NotifierCallback is { } callback)
             {
-                callback(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor));
+                callback(new DeviceNotifier(adapter, this._notificationService, builder.HasPowerStateSensor));
             }
         }
         this._deviceIndex = new(
             this._devices,
-            nameof(DeviceAdapterModel.Manufacturer),
-            nameof(DeviceAdapterModel.Name),
-            nameof(DeviceAdapterModel.Tokens),
-            nameof(DeviceAdapterModel.Type)
+            0.5,
+            model => model.Manufacturer,
+            model => model.Name,
+            model => model.Tokens,
+            model => TextAttribute.GetText(model.Type)
         );
     }
 

@@ -16,7 +16,9 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     {
         this.Id = id;
         this.Info = new(this._adapter = adapter);
-        this.Tokens = string.Join(' ', adapter.Tokens);
+        this.Tokens = adapter.Tokens.Count != 0 
+            ? string.Join(' ', adapter.Tokens) 
+            : string.Empty;
     }
 
     /// <summary>
@@ -29,7 +31,6 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     /// </summary>
     [JsonPropertyName("capabilities")]
     public IReadOnlyCollection<IComponent> Components => this._adapter.Components;
-
 
     /// <summary>
     /// Gets the collection of unique capabilities of the device.

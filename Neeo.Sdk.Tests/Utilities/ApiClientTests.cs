@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -17,13 +16,14 @@ namespace Neeo.Sdk.Tests.Utilities;
 public sealed class ApiClientTests : IDisposable
 {
     private readonly ApiClient _apiClient;
+    private readonly HttpClient _httpClient;
     private readonly Mock<HttpMessageHandler> _mockMessageHandler = new(MockBehavior.Strict);
 
     public ApiClientTests()
     {
         Mock<IBrain> mockBrain = new(MockBehavior.Strict);
         mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
-        this._apiClient = new(mockBrain.Object, this._mockMessageHandler.Object, NullLogger<ApiClient>.Instance);
+        this._apiClient = new(mockBrain.Object, this._httpClient = new(this._mockMessageHandler.Object), NullLogger<ApiClient>.Instance);
         // Required in strict mocks.
         this._mockMessageHandler
             .Protected()
@@ -38,7 +38,7 @@ public sealed class ApiClientTests : IDisposable
         Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken);
     }
 
-    public void Dispose() => this._apiClient.Dispose();
+    public void Dispose() => this._httpClient.Dispose();
 
     [Theory]
     [InlineData("abcde")]
@@ -46,21 +46,21 @@ public sealed class ApiClientTests : IDisposable
     [InlineData("1234")]
     public async Task GetAsync_should_transform_response_body(string data)
     {
-        this.SetupJsonResponse(data);
+        _ = this.SetupJsonResponse(data);
 
-        Assert.Equal(data.Length, await this._apiClient.GetAsync("/", static (string text) => text.Length));
+        Assert.Equal(data.Length, await this._apiClient.GetAsync("/", (string text) => text.Length));
     }
 
     [Fact]
     public async Task GetAsync_should_use_HTTP_GET()
     {
-        Lazy<(HttpRequestMessage, string?)> lazy = this.SetupJsonResponse(new object());
+        Task<RequestData> task = this.SetupJsonResponse(new object());
 
         await this._apiClient.GetAsync("/", Identity<object>.Projection);
 
-        var (request, requestBody) = lazy.Value;
-        Assert.Equal(HttpMethod.Get, request.Method);
-        Assert.Null(requestBody);
+        RequestData data = await task;
+        Assert.Equal(HttpMethod.Get, data.Request.Method);
+        Assert.Null(data.Body);
     }
 
     [Theory]
@@ -75,31 +75,31 @@ public sealed class ApiClientTests : IDisposable
     }
 
     [Fact]
-    public void PostAsync_should_use_HTTP_POST_and_serialize_body()
+    public async Task PostAsync_should_use_HTTP_POST_and_serialize_bodyAsync()
     {
-        Lazy<(HttpRequestMessage, string?)> lazy = this.SetupJsonResponse(new object());
+        Task<RequestData> task = this.SetupJsonResponse(new object());
 
         var body = new { A = "123" };
         _ = this._apiClient.PostAsync("/", body, Identity<object>.Projection);
 
-        var (request, requestBody) = lazy.Value;
-        Assert.Equal(HttpMethod.Post, request.Method);
-        Assert.NotNull(requestBody);
-        Assert.Equal(JsonSerializer.Serialize(body, JsonSerialization.Options), requestBody);
+        RequestData data = await task;
+        Assert.Equal(HttpMethod.Post, data.Request.Method);
+        Assert.NotNull(data.Body);
+        Assert.Equal(JsonSerializer.Serialize(body, JsonSerialization.Options), data.Body);
     }
 
     [Theory]
     [InlineData("/")]
     [InlineData("/foo")]
     [InlineData("/foo/bar")]
-    public void Requests_should_concatenate_paths_correctly(string path)
+    public async void Requests_should_concatenate_paths_correctly(string path)
     {
-        Lazy<(HttpRequestMessage, string?)> lazy = this.SetupJsonResponse(new object());
+        Task<RequestData> task = this.SetupJsonResponse(new object());
 
         _ = this._apiClient.GetAsync(path, Identity<object>.Projection);
 
-        var (request, _) = lazy.Value;
-        Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri!.ToString());
+        RequestData data = await task;
+        Assert.Equal($"http://127.0.0.1:1234{path}", data.Request.RequestUri!.ToString());
     }
 
     [Fact]
@@ -107,25 +107,29 @@ public sealed class ApiClientTests : IDisposable
         () => this._apiClient.GetAsync("path_without_preceding_slash", Identity<object>.Projection)
     );
 
-    private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)
+    private Task<RequestData> SetupJsonResponse<T>(T data)
     {
-        List<HttpRequestMessage> captured = new();
-        string? requestBody = default;
+        TaskCompletionSource<RequestData> source = new();
         this._mockMessageHandler
             .Protected()
             .As<IMessageHandlerMockedMethods>()
-            .Setup(handler => handler.SendAsync(Capture.In(captured), It.IsAny<CancellationToken>()))
-            .Returns(async (HttpRequestMessage request, CancellationToken cancellationToken) =>
-            {
-                if (request.Content is { } content)
-                {
-                    requestBody = await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                }
-                return new()
-                {
-                    Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options))
-                };
-            });
-        return new(() => (captured.Single(), requestBody));
+            .Setup(handler => handler.SendAsync(
+                Capture.With(new CaptureMatch<HttpRequestMessage>(request => source.SetResult(new(request, GetBody(request))))), 
+                It.IsAny<CancellationToken>()
+            ))
+            .ReturnsAsync(value: new() { Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options)) });
+        return source.Task;
     }
+
+    static string? GetBody(HttpRequestMessage request)
+    {
+        if (request.Content is not { } content)
+        {
+            return null;
+        }
+        using StreamReader reader = new(content.ReadAsStream(default));
+        return reader.ReadToEnd();
+    }
+
+    private readonly record struct RequestData(HttpRequestMessage Request,  string? Body);
 }

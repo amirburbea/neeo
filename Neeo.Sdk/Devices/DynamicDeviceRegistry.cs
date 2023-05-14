@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Features;
 
 namespace Neeo.Sdk.Devices;
@@ -36,9 +37,13 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 {
     private readonly ConcurrentDictionary<string, IDeviceAdapter> _discoveredDevices = new();
     private readonly ReaderWriterLockSlim _lock = new();
+    private readonly IDeviceFactory _deviceFactory;
     private readonly ILogger<DynamicDeviceRegistry> _logger;
 
-    public DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) => this._logger = logger;
+    public DynamicDeviceRegistry(IDeviceFactory deviceFactory, ILogger<DynamicDeviceRegistry> logger)
+    {
+        (this._deviceFactory, this._logger) = (deviceFactory, logger);
+    }
 
     public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken = default)
     {
@@ -63,7 +68,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         {
             return default;
         }
-        IDeviceAdapter adapter = builder.BuildAdapter();
+        IDeviceAdapter adapter = this._deviceFactory.BuildDevice(builder);
         this.RegisterDiscoveredDevice(key, adapter);
         return adapter;
     }
@@ -76,7 +81,7 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         }
         this.RegisterDiscoveredDevice(
             DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId),
-            builder.BuildAdapter()
+            this._deviceFactory.BuildDevice(builder)
         );
     }
 

@@ -66,19 +66,20 @@ internal static class IntegrationServer
     private static void ConfigureServices(IServiceCollection services, IBrain brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
         .AddSingleton(brain)
         .AddSingleton(devices)
-        .AddSingleton<IApiClient, ApiClient>()
+        .AddSingleton<IDeviceFactory, DeviceFactory>()
         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
         .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
         .AddSingleton<INotificationMapping, NotificationMapping>()
         .AddSingleton<INotificationService, NotificationService>()
         .AddSingleton<ISdkEnvironment, SdkEnvironment>()
-        .AddSingleton<HttpMessageHandler>(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
         .AddSingleton<PgpPublicKeyResponse>()
         .AddSingleton(PgpKeysGenerator.CreatePgpKeyPair()) // Keys are created at random at the start of the server.
         .AddSingleton((SdkAdapterName)adapterName)
         .AddHostedService<SdkRegistration>()
         .AddHostedService<SubscriptionsNotifier>()
-        .AddHostedService<UriPrefixNotifier>();
+        .AddHostedService<UriPrefixNotifier>()
+        .AddHttpClient<IApiClient, ApiClient>()
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
 
     private static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPAddress hostAddress, int port) => builder
         .ConfigureKestrel(options =>
@@ -90,10 +91,10 @@ internal static class IntegrationServer
         .ConfigureServices(services =>
         {
             services
-               .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
-               .AddJsonOptions(options => IntegrationServer.ConfigureJsonOptions(options.JsonSerializerOptions))
-               .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-               .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AssemblyControllerFeatureProvider()));
+                .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
+                .AddJsonOptions(options => IntegrationServer.ConfigureJsonOptions(options.JsonSerializerOptions))
+                .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+                .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new AssemblyControllerFeatureProvider()));
         })
         .Configure((context, builder) =>
         {

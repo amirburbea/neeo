@@ -45,7 +45,7 @@ public interface IApiClient
         where TData : notnull;
 }
 
-internal sealed class ApiClient : IApiClient, IDisposable
+internal sealed class ApiClient : IApiClient
 {
     private static readonly MediaTypeHeaderValue _jsonContentType = new("application/json");
 
@@ -53,12 +53,10 @@ internal sealed class ApiClient : IApiClient, IDisposable
     private readonly ILogger<ApiClient> _logger;
     private readonly string _uriPrefix;
 
-    public ApiClient(IBrain brain, HttpMessageHandler messageHandler, ILogger<ApiClient> logger)
+    public ApiClient(IBrain brain, HttpClient httpClient, ILogger<ApiClient> logger)
     {
-        (this._uriPrefix, this._httpClient, this._logger) = ($"http://{brain.ServiceEndPoint}", new(messageHandler), logger);
+        (this._uriPrefix, this._httpClient, this._logger) = ($"http://{brain.ServiceEndPoint}", httpClient, logger);
     }
-
-    public void Dispose() => this._httpClient.Dispose();
 
     public Task<TResult> GetAsync<TData, TResult>(string path, Func<TData, TResult> transform, CancellationToken cancellationToken = default)
         where TData : notnull
@@ -75,13 +73,12 @@ internal sealed class ApiClient : IApiClient, IDisposable
         stream.Seek(0L, SeekOrigin.Begin);
         using StreamContent content = new(stream) { Headers = { ContentType = ApiClient._jsonContentType } };
         return await this.FetchAsync(path, HttpMethod.Post, content, transform, cancellationToken).ConfigureAwait(false);
-        
     }
 
     private async Task<TResult> FetchAsync<TData, TResult>(string path, HttpMethod method, HttpContent? content, Func<TData, TResult> transform, CancellationToken cancellationToken)
         where TData : notnull
     {
-        if (!path.StartsWith('/'))
+        if (path is not ['/', ..])
         {
             throw new ArgumentException("Path must start with a forward slash (\"/\").", nameof(path));
         }

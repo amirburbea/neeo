@@ -23,7 +23,6 @@ internal static class Program
         */
         using TVClient client = new("7S9R359I");
         await client.ConnectAsync(IPAddress.Parse("192.168.253.120")).ConfigureAwait(false);
-
         Console.WriteLine($"MUTE:{await client.GetMuteStateAsync()}");
         Console.WriteLine($"LANMAC:'{await client.GetWiredMacAddressAsync()}'");
         Console.WriteLine($"WIFIMAC:'{await client.GetWiFiMacAddressAsync()}'");
@@ -114,7 +113,7 @@ internal static class Program
 
         public ValueTask<bool> LaunchAppAsync(App app) => this.LaunchAppAsync(AppName.Of(app));
 
-        public async ValueTask<bool> LaunchAppAsync(string appName) => "OK" == await SendCommandAsync($"APP_LAUNCH {appName}").ConfigureAwait(false);
+        public async ValueTask<bool> LaunchAppAsync(string appName) => "OK" == await this.SendCommandAsync($"APP_LAUNCH {appName}").ConfigureAwait(false);
 
         public async ValueTask PowerOffAsync() => await this.SendCommandAsync("POWER off").ConfigureAwait(false);
 

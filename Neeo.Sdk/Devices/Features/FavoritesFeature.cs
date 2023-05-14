@@ -28,6 +28,6 @@ internal sealed class FavoritesFeature : IFavoritesFeature
     public async Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite)
     {
         await this._handler(deviceId, favorite).ConfigureAwait(false);
-        return true;
+        return new();
     }
 }

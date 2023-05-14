@@ -144,7 +144,6 @@ public sealed class WebOSClient : IDisposable
         }
         catch (OperationCanceledException)
         {
-            // KodiClient was disposed.
             return;
         }
         catch (WebSocketException)
@@ -157,7 +156,6 @@ public sealed class WebOSClient : IDisposable
             {
                 ArrayPool<byte>.Shared.Return(previous);
             }
-            //this.CancelOutstanding();
         }
 
         void Process(ReadOnlySpan<byte> message)

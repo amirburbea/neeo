@@ -14,6 +14,8 @@ namespace Neeo.Drivers.Hisense;
 
 public sealed class HisenseDeviceProvider : IDeviceProvider
 {
+    private static readonly IComparer<AppInfo> _appComparer = ProjectionComparer.Create((AppInfo app) => app.Name, StringComparer.OrdinalIgnoreCase);
+
     private static readonly Dictionary<Buttons, RemoteKey> _remoteKeys = new()
     {
         [Buttons.Back] = RemoteKey.Back,
@@ -97,16 +99,16 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         }
         list.AddTileRow(new ListTile("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png"));
         AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync().ConfigureAwait(false), static app => !app.IsUninstalled);
-        Array.Sort(apps, (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
-        (_, int limit, int? offset) = list.Parameters;
-        if (offset is > 0 && limit < apps.Length)
+        Array.Sort(apps, HisenseDeviceProvider._appComparer);
+        AddEntries(list, apps);
+
+        static void AddEntries(ListBuilder list, AppInfo[] apps)
         {
-            int start = offset ?? 0;
-            apps = apps[start..(start + limit)];
-        }
-        foreach ((string name, string url, _) in apps)
-        {
-            list.AddEntry(new(name, url, actionIdentifier: name));
+            (_, int limit, int? offset) = list.Parameters;
+            foreach ((string name, string url, _) in offset is int start and > 0 && limit < apps.Length ? apps.AsSpan(start, start + limit) : apps)
+            {
+                list.AddEntry(new(name, url, actionIdentifier: name));
+            }
         }
     }
 
@@ -127,7 +129,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
     {
         this._logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceListAsync), string.Join(',', deviceIds));
         Array.ForEach(deviceIds, deviceId => this._deviceIds.Add(deviceId));
-        if (deviceIds is not [{ } macAddress,..])
+        if (deviceIds is not [{ } macAddress, ..])
         {
             return;
         }

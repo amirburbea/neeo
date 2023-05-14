@@ -9,7 +9,7 @@ internal sealed class PgpPublicKeyResponse
 {
     public PgpPublicKeyResponse(PgpKeyPair pgpKeys)
     {
-        using Stream outputStream = new MemoryStream();
+        using MemoryStream outputStream = new();
         using (ArmoredOutputStream armoredStream = new(outputStream))
         {
             armoredStream.SetHeader(ArmoredOutputStream.HeaderVersion, default);

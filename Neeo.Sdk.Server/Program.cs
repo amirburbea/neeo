@@ -44,7 +44,7 @@ public static class Program
 
     private static void ConfigureServices(IConfiguration configuration, IServiceCollection services)
     {
-        if (configuration.GetSection("Drivers").Get<string[]>() is not { Length: > 1 } driverPaths)
+        if (configuration.GetSection("Drivers").Get<string[]>() is not { Length: > 0 } driverPaths)
         {
             throw new ApplicationException("Invalid configuration, configuration should have an array \"Drivers\" with at least one driver assembly.");
         }
@@ -55,8 +55,7 @@ public static class Program
             {
                 throw new FileNotFoundException(fullPath);
             }
-            LoadContext context = new(fullPath);
-            Assembly assembly = context.LoadFromAssemblyName(AssemblyName.GetAssemblyName(fullPath));
+            Assembly assembly = new LoadContext(fullPath).LoadFromAssemblyName(AssemblyName.GetAssemblyName(fullPath));
             foreach (Type type in assembly.GetExportedTypes())
             {
                 if (!type.IsClass || type.IsAbstract || type.IsGenericTypeDefinition)

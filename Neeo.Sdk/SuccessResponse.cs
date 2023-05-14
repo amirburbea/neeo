@@ -3,12 +3,17 @@
 /// <summary>
 /// A structure indicating success - used as a standard return type for NEEO Brain APIs.
 /// </summary>
-/// <param name="Success">A value indicating if the API call was successful.</param>
-public readonly record struct SuccessResponse(bool Success)
+public readonly struct SuccessResponse
 {
     /// <summary>
-    /// Defines an implicit conversion wrapping a boolean value within a <see cref="SuccessResponse"/>.
+    /// Initializes a new instance of the <see cref="SuccessResponse"/> struct.
     /// </summary>
-    /// <param name="success">A value indicating if the API call was successful.</param>
-    public static implicit operator SuccessResponse(bool success) => new(success);
+    public SuccessResponse()
+    {
+    }
+
+    /// <summary>
+    /// Returns <see langword="true" /> to indicate the operation was successful.
+    /// </summary>
+    public bool Success { get; } = true;
 }

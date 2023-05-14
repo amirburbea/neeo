@@ -12,7 +12,7 @@ using Zeroconf;
 
 namespace Neeo.Drivers.Kodi;
 
-[Service(typeof(KodiClientManager))]
+[Service]
 public sealed class KodiClientManager : IDisposable
 {
     private readonly KodiClientFactory _clientFactory;

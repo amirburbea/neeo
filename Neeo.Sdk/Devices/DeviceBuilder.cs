@@ -309,12 +309,6 @@ public interface IDeviceBuilder
     IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool isLabelVisible = true);
 
     /// <summary>
-    /// Builds a device adapter based on this instance.
-    /// </summary>
-    /// <returns>The created device adapter.</returns>
-    IDeviceAdapter BuildAdapter();
-
-    /// <summary>
     /// Set timing related information (the delays NEEO should use when interacting with a device),
     /// which will be used when generating recipes.
     /// </summary>
@@ -619,8 +613,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
        bool isLabelVisible
     ) => this.AddTextLabel(name, label, getter, isLabelVisible);
 
-    IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
-
     IDeviceBuilder IDeviceBuilder.DefineTiming(
         int? powerOnDelay,
         int? shutdownDelay,
@@ -903,7 +895,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceAdapter BuildAdapter()
+    internal DeviceAdapter BuildAdapter()
     {
         if (this.ButtonHandler == null && this._buttons.Any())
         {

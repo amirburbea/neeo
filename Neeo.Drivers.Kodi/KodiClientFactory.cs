@@ -4,7 +4,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
 
-[Service(typeof(KodiClientFactory))]
+[Service]
 public sealed class KodiClientFactory
 {
     private readonly ILogger<KodiClient> _clientLogger;

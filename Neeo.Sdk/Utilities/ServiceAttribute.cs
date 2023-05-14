@@ -27,7 +27,7 @@ public sealed class ServiceAttribute : Attribute
     /// <param name="lifetime">The service lifetime.</param>
     public ServiceAttribute(Type? serviceType, ServiceLifetime lifetime = ServiceLifetime.Singleton)
     {
-        (ServiceType, Lifetime) = (serviceType, lifetime);
+        (this.ServiceType, this.Lifetime) = (serviceType, lifetime);
     }
 
     /// <summary>
