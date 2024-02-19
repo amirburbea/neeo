@@ -16,8 +16,8 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     {
         this.Id = id;
         this.Info = new(this._adapter = adapter);
-        this.Tokens = adapter.Tokens.Count != 0 
-            ? string.Join(' ', adapter.Tokens) 
+        this.Tokens = adapter.Tokens.Count != 0
+            ? string.Join(' ', adapter.Tokens)
             : string.Empty;
     }
 

@@ -1,9 +1,9 @@
 ﻿namespace Neeo.Drivers.Kodi.Models;
 
 public readonly record struct PlayerState(
-    PlayState PlayState, 
-    string NowPlayingLabel, 
-    string NowPlayingDescription, 
+    PlayState PlayState,
+    string NowPlayingLabel,
+    string NowPlayingDescription,
     string NowPlayingImage
 )
 {

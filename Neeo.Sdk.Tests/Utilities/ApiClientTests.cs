@@ -107,21 +107,7 @@ public sealed class ApiClientTests : IDisposable
         () => this._apiClient.GetAsync("path_without_preceding_slash", Identity<object>.Projection)
     );
 
-    private Task<RequestData> SetupJsonResponse<T>(T data)
-    {
-        TaskCompletionSource<RequestData> source = new();
-        this._mockMessageHandler
-            .Protected()
-            .As<IMessageHandlerMockedMethods>()
-            .Setup(handler => handler.SendAsync(
-                Capture.With(new CaptureMatch<HttpRequestMessage>(request => source.SetResult(new(request, GetBody(request))))), 
-                It.IsAny<CancellationToken>()
-            ))
-            .ReturnsAsync(value: new() { Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options)) });
-        return source.Task;
-    }
-
-    static string? GetBody(HttpRequestMessage request)
+    private static string? GetBody(HttpRequestMessage request)
     {
         if (request.Content is not { } content)
         {
@@ -131,5 +117,19 @@ public sealed class ApiClientTests : IDisposable
         return reader.ReadToEnd();
     }
 
-    private readonly record struct RequestData(HttpRequestMessage Request,  string? Body);
+    private Task<RequestData> SetupJsonResponse<T>(T data)
+    {
+        TaskCompletionSource<RequestData> source = new();
+        this._mockMessageHandler
+            .Protected()
+            .As<IMessageHandlerMockedMethods>()
+            .Setup(handler => handler.SendAsync(
+                Capture.With(new CaptureMatch<HttpRequestMessage>(request => source.SetResult(new(request, GetBody(request))))),
+                It.IsAny<CancellationToken>()
+            ))
+            .ReturnsAsync(value: new() { Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options)) });
+        return source.Task;
+    }
+
+    private readonly record struct RequestData(HttpRequestMessage Request, string? Body);
 }

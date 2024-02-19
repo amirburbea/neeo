@@ -7,7 +7,7 @@ namespace Neeo.Sdk.Devices;
 
 /// <summary>
 /// Callback invoked via a custom REST route to be handled by the device driver.
-/// 
+///
 /// This can be used to allow the driver to host web content (such as dynamically generated images)
 /// without requiring setting up another HTTP endpoint.
 /// </summary>

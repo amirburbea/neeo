@@ -8,6 +8,9 @@ namespace Neeo.Sdk.Utilities;
 
 public static partial class NetworkMethods
 {
+    [GeneratedRegex("^\\? \\((?<ip>(\\d+\\.){3}\\d+)\\).+(?<mac>([a-f\\d]{2}:){5}[a-f\\d]{2})", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture)]
+    private static partial Regex ArpLineRegex();
+
     private static void PopulateNetworkDevicesViaCommandLine(Dictionary<IPAddress, PhysicalAddress> output)
     {
         using Process process = Process.Start(startInfo: new() { FileName = "arp", Arguments = "-an", UseShellExecute = false, RedirectStandardOutput = true })!;
@@ -20,7 +23,4 @@ public static partial class NetworkMethods
         }
         process.WaitForExit();
     }
-
-    [GeneratedRegex("^\\? \\((?<ip>(\\d+\\.){3}\\d+)\\).+(?<mac>([a-f\\d]{2}:){5}[a-f\\d]{2})", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture)]
-    private static partial Regex ArpLineRegex();
 }

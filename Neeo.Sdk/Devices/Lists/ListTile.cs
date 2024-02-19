@@ -15,7 +15,6 @@ public sealed class ListTile(
     ListUIAction? uiAction = default
 ) : ClickableListItemBase(actionIdentifier, uiAction)
 {
-
     /// <summary>
     /// Tells the NEEO Brain that this is a Tile.
     /// </summary>

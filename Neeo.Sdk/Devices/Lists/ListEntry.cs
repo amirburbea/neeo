@@ -21,11 +21,15 @@ public sealed class ListEntry(
     ListUIAction? uiAction = default
     ) : ClickableListItemBase(actionIdentifier, uiAction)
 {
-
     /// <summary>
     /// Gets the (optional) identifier of the directory to be browsed upon clicking this entry, typically used to point to a subdirectory.
     /// </summary>
     public string? BrowseIdentifier { get; } = browseIdentifier;
+
+    /// <summary>
+    /// Gets the (optional) label for the entry to use instead of the title.
+    /// </summary>
+    public string? Label { get; } = label;
 
     /// <summary>
     /// Gets the (optional) URI of a thumbnail to display next to the entry in the list.
@@ -36,9 +40,4 @@ public sealed class ListEntry(
     /// Gets the entry title.
     /// </summary>
     public string Title { get; } = title;
-
-    /// <summary>
-    /// Gets the (optional) label for the entry to use instead of the title.
-    /// </summary>
-    public string? Label { get; } = label;
 }

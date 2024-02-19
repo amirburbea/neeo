@@ -9,7 +9,6 @@ namespace Neeo.Sdk.Utilities;
 /// <param name="data">The data for the event.</param>
 public sealed class DataEventArgs<TData>(TData data) : EventArgs
 {
-
     /// <summary>
     /// Gets the data for the event.
     /// </summary>

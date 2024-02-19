@@ -297,19 +297,19 @@ public sealed class Television(IPAddress ipAddress, PhysicalAddress macAddress, 
         private static readonly MqttFactory _clientFactory = new();
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
         private readonly IMqttClient _client = Connection._clientFactory.CreateMqttClient();
+
         private readonly MqttClientOptions _options = new MqttClientOptionsBuilder()
                 .WithClientId(Uri.EscapeDataString($"{clientIdPrefix}-{macAddress}"))
                 .WithTcpServer(ipAddress.ToString(), 36669)
                 .WithCredentials("hisenseservice", "multimqttservice")
                 .WithTimeout(TimeSpan.FromMilliseconds(750))
                 .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-                .WithTls(parameters =>
+                .WithTlsOptions(builder =>
                 {
-                    parameters.UseTls = true;
-                    parameters.CertificateValidationHandler = _ => true;
+                    builder.UseTls().WithCertificateValidationHandler(_ => true);
                     if (useCertificates)
                     {
-                        parameters.Certificates = [Connection.LoadCertificate()];
+                        builder.WithClientCertificates([Connection.LoadCertificate()]);
                     }
                 })
                 .Build();
@@ -441,7 +441,7 @@ public sealed class Television(IPAddress ipAddress, PhysicalAddress macAddress, 
             return false;
         }
 
-        private static X509Certificate LoadCertificate()
+        private static X509Certificate2 LoadCertificate()
         {
             using Stream certificateStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(Television).Namespace}.Certificates.rcm_certchain_pem.cer")!;
             using StreamReader certificateReader = new(certificateStream);

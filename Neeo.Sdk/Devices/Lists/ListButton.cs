@@ -14,10 +14,10 @@ public enum ListButtonIcon
 }
 
 /// <summary>
-/// 
+///
 /// </summary>
 /// <remarks>
-/// 
+///
 /// </remarks>
 /// <param name="title">The title of the button.</param>
 /// <param name="actionIdentifier"></param>

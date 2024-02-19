@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Describes a device feature.
-/// 
+///
 /// Features are used by the integration server to fulfill requests or perform operations
 /// on devices.
 /// </summary>

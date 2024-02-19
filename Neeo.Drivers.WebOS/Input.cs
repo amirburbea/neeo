@@ -7,6 +7,7 @@ public enum Input
 {
     [Input("externalinput.av1")]
     AV,
+
     Hdmi1,
     Hdmi2,
     Hdmi3,

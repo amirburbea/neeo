@@ -145,7 +145,7 @@ public static class DeviceTypes
     /// </summary>
     /// <param name="type">The type of the device.</param>
     /// <returns>Boolean value.</returns>
-    public static bool SupportsTiming(this DeviceType type) => type 
-        is not DeviceType.Accessory 
+    public static bool SupportsTiming(this DeviceType type) => type
+        is not DeviceType.Accessory
         and not DeviceType.Light;
 }

@@ -23,7 +23,7 @@ public static class ProjectionComparer
 }
 
 /// <summary>
-/// 
+///
 /// </summary>
 /// <typeparam name="T"></typeparam>
 /// <typeparam name="TResult"></typeparam>

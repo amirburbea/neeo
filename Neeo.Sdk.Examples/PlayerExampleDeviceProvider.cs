@@ -30,8 +30,6 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             .EnableNotifications(notifier => this._controller.Notifier = notifier);
     }
 
-    public IDeviceBuilder DeviceBuilder { get; }
-
     internal enum Pet
     {
         Kitten,
@@ -66,6 +64,8 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
         Description,
     }
 
+    public IDeviceBuilder DeviceBuilder { get; }
+
     private static string GetCoverArt(Pet pet) => $"https://neeo-sdk.neeo.io/{pet.ToString().ToLower()}.jpg";
 
     private static string GetDescription(Pet pet) => $"A song about my {pet.ToString().ToLower()}";
@@ -89,7 +89,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             this.SetValue(PlayerKey.Description, GetDescription(Pet.Kitten));
         }
 
-        public Pet Pet { get; set; } 
+        public Pet Pet { get; set; }
 
         public TValue GetValue<TValue>(PlayerKey key) => (TValue)this._dictionary[TextAttribute.GetText(key)];
 

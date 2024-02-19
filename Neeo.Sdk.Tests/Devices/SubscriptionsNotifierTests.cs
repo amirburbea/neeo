@@ -73,7 +73,7 @@ public sealed class SubscriptionsNotifierTests
                 .ReturnsTransformOf(ids);
             mockFeature
                 .Setup(feature => feature.InitializeDeviceListAsync(It.IsAny<string[]>()))
-                .Returns(InitializeDeviceListAsync);            
+                .Returns(InitializeDeviceListAsync);
             return mockFeature.Object;
 
             Task InitializeDeviceListAsync(string[] deviceIds)

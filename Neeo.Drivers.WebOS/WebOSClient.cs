@@ -73,25 +73,6 @@ public sealed class WebOSClient(IPAddress ipAddress) : IDisposable
         source?.Cancel();
     }
 
-    private void OnConnected()
-    {
-        this.Connected?.Invoke(this, EventArgs.Empty);
-    }
-
-    private async void OnDisconnected()
-    {
-        this.CleanUp();
-        this.Disconnected?.Invoke(this, EventArgs.Empty);
-        using PeriodicTimer timer = new(TimeSpan.FromMinutes(1d));
-        while (!this.IsDisposed && !this.IsConnected && await timer.WaitForNextTickAsync().ConfigureAwait(false))
-        {
-            if (await this.ConnectAsync().ConfigureAwait(false))
-            {
-                return;
-            }
-        }
-    }
-
     private async Task MessageLoop()
     {
         byte[] previous = [];
@@ -171,6 +152,25 @@ public sealed class WebOSClient(IPAddress ipAddress) : IDisposable
             //{
             //    this.ProcessIncomingMessage(response.Method, parameters.Data);
             //}
+        }
+    }
+
+    private void OnConnected()
+    {
+        this.Connected?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async void OnDisconnected()
+    {
+        this.CleanUp();
+        this.Disconnected?.Invoke(this, EventArgs.Empty);
+        using PeriodicTimer timer = new(TimeSpan.FromMinutes(1d));
+        while (!this.IsDisposed && !this.IsConnected && await timer.WaitForNextTickAsync().ConfigureAwait(false))
+        {
+            if (await this.ConnectAsync().ConfigureAwait(false))
+            {
+                return;
+            }
         }
     }
 }

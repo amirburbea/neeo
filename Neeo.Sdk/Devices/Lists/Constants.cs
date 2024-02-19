@@ -4,7 +4,6 @@ internal static class Constants
 {
     public const int MaxButtonsPerRow = 3;
 
-    public const int MaxTilesPerRow = 2;
-
     public const int MaxItems = 64;
+    public const int MaxTilesPerRow = 2;
 }

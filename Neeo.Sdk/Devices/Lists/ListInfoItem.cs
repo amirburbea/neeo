@@ -14,7 +14,7 @@ namespace Neeo.Sdk.Devices.Lists;
 /// <param name="affirmativeButtonText"></param>
 /// <param name="negativeButtonText"></param>
 /// <remarks>
-/// While these functions work in the NEEO application and EUI page, <paramref name="affirmativeButtonText"/> 
+/// While these functions work in the NEEO application and EUI page, <paramref name="affirmativeButtonText"/>
 /// and <paramref name="negativeButtonText"/> don't work on the remote, and should therefore be avoided.
 /// </remarks>
 public sealed class ListInfoItem(
@@ -25,9 +25,8 @@ public sealed class ListInfoItem(
     string? negativeButtonText = default
     ) : ClickableListItemBase(actionIdentifier)
 {
-
     /// <summary>
-    /// Within the dialog, 
+    /// Within the dialog,
     /// </summary>
     public string? AffirmativeButtonText { get; } = affirmativeButtonText;
 

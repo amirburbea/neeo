@@ -34,8 +34,8 @@ public interface ISubscriptionFeature : IFeature
 }
 
 internal sealed class SubscriptionFeature(
-    DeviceSubscriptionHandler onDeviceAdded, 
-    DeviceSubscriptionHandler onDeviceRemoved, 
+    DeviceSubscriptionHandler onDeviceAdded,
+    DeviceSubscriptionHandler onDeviceRemoved,
     DeviceSubscriptionListHandler deviceListInitializer
 ) : ISubscriptionFeature
 {

@@ -69,14 +69,14 @@ public sealed class ListBuilder
     public ListBuilder AddButtonRow(params ListButton[] buttons) => this.AddItem(new ListButtonRow(buttons));
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="entry"></param>
     /// <returns><see cref="ListBuilder"/> for chaining.</returns>
     public ListBuilder AddEntry(ListEntry entry) => this.AddItem(entry);
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="title"></param>
     /// <returns><see cref="ListBuilder"/> for chaining.</returns>

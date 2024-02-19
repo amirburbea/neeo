@@ -32,7 +32,7 @@ public enum ButtonGroups : ulong
     MenuAndBack = Menu | Back,
 
     /// <summary>
-    /// &quot;DIGIT 0&quot;, &quot;DIGIT 1&quot;, &quot;DIGIT 2&quot;, &quot;DIGIT 3&quot;, &quot;DIGIT 4&quot;, 
+    /// &quot;DIGIT 0&quot;, &quot;DIGIT 1&quot;, &quot;DIGIT 2&quot;, &quot;DIGIT 3&quot;, &quot;DIGIT 4&quot;,
     /// &quot;DIGIT 5&quot;, &quot;DIGIT 6&quot;, &quot;DIGIT 7&quot;, &quot;DIGIT 8&quot;, &quot;DIGIT 9&quot;.
     /// </summary>
     NumberPad = Digit0 | Digit1 | Digit2 | Digit3 | Digit4 | Digit5 | Digit6 | Digit7 | Digit8 | Digit9,

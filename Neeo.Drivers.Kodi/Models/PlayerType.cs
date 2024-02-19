@@ -8,8 +8,10 @@ internal enum PlayerType
 {
     [Text("audio")]
     Audio,
+
     [Text("picture")]
     Picture,
+
     [Text("video")]
     Video,
 }

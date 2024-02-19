@@ -49,7 +49,7 @@ internal sealed class ApiClient(IBrain brain, HttpClient httpClient, ILogger<Api
 {
     private static readonly MediaTypeHeaderValue _jsonContentType = new("application/json");
 
-    private readonly string _uriPrefix= $"http://{brain.ServiceEndPoint}";
+    private readonly string _uriPrefix = $"http://{brain.ServiceEndPoint}";
 
     public Task<TResult> GetAsync<TData, TResult>(string path, Func<TData, TResult> transform, CancellationToken cancellationToken = default)
         where TData : notnull

@@ -35,9 +35,9 @@ public interface IDynamicDeviceRegistry
 
 internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
 {
+    private readonly IDeviceFactory _deviceFactory;
     private readonly ConcurrentDictionary<string, IDeviceAdapter> _discoveredDevices = new();
     private readonly ReaderWriterLockSlim _lock = new();
-    private readonly IDeviceFactory _deviceFactory;
     private readonly ILogger<DynamicDeviceRegistry> _logger;
 
     public DynamicDeviceRegistry(IDeviceFactory deviceFactory, ILogger<DynamicDeviceRegistry> logger)

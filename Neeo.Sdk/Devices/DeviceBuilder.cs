@@ -672,6 +672,184 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
 
+    internal DeviceAdapter BuildAdapter()
+    {
+        if (this.ButtonHandler == null && this._buttons.Any())
+        {
+            throw new InvalidOperationException($"There are buttons defined but no handler was specified (by calling {nameof(IDeviceBuilder.AddButtonHandler)}.");
+        }
+        if (this.Type.RequiresInput() && !this._hasInput)
+        {
+            throw new InvalidOperationException($"No input buttons defined - note that input button names must begin with \"{DeviceBuilderConstants.InputPrefix}\".");
+        }
+        if (this.Characteristics.Contains(DeviceCharacteristic.BridgeDevice) && this.Setup.RegistrationType is null)
+        {
+            throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
+        }
+        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic).ToList();
+        string pathPrefix = $"/device/{this.AdapterName}/";
+        HashSet<string> paths = [];
+        List<Component> components = [];
+        Dictionary<string, IFeature> features = [];
+        foreach ((string name, string? label) in this._buttons.Values)
+        {
+            AddComponentAndRouteHandler(BuildButton(pathPrefix, name, label), new ButtonFeature(this.ButtonHandler!, name));
+        }
+        foreach ((string name, string? label, ValueFeature valueFeature, IReadOnlyCollection<double> range, string unit) in this._sliders.Values)
+        {
+            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new RangeSensorDetails(range, Uri.EscapeDataString(unit))), valueFeature);
+            AddComponentAndRouteHandler(BuildSlider(pathPrefix, name, label, range, unit), valueFeature);
+        }
+        foreach ((string name, string? label, ValueFeature valueFeature) in this._switches.Values)
+        {
+            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.Binary)), valueFeature);
+            AddComponentAndRouteHandler(BuildSwitch(pathPrefix, name, label), valueFeature);
+        }
+        foreach ((string name, string? label, ValueFeature valueFeature, bool isLabelVisible) in this._textLabels.Values)
+        {
+            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.String)), valueFeature);
+            AddComponentAndRouteHandler(BuildTextLabel(pathPrefix, name, label, isLabelVisible), valueFeature);
+        }
+        foreach ((string name, string? label, ValueFeature valueFeature, ImageSize size) in this._imageUrls.Values)
+        {
+            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.String)), valueFeature);
+            AddComponentAndRouteHandler(BuildImageUrl(pathPrefix, name, label, size), valueFeature);
+        }
+        foreach (DirectoryParameters parameters in this._directories.Values)
+        {
+            AddComponentAndRouteHandler(BuildDirectory(pathPrefix, parameters), parameters.Feature);
+        }
+        foreach (SensorParameters parameters in this._sensors.Values)
+        {
+            AddComponentAndRouteHandler(
+                parameters switch
+                {
+                    { Type: SensorType.Power } => BuildPowerSensor(pathPrefix),
+                    RangeSensorParameters rsd => BuildSensor(pathPrefix, rsd.Name, rsd.Label, new RangeSensorDetails(rsd.Range, Uri.EscapeDataString(rsd.Unit))),
+                    _ => BuildSensor(pathPrefix, parameters.Name, parameters.Label, new(parameters.Type))
+                },
+                parameters.ValueFeature
+            );
+        }
+        if (this.DiscoveryFeature is { } discoveryFeature)
+        {
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), discoveryFeature);
+            if (this.RegistrationFeature is { } registrationFeature)
+            {
+                deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);
+                AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), registrationFeature);
+            }
+        }
+        else if (!deviceCapabilities.Contains(DeviceCapability.DynamicDevice) && deviceCapabilities.FindIndex(RequiresDiscovery) is int index and > -1)
+        {
+            throw new InvalidOperationException($"Discovery required for {deviceCapabilities[index]}.");
+        }
+        if (this.FavoritesFeature is { } favoritesFeature)
+        {
+            if (this._digitCount != 10)
+            {
+                throw new InvalidOperationException("Can not enable favorites without the 10 digit buttons being added. It is highly recommended to call AddButtonGroup(ButtonGroup.NumberPad).");
+            }
+            deviceCapabilities.Add(DeviceCapability.CustomFavoriteHandler);
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), favoritesFeature);
+        }
+        if (this.SubscriptionFeature is { } subscriptionFeature)
+        {
+            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), subscriptionFeature);
+        }
+        return new(
+            this.AdapterName,
+            components,
+            features,
+            deviceCapabilities,
+            this.Name,
+            this.DriverVersion,
+            this.Icon,
+            this.Initializer,
+            this.Manufacturer,
+            this._routeHandler,
+            this.Setup,
+            this.SpecificName,
+            this.Timing ?? new(),
+            this.AdditionalSearchTokens,
+            this.Type,
+            this._uriPrefixCallback
+        );
+
+        void AddComponentAndRouteHandler(Component component, IFeature feature)
+        {
+            AddRouteHandler(component, feature);
+            components.Add(component);
+        }
+
+        void AddRouteHandler(Component component, IFeature feature) => features[Uri.UnescapeDataString(component.Name)] = paths.Add(component.Path)
+            ? feature
+            : throw new InvalidOperationException($"Path {component.Path} is not unique.");
+
+        static Component BuildButton(string pathPrefix, string featureName, string? label)
+        {
+            string name = Uri.EscapeDataString(featureName);
+            return new(ComponentType.Button, name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name);
+        }
+
+        static Component BuildComponent(string pathPrefix, ComponentType type)
+        {
+            string name = Uri.EscapeDataString(TextAttribute.GetText(type));
+            return new(type, name, default, pathPrefix + name);
+        }
+
+        static DirectoryComponent BuildDirectory(string pathPrefix, DirectoryParameters parameters)
+        {
+            (string directoryName, string? label, DirectoryRole? role, _) = parameters;
+            string name = Uri.EscapeDataString(directoryName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, role);
+        }
+
+        static ImageUrlComponent BuildImageUrl(string pathPrefix, string imageName, string? label, ImageSize size)
+        {
+            string name = Uri.EscapeDataString(imageName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, size, GetSensorName(name));
+        }
+
+        static SensorComponent BuildPowerSensor(string pathPrefix)
+        {
+            SensorComponent component = BuildSensor(pathPrefix, "-", DeviceBuilderConstants.PowerSensorLabel, new(SensorType.Power));
+            /*
+                Power state sensors are added by AddPowerStateSensor with the name "powerstate".
+                For backward compatibility, we need to avoid changing it to "POWERSTATE_SENSOR".
+            */
+            return component with { Name = Constants.PowerSensorName, Path = pathPrefix + Constants.PowerSensorName };
+        }
+
+        static TextLabelComponent BuildTextLabel(string pathPrefix, string labelName, string? label, bool isLabelVisible)
+        {
+            string name = Uri.EscapeDataString(labelName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, isLabelVisible, GetSensorName(name));
+        }
+
+        static SensorComponent BuildSensor(string pathPrefix, string sensorName, string? label, SensorDetails sensor)
+        {
+            string name = GetSensorName(Uri.EscapeDataString(sensorName));
+            return new(name, Uri.EscapeDataString(label ?? sensorName), pathPrefix + name, sensor);
+        }
+
+        static SliderComponent BuildSlider(string pathPrefix, string sliderName, string? label, IReadOnlyCollection<double> range, string unit)
+        {
+            string name = Uri.EscapeDataString(sliderName);
+            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, new(range, Uri.EscapeDataString(unit), GetSensorName(name)));
+        }
+
+        static SwitchComponent BuildSwitch(string pathPrefix, string switchName, string? label)
+        {
+            string name = Uri.EscapeDataString(switchName);
+            return new(name, Uri.EscapeDataString(label ?? string.Empty), pathPrefix + name, GetSensorName(name));
+        }
+
+        static string GetSensorName(string name) => name.EndsWith(SensorComponent.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorComponent.ComponentSuffix);
+
+        static bool RequiresDiscovery(DeviceCapability capability) => capability is DeviceCapability.BridgeDevice or DeviceCapability.AddAnotherDevice or DeviceCapability.RegisterUserAccount;
+    }
+
     [GeneratedRegex(@"^DIGIT \d$", RegexOptions.Compiled)]
     private static partial Regex DigitRegex();
 
@@ -893,184 +1071,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
             throw new ArgumentException($"\"{name}\" already defined.", nameof(name));
         }
         return this;
-    }
-
-    internal DeviceAdapter BuildAdapter()
-    {
-        if (this.ButtonHandler == null && this._buttons.Any())
-        {
-            throw new InvalidOperationException($"There are buttons defined but no handler was specified (by calling {nameof(IDeviceBuilder.AddButtonHandler)}.");
-        }
-        if (this.Type.RequiresInput() && !this._hasInput)
-        {
-            throw new InvalidOperationException($"No input buttons defined - note that input button names must begin with \"{DeviceBuilderConstants.InputPrefix}\".");
-        }
-        if (this.Characteristics.Contains(DeviceCharacteristic.BridgeDevice) && this.Setup.RegistrationType is null)
-        {
-            throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
-        }
-        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic).ToList();
-        string pathPrefix = $"/device/{this.AdapterName}/";
-        HashSet<string> paths = [];
-        List<Component> components = [];
-        Dictionary<string, IFeature> features = [];
-        foreach ((string name, string? label) in this._buttons.Values)
-        {
-            AddComponentAndRouteHandler(BuildButton(pathPrefix, name, label), new ButtonFeature(this.ButtonHandler!, name));
-        }
-        foreach ((string name, string? label, ValueFeature valueFeature, IReadOnlyCollection<double> range, string unit) in this._sliders.Values)
-        {
-            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new RangeSensorDetails(range, Uri.EscapeDataString(unit))), valueFeature);
-            AddComponentAndRouteHandler(BuildSlider(pathPrefix, name, label, range, unit), valueFeature);
-        }
-        foreach ((string name, string? label, ValueFeature valueFeature) in this._switches.Values)
-        {
-            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.Binary)), valueFeature);
-            AddComponentAndRouteHandler(BuildSwitch(pathPrefix, name, label), valueFeature);
-        }
-        foreach ((string name, string? label, ValueFeature valueFeature, bool isLabelVisible) in this._textLabels.Values)
-        {
-            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.String)), valueFeature);
-            AddComponentAndRouteHandler(BuildTextLabel(pathPrefix, name, label, isLabelVisible), valueFeature);
-        }
-        foreach ((string name, string? label, ValueFeature valueFeature, ImageSize size) in this._imageUrls.Values)
-        {
-            AddComponentAndRouteHandler(BuildSensor(pathPrefix, name, label, new(SensorType.String)), valueFeature);
-            AddComponentAndRouteHandler(BuildImageUrl(pathPrefix, name, label, size), valueFeature);
-        }
-        foreach (DirectoryParameters parameters in this._directories.Values)
-        {
-            AddComponentAndRouteHandler(BuildDirectory(pathPrefix, parameters), parameters.Feature);
-        }
-        foreach (SensorParameters parameters in this._sensors.Values)
-        {
-            AddComponentAndRouteHandler(
-                parameters switch
-                {
-                    { Type: SensorType.Power } => BuildPowerSensor(pathPrefix),
-                    RangeSensorParameters rsd => BuildSensor(pathPrefix, rsd.Name, rsd.Label, new RangeSensorDetails(rsd.Range, Uri.EscapeDataString(rsd.Unit))),
-                    _ => BuildSensor(pathPrefix, parameters.Name, parameters.Label, new(parameters.Type))
-                },
-                parameters.ValueFeature
-            );
-        }
-        if (this.DiscoveryFeature is { } discoveryFeature)
-        {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Discovery), discoveryFeature);
-            if (this.RegistrationFeature is { } registrationFeature)
-            {
-                deviceCapabilities.Add(DeviceCapability.RegisterUserAccount);
-                AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Registration), registrationFeature);
-            }
-        }
-        else if (!deviceCapabilities.Contains(DeviceCapability.DynamicDevice) && deviceCapabilities.FindIndex(RequiresDiscovery) is int index and > -1)
-        {
-            throw new InvalidOperationException($"Discovery required for {deviceCapabilities[index]}.");
-        }
-        if (this.FavoritesFeature is { } favoritesFeature)
-        {
-            if (this._digitCount != 10)
-            {
-                throw new InvalidOperationException("Can not enable favorites without the 10 digit buttons being added. It is highly recommended to call AddButtonGroup(ButtonGroup.NumberPad).");
-            }
-            deviceCapabilities.Add(DeviceCapability.CustomFavoriteHandler);
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.FavoritesHandler), favoritesFeature);
-        }
-        if (this.SubscriptionFeature is { } subscriptionFeature)
-        {
-            AddRouteHandler(BuildComponent(pathPrefix, ComponentType.Subscription), subscriptionFeature);
-        }
-        return new(
-            this.AdapterName,
-            components,
-            features,
-            deviceCapabilities,
-            this.Name,
-            this.DriverVersion,
-            this.Icon,
-            this.Initializer,
-            this.Manufacturer,
-            this._routeHandler,
-            this.Setup,
-            this.SpecificName,
-            this.Timing ?? new(),
-            this.AdditionalSearchTokens,
-            this.Type,
-            this._uriPrefixCallback
-        );
-
-        void AddComponentAndRouteHandler(Component component, IFeature feature)
-        {
-            AddRouteHandler(component, feature);
-            components.Add(component);
-        }
-
-        void AddRouteHandler(Component component, IFeature feature) => features[Uri.UnescapeDataString(component.Name)] = paths.Add(component.Path)
-            ? feature
-            : throw new InvalidOperationException($"Path {component.Path} is not unique.");
-
-        static Component BuildButton(string pathPrefix, string featureName, string? label)
-        {
-            string name = Uri.EscapeDataString(featureName);
-            return new(ComponentType.Button, name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name);
-        }
-
-        static Component BuildComponent(string pathPrefix, ComponentType type)
-        {
-            string name = Uri.EscapeDataString(TextAttribute.GetText(type));
-            return new(type, name, default, pathPrefix + name);
-        }
-
-        static DirectoryComponent BuildDirectory(string pathPrefix, DirectoryParameters parameters)
-        {
-            (string directoryName, string? label, DirectoryRole? role, _) = parameters;
-            string name = Uri.EscapeDataString(directoryName);
-            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, role);
-        }
-
-        static ImageUrlComponent BuildImageUrl(string pathPrefix, string imageName, string? label, ImageSize size)
-        {
-            string name = Uri.EscapeDataString(imageName);
-            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, size, GetSensorName(name));
-        }
-
-        static SensorComponent BuildPowerSensor(string pathPrefix)
-        {
-            SensorComponent component = BuildSensor(pathPrefix, "-", DeviceBuilderConstants.PowerSensorLabel, new(SensorType.Power));
-            /*
-                Power state sensors are added by AddPowerStateSensor with the name "powerstate".
-                For backward compatibility, we need to avoid changing it to "POWERSTATE_SENSOR".
-            */
-            return component with { Name = Constants.PowerSensorName, Path = pathPrefix + Constants.PowerSensorName };
-        }
-
-        static TextLabelComponent BuildTextLabel(string pathPrefix, string labelName, string? label, bool isLabelVisible)
-        {
-            string name = Uri.EscapeDataString(labelName);
-            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, isLabelVisible, GetSensorName(name));
-        }
-
-        static SensorComponent BuildSensor(string pathPrefix, string sensorName, string? label, SensorDetails sensor)
-        {
-            string name = GetSensorName(Uri.EscapeDataString(sensorName));
-            return new(name, Uri.EscapeDataString(label ?? sensorName), pathPrefix + name, sensor);
-        }
-
-        static SliderComponent BuildSlider(string pathPrefix, string sliderName, string? label, IReadOnlyCollection<double> range, string unit)
-        {
-            string name = Uri.EscapeDataString(sliderName);
-            return new(name, label != null ? Uri.EscapeDataString(label) : name, pathPrefix + name, new(range, Uri.EscapeDataString(unit), GetSensorName(name)));
-        }
-
-        static SwitchComponent BuildSwitch(string pathPrefix, string switchName, string? label)
-        {
-            string name = Uri.EscapeDataString(switchName);
-            return new(name, Uri.EscapeDataString(label ?? string.Empty), pathPrefix + name, GetSensorName(name));
-        }
-
-        static string GetSensorName(string name) => name.EndsWith(SensorComponent.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorComponent.ComponentSuffix);
-
-        static bool RequiresDiscovery(DeviceCapability capability) => capability is DeviceCapability.BridgeDevice or DeviceCapability.AddAnotherDevice or DeviceCapability.RegisterUserAccount;
     }
 
     private DeviceBuilder DefineTiming(int? powerOnDelay, int? shutdownDelay, int? sourceSwitchDelay)

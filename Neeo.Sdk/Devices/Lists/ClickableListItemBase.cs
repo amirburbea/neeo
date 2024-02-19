@@ -9,7 +9,6 @@ namespace Neeo.Sdk.Devices.Lists;
 /// <param name="uiAction">The (optional) list UI action - special predefined actions that can be performed upon clicking this item.</param>
 public abstract class ClickableListItemBase(string? actionIdentifier = default, ListUIAction? uiAction = default)
 {
-
     /// <summary>
     /// Gets the (optional) identifier of the action to be performed upon clicking this item, typically used to point to a file to open.
     /// </summary>
