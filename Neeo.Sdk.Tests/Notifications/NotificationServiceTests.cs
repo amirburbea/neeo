@@ -17,7 +17,7 @@ using Message = NotificationService.Message;
 
 public sealed class NotificationServiceTests : IDisposable
 {
-    private readonly List<Message> _messages = new();
+    private readonly List<Message> _messages = [];
     private readonly Mock<INotificationMapping> _mockNotificationMapping = new(MockBehavior.Strict);
     private readonly NotificationService _notificationService;
 

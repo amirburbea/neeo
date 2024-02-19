@@ -77,11 +77,9 @@ public static class Program
             .AddHostedService<SdkService>();
     }
 
-    private sealed class LoadContext : AssemblyLoadContext
+    private sealed class LoadContext(string assemblyPath) : AssemblyLoadContext
     {
-        private readonly AssemblyDependencyResolver _resolver;
-
-        public LoadContext(string assemblyPath) => this._resolver = new(assemblyPath);
+        private readonly AssemblyDependencyResolver _resolver = new(assemblyPath);
 
         protected override Assembly? Load(AssemblyName assemblyName) => this._resolver.ResolveAssemblyToPath(assemblyName) is { } path
             ? this.LoadFromAssemblyPath(path)

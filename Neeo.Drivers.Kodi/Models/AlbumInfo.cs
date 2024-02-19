@@ -2,5 +2,5 @@
 
 public readonly record struct AlbumInfo()
 {
-    internal static readonly string[] Fields = { };
+    internal static readonly string[] Fields = [];
 }

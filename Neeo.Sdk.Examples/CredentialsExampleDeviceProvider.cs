@@ -21,7 +21,7 @@ public class CredentialsExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static DiscoveredDevice[] DiscoverDevices() => new DiscoveredDevice[] { new("credentialed-device", "Credentialed Device", true) };
+    private static DiscoveredDevice[] DiscoverDevices() => [new("credentialed-device", "Credentialed Device", true)];
 
     private string GetLabelText(string deviceId) => this._isRegistered ? $"{deviceId} registered as {Constants.UserName}" : $"{deviceId} not registered";
 

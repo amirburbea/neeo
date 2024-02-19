@@ -35,7 +35,7 @@ internal static class ApiClientMockMethods
             Expression.Call(
                 typeof(Task),
                 nameof(Task.FromResult),
-                new[] { typeArguments[1] },
+                [typeArguments[1]],
                 Expression.Invoke(
                     Expression.Convert(
                         transform,

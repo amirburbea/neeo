@@ -43,7 +43,7 @@ internal sealed class DiscoveryFeature : IDiscoveryFeature
     {
         if (await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } devices)
         {
-            return Array.Empty<DiscoveredDevice>();
+            return [];
         }
         this.Validate(optionalDeviceId, devices);
         return devices;

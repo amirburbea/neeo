@@ -13,18 +13,11 @@ using Zeroconf;
 namespace Neeo.Drivers.Kodi;
 
 [Service]
-public sealed class KodiClientManager : IDisposable
+public sealed class KodiClientManager(KodiClientFactory clientFactory, ILogger<KodiClientManager> logger) : IDisposable
 {
-    private readonly KodiClientFactory _clientFactory;
     private readonly ConcurrentDictionary<string, KodiClient> _clients = new();
-    private readonly ILogger<KodiClientManager> _logger;
     private PeriodicTimer? _discoveryTimer;
     private Task? _initializationTask;
-
-    public KodiClientManager(KodiClientFactory clientFactory, ILogger<KodiClientManager> logger)
-    {
-        (this._clientFactory, this._logger) = (clientFactory, logger);
-    }
 
     public event EventHandler<DataEventArgs<KodiClient>>? ClientDiscovered;
 
@@ -55,11 +48,11 @@ public sealed class KodiClientManager : IDisposable
                 // IP address previously discovered.
                 return;
             }
-            this._logger.LogInformation("Found client ({name}) at IP address {ip}.", host.DisplayName, ipAddress);
-            KodiClient client = this._clientFactory.CreateClient(host.DisplayName, ipAddress, host.Services.First().Value.Port);
+            logger.LogInformation("Found client ({name}) at IP address {ip}.", host.DisplayName, ipAddress);
+            KodiClient client = clientFactory.CreateClient(host.DisplayName, ipAddress, host.Services.First().Value.Port);
             if (!await client.ConnectAsync(cancellationToken).ConfigureAwait(false) || client.MacAddress.Equals(PhysicalAddress.None))
             {
-                this._logger.LogWarning("Something went wrong, ignoring client at {ip}.", ipAddress);
+                logger.LogWarning("Something went wrong, ignoring client at {ip}.", ipAddress);
                 client.Dispose();
                 return;
             }

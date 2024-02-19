@@ -9,9 +9,9 @@ namespace Neeo.Sdk.Utilities;
 
 public static partial class NetworkMethods
 {
-    private static ReadOnlySpan<byte> BroadcastAddress => new byte[] { 255, 255, 255, 255, 255, 255 };
+    private static ReadOnlySpan<byte> BroadcastAddress => [255, 255, 255, 255, 255, 255];
 
-    private static ReadOnlySpan<byte> VirtualAddress => new byte[] { 0, 0, 0, 0, 0, 0 };
+    private static ReadOnlySpan<byte> VirtualAddress => [0, 0, 0, 0, 0, 0];
 
     private static void PopulateNetworkDevicesViaInterop(Dictionary<IPAddress, PhysicalAddress> output)
     {
@@ -38,7 +38,7 @@ public static partial class NetworkMethods
                 {
                     continue;
                 }
-                byte[] bytes = new[] { row.mac0, row.mac1, row.mac2, row.mac3, row.mac4, row.mac5 };
+                byte[] bytes = [row.mac0, row.mac1, row.mac2, row.mac3, row.mac4, row.mac5];
                 if (!bytes.AsSpan().SequenceEqual(NetworkMethods.VirtualAddress) && !bytes.AsSpan().SequenceEqual(NetworkMethods.BroadcastAddress))
                 {
                     output.Add(ipAddress, new(bytes));

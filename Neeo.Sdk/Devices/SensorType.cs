@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;

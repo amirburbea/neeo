@@ -89,7 +89,7 @@ public sealed partial class Brain : IBrain
     public static async Task<Brain[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brain._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return hosts.Count == 0 ? Array.Empty<Brain>() : hosts.Select(Brain.CreateBrain).ToArray();
+        return hosts.Count == 0 ? [] : hosts.Select(Brain.CreateBrain).ToArray();
     }
 
     /// <summary>

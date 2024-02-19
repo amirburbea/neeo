@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text.Json.Serialization;
 
 namespace Neeo.Sdk.Utilities.TokenSearch;
 
@@ -46,7 +45,7 @@ internal sealed class TokenSearch<T>
             .Take(5)
             .ToArray();
         int maxScore = 0;
-        Dictionary<T, int> scores = new();
+        Dictionary<T, int> scores = [];
         foreach (T item in this._items)
         {
             int score = this._itemValues(item)
@@ -92,13 +91,9 @@ internal sealed class TokenSearch<T>
         };
     }
 
-    private sealed class Visitor : ExpressionVisitor
+    private sealed class Visitor(ParameterExpression parameter) : ExpressionVisitor
     {
-        private readonly ParameterExpression _parameter;
-
-        public Visitor(ParameterExpression parameter) => this._parameter = parameter;
-
-        protected override Expression VisitParameter(ParameterExpression _) => this._parameter;
+        protected override Expression VisitParameter(ParameterExpression _) => parameter;
     }
 }
 

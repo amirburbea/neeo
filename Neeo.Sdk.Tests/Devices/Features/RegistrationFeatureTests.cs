@@ -1,18 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using Moq;
-using Moq.Protected;
-using Neeo.Sdk.Rest;
-using Neeo.Sdk.Utilities;
-using Org.BouncyCastle.Bcpg;
-using Org.BouncyCastle.Bcpg.OpenPgp;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Security;
-using Xunit;
-
-namespace Neeo.Sdk.Tests.Devices.Features;
+﻿namespace Neeo.Sdk.Tests.Devices.Features;
 
 
 // TODO: Implement registration feature tests.

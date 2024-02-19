@@ -16,33 +16,26 @@ public enum ListButtonIcon
 /// <summary>
 /// 
 /// </summary>
-public sealed class ListButton : ClickableListItemBase
+/// <remarks>
+/// 
+/// </remarks>
+/// <param name="title">The title of the button.</param>
+/// <param name="actionIdentifier"></param>
+/// <param name="inverse"></param>
+/// <param name="icon"></param>
+/// <param name="uiAction"></param>
+public sealed class ListButton(
+    string title,
+    string actionIdentifier,
+    bool? inverse = default,
+    ListButtonIcon? icon = default,
+    ListUIAction? uiAction = default
+) : ClickableListItemBase(actionIdentifier, uiAction)
 {
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="title">The title of the button.</param>
-    /// <param name="actionIdentifier"></param>
-    /// <param name="inverse"></param>
-    /// <param name="icon"></param>
-    /// <param name="uiAction"></param>
-    public ListButton(
-        string title,
-        string actionIdentifier,
-        bool? inverse = default,
-        ListButtonIcon? icon = default,
-        ListUIAction? uiAction = default
-    ) : base(actionIdentifier, uiAction)
-    {
-        this.Title = Validator.ValidateText(title, maxLength: 255);
-        this.Icon = icon;
-        this.Inverse = inverse;
-    }
-
     [JsonPropertyName("iconName")]
-    public ListButtonIcon? Icon { get; }
+    public ListButtonIcon? Icon { get; } = icon;
 
-    public bool? Inverse { get; }
+    public bool? Inverse { get; } = inverse;
 
     /// <summary>
     /// Tells the NEEO Brain that this is a Button.
@@ -52,5 +45,5 @@ public sealed class ListButton : ClickableListItemBase
     /// <summary>
     /// Gets the title of the button.
     /// </summary>
-    public string Title { get; }
+    public string Title { get; } = Validator.ValidateText(title, maxLength: 255);
 }

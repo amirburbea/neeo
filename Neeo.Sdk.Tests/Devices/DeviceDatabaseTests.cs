@@ -65,7 +65,7 @@ public sealed class DeviceDatabaseTests
     public void GetAdapterAsync_calls_initializer_before_returning_adapter()
     {
         var (mockBuilder, mockAdapter, _) = this.CreateDevice("name");
-        Mock<DeviceInitializer> mockInitializer = new Mock<DeviceInitializer>(MockBehavior.Strict);
+        Mock<DeviceInitializer> mockInitializer = new(MockBehavior.Strict);
         mockInitializer.Setup(initializer => initializer(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         mockAdapter.Setup(adapter => adapter.Initializer).Returns(mockInitializer.Object);
         DeviceDatabase database = this.CreateDatabase(mockBuilder.Object);
@@ -98,7 +98,7 @@ public sealed class DeviceDatabaseTests
     public void GetAdapterAsync_does_not_call_initializer_if_initialized()
     {
         var (mockBuilder, mockAdapter, _) = this.CreateDevice("name");
-        Mock<DeviceInitializer> mockInitializer = new Mock<DeviceInitializer>(MockBehavior.Strict);
+        Mock<DeviceInitializer> mockInitializer = new(MockBehavior.Strict);
         mockInitializer.Setup(initializer => initializer(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         mockAdapter.Setup(adapter => adapter.Initializer).Returns(mockInitializer.Object);
         DeviceDatabase database = this.CreateDatabase(mockBuilder.Object);
@@ -124,7 +124,7 @@ public sealed class DeviceDatabaseTests
     [Fact]
     public async Task GetAdapterAsync_returns_null_for_invalid_name()
     {
-        DeviceDatabase database = this.CreateDatabase(Array.Empty<IDeviceBuilder>());
+        DeviceDatabase database = this.CreateDatabase([]);
 
         Assert.Null(await database.GetAdapterAsync("name"));
     }
@@ -135,7 +135,7 @@ public sealed class DeviceDatabaseTests
         IDeviceBuilder[] builders = new IDeviceBuilder[3];
         for (int i = 0; i < builders.Length; i++)
         {
-            var (mockBuilder, _, _) = this.CreateDevice($"device{i}", new[] { $"token{i}" });
+            var (mockBuilder, _, _) = this.CreateDevice($"device{i}", [$"token{i}"]);
             builders[i] = mockBuilder.Object;
         }
         DeviceDatabase database = this.CreateDatabase(builders);
@@ -150,7 +150,7 @@ public sealed class DeviceDatabaseTests
     [Fact]
     public void GetDeviceByAdapterName_should_return_null_for_invalid_name()
     {
-        DeviceDatabase database = this.CreateDatabase(Array.Empty<IDeviceBuilder>());
+        DeviceDatabase database = this.CreateDatabase([]);
 
         Assert.Null(database.GetDeviceByAdapterName("name"));
     }
@@ -176,7 +176,7 @@ public sealed class DeviceDatabaseTests
     [Fact]
     public void GetDeviceById_should_return_null_for_invalid_id()
     {
-        DeviceDatabase database = this.CreateDatabase(Array.Empty<IDeviceBuilder>());
+        DeviceDatabase database = this.CreateDatabase([]);
 
         Assert.Null(database.GetDeviceById(5));
     }
@@ -190,16 +190,19 @@ public sealed class DeviceDatabaseTests
         this._mockDeviceFactory.Setup(factory => factory.BuildDevice(mockBuilder.Object)).Returns(mockAdapter.Object);
         string adapterName = name ?? nameof(mockAdapter);
         mockBuilder.Setup(builder => builder.AdapterName).Returns(adapterName);
-        mockAdapter.Setup(adapter => adapter.DeviceName).Returns(value: adapterName);
+        mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.Initializer).Returns(value: null);
-        mockAdapter.Setup(adapter => adapter.Tokens).Returns(tokens ?? Array.Empty<string>());
+        mockAdapter.Setup(adapter => adapter.Tokens).Returns(tokens ?? []);
         mockBuilder.Setup(builder => builder.HasPowerStateSensor).Returns(true);
-        Mock<DeviceNotifierCallback>? mockCallback = notifierCallback
-            ? new Mock<DeviceNotifierCallback>(MockBehavior.Strict)
-            : null;
-        mockCallback?.Setup(callback => callback(It.IsAny<IDeviceNotifier>()));
-        mockBuilder.Setup(builder => builder.NotifierCallback).Returns(mockCallback?.Object);
+        if (!notifierCallback)
+        {
+            mockBuilder.Setup(builder => builder.NotifierCallback).Returns(value: null);
+            return (mockBuilder, mockAdapter, null);
+        }
+        Mock<DeviceNotifierCallback> mockCallback = new(MockBehavior.Strict);
+        mockCallback.Setup(callback => callback(It.IsAny<IDeviceNotifier>()));
+        mockBuilder.Setup(builder => builder.NotifierCallback).Returns(mockCallback.Object);
         return (mockBuilder, mockAdapter, mockCallback);
     }
 }

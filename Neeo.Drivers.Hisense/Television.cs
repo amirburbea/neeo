@@ -19,24 +19,12 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Hisense;
 
-public sealed class Television : IDisposable
+public sealed class Television(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix) : IDisposable
 {
-    private readonly string _clientIdPrefix;
-    private readonly ILogger _logger;
-    private readonly bool _useCertificates;
-
+    private readonly string _clientIdPrefix = clientIdPrefix ?? Dns.GetHostName();
     private Connection? _connection;
     private bool _isDisposed;
     private PeriodicTimer? _reconnectTimer;
-
-    private Television(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
-    {
-        this.IPAddress = ipAddress;
-        this.MacAddress = macAddress;
-        this._logger = logger;
-        this._useCertificates = useCertificates;
-        this._clientIdPrefix = clientIdPrefix ?? Dns.GetHostName();
-    }
 
     public event EventHandler? Connected;
 
@@ -50,15 +38,15 @@ public sealed class Television : IDisposable
 
     public string DeviceId => this.MacAddress.ToString();
 
-    public IPAddress IPAddress { get; }
+    public IPAddress IPAddress { get; } = ipAddress;
 
     public bool IsConnected => this._connection != null && this._connection.IsConnected;
 
-    public PhysicalAddress MacAddress { get; }
+    public PhysicalAddress MacAddress { get; } = macAddress;
 
     public static async Task<Television[]> DiscoverAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
-        ConcurrentBag<Television> bag = new();
+        ConcurrentBag<Television> bag = [];
         await Task.WhenAll(
             NetworkMethods.GetNetworkDevices().Select(async pair =>
             {
@@ -285,7 +273,7 @@ public sealed class Television : IDisposable
         {
             throw new ObjectDisposedException(this.GetType().FullName);
         }
-        Connection connection = new(this.IPAddress, this.MacAddress, this._logger, this._useCertificates, this._clientIdPrefix);
+        Connection connection = new(this.IPAddress, this.MacAddress, logger, useCertificates, this._clientIdPrefix);
         if (!await connection.TryConnectAsync(cancellationToken).ConfigureAwait(false) || this._isDisposed)
         {
             connection.Dispose();
@@ -304,20 +292,12 @@ public sealed class Television : IDisposable
         return true;
     }
 
-    private sealed class Connection : IDisposable
+    private sealed class Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix) : IDisposable
     {
         private static readonly MqttFactory _clientFactory = new();
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
-        private readonly IMqttClient _client;
-        private readonly ILogger _logger;
-
-        private readonly MqttClientOptions _options;
-
-        public Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix)
-        {
-            this._client = Connection._clientFactory.CreateMqttClient();
-            this._logger = logger;
-            this._options = new MqttClientOptionsBuilder()
+        private readonly IMqttClient _client = Connection._clientFactory.CreateMqttClient();
+        private readonly MqttClientOptions _options = new MqttClientOptionsBuilder()
                 .WithClientId(Uri.EscapeDataString($"{clientIdPrefix}-{macAddress}"))
                 .WithTcpServer(ipAddress.ToString(), 36669)
                 .WithCredentials("hisenseservice", "multimqttservice")
@@ -329,11 +309,10 @@ public sealed class Television : IDisposable
                     parameters.CertificateValidationHandler = _ => true;
                     if (useCertificates)
                     {
-                        parameters.Certificates = new[] { Connection.LoadCertificate() };
+                        parameters.Certificates = [Connection.LoadCertificate()];
                     }
                 })
                 .Build();
-        }
 
         public event EventHandler? Disconnected;
 
@@ -372,7 +351,7 @@ public sealed class Television : IDisposable
 
         public void Dispose()
         {
-            this._logger.LogInformation("Disposing {clientId}.", this._options.ClientId);
+            logger.LogInformation("Disposing {clientId}.", this._options.ClientId);
             this._client.Dispose();
         }
 
@@ -420,7 +399,7 @@ public sealed class Television : IDisposable
                 string text => text,
                 _ => JsonSerializer.Serialize(body, Connection._jsonOptions)
             };
-            this._logger.LogInformation("Sending message '{payload}' to topic '{topic}'.", payload, topic);
+            logger.LogInformation("Sending message '{payload}' to topic '{topic}'.", payload, topic);
             if (!waitForNextMessage)
             {
                 await PublishAsync().ConfigureAwait(false);
@@ -440,7 +419,7 @@ public sealed class Television : IDisposable
 
             void OnMessageReceived(object? sender, DataEventArgs<(string, string)> e) => taskCompletionSource.TrySetResult(e.Data);
 
-            Task PublishAsync() => this._client.PublishAsync(new() { Topic = topic, Payload = Encoding.UTF8.GetBytes(payload) });
+            Task PublishAsync() => this._client.PublishAsync(new() { Topic = topic, PayloadSegment = Encoding.UTF8.GetBytes(payload) });
         }
 
         public async Task<bool> TryConnectAsync(CancellationToken cancellationToken)
@@ -479,7 +458,7 @@ public sealed class Television : IDisposable
 
         private Task OnDisconnected(MqttClientDisconnectedEventArgs e)
         {
-            this._logger.LogInformation("Disconnected: {reason}", e.Reason);
+            logger.LogInformation("Disconnected: {reason}", e.Reason);
             this.Disconnected?.Invoke(this, e);
             return Task.CompletedTask;
         }
@@ -487,22 +466,20 @@ public sealed class Television : IDisposable
         private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             string topic = e.ApplicationMessage.Topic;
-            string payload = e.ApplicationMessage.Payload is { } bytes ? Encoding.UTF8.GetString(bytes) : string.Empty;
-            this._logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
+            string payload = e.ApplicationMessage.PayloadSegment.Array is null
+                ? string.Empty
+                : Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment.AsSpan());
+            logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
             this.MessageReceived?.Invoke(this, new((topic, payload)));
             switch (topic)
             {
                 case BroadcastTopics.Sleep:
                     this.Sleep?.Invoke(this, EventArgs.Empty);
                     break;
-
                 case BroadcastTopics.VolumeChange:
                     this.VolumeChanged?.Invoke(this, new(Connection.TranslateVolumePayload(payload)));
                     break;
-
-                case BroadcastTopics.Launcher:
-                case BroadcastTopics.Settings:
-                case BroadcastTopics.State:
+                case BroadcastTopics.Launcher or BroadcastTopics.Settings or BroadcastTopics.State:
                     this.StateChanged?.Invoke(this, new(this.TranslateStateMessage(topic, payload)));
                     break;
             }
@@ -511,25 +488,19 @@ public sealed class Television : IDisposable
 
         private IState TranslateStateMessage(string topic, string payload)
         {
-            switch (topic)
+            return topic switch
             {
-                case BroadcastTopics.Launcher:
-                    return new State(StateType.Launcher);
-
-                case BroadcastTopics.Settings:
-                    return new State(StateType.Settings);
-
-                case BroadcastTopics.State:
-                    StateData data = JsonSerializer.Deserialize<StateData>(payload, Connection._jsonOptions);
-                    return data.Type switch
-                    {
-                        "livetv" => new State(StateType.LiveTV),
-                        "sourceswitch" => new State(StateType.SourceSwitch),
-                        "app" => new AppState(new(data.Name!, data.Url!)),
-                        _ => throw new ApplicationException($"Unexpected payload: {payload}"),
-                    };
-            }
-            return new State(topic == this.GetDataTopic("ui_service", "authentication") ? StateType.AuthenticationRequired : StateType.Unknown);
+                BroadcastTopics.Launcher => new State(StateType.Launcher),
+                BroadcastTopics.Settings => new State(StateType.Settings),
+                BroadcastTopics.State when JsonSerializer.Deserialize<StateData>(payload, Connection._jsonOptions) is { } data => data.Type switch
+                {
+                    "livetv" => new State(StateType.LiveTV),
+                    "sourceswitch" => new State(StateType.SourceSwitch),
+                    "app" => new AppState(new(data.Name!, data.Url!)),
+                    _ => throw new ApplicationException($"Unexpected payload: {payload}"),
+                },
+                _ => new State(topic == this.GetDataTopic("ui_service", "authentication") ? StateType.AuthenticationRequired : StateType.Unknown),
+            };
         }
 
         private static class BroadcastTopics

@@ -21,12 +21,14 @@ internal static class FlaggedEnumerations
         {
             if (!EnumNames<T>._isValidType)
             {
-                return Array.Empty<string>();
+                return [];
             }
             ulong numericValue = Unsafe.As<T, ulong>(ref value);
-            return (numericValue & (numericValue - 1ul)) == 0ul // Is this a single flag.
-               ? new[] { TextAttribute.GetText(value) }
-               : ExtractFlags(numericValue);
+            return (numericValue & (numericValue - 1ul)) switch
+            {
+                0ul => new[] { TextAttribute.GetText(value) },
+                _ => ExtractFlags(numericValue),
+            };
 
             static IEnumerable<string> ExtractFlags(ulong value)
             {

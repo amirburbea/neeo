@@ -19,11 +19,9 @@ public interface IFavoritesFeature : IFeature
     Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite);
 }
 
-internal sealed class FavoritesFeature : IFavoritesFeature
+internal sealed class FavoritesFeature(FavoriteHandler handler) : IFavoritesFeature
 {
-    private readonly FavoriteHandler _handler;
-
-    public FavoritesFeature(FavoriteHandler handler) => this._handler = handler ?? throw new ArgumentNullException(nameof(handler));
+    private readonly FavoriteHandler _handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
     public async Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite)
     {

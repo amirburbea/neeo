@@ -6,7 +6,6 @@ using Moq;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Features;
-using Neeo.Sdk.Devices.Setup;
 using Xunit;
 
 namespace Neeo.Sdk.Tests.Devices;
@@ -78,7 +77,7 @@ public sealed class DynamicDeviceRegistryTests
         {
             mockFeature = new(MockBehavior.Strict);
             mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(enableDynamicDeviceBuilder);
-            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<DiscoveredDevice>());
+            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         }
         else
         {

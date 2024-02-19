@@ -14,7 +14,7 @@ public readonly record struct SongInfo(
     [property: JsonPropertyName("songid")] int? SongId
 ) : IMediaInfo
 {
-    internal static readonly string[] Fields = { "album", "thumbnail", "title", "artist", "track" };
+    internal static readonly string[] Fields = ["album", "thumbnail", "title", "artist", "track"];
 
     string IMediaInfo.GetId() => $"songid:{this.SongId}";
 

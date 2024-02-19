@@ -24,7 +24,7 @@ public class SecurityCodeExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static DiscoveredDevice[] DiscoverDevices() => new DiscoveredDevice[] { new("code-device", "Security Code Device", true) };
+    private static DiscoveredDevice[] DiscoverDevices() => [new("code-device", "Security Code Device", true)];
 
     private string GetLabelText(string deviceId) => $"{deviceId} {(this._isRegistered ? "successfully" : "not")} registered";
 

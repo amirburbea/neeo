@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -20,7 +19,7 @@ public static class TVDiscovery
         using CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         source.CancelAfter(scanTime);
         using UdpClient client = new();
-        HashSet<IPAddress> addresses = new();
+        HashSet<IPAddress> addresses = [];
         byte[] request = Encoding.UTF8.GetBytes(string.Format(Constants.SearchRequestTemplate, Constants.SecondScreenService));
         while (!source.IsCancellationRequested)
         {

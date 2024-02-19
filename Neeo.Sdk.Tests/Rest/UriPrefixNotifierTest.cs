@@ -29,7 +29,7 @@ public sealed class UriPrefixNotifierTest
             uriPrefix = prefix;
             return ValueTask.CompletedTask;
         });
-        this._mockDatabase.Setup(database => database.Adapters).Returns(new[] { mockDevice.Object });
+        this._mockDatabase.Setup(database => database.Adapters).Returns([mockDevice.Object]);
 
         await this._uriPrefixNotifier.StartAsync();
 

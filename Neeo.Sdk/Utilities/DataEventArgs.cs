@@ -6,18 +6,14 @@ namespace Neeo.Sdk.Utilities;
 /// Generic event arguments for reporting data.
 /// </summary>
 /// <typeparam name="TData">Type of data for the event.</typeparam>
-public sealed class DataEventArgs<TData> : EventArgs
+/// <param name="data">The data for the event.</param>
+public sealed class DataEventArgs<TData>(TData data) : EventArgs
 {
-    /// <summary>
-    /// Initializes a new instance of <see cref="DataEventArgs{TData}"/> with the specified <paramref name="data"/>.
-    /// </summary>
-    /// <param name="data">The data for the event.</param>
-    public DataEventArgs(TData data) => this.Data = data;
 
     /// <summary>
     /// Gets the data for the event.
     /// </summary>
-    public TData Data { get; }
+    public TData Data { get; } = data;
 
     /// <summary>
     /// Implicitly wraps the <paramref name="data"/> in a <see cref="DataEventArgs{TData}"/>.

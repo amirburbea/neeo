@@ -12,7 +12,7 @@ public readonly record struct VideoInfo(
     [property: JsonPropertyName("movieid")] int? MovieId
 ) : IMediaInfo
 {
-    internal static readonly string[] Fields = { "thumbnail", "title", "year", "genre", "art" };
+    internal static readonly string[] Fields = ["thumbnail", "title", "year", "genre", "art"];
 
     string IMediaInfo.GetId() => $"movieid:{this.MovieId}";
 

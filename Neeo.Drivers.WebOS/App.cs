@@ -41,11 +41,9 @@ public enum App
 }
 
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-internal sealed class AppAttribute : Attribute, INameAttribute
+internal sealed class AppAttribute(string name) : Attribute, INameAttribute
 {
-    public AppAttribute(string name) => this.Name = name;
-
-    public string Name { get; }
+    public string Name { get; } = name;
 }
 
 public static class AppName

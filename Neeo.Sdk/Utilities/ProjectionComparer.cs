@@ -27,24 +27,15 @@ public static class ProjectionComparer
 /// </summary>
 /// <typeparam name="T"></typeparam>
 /// <typeparam name="TResult"></typeparam>
-public sealed class ProjectionComparer<T, TResult> : Comparer<T>
+/// <param name="projection"></param>
+/// <param name="comparer">
+/// Optional - the comparer to use to compare the <paramref name="projection"/> results,
+/// defaulted to <see cref="EqualityComparer{T}.Default"/> when left <see langword="null"/>.
+/// </param>
+public sealed class ProjectionComparer<T, TResult>(Func<T, TResult> projection, IComparer<TResult>? comparer = null) : Comparer<T>
 {
-    private readonly IComparer<TResult> _comparer;
-    private readonly Func<T, TResult> _projection;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ProjectionComparer{T, TResult}"/> class.
-    /// </summary>
-    /// <param name="projection"></param>
-    /// <param name="comparer">
-    /// Optional - the comparer to use to compare the <paramref name="projection"/> results,
-    /// defaulted to <see cref="EqualityComparer{T}.Default"/> when left <see langword="null"/>.
-    /// </param>
-    public ProjectionComparer(Func<T, TResult> projection, IComparer<TResult>? comparer = null)
-    {
-        this._projection = projection ?? throw new ArgumentNullException(nameof(projection));
-        this._comparer = comparer ?? Comparer<TResult>.Default;
-    }
+    private readonly IComparer<TResult> _comparer = comparer ?? Comparer<TResult>.Default;
+    private readonly Func<T, TResult> _projection = projection ?? throw new ArgumentNullException(nameof(projection));
 
     /// <summary>
     /// Compares two objects and returns a value indicating whether one is less than,

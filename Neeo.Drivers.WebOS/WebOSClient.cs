@@ -7,13 +7,11 @@ using System.Threading.Tasks;
 
 namespace Neeo.Drivers.WebOS;
 
-public sealed class WebOSClient : IDisposable
+public sealed class WebOSClient(IPAddress ipAddress) : IDisposable
 {
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
     private ClientWebSocket? _webSocket;
-
-    public WebOSClient(IPAddress ipAddress) => this.IPAddress = ipAddress;
 
     public event EventHandler? Connected;
 
@@ -21,7 +19,7 @@ public sealed class WebOSClient : IDisposable
 
     private event EventHandler? Disposed;
 
-    public IPAddress IPAddress { get; }
+    public IPAddress IPAddress { get; } = ipAddress;
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open };
 
@@ -96,7 +94,7 @@ public sealed class WebOSClient : IDisposable
 
     private async Task MessageLoop()
     {
-        byte[] previous = Array.Empty<byte>();
+        byte[] previous = [];
         try
         {
             if (this._cancellationTokenSource is not { } cts || this._webSocket is not { State: WebSocketState.Open } webSocket)
@@ -131,7 +129,7 @@ public sealed class WebOSClient : IDisposable
                     (previous, previousLength) = (next, nextLength);
                     continue;
                 }
-                (previous, previousLength) = (Array.Empty<byte>(), 0);
+                (previous, previousLength) = ([], 0);
                 try
                 {
                     Process(next.AsSpan(0, nextLength));

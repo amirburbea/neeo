@@ -17,15 +17,13 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
 
-public sealed class KodiClient : IDisposable
+public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger) : IDisposable
 {
     internal static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    private readonly int _httpPort;
-    private readonly ILogger _logger;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
@@ -34,11 +32,6 @@ public sealed class KodiClient : IDisposable
     private PlayerState _playerState = PlayerState.Defaults;
     private int _volume;
     private WebSocket? _webSocket;
-
-    public KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger)
-    {
-        (this.DisplayName, this.IPAddress, this._httpPort, this._logger) = (displayName, ipAddress, httpPort, logger);
-    }
 
     public event EventHandler? Connected;
 
@@ -54,9 +47,9 @@ public sealed class KodiClient : IDisposable
 
     public string DeviceId { get; private set; } = string.Empty;
 
-    public string DisplayName { get; }
+    public string DisplayName { get; } = displayName;
 
-    public IPAddress IPAddress { get; }
+    public IPAddress IPAddress { get; } = ipAddress;
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open };
 
@@ -92,7 +85,7 @@ public sealed class KodiClient : IDisposable
 
         async Task<bool> ConnectAsync()
         {
-            this._logger.LogInformation("Connecting to {ipAddress}:9090/jsonrpc...", this.IPAddress);
+            logger.LogInformation("Connecting to {ipAddress}:9090/jsonrpc...", this.IPAddress);
             ClientWebSocket webSocket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
             CancellationTokenSource cts = new();
             try
@@ -102,12 +95,12 @@ public sealed class KodiClient : IDisposable
                 this._webSocket = webSocket;
                 _ = Task.Factory.StartNew(this.MessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
                 await this.OnConnected().ConfigureAwait(false);
-                this._logger.LogInformation("Connected to {ipAddress}:9090/jsonrpc...", this.IPAddress);
+                logger.LogInformation("Connected to {ipAddress}:9090/jsonrpc...", this.IPAddress);
                 return true;
             }
             catch (WebSocketException)
             {
-                this._logger.LogWarning("Failed to connect to {ipAddress}:9090/jsonrpc.", this.IPAddress);
+                logger.LogWarning("Failed to connect to {ipAddress}:9090/jsonrpc.", this.IPAddress);
                 cts.Dispose();
                 webSocket.Dispose();
                 return false;
@@ -143,7 +136,7 @@ public sealed class KodiClient : IDisposable
         (EpisodeListResult result) => QueryData.Create(result.Limits.Total, result.Episodes)
     );
 
-    public string GetImageUrl(string image) => $"http://{this.IPAddress}:{this._httpPort}/vfs/{Uri.EscapeDataString(image)}";
+    public string GetImageUrl(string image) => $"http://{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
 
     public Task<string> GetLabelAsync(string label) => this.SendMessageAsync(
         "Xbmc.GetInfoLabels",
@@ -261,7 +254,7 @@ public sealed class KodiClient : IDisposable
 
     private async Task MessageLoop()
     {
-        byte[] previous = Array.Empty<byte>();
+        byte[] previous = [];
         try
         {
             if (this._cancellationTokenSource is not { } cts || this._webSocket is not { State: WebSocketState.Open } webSocket)
@@ -292,7 +285,7 @@ public sealed class KodiClient : IDisposable
                     (previous, previousLength) = (next, nextLength);
                     continue;
                 }
-                (previous, previousLength) = (Array.Empty<byte>(), 0);
+                (previous, previousLength) = ([], 0);
                 try
                 {
                     Process(next.AsSpan(0, nextLength));
@@ -465,7 +458,7 @@ public sealed class KodiClient : IDisposable
             {
                 return transform(ExtractPayload(await elementSource.Task.ConfigureAwait(false)));
             }
-            this._logger.LogWarning("Something went wrong (SendMessageAsync timed out)");
+            logger.LogWarning("Something went wrong (SendMessageAsync timed out)");
             return await CreateCanceledTask().ConfigureAwait(false);
 
             TPayload ExtractPayload(JsonElement element)
@@ -480,7 +473,7 @@ public sealed class KodiClient : IDisposable
                 }
                 catch (JsonException)
                 {
-                    this._logger.LogError("Failed to deserialize to {payload} from {element}.", typeof(TPayload), element);
+                    logger.LogError("Failed to deserialize to {payload} from {element}.", typeof(TPayload), element);
                     throw;
                 }
             }
@@ -557,7 +550,7 @@ public sealed class KodiClient : IDisposable
         string Thumbnail
     )
     {
-        public static readonly string[] Fields = new[] { "thumbnail", "title" };
+        public static readonly string[] Fields = ["thumbnail", "title"];
     }
 
     private readonly record struct PlayerInfo(

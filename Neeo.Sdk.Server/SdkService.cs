@@ -11,38 +11,34 @@ using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Server;
 
-public sealed class SdkService : IHostedService
-{
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<SdkService> _logger;
-    private readonly IDeviceProvider[] _providers;
-    private ISdkEnvironment? _environment;
-
-    public SdkService(
+public sealed class SdkService(
         IEnumerable<IDeviceProvider> providers,
         IConfiguration configuration,
         ILogger<SdkService> logger
-    ) => (this._configuration, this._logger, this._providers) = (configuration, logger, providers as IDeviceProvider[] ?? providers.ToArray());
+    ) : IHostedService
+{
+    private readonly IDeviceProvider[] _providers = providers as IDeviceProvider[] ?? providers.ToArray();
+    private ISdkEnvironment? _environment;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         Brain? brain;
-        if (this._configuration.GetValue<string>(nameof(Brain)) is { } text && IPAddress.TryParse(text, out IPAddress? address))
+        if (configuration.GetValue<string>(nameof(Brain)) is { } text && IPAddress.TryParse(text, out IPAddress? address))
         {
             brain = new(address);
         }
         else
         {
-            this._logger.LogInformation("Discovering brain...");
+            logger.LogInformation("Discovering brain...");
             if ((brain = await Brain.DiscoverOneAsync(cancellationToken).ConfigureAwait(false)) is null)
             {
                 const string errorMessage = "Failed to discover brain on the network. (If on Windows, ensure Bonjour is installed).";
                 throw new ApplicationException(errorMessage);
             }
         }
-        this._logger.LogInformation("Using brain at {endpoint}...", brain.ServiceEndPoint);
-        this._environment = await brain.StartServerAsync(this._providers, name: this._configuration.GetValue<string>("ServerName"), cancellationToken: cancellationToken).ConfigureAwait(false);
-        this._logger.LogInformation("Started server at address {address}...", this._environment.HostAddress);
+        logger.LogInformation("Using brain at {endpoint}...", brain.ServiceEndPoint);
+        this._environment = await brain.StartServerAsync(this._providers, name: configuration.GetValue<string>("ServerName"), cancellationToken: cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Started server at address {address}...", this._environment.HostAddress);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -51,7 +47,7 @@ public sealed class SdkService : IHostedService
         {
             return;
         }
-        this._logger.LogInformation("Stopping server at address {address}...", environment.HostAddress);
+        logger.LogInformation("Stopping server at address {address}...", environment.HostAddress);
         await environment.StopAsync(cancellationToken).ConfigureAwait(false);
     }
 }

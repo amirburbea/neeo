@@ -48,9 +48,9 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         [Buttons.VolumeUp] = RemoteKey.VolumeUp,
     };
 
-    private readonly HashSet<string> _deviceIds = new();
+    private readonly HashSet<string> _deviceIds = [];
     private readonly ILogger _logger;
-    private Television[] _candidates = Array.Empty<Television>();
+    private Television[] _candidates = [];
     private bool _connected;
     private IDeviceNotifier? _notifier;
     private Television? _tv;
@@ -218,8 +218,8 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
             this.SetTV(tv, state);
         }
         return (tv = this._tv) is null
-            ? Array.Empty<DiscoveredDevice>()
-            : new DiscoveredDevice[] { new(tv.DeviceId, $"Hisense TV ({tv.MacAddress})", true) };
+            ? []
+            : [new(tv.DeviceId, $"Hisense TV ({tv.MacAddress})", true)];
     }
 
     private async Task<bool> QueryIsRegistered()
@@ -244,7 +244,7 @@ public sealed class HisenseDeviceProvider : IDeviceProvider
         {
             return RegistrationResult.Success;
         }
-        Television[] candidates = this._tv is { } tv ? new[] { tv } : this._candidates;
+        Television[] candidates = this._tv is { } tv ? [tv] : this._candidates;
         for (int index = 0; index < candidates.Length; index++)
         {
             Television candidate = candidates[index];
