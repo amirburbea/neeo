@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
-using Neeo.Sdk.Devices.Setup;
 using Xunit;
 
 namespace Neeo.Sdk.Tests.Devices;
@@ -30,7 +29,7 @@ public sealed class DynamicDeviceRegistryTests
         var (mockRootAdapter, _) = CreateRootAdapter(discovery: true, enableDynamicDeviceBuilder: true);
         Mock<IDeviceAdapter> mockDynamicAdapter = new(MockBehavior.Strict);
         mockDynamicAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockDynamicAdapter));
-        mockDynamicAdapter.Setup(adapter => adapter.DeviceCapabilities).Returns(new[] { DeviceCapability.DynamicDevice });
+        mockDynamicAdapter.Setup(adapter => adapter.DeviceCapabilities).Returns([DeviceCapability.DynamicDevice]);
         Mock<IDeviceBuilder> mockDeviceBuilder = new(MockBehavior.Strict);
         mockDeviceBuilder.Setup(device => device.BuildAdapter()).Returns(mockDynamicAdapter.Object);
 
@@ -62,7 +61,7 @@ public sealed class DynamicDeviceRegistryTests
         var (mockRootAdapter, _) = CreateRootAdapter(discovery: true, enableDynamicDeviceBuilder: true);
         Mock<IDeviceAdapter> mockDynamicAdapter = new(MockBehavior.Strict);
         mockDynamicAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockDynamicAdapter));
-        mockDynamicAdapter.Setup(adapter => adapter.DeviceCapabilities).Returns(Array.Empty<DeviceCapability>());
+        mockDynamicAdapter.Setup(adapter => adapter.DeviceCapabilities).Returns([]);
         Mock<IDeviceBuilder> mockDeviceBuilder = new(MockBehavior.Strict);
         mockDeviceBuilder.Setup(device => device.BuildAdapter()).Returns(mockDynamicAdapter.Object);
 
@@ -78,7 +77,7 @@ public sealed class DynamicDeviceRegistryTests
         {
             mockFeature = new(MockBehavior.Strict);
             mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(enableDynamicDeviceBuilder);
-            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<DiscoveredDevice>());
+            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         }
         else
         {

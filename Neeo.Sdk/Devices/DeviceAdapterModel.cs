@@ -30,7 +30,6 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     [JsonPropertyName("capabilities")]
     public IReadOnlyCollection<IComponent> Components => this._adapter.Components;
 
-
     /// <summary>
     /// Gets the collection of unique capabilities of the device.
     /// </summary>

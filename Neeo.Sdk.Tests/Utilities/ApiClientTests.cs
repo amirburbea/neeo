@@ -109,7 +109,7 @@ public sealed class ApiClientTests : IDisposable
 
     private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)
     {
-        List<HttpRequestMessage> captured = new();
+        List<HttpRequestMessage> captured = [];
         string? requestBody = default;
         this._mockMessageHandler
             .Protected()

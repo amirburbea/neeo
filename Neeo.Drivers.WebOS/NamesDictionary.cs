@@ -9,7 +9,7 @@ internal static class NameDictionary
 {
     public static Dictionary<T, string> Generate<T, TAttribute>()
         where T : struct, Enum
-        where TAttribute : Attribute,INameAttribute => new(
+        where TAttribute : Attribute, INameAttribute => new(
         from field in typeof(T).GetFields(BindingFlags.Static | BindingFlags.Public)
         select KeyValuePair.Create(
             (T)field.GetValue(null)!,

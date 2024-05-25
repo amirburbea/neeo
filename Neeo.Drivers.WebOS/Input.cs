@@ -7,6 +7,7 @@ public enum Input
 {
     [Input("externalinput.av1")]
     AV,
+
     Hdmi1,
     Hdmi2,
     Hdmi3,
@@ -15,11 +16,9 @@ public enum Input
 }
 
 [AttributeUsage(AttributeTargets.Field)]
-internal sealed class InputAttribute : Attribute, INameAttribute
+internal sealed class InputAttribute(string name) : Attribute, INameAttribute
 {
-    public InputAttribute(string name) => this.Name = name;
-
-    public string Name { get; }
+    public string Name { get; } = name;
 }
 
 public static class InputName

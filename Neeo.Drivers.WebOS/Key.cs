@@ -78,11 +78,9 @@ public enum Key
 }
 
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-internal sealed class KeyAttribute : Attribute, INameAttribute
+internal sealed class KeyAttribute(string key) : Attribute, INameAttribute
 {
-    public KeyAttribute(string key) => this.Key = key;
-
-    public string Key { get; }
+    public string Key { get; } = key;
 
     string INameAttribute.Name => this.Key;
 }

@@ -3,13 +3,8 @@ using Neeo.Sdk.Devices;
 
 namespace Neeo.Drivers.Kodi;
 
-public sealed class KodiRemoteDeviceProvider : KodiDeviceProviderBase
+public sealed class KodiRemoteDeviceProvider(KodiClientManager clientManager, ILogger<KodiRemoteDeviceProvider> logger) : KodiDeviceProviderBase(clientManager, "Remote (Kodi)", DeviceType.TV, logger)
 {
-    public KodiRemoteDeviceProvider(KodiClientManager clientManager, ILogger<KodiRemoteDeviceProvider> logger)
-        : base(clientManager, "Remote (Kodi)", DeviceType.TV, logger)
-    {
-    }
-
     protected override IDeviceBuilder CreateDevice() => base.CreateDevice()
         .AddTextLabel("TITLE", "Now Playing Title", this.GetTitleAsync, isLabelVisible: true)
         .AddTextLabel("DESCRIPTION", "Now Playing Description", this.GetDescriptionAsync, isLabelVisible: true)

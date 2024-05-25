@@ -17,12 +17,12 @@ using Entry = NotificationMapping.Entry;
 public sealed class NotificationMappingTests
 {
     private static readonly Entry[] _entries =
-    {
+    [
         new("key0", Name: "name0", Label: "name1"),
         new("key1", Name: "name1", Label: "name1"),
         new("key2", Name: "name2", Label: "label2"),
         new("key3", Name: "name3", Label: "label2"),
-    };
+    ];
 
     private readonly NotificationMapping _notificationMapping;
     private readonly Lazy<string> _path;
@@ -31,7 +31,7 @@ public sealed class NotificationMappingTests
     {
         Mock<ISdkEnvironment> mockEnvironment = new(MockBehavior.Strict);
         mockEnvironment.Setup(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
-        List<string> paths = new();
+        List<string> paths = [];
         Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         mockClient
             .Setup(client => client.GetAsync(Capture.In(paths), It.IsAny<Func<Entry[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
@@ -53,7 +53,7 @@ public sealed class NotificationMappingTests
     {
         var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
 
-        Assert.Equal(new[] { "key2", "key3" }, keys);
+        Assert.Equal<string>(["key2", "key3"], keys);
     }
 
     [Fact]

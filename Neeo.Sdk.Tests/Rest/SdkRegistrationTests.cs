@@ -25,8 +25,8 @@ public sealed class SdkRegistrationTests
         mockBrain.Setup(brain => brain.HostName).Returns(nameof(Brain));
         mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
         Mock<IApiClient> mockApiClient = new(MockBehavior.Strict);
-        List<string> path = new();
-        List<string> body = new();
+        List<string> path = [];
+        List<string> body = [];
         // Each method sends an anonymous type as the post body so we must set up with It.IsAnyType.
         // Capture is not compatible with It.IsAnyType so unlike the path we must capture the body within the returns method.
         mockApiClient

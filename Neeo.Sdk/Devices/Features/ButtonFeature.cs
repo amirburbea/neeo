@@ -17,16 +17,11 @@ public interface IButtonFeature : IFeature
     Task<SuccessResponse> ExecuteAsync(string deviceId);
 }
 
-internal sealed class ButtonFeature : IButtonFeature
+internal sealed class ButtonFeature(ButtonHandler handler, string button) : IButtonFeature
 {
-    private readonly string _button;
-    private readonly ButtonHandler _handler;
-
-    public ButtonFeature(ButtonHandler handler, string button) => (this._handler, this._button) = (handler, button);
-
     public async Task<SuccessResponse> ExecuteAsync(string deviceId)
     {
-        await this._handler(deviceId, this._button).ConfigureAwait(false);
+        await handler(deviceId, button).ConfigureAwait(false);
         return true;
     }
 }

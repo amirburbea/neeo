@@ -13,25 +13,17 @@ public enum ListButtonIcon
     Repeat
 }
 
-public sealed class ListButton : ClickableListItemBase
+public sealed class ListButton(string title, string actionIdentifier, bool? inverse = default, ListButtonIcon? icon = default, ListUIAction? uiAction = default) : ClickableListItemBase(actionIdentifier, uiAction)
 {
-    public ListButton(string title, string actionIdentifier, bool? inverse = default, ListButtonIcon? icon = default, ListUIAction? uiAction = default)
-        : base(actionIdentifier, uiAction)
-    {
-        this.Title = Validator.ValidateText(title, maxLength: 255);
-        this.Icon = icon;
-        this.Inverse = inverse;
-    }
-
     [JsonPropertyName("iconName")]
-    public ListButtonIcon? Icon { get; }
+    public ListButtonIcon? Icon { get; } = icon;
 
-    public bool? Inverse { get; }
+    public bool? Inverse { get; } = inverse;
 
     /// <summary>
     /// Tells the NEEO Brain that this is a Button.
     /// </summary>
     public bool IsButton { get; } = true;
 
-    public string Title { get; }
+    public string Title { get; } = Validator.ValidateText(title, maxLength: 255);
 }

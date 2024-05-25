@@ -138,8 +138,6 @@ internal sealed class InputCommandAttribute : Attribute
         select KeyValuePair.Create((InputCommand)field.GetValue(null)!, attribute)
     );
 
-    public static InputCommandAttribute? GetAttribute(InputCommand command) => InputCommandAttribute._attributes.GetValueOrDefault(command);
-
     public InputCommandAttribute(string method, string? action = default)
     {
         (this.Method, this.Action) = (method, action);
@@ -148,4 +146,6 @@ internal sealed class InputCommandAttribute : Attribute
     public string? Action { get; }
 
     public string Method { get; }
+
+    public static InputCommandAttribute? GetAttribute(InputCommand command) => InputCommandAttribute._attributes.GetValueOrDefault(command);
 }

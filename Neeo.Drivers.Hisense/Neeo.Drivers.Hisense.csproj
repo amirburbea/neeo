@@ -1,8 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
-	<LangVersion>11.0</LangVersion>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <OutputType>Library</OutputType>
@@ -19,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MQTTnet" Version="4.1.2.350" />
+    <PackageReference Include="MQTTnet" Version="4.3.6.1152" />
   </ItemGroup>
 
   <ItemGroup>

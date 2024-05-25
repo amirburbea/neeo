@@ -30,8 +30,6 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             .EnableNotifications(notifier => this._controller.Notifier = notifier);
     }
 
-    public IDeviceBuilder DeviceBuilder { get; }
-
     internal enum Pet
     {
         Kitten,
@@ -66,6 +64,8 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
         Description,
     }
 
+    public IDeviceBuilder DeviceBuilder { get; }
+
     private static string GetCoverArt(Pet pet) => $"https://neeo-sdk.neeo.io/{pet.ToString().ToLower()}.jpg";
 
     private static string GetDescription(Pet pet) => $"A song about my {pet.ToString().ToLower()}";
@@ -74,7 +74,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
     private sealed class PlayerService
     {
-        private readonly ConcurrentDictionary<string, object> _dictionary = new();
+        private readonly ConcurrentDictionary<string, object> _dictionary = [];
 
         public PlayerService()
         {
@@ -96,12 +96,9 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
         public void SetValue(PlayerKey key, object value) => this._dictionary[TextAttribute.GetText(key)] = value;
     }
 
-    private sealed class PlayerWidgetController : IPlayerWidgetController
+    private sealed class PlayerWidgetController(ILogger logger) : IPlayerWidgetController
     {
-        private readonly ILogger _logger;
         private readonly PlayerService _service = new();
-
-        public PlayerWidgetController(ILogger logger) => this._logger = logger;
 
         public bool IsQueueSupported => false;
 
@@ -202,7 +199,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
         private Task<TValue> GetValueAsync<TValue>(PlayerKey key)
         {
-            this._logger.LogInformation("Getting component state {key}", key);
+            logger.LogInformation("Getting component state {key}", key);
             return Task.FromResult(this._service.GetValue<TValue>(key));
         }
 
@@ -214,7 +211,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
         private async Task SetValueAsync(PlayerKey key, object value)
         {
-            this._logger.LogInformation("Setting component {key} to {value}", key, value);
+            logger.LogInformation("Setting component {key} to {value}", key, value);
             await this.Notifier.SendNotificationAsync(TextAttribute.GetText(key), value).ConfigureAwait(false);
             this._service.SetValue(key, value);
         }

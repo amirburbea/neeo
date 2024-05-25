@@ -45,18 +45,12 @@ public interface IApiClient
         where TData : notnull;
 }
 
-internal sealed class ApiClient : IApiClient, IDisposable
+internal sealed class ApiClient(IBrain brain, HttpMessageHandler messageHandler, ILogger<ApiClient> logger) : IApiClient, IDisposable
 {
     private static readonly MediaTypeHeaderValue _jsonContentType = new("application/json");
 
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<ApiClient> _logger;
-    private readonly string _uriPrefix;
-
-    public ApiClient(IBrain brain, HttpMessageHandler messageHandler, ILogger<ApiClient> logger)
-    {
-        (this._uriPrefix, this._httpClient, this._logger) = ($"http://{brain.ServiceEndPoint}", new(messageHandler), logger);
-    }
+    private readonly HttpClient _httpClient = new(messageHandler);
+    private readonly string _uriPrefix = $"http://{brain.ServiceEndPoint}";
 
     public void Dispose() => this._httpClient.Dispose();
 
@@ -85,7 +79,7 @@ internal sealed class ApiClient : IApiClient, IDisposable
             throw new ArgumentException("Path must start with a forward slash (\"/\").", nameof(path));
         }
         string uri = this._uriPrefix + path;
-        this._logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
+        logger.LogInformation("Making {method} request to {uri}...", method.Method, uri);
         using HttpRequestMessage request = new(method, uri) { Content = content };
         using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);

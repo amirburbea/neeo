@@ -29,20 +29,13 @@ public interface ISubscriptionFeature : IFeature
     Task InitializeDeviceListAsync(string[] deviceIds);
 }
 
-internal sealed class SubscriptionFeature : ISubscriptionFeature
+internal sealed class SubscriptionFeature(DeviceSubscriptionHandler onDeviceAdded, DeviceSubscriptionHandler onDeviceRemoved, DeviceSubscriptionListHandler deviceListInitializer) : ISubscriptionFeature
 {
-    private readonly DeviceSubscriptionListHandler _deviceListInitializer;
+    private readonly DeviceSubscriptionListHandler _deviceListInitializer = deviceListInitializer ?? throw new ArgumentNullException(nameof(deviceListInitializer));
 
-    public SubscriptionFeature(DeviceSubscriptionHandler onDeviceAdded, DeviceSubscriptionHandler onDeviceRemoved, DeviceSubscriptionListHandler deviceListInitializer)
-    {
-        this.OnDeviceAdded = onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded));
-        this.OnDeviceRemoved = onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved));
-        this._deviceListInitializer = deviceListInitializer ?? throw new ArgumentNullException(nameof(deviceListInitializer));
-    }
+    public DeviceSubscriptionHandler OnDeviceAdded { get; } = onDeviceAdded ?? throw new ArgumentNullException(nameof(onDeviceAdded));
 
-    public DeviceSubscriptionHandler OnDeviceAdded { get; }
-
-    public DeviceSubscriptionHandler OnDeviceRemoved { get; }
+    public DeviceSubscriptionHandler OnDeviceRemoved { get; } = onDeviceRemoved ?? throw new ArgumentNullException(nameof(onDeviceRemoved));
 
     public Task InitializeDeviceListAsync(string[] deviceIds) => this._deviceListInitializer(deviceIds);
 }

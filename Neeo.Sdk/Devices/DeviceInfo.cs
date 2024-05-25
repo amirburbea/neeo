@@ -6,25 +6,22 @@ namespace Neeo.Sdk.Devices;
 /// <summary>
 /// Identifying information about a device.
 /// </summary>
-public readonly struct DeviceInfo
+/// <param name="adapter">The device adapter being described.</param>
+public readonly struct DeviceInfo(IDeviceAdapter adapter)
 {
-    private readonly IDeviceAdapter _adapter;
-
-    internal DeviceInfo(IDeviceAdapter adapter) => this._adapter = adapter;
-
     /// <summary>
     /// Gets the device adapter name.
     /// </summary>
-    public string Name => this._adapter.DeviceName;
+    public string Name => adapter.DeviceName;
 
     /// <summary>
     /// Gets the optional specific name specified for the device.
     /// </summary>
     [JsonPropertyName("specificname")]
-    public string? SpecificName => this._adapter.SpecificName;
+    public string? SpecificName => adapter.SpecificName;
 
     /// <summary>
     /// Gets the collection of additional search tokens specified for the device.
     /// </summary>
-    public IReadOnlyCollection<string> Tokens => this._adapter.Tokens;
+    public IReadOnlyCollection<string> Tokens => adapter.Tokens;
 }

@@ -34,7 +34,7 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        this._logger.LogInformation("{method} {adapter}:{deviceId}.", methodName, adapter.DeviceName, deviceId);
+        logger.LogInformation("{method} {adapter}:{deviceId}.", methodName, adapter.DeviceName, deviceId);
         if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature && handlerProjection(feature) is { } subscriptionHandler)
         {
             await subscriptionHandler(deviceId);

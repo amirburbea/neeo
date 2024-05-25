@@ -8,19 +8,17 @@ namespace Neeo.Sdk.Utilities;
 /// <summary>
 /// An attribute used to associate text with an enumeration value.
 /// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="TextAttribute"/> with the specified <paramref name="text"/>.
+/// </remarks>
+/// <param name="text">The text associated with the decorated item.</param>
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
-public sealed class TextAttribute : Attribute
+public sealed class TextAttribute(string text) : Attribute
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="TextAttribute"/> with the specified <paramref name="text"/>.
-    /// </summary>
-    /// <param name="text">The text associated with the decorated item.</param>
-    public TextAttribute(string text) => this.Text = text;
-
     /// <summary>
     /// The text associated with the decorated item.
     /// </summary>
-    public string Text { get; }
+    public string Text { get; } = text;
 
     /// <summary>
     /// Attempts to find the enumerated value associated with the specified text.

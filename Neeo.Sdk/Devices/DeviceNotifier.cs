@@ -58,22 +58,14 @@ public interface IDeviceNotifier
     Task SendPowerNotificationAsync(bool powerState, string deviceId = "default", CancellationToken cancellationToken = default);
 }
 
-internal sealed class DeviceNotifier : IDeviceNotifier
+internal sealed class DeviceNotifier(IDeviceAdapter adapter, INotificationService notificationService, bool supportsPowerNotifications) : IDeviceNotifier
 {
-    private readonly IDeviceAdapter _adapter;
-    private readonly INotificationService _notificationService;
-
-    public DeviceNotifier(IDeviceAdapter adapter, INotificationService notificationService, bool supportsPowerNotifications)
-    {
-        (this._adapter, this._notificationService, this.SupportsPowerNotifications) = (adapter, notificationService, supportsPowerNotifications);
-    }
-
-    public bool SupportsPowerNotifications { get; }
+    public bool SupportsPowerNotifications => supportsPowerNotifications;
 
     public Task SendNotificationAsync(string componentName, object value, string deviceId, CancellationToken cancellationToken)
     {
-        return this._notificationService.SendSensorNotificationAsync(
-            this._adapter,
+        return notificationService.SendSensorNotificationAsync(
+            adapter,
             new(deviceId, componentName, value),
             cancellationToken
         );
@@ -81,12 +73,12 @@ internal sealed class DeviceNotifier : IDeviceNotifier
 
     public Task SendPowerNotificationAsync(bool powerState, string deviceId, CancellationToken cancellationToken)
     {
-        if (!this.SupportsPowerNotifications)
+        if (!supportsPowerNotifications)
         {
             throw new NotSupportedException("The device did not register a power state sensor.");
         }
-        return this._notificationService.SendNotificationAsync(
-            this._adapter,
+        return notificationService.SendNotificationAsync(
+            adapter,
             new(deviceId, Constants.PowerSensorName, BooleanBoxes.GetBox(powerState)),
             cancellationToken
         );

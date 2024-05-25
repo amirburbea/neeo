@@ -18,7 +18,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             .SetIcon(DeviceIconOverride.NeeoBrain)
             .AddAdditionalSearchTokens("explorer")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-            .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, populator: Browse, actionHandler: OnDirectoryAction);
+            .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, populator: Browse, actionHandler: this.OnDirectoryAction);
     }
 
     public IDeviceBuilder DeviceBuilder { get; }

@@ -7,13 +7,11 @@ using System.Threading.Tasks;
 
 namespace Neeo.Drivers.WebOS;
 
-public sealed class WebOSClient : IDisposable
+public sealed class WebOSClient(IPAddress ipAddress) : IDisposable
 {
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
     private ClientWebSocket? _webSocket;
-
-    public WebOSClient(IPAddress ipAddress) => this.IPAddress = ipAddress;
 
     public event EventHandler? Connected;
 
@@ -21,7 +19,7 @@ public sealed class WebOSClient : IDisposable
 
     private event EventHandler? Disposed;
 
-    public IPAddress IPAddress { get; }
+    public IPAddress IPAddress { get; } = ipAddress;
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open };
 
@@ -75,28 +73,9 @@ public sealed class WebOSClient : IDisposable
         source?.Cancel();
     }
 
-    private void OnConnected()
-    {
-        this.Connected?.Invoke(this, EventArgs.Empty);
-    }
-
-    private async void OnDisconnected()
-    {
-        this.CleanUp();
-        this.Disconnected?.Invoke(this, EventArgs.Empty);
-        using PeriodicTimer timer = new(TimeSpan.FromMinutes(1d));
-        while (!this.IsDisposed && !this.IsConnected && await timer.WaitForNextTickAsync().ConfigureAwait(false))
-        {
-            if (await this.ConnectAsync().ConfigureAwait(false))
-            {
-                return;
-            }
-        }
-    }
-
     private async Task MessageLoop()
     {
-        byte[] previous = Array.Empty<byte>();
+        byte[] previous = [];
         try
         {
             if (this._cancellationTokenSource is not { } cts || this._webSocket is not { State: WebSocketState.Open } webSocket)
@@ -131,7 +110,7 @@ public sealed class WebOSClient : IDisposable
                     (previous, previousLength) = (next, nextLength);
                     continue;
                 }
-                (previous, previousLength) = (Array.Empty<byte>(), 0);
+                (previous, previousLength) = ([], 0);
                 try
                 {
                     Process(next.AsSpan(0, nextLength));
@@ -160,7 +139,7 @@ public sealed class WebOSClient : IDisposable
             //this.CancelOutstanding();
         }
 
-        void Process(ReadOnlySpan<byte> message)
+        static void Process(ReadOnlySpan<byte> message)
         {
             //JsonRpcResponse response = JsonSerializer.Deserialize<JsonRpcResponse>(message, JsonRpc.SerializerOptions);
             //if (response.Error is { Message: { } errorMessage })
@@ -175,6 +154,25 @@ public sealed class WebOSClient : IDisposable
             //{
             //    this.ProcessIncomingMessage(response.Method, parameters.Data);
             //}
+        }
+    }
+
+    private void OnConnected()
+    {
+        this.Connected?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async void OnDisconnected()
+    {
+        this.CleanUp();
+        this.Disconnected?.Invoke(this, EventArgs.Empty);
+        using PeriodicTimer timer = new(TimeSpan.FromMinutes(1d));
+        while (!this.IsDisposed && !this.IsConnected && await timer.WaitForNextTickAsync().ConfigureAwait(false))
+        {
+            if (await this.ConnectAsync().ConfigureAwait(false))
+            {
+                return;
+            }
         }
     }
 }

@@ -19,14 +19,14 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        this._logger.LogInformation("Beginning discovery for {adapter}...", adapter.DeviceName);
+        logger.LogInformation("Beginning discovery for {adapter}...", adapter.DeviceName);
         if (await feature.DiscoverAsync(cancellationToken: cancellationToken) is not { Length: > 0 } devices)
         {
             return Array.Empty<DiscoveredDevice>();
         }
         if (feature.EnableDynamicDeviceBuilder)
         {
-            Parallel.ForEach(devices, new() { CancellationToken = cancellationToken }, device => this._dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, device.DeviceBuilder!));
+            Parallel.ForEach(devices, new() { CancellationToken = cancellationToken }, device => dynamicDevices.RegisterDiscoveredDevice(adapter, device.Id, device.DeviceBuilder!));
         }
         return devices;
     }
@@ -38,7 +38,7 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        this._logger.LogInformation("Querying registration for {adapter}...", adapter.DeviceName);
+        logger.LogInformation("Querying registration for {adapter}...", adapter.DeviceName);
         return await feature.QueryIsRegisteredAsync();
     }
 
@@ -49,8 +49,8 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        this._logger.LogInformation("Registering {adapter}...", adapter.DeviceName);
-        if (await feature.RegisterAsync(payload.Data, this._privateKey) is not { IsSuccess: false, Error: { } errorMessage })
+        logger.LogInformation("Registering {adapter}...", adapter.DeviceName);
+        if (await feature.RegisterAsync(payload.Data, pgpKeys.PrivateKey) is not { IsSuccess: false, Error: { } errorMessage })
         {
             return this.Ok();
         }

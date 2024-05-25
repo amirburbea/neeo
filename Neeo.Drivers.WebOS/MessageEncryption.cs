@@ -12,7 +12,7 @@ internal static partial class MessageEncryption
     private static readonly byte[] _emptyIV = new byte[Constants.IVLength];
 
     private static readonly byte[] _salt =
-    {
+    [
         0x63,
         0x61,
         0xb8,
@@ -29,7 +29,7 @@ internal static partial class MessageEncryption
         0x56,
         0x8f,
         0xb9,
-    };
+    ];
 
     public static string Decrypt(byte[] key, byte[] encrypted)
     {

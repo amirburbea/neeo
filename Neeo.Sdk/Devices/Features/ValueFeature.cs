@@ -27,18 +27,9 @@ public interface IValueFeature : IFeature
     Task<SuccessResponse> SetValueAsync(string deviceId, string value);
 }
 
-internal sealed class ValueFeature : IValueFeature
+internal sealed class ValueFeature(Func<string, Task<object>> getter, Func<string, string, Task>? setter = default) : IValueFeature
 {
-    private readonly Func<string, Task<object>> _getter;
-    private readonly Func<string, string, Task>? _setter;
-
-    private ValueFeature(Func<string, Task<object>> getter, Func<string, string, Task>? setter = default)
-    {
-        (this._getter, this._setter) = (getter, setter);
-    }
-
-    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter)
-        where TValue : notnull => new(
+    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter) where TValue : notnull => new(
         ValueFeature.WrapGetter(getter, ObjectConverter<TValue>.Default)
     );
 
@@ -56,11 +47,11 @@ internal sealed class ValueFeature : IValueFeature
         ValueFeature.WrapSetter(setter, double.Parse)
     );
 
-    public async Task<ValueResponse> GetValueAsync(string deviceId) => new(await this._getter(deviceId).ConfigureAwait(false));
+    public async Task<ValueResponse> GetValueAsync(string deviceId) => new(await getter(deviceId).ConfigureAwait(false));
 
     public async Task<SuccessResponse> SetValueAsync(string deviceId, string value)
     {
-        await (this._setter ?? throw new NotSupportedException())(deviceId, value).ConfigureAwait(false);
+        await (setter ?? throw new NotSupportedException())(deviceId, value).ConfigureAwait(false);
         return true;
     }
 

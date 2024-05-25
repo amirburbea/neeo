@@ -12,14 +12,11 @@ using Zeroconf;
 
 namespace Neeo.Drivers.Kodi;
 
-public sealed class KodiClientManager : IDisposable
+public sealed class KodiClientManager(ILogger<KodiClient> logger) : IDisposable
 {
     private readonly ConcurrentDictionary<string, KodiClient> _clients = new();
-    private readonly ILogger<KodiClient> _logger;
     private PeriodicTimer? _discoveryTimer;
     private Task? _initializationTask;
-
-    public KodiClientManager(ILogger<KodiClient> logger) => this._logger = logger;
 
     public event EventHandler<DataEventArgs<KodiClient>>? ClientDiscovered;
 
@@ -44,11 +41,11 @@ public sealed class KodiClientManager : IDisposable
             {
                 return;
             }
-            this._logger.LogInformation("Found client ({name}) at IP address {ip}.", host.DisplayName, host.IPAddress);
-            KodiClient client = new(host.DisplayName, ipAddress, host.Services.First().Value.Port, this._logger);
+            logger.LogInformation("Found client ({name}) at IP address {ip}.", host.DisplayName, host.IPAddress);
+            KodiClient client = new(host.DisplayName, ipAddress, host.Services.First().Value.Port, logger);
             if (!await client.ConnectAsync(cancellationToken).ConfigureAwait(false) || client.MacAddress.Equals(PhysicalAddress.None))
             {
-                this._logger.LogWarning("Something went wrong, ignoring client at {ip}.", client.IPAddress);
+                logger.LogWarning("Something went wrong, ignoring client at {ip}.", client.IPAddress);
                 client.Dispose();
                 return;
             }

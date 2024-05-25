@@ -7,7 +7,7 @@ namespace Neeo.Sdk.Devices.Lists;
 
 public sealed class ListBuilder
 {
-    private readonly List<IListItem> _items = new();
+    private readonly List<IListItem> _items = [];
     private readonly int _limit;
 
     internal ListBuilder(BrowseParameters parameters)

@@ -28,22 +28,14 @@ public interface IDirectoryFeature : IFeature
     Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier);
 }
 
-internal sealed class DirectoryFeature : IDirectoryFeature
+internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? identifier = default) : IDirectoryFeature
 {
-    private readonly DirectoryActionHandler _actionHandler;
-    private readonly DirectoryBrowser _browser;
-    private readonly string? _identifier;
-
-    public DirectoryFeature(DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? identifier = default)
-    {
-        this._browser = browser ?? throw new ArgumentNullException(nameof(browser));
-        this._actionHandler = actionHandler ?? throw new ArgumentNullException(nameof(actionHandler));
-        this._identifier = identifier;
-    }
+    private readonly DirectoryActionHandler _actionHandler = actionHandler ?? throw new ArgumentNullException(nameof(actionHandler));
+    private readonly DirectoryBrowser _browser = browser ?? throw new ArgumentNullException(nameof(browser));
 
     public async Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters)
     {
-        ListBuilder builder = new(string.IsNullOrEmpty(parameters.BrowseIdentifier) && !string.IsNullOrEmpty(this._identifier) ? parameters with { BrowseIdentifier = this._identifier } : parameters);
+        ListBuilder builder = new(string.IsNullOrEmpty(parameters.BrowseIdentifier) && !string.IsNullOrEmpty(identifier) ? parameters with { BrowseIdentifier = identifier } : parameters);
         await this._browser(deviceId, builder).ConfigureAwait(false);
         return builder;
     }

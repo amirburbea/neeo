@@ -432,15 +432,15 @@ public interface IDeviceBuilder
 
 internal sealed partial class DeviceBuilder : IDeviceBuilder
 {
-    private readonly List<string> _additionalSearchTokens = new();
-    private readonly Dictionary<string, ButtonParameters> _buttons = new();
-    private readonly HashSet<DeviceCharacteristic> _characteristics = new();
-    private readonly Dictionary<string, DirectoryParameters> _directories = new();
-    private readonly Dictionary<string, ImageUrlParameters> _imageUrls = new();
-    private readonly Dictionary<string, SensorParameters> _sensors = new();
-    private readonly Dictionary<string, SliderParameters> _sliders = new();
-    private readonly Dictionary<string, SwitchParameters> _switches = new();
-    private readonly Dictionary<string, TextLabelParameters> _textLabels = new();
+    private readonly List<string> _additionalSearchTokens = [];
+    private readonly Dictionary<string, ButtonParameters> _buttons = [];
+    private readonly HashSet<DeviceCharacteristic> _characteristics = [];
+    private readonly Dictionary<string, DirectoryParameters> _directories = [];
+    private readonly Dictionary<string, ImageUrlParameters> _imageUrls = [];
+    private readonly Dictionary<string, SensorParameters> _sensors = [];
+    private readonly Dictionary<string, SliderParameters> _sliders = [];
+    private readonly Dictionary<string, SwitchParameters> _switches = [];
+    private readonly Dictionary<string, TextLabelParameters> _textLabels = [];
     private int _digitCount;
     private bool _hasInput;
     private bool _hasPlayerWidget;
@@ -660,6 +660,9 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
     IDeviceBuilder IDeviceBuilder.SetManufacturer(string manufacturer) => this.SetManufacturer(manufacturer);
 
     IDeviceBuilder IDeviceBuilder.SetSpecificName(string? specificName) => this.SetSpecificName(specificName);
+
+    [GeneratedRegex(@"^DIGIT \d$", RegexOptions.Compiled)]
+    private static partial Regex DigitRegex();
 
     private DeviceBuilder AddAdditionalSearchTokens(IEnumerable<string> tokens)
     {
@@ -883,7 +886,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     private DeviceAdapter BuildAdapter()
     {
-        if (this.ButtonHandler == null && this._buttons.Any())
+        if (this.ButtonHandler == null && this._buttons.Count != 0)
         {
             throw new InvalidOperationException($"There are buttons defined but no handler was specified (by calling {nameof(IDeviceBuilder.AddButtonHandler)}.");
         }
@@ -897,9 +900,9 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         }
         List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic).ToList();
         string pathPrefix = $"/device/{this.AdapterName}/";
-        HashSet<string> paths = new();
-        List<Component> components = new();
-        Dictionary<string, IFeature> features = new();
+        HashSet<string> paths = [];
+        List<Component> components = [];
+        Dictionary<string, IFeature> features = [];
         foreach ((string name, string? label) in this._buttons.Values)
         {
             AddComponentAndRouteHandler(BuildButton(pathPrefix, name, label), new ButtonFeature(this.ButtonHandler!, name));
@@ -1168,9 +1171,6 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         this.SpecificName = Validator.ValidateText(specificName, allowNull: true);
         return this;
     }
-
-    [GeneratedRegex(@"^DIGIT \d$", RegexOptions.Compiled)]
-    private static partial Regex DigitRegex();
 
     private sealed record ButtonParameters(string Name, string? Label) : ParametersBase(Name, Label);
 

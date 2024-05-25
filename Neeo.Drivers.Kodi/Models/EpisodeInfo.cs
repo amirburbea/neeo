@@ -12,7 +12,7 @@ public readonly record struct EpisodeInfo(
     [property: JsonPropertyName("episodeid")] int? EpisodeId
 ) : IMediaInfo
 {
-    internal static readonly string[] Fields = { "title", "showtitle", "season", "episode", "art" };
+    internal static readonly string[] Fields = ["title", "showtitle", "season", "episode", "art"];
 
     string IMediaInfo.GetId() => $"episodeid:{this.EpisodeId}";
 

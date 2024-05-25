@@ -85,12 +85,10 @@ internal static class Program
         }
     }
 
-    public sealed class TVClient : IDisposable
+    public sealed class TVClient(string keyCode) : IDisposable
     {
-        private readonly byte[] _key;
+        private readonly byte[] _key = MessageEncryption.DeriveKey(keyCode);
         private readonly TinySocket _socket = new();
-
-        public TVClient(string keyCode) => this._key = MessageEncryption.DeriveKey(keyCode);
 
         public void Close() => this._socket.Close();
 
@@ -114,7 +112,7 @@ internal static class Program
 
         public ValueTask<bool> LaunchAppAsync(App app) => this.LaunchAppAsync(AppName.Of(app));
 
-        public async ValueTask<bool> LaunchAppAsync(string appName) => "OK" == await SendCommandAsync($"APP_LAUNCH {appName}").ConfigureAwait(false);
+        public async ValueTask<bool> LaunchAppAsync(string appName) => "OK" == await this.SendCommandAsync($"APP_LAUNCH {appName}").ConfigureAwait(false);
 
         public async ValueTask PowerOffAsync() => await this.SendCommandAsync("POWER off").ConfigureAwait(false);
 

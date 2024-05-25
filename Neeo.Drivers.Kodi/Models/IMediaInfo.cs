@@ -2,11 +2,11 @@
 
 public interface IMediaInfo
 {
-    string GetId();
-
-    string GetTitle();
+    string GetCoverArt();
 
     string GetDescription();
 
-    string GetCoverArt();
+    string GetId();
+
+    string GetTitle();
 }

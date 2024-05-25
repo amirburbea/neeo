@@ -105,7 +105,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     }
 
     public SearchEntry<DeviceAdapterModel>[] Search(string? query) => string.IsNullOrEmpty(query)
-        ? Array.Empty<SearchEntry<DeviceAdapterModel>>()
+        ? []
         : this._deviceIndex.Search(query).Take(OptionConstants.MaxSearchResults).ToArray();
 
     private static class OptionConstants

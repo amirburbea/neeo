@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -15,12 +14,21 @@ public static class TVDiscovery
 {
     private static readonly IPEndPoint _discoveryEndpoint = new(IPAddress.Parse("239.255.255.250"), 1900);
 
+    public static async Task<IPAddress?> DiscoverTVAsync(int scanTime = 5000, CancellationToken cancellationToken = default)
+    {
+        await foreach (IPAddress address in TVDiscovery.DiscoverTVsAsync(scanTime, cancellationToken).ConfigureAwait(false))
+        {
+            return address;
+        }
+        return default;
+    }
+
     public static async IAsyncEnumerable<IPAddress> DiscoverTVsAsync(int scanTime = 5000, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         source.CancelAfter(scanTime);
         using UdpClient client = new();
-        HashSet<IPAddress> addresses = new();
+        HashSet<IPAddress> addresses = [];
         byte[] request = Encoding.UTF8.GetBytes(string.Format(Constants.SearchRequestTemplate, Constants.SecondScreenService));
         while (!source.IsCancellationRequested)
         {
@@ -49,15 +57,6 @@ public static class TVDiscovery
                 }
             }
         }
-    }
-
-    public static async Task<IPAddress?> DiscoverTVAsync(int scanTime = 5000, CancellationToken cancellationToken = default)
-    {
-        await foreach (IPAddress address in TVDiscovery.DiscoverTVsAsync(scanTime, cancellationToken).ConfigureAwait(false))
-        {
-            return address;
-        }
-        return default;
     }
 
     private static class Constants

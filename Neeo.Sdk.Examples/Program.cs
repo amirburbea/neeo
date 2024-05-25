@@ -13,12 +13,12 @@ namespace Neeo.Sdk.Examples;
 
 public static class Program
 {
-    private static readonly Assembly[] _assemblies = new[]
-    {
+    private static readonly Assembly[] _assemblies =
+    [
         Assembly.GetExecutingAssembly(),
         typeof(HisenseDeviceProvider).Assembly,
         typeof(KodiDeviceProviderBase).Assembly,
-    };
+    ];
 
     private static async Task Main()
     {

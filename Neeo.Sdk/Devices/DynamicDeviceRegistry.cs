@@ -32,13 +32,10 @@ public interface IDynamicDeviceRegistry
     void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder);
 }
 
-internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
+internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) : IDynamicDeviceRegistry
 {
     private readonly ConcurrentDictionary<string, IDeviceAdapter> _discoveredDevices = new();
     private readonly ReaderWriterLockSlim _lock = new();
-    private readonly ILogger<DynamicDeviceRegistry> _logger;
-
-    public DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) => this._logger = logger;
 
     public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken = default)
     {
@@ -99,6 +96,6 @@ internal sealed class DynamicDeviceRegistry : IDynamicDeviceRegistry
         {
             this._lock.ExitWriteLock();
         }
-        this._logger.LogInformation("Added device, currently registered {count} dynamic device(s).", count);
+        logger.LogInformation("Added device, currently registered {count} dynamic device(s).", count);
     }
 }

@@ -27,8 +27,8 @@ public sealed class UriPrefixNotifierTest
         Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(nameof(mockAdapter));
         string? uriPrefix = default;
-        mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(prefix=>uriPrefix=prefix);
-        this._mockDatabase.Setup(database => database.Adapters).Returns(new[] { mockAdapter.Object });
+        mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(prefix => uriPrefix = prefix);
+        this._mockDatabase.Setup(database => database.Adapters).Returns([mockAdapter.Object]);
 
         await this._uriPrefixNotifier.StartAsync(default);
 

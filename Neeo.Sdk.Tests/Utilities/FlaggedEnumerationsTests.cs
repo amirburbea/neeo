@@ -60,11 +60,11 @@ public sealed class FlaggedEnumerationsTests
     [InlineData(TestEnum.Two)]
     [InlineData(TestEnum.Four)]
     [InlineData((TestEnum)0)]
-    public void GetNames_should_return_single_value_array_when_not_flagged_value(TestEnum value)
+    public void GetNames_should_return_single_value_when_not_flagged_value(TestEnum value)
     {
         var names = FlaggedEnumerations.GetNames(value);
 
-        Assert.IsType<string[]>(names);
+        Assert.Single(names);
         Assert.Equal(TextAttribute.GetText(value), names.Single());
     }
 }

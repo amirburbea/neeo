@@ -24,7 +24,7 @@ internal static class Validator
 
     public static double[] ValidateRange(double low, double high) => double.IsNaN(low) || double.IsNaN(high) || double.IsInfinity(low) || double.IsInfinity(high) || low >= high
         ? throw new ArgumentException("Range low must be less than range high and neither value can be infinity or NaN.")
-        : new[] { low, high };
+        : [low, high];
 
     [return: NotNullIfNotNull(nameof(text))]
     public static string? ValidateText(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerArgumentExpression(nameof(text))] string name = "") => text switch

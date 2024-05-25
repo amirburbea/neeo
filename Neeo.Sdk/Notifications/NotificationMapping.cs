@@ -26,19 +26,10 @@ public interface INotificationMapping
     ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken = default);
 }
 
-internal sealed class NotificationMapping : INotificationMapping
+internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment environment, ILogger<NotificationMapping> logger) : INotificationMapping
 {
     private readonly ConcurrentDictionary<string, EntryCache> _cache = new();
-    private readonly IApiClient _client;
-    private readonly ILogger<NotificationMapping> _logger;
-    private readonly string _sdkAdapterName;
-
-    public NotificationMapping(IApiClient client, ISdkEnvironment environment, ILogger<NotificationMapping> logger)
-    {
-        this._sdkAdapterName = environment.SdkAdapterName;
-        this._client = client;
-        this._logger = logger;
-    }
+    private readonly string _sdkAdapterName = environment.SdkAdapterName;
 
     public async ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken)
     {
@@ -51,12 +42,12 @@ internal sealed class NotificationMapping : INotificationMapping
         {
             return keys;
         }
-        this._logger.LogWarning("Component {deviceName} {component} not found.", adapter.DeviceName, componentName); // Maybe our definition is out of date?
+        logger.LogWarning("Component {deviceName} {component} not found.", adapter.DeviceName, componentName); // Maybe our definition is out of date?
         this._cache.TryRemove(cacheKey, out _);
-        return Array.Empty<string>();
+        return [];
     }
 
-    private Task<EntryCache> FetchEntriesAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this._client.GetAsync(
+    private Task<EntryCache> FetchEntriesAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => client.GetAsync(
         string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, adapterName, deviceId),
         static (Entry[] entries) => new EntryCache(entries),
         cancellationToken
@@ -66,7 +57,7 @@ internal sealed class NotificationMapping : INotificationMapping
 
     private sealed record EntryCache(Entry[] Entries)
     {
-        private readonly Dictionary<string, string[]> _cache = new();
+        private readonly Dictionary<string, string[]> _cache = [];
 
         public string[] GetNotificationKeys(string componentName)
         {
@@ -81,13 +72,13 @@ internal sealed class NotificationMapping : INotificationMapping
                 int index = Array.FindIndex(this.Entries, Match);
                 if (index == -1)
                 {
-                    return Array.Empty<string>();
+                    return [];
                 }
                 if (index == this.Entries.Length - 1)
                 {
-                    return new[] { this.Entries[index].EventKey };
+                    return [this.Entries[index].EventKey];
                 }
-                List<string> keys = new() { this.Entries[index++].EventKey };
+                List<string> keys = [this.Entries[index++].EventKey];
                 for (; index < this.Entries.Length; index++)
                 {
                     Entry entry = this.Entries[index];
@@ -96,7 +87,7 @@ internal sealed class NotificationMapping : INotificationMapping
                         keys.Add(entry.EventKey);
                     }
                 }
-                return keys is [string key] ? new[] { key } : keys.Distinct().ToArray();
+                return keys is [string key] ? [key] : keys.Distinct().ToArray();
 
                 bool Match(Entry entry) => componentName == projection(entry);
             }

@@ -32,15 +32,9 @@ public interface IRegistrationFeature : IFeature
     Task<RegistrationResult> RegisterAsync(string credentials, PgpPrivateKey privateKey);
 }
 
-internal sealed class RegistrationFeature : IRegistrationFeature
+internal sealed class RegistrationFeature(QueryIsRegistered queryIsRegistered, Func<Stream, Task<RegistrationResult>> register) : IRegistrationFeature
 {
-    private readonly QueryIsRegistered _queryIsRegistered;
-    private readonly Func<Stream, Task<RegistrationResult>> _register;
-
-    private RegistrationFeature(QueryIsRegistered queryIsRegistered, Func<Stream, Task<RegistrationResult>> register)
-    {
-        (this._queryIsRegistered, this._register) = (queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered)), register);
-    }
+    private readonly QueryIsRegistered _queryIsRegistered= queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered));
 
     public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> register)
         where TPayload : struct
@@ -69,7 +63,7 @@ internal sealed class RegistrationFeature : IRegistrationFeature
             if (privateFactory.NextPgpObject() is PgpLiteralData literal)
             {
                 using Stream credentialsStream = literal.GetInputStream();
-                return await this._register(credentialsStream).ConfigureAwait(false);
+                return await register(credentialsStream).ConfigureAwait(false);
             }
         }
         return RegistrationResult.Failed("Failed to decrypt credentials.");

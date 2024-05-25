@@ -30,7 +30,7 @@ internal sealed class SubscriptionsNotifier : IHostedService
         async ValueTask NotifySubscriptionsAsync(IDeviceAdapter adapter, CancellationToken cancellationToken)
         {
             if (adapter.GetFeature(ComponentType.Subscription) is not ISubscriptionFeature feature)
-            { 
+            {
                 return;
             }
             this._logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);

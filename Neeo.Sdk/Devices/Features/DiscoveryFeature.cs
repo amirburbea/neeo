@@ -28,22 +28,17 @@ public interface IDiscoveryFeature : IFeature
     Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default);
 }
 
-internal sealed class DiscoveryFeature : IDiscoveryFeature
+internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder = false) : IDiscoveryFeature
 {
-    private readonly DiscoveryProcess _process;
+    private readonly DiscoveryProcess _process = process ?? throw new ArgumentNullException(nameof(process));
 
-    public DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder = false)
-    {
-        (this._process, this.EnableDynamicDeviceBuilder) = (process ?? throw new ArgumentNullException(nameof(process)), enableDynamicDeviceBuilder);
-    }
-
-    public bool EnableDynamicDeviceBuilder { get; }
+    public bool EnableDynamicDeviceBuilder { get; } = enableDynamicDeviceBuilder;
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default)
     {
         if (await this._process(optionalDeviceId, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } devices)
         {
-            return Array.Empty<DiscoveredDevice>();
+            return [];
         }
         this.Validate(optionalDeviceId, devices);
         return devices;

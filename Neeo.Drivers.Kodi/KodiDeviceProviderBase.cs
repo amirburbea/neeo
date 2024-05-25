@@ -56,7 +56,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private readonly KodiClientManager _clientManager;
     private readonly Lazy<IDeviceBuilder> _deviceBuilder;
-    private readonly HashSet<string> _deviceIds = new();
+    private readonly HashSet<string> _deviceIds = [];
     private readonly string _deviceName;
     private readonly DeviceType _deviceType;
     private readonly ReaderWriterLockSlim _lock = new();
@@ -420,7 +420,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        List<Task> tasks = new();
+        List<Task> tasks = [];
         switch (e.Data.PlayState)
         {
             case PlayState.Paused:
@@ -472,7 +472,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     {
         if (deviceId != null && this._clientManager.GetClientOrDefault(deviceId) is { } client)
         {
-            return new[] { this.CreateDiscoveredDevice(client) };
+            return [this.CreateDiscoveredDevice(client)];
         }
         await this._clientManager.DiscoverAsync(1000, client => client.DeviceId == deviceId, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(deviceId))
@@ -481,9 +481,9 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
         if ((client = this.GetClientOrDefault(deviceId)) != null)
         {
-            return new[] { this.CreateDiscoveredDevice(client) };
+            return [this.CreateDiscoveredDevice(client)];
         }
-        return Array.Empty<DiscoveredDevice>();
+        return [];
     }
 
     private Task<bool> GetIsPoweredOnAsync(string deviceId) => Task.FromResult(this.IsClientReady(deviceId));
@@ -521,7 +521,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private async Task InitializeDeviceListAsync(string[] deviceIds)
     {
-
         await this._clientManager.InitializeAsync(deviceId: deviceIds is [{ } id] ? id : null).ConfigureAwait(false);
         if (deviceIds.Length == 0)
         {
@@ -590,12 +589,8 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private void SetUriPrefix(string prefix) => this._uriPrefix = prefix;
 
-    private readonly struct EmbeddedImages
+    private readonly struct EmbeddedImages(string uriPrefix)
     {
-        private readonly string _uriPrefix;
-
-        public EmbeddedImages(string uriPrefix) => this._uriPrefix = uriPrefix;
-
         public string Filter => this.GetEmbeddedResourceUrl("filter.jpg");
 
         public string Movie => this.GetEmbeddedResourceUrl("movie.jpg");
@@ -606,7 +601,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
         public string TVShow => this.GetEmbeddedResourceUrl("tvshow.jpg");
 
-        private string GetEmbeddedResourceUrl(string suffix) => this._uriPrefix + suffix;
+        private string GetEmbeddedResourceUrl(string suffix) => uriPrefix + suffix;
     }
 
     protected static class Constants

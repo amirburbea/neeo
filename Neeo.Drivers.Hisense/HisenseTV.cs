@@ -58,7 +58,7 @@ public sealed class HisenseTV : IDisposable
 
     public static async Task<HisenseTV[]> DiscoverAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
-        ConcurrentBag<HisenseTV> bag = new();
+        ConcurrentBag<HisenseTV> bag = [];
         await Task.WhenAll(
             NetworkMethods.GetNetworkDevices().Select(async pair =>
             {
@@ -76,7 +76,7 @@ public sealed class HisenseTV : IDisposable
                 }
             })
         ).ConfigureAwait(false);
-        return bag.ToArray();
+        return [.. bag];
     }
 
     public static Task<HisenseTV?> DiscoverOneAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
@@ -281,10 +281,7 @@ public sealed class HisenseTV : IDisposable
 
     private async Task<bool> TryConnectAsync(CancellationToken cancellationToken = default)
     {
-        if (this._isDisposed)
-        {
-            throw new ObjectDisposedException(this.GetType().FullName);
-        }
+        ObjectDisposedException.ThrowIf(this._isDisposed, this);
         Connection connection = new(this.IPAddress, this.MacAddress, this._logger, this._useCertificates, this._clientIdPrefix);
         if (!await connection.TryConnectAsync(cancellationToken).ConfigureAwait(false) || this._isDisposed)
         {
@@ -304,20 +301,13 @@ public sealed class HisenseTV : IDisposable
         return true;
     }
 
-    private sealed class Connection : IDisposable
+    private sealed class Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix) : IDisposable
     {
         private static readonly MqttFactory _clientFactory = new();
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
-        private readonly IMqttClient _client;
-        private readonly ILogger _logger;
+        private readonly IMqttClient _client = Connection._clientFactory.CreateMqttClient();
 
-        private readonly MqttClientOptions _options;
-
-        public Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix)
-        {
-            this._client = Connection._clientFactory.CreateMqttClient();
-            this._logger = logger;
-            this._options = new MqttClientOptionsBuilder()
+        private readonly MqttClientOptions _options = new MqttClientOptionsBuilder()
                 .WithClientId(Uri.EscapeDataString($"{clientIdPrefix}-{macAddress}"))
                 .WithTcpServer(ipAddress.ToString(), 36669)
                 .WithCredentials("hisenseservice", "multimqttservice")
@@ -329,11 +319,10 @@ public sealed class HisenseTV : IDisposable
                     parameters.CertificateValidationHandler = _ => true;
                     if (useCertificates)
                     {
-                        parameters.Certificates = new[] { Connection.LoadCertificate() };
+                        parameters.Certificates = [Connection.LoadCertificate()];
                     }
                 })
                 .Build();
-        }
 
         public event EventHandler? Disconnected;
 
@@ -372,7 +361,7 @@ public sealed class HisenseTV : IDisposable
 
         public void Dispose()
         {
-            this._logger.LogInformation("Disposing {clientId}.", this._options.ClientId);
+            logger.LogInformation("Disposing {clientId}.", this._options.ClientId);
             this._client.Dispose();
         }
 
@@ -420,7 +409,7 @@ public sealed class HisenseTV : IDisposable
                 string text => text,
                 _ => JsonSerializer.Serialize(body, Connection._jsonOptions)
             };
-            this._logger.LogInformation("Sending message '{payload}' to topic '{topic}'.", payload, topic);
+            logger.LogInformation("Sending message '{payload}' to topic '{topic}'.", payload, topic);
             if (!waitForNextMessage)
             {
                 await PublishAsync().ConfigureAwait(false);
@@ -462,7 +451,7 @@ public sealed class HisenseTV : IDisposable
             return false;
         }
 
-        private static X509Certificate LoadCertificate()
+        private static X509Certificate2 LoadCertificate()
         {
             using Stream certificateStream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(HisenseTV).Namespace}.Certificates.rcm_certchain_pem.cer")!;
             using StreamReader certificateReader = new(certificateStream);
@@ -479,7 +468,7 @@ public sealed class HisenseTV : IDisposable
 
         private Task OnDisconnected(MqttClientDisconnectedEventArgs e)
         {
-            this._logger.LogInformation("Disconnected: {reason}", e.Reason);
+            logger.LogInformation("Disconnected: {reason}", e.Reason);
             this.Disconnected?.Invoke(this, e);
             return Task.CompletedTask;
         }
@@ -488,7 +477,7 @@ public sealed class HisenseTV : IDisposable
         {
             string topic = e.ApplicationMessage.Topic;
             string payload = e.ApplicationMessage.Payload is { } bytes ? Encoding.UTF8.GetString(bytes) : string.Empty;
-            this._logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
+            logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
             this.MessageReceived?.Invoke(this, new((topic, payload)));
             switch (topic)
             {

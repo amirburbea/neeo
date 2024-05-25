@@ -11,19 +11,10 @@ namespace Neeo.Sdk.Utilities.TokenSearch;
 /// Based on <a href="https://github.com/neophob/tokensearch.js">tokensearch.js</a>.
 /// </summary>
 /// <typeparam name="T">The type of items being searched</typeparam>
-internal sealed class TokenSearch<T>
+internal sealed class TokenSearch<T>(T[] items, params string[] searchProperties)
     where T : notnull, IComparable<T>
 {
     public static readonly Func<T, string, object?> GetItemValue = TokenSearch<T>.CreateGetItemValue();
-
-    private readonly T[] _items;
-    private readonly string[] _searchProperties;
-
-    public TokenSearch(T[] items, params string[] searchProperties)
-    {
-        this._items = items;
-        this._searchProperties = searchProperties;
-    }
 
     public IEnumerable<SearchEntry<T>> Search(string query)
     {
@@ -32,13 +23,13 @@ internal sealed class TokenSearch<T>
             .Distinct()
             .Take(5)
             .ToArray();
-        List<SearchEntry<T>> list = new();
+        List<SearchEntry<T>> list = [];
         int maxScore = 0;
-        foreach (T item in this._items)
+        foreach (T item in items)
         {
-            IEnumerable<string> dataTokens = this._searchProperties == null
-                  ? new[] { item.ToString() ?? string.Empty }
-                  : this._searchProperties.Select(property => TokenSearch<T>.GetItemValue(item, property)?.ToString() ?? string.Empty);
+            IEnumerable<string> dataTokens = searchProperties == null
+                  ? [item.ToString() ?? string.Empty]
+                  : searchProperties.Select(property => TokenSearch<T>.GetItemValue(item, property)?.ToString() ?? string.Empty);
             int score = dataTokens.Sum(dataToken => searchTokens.Sum(searchToken => TokenSearch<T>.Score(dataToken, searchToken)));
             if (score <= 0)
             {
@@ -47,7 +38,7 @@ internal sealed class TokenSearch<T>
             maxScore = Math.Max(score, maxScore);
             list.Add(new(item) { Score = score });
         }
-        return TokenSearch<T>.Normalize(list, maxScore, this._searchProperties).OrderBy(x => x);
+        return TokenSearch<T>.Normalize(list, maxScore, searchProperties!).OrderBy(x => x);
     }
 
     /// <summary>
