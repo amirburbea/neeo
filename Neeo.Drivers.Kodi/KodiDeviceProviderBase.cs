@@ -521,6 +521,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private async Task InitializeDeviceListAsync(string[] deviceIds)
     {
+        this._logger.LogInformation("Initialized with [{deviceIds}]", string.Join(',', deviceIds));
         await this._clientManager.InitializeAsync(deviceId: deviceIds is [{ } id] ? id : null).ConfigureAwait(false);
         if (deviceIds.Length == 0)
         {

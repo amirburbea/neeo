@@ -29,18 +29,11 @@ public interface ISdkEnvironment
     Task StopAsync(CancellationToken cancellationToken = default);
 }
 
-internal sealed class SdkEnvironment : ISdkEnvironment
+internal sealed class SdkEnvironment(SdkAdapterName sdkAdapterName, IServer server) : ISdkEnvironment
 {
-    private readonly IServer _server;
+    public string HostAddress => server.Features.Get<IServerAddressesFeature>()!.Addresses.Single();
 
-    public SdkEnvironment(SdkAdapterName sdkAdapterName, IServer server)
-    {
-        (this.SdkAdapterName, this._server) = ((string)sdkAdapterName, server);
-    }
+    public string SdkAdapterName { get; } = (string)sdkAdapterName;
 
-    public string HostAddress => this._server.Features.Get<IServerAddressesFeature>()!.Addresses.Single();
-
-    public string SdkAdapterName { get; }
-
-    public Task StopAsync(CancellationToken cancellationToken) => this._server.StopAsync(cancellationToken);
+    public Task StopAsync(CancellationToken cancellationToken) => server.StopAsync(cancellationToken);
 }

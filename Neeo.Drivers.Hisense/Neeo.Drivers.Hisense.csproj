@@ -22,6 +22,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
+	  <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj">
+		  <Private>false</Private>
+		  <ExcludeAssets>runtime</ExcludeAssets>
+	  </ProjectReference>
   </ItemGroup>
 </Project>

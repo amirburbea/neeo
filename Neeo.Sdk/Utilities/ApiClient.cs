@@ -30,19 +30,17 @@ public interface IApiClient
 
     /// <summary>
     /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
-    /// <paramref name="path"/> and return the output of the specified <paramref name="transform"/>.
+    /// <paramref name="path"/> and return the a value indicating success.
+    /// 
+    /// All NEEO Brain APIs returns a simple success response.
     /// </summary>
     /// <typeparam name="TBody">The type of the body.</typeparam>
-    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
-    /// <typeparam name="TOutput">The output type of the transform.</typeparam>
     /// <param name="path">The API path on the NEEO Brain.</param>
     /// <param name="body">An object to serialize into JSON to be used as the body of the request.</param>
-    /// <param name="transform">The transformation to run on the data.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
-        where TBody : notnull
-        where TData : notnull;
+    Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
+        where TBody : notnull;
 }
 
 internal sealed class ApiClient(IBrain brain, HttpMessageHandler messageHandler, ILogger<ApiClient> logger) : IApiClient, IDisposable
@@ -60,15 +58,14 @@ internal sealed class ApiClient(IBrain brain, HttpMessageHandler messageHandler,
         return this.FetchAsync(path, HttpMethod.Get, default, transform, cancellationToken);
     }
 
-    public async Task<TOutput> PostAsync<TBody, TData, TOutput>(string path, TBody body, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+    public async Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
         where TBody : notnull
-        where TData : notnull
     {
         using MemoryStream stream = new();
         await JsonSerializer.SerializeAsync(stream, body, JsonSerialization.Options, cancellationToken).ConfigureAwait(false);
         stream.Seek(0L, SeekOrigin.Begin);
         using StreamContent content = new(stream) { Headers = { ContentType = ApiClient._jsonContentType } };
-        return await this.FetchAsync(path, HttpMethod.Post, content, transform, cancellationToken).ConfigureAwait(false);
+        return await this.FetchAsync(path, HttpMethod.Post, content, static (SuccessResponse response) => response.Success, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<TOutput> FetchAsync<TData, TOutput>(string path, HttpMethod method, HttpContent? content, Func<TData, TOutput> transform, CancellationToken cancellationToken)

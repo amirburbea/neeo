@@ -33,8 +33,8 @@ public sealed class NotificationServiceTests : IDisposable
         Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         TaskCompletionSource tcs = new();
         mockClient
-            .Setup(client => client.PostAsync(UrlPaths.Notifications, Capture.In(this._messages), It.IsAny<Func<SuccessResponse, It.IsAnyType>>(), It.IsAny<CancellationToken>()))
-            .ReturnsTransformOf(new SuccessResponse(true))
+            .Setup(client => client.PostAsync(UrlPaths.Notifications, Capture.In(this._messages), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true)
             .Callback(tcs.SetResult);
         this._postAsyncCompleted = tcs.Task;
         this._notificationService = new(mockClient.Object, this._mockNotificationMapping.Object, NullLogger<NotificationService>.Instance);

@@ -58,7 +58,7 @@ public sealed class UriPrefixNotifierTest
 
         void SetUriPrefix(int index)
         {
-            Thread.Sleep(100);
+            Thread.Sleep(10);
             threadIds[index] = Environment.CurrentManagedThreadId;
         }
     }

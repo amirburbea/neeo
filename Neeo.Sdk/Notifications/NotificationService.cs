@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -92,7 +93,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._logger.LogDebug("Sending {message}", message);
         try
         {
-            if (await this._client.PostAsync(UrlPaths.Notifications, message, static (SuccessResponse response) => response.Success, this._cancellationSource.Token).ConfigureAwait(false))
+            if (await this._client.PostAsync(UrlPaths.Notifications, message, this._cancellationSource.Token).ConfigureAwait(false))
             {
                 this.UpdateCache(message);
             }
@@ -117,7 +118,9 @@ internal sealed class NotificationService : INotificationService, IDisposable
         }
         Parallel.ForEach(keys, new() { CancellationToken = cancellationToken }, notificationKey =>
         {
-            Message message = new(isSensorNotification ? Constants.DeviceSensorUpdateKey : notificationKey, isSensorNotification ? new SensorData(notificationKey, value) : value);
+            Message message = isSensorNotification
+                ? Message.SensorUpdate(notificationKey, value)
+                : new(notificationKey, value);
             if (!this._actionBlock.Post(message))
             {
                 this._logger.LogWarning("Failed to send notification:{message}", message);
@@ -140,13 +143,15 @@ internal sealed class NotificationService : INotificationService, IDisposable
 
     public readonly record struct Message(string Type, object Data)
     {
+        public static Message SensorUpdate(string notificationKey, object value) => new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value));
+
         public (string, object) ExtractTypeAndData()
         {
-            return this.Data is SensorData { SensorEventKey: { } sensorKey, SensorValue: { } sensorValue }
-                ? (sensorKey, sensorValue)
+            return this.Data is SensorData { SensorEventKey: { } key, SensorValue: { } value }
+                ? (key, value)
                 : (this.Type, this.Data);
         }
-    }
 
-    private sealed record class SensorData(string SensorEventKey, object SensorValue);
+        private sealed record class SensorData(string SensorEventKey, object SensorValue);
+    }
 }

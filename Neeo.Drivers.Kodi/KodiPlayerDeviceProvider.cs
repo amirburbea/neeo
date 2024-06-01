@@ -5,7 +5,7 @@ using Neeo.Sdk.Devices.Lists;
 
 namespace Neeo.Drivers.Kodi;
 
-public sealed class KodiPlayerDeviceProvider(KodiClientManager clientManager, ILogger<KodiRemoteDeviceProvider> logger) : KodiDeviceProviderBase(clientManager, "Player (Kodi)", DeviceType.MediaPlayer, logger), IPlayerWidgetController
+public sealed class KodiPlayerDeviceProvider(KodiClientManager clientManager, ILogger<KodiPlayerDeviceProvider> logger) : KodiDeviceProviderBase(clientManager, "Player (Kodi)", DeviceType.MediaPlayer, logger), IPlayerWidgetController
 {
     public bool IsQueueSupported => false;
 

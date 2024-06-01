@@ -129,7 +129,7 @@ public enum InputCommand
 }
 
 [AttributeUsage(AttributeTargets.Field)]
-internal sealed class InputCommandAttribute : Attribute
+internal sealed class InputCommandAttribute(string method, string? action = default) : Attribute
 {
     private static readonly Dictionary<InputCommand, InputCommandAttribute> _attributes = new(
         from field in typeof(InputCommand).GetFields(BindingFlags.Static | BindingFlags.Public)
@@ -138,14 +138,9 @@ internal sealed class InputCommandAttribute : Attribute
         select KeyValuePair.Create((InputCommand)field.GetValue(null)!, attribute)
     );
 
-    public InputCommandAttribute(string method, string? action = default)
-    {
-        (this.Method, this.Action) = (method, action);
-    }
+    public string? Action { get; } = action;
 
-    public string? Action { get; }
-
-    public string Method { get; }
+    public string Method { get; } = method;
 
     public static InputCommandAttribute? GetAttribute(InputCommand command) => InputCommandAttribute._attributes.GetValueOrDefault(command);
 }

@@ -313,13 +313,14 @@ public sealed class HisenseTV : IDisposable
                 .WithCredentials("hisenseservice", "multimqttservice")
                 .WithTimeout(TimeSpan.FromMilliseconds(750))
                 .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-                .WithTls(parameters =>
+                .WithTlsOptions(builder =>
                 {
-                    parameters.UseTls = true;
-                    parameters.CertificateValidationHandler = _ => true;
+                    builder
+                        .UseTls()
+                        .WithCertificateValidationHandler(_ => true);
                     if (useCertificates)
                     {
-                        parameters.Certificates = [Connection.LoadCertificate()];
+                        builder.WithClientCertificates([Connection.LoadCertificate()]);
                     }
                 })
                 .Build();
@@ -429,7 +430,7 @@ public sealed class HisenseTV : IDisposable
 
             void OnMessageReceived(object? sender, DataEventArgs<(string, string)> e) => taskCompletionSource.TrySetResult(e.Data);
 
-            Task PublishAsync() => this._client.PublishAsync(new() { Topic = topic, Payload = Encoding.UTF8.GetBytes(payload) });
+            Task PublishAsync() => this._client.PublishAsync(new() { Topic = topic, PayloadSegment = Encoding.UTF8.GetBytes(payload) });
         }
 
         public async Task<bool> TryConnectAsync(CancellationToken cancellationToken)
@@ -476,7 +477,7 @@ public sealed class HisenseTV : IDisposable
         private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             string topic = e.ApplicationMessage.Topic;
-            string payload = e.ApplicationMessage.Payload is { } bytes ? Encoding.UTF8.GetString(bytes) : string.Empty;
+            string payload = e.ApplicationMessage.PayloadSegment is { } bytes ? Encoding.UTF8.GetString(bytes) : string.Empty;
             logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
             this.MessageReceived?.Invoke(this, new((topic, payload)));
             switch (topic)

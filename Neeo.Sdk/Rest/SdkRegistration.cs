@@ -16,7 +16,7 @@ internal sealed class SdkRegistration(IBrain brain, IApiClient client, ISdkEnvir
     {
         try
         {
-            await this.PostAsync(UrlPaths.RegisterServer, new { Name = environment.SdkAdapterName, BaseUrl = environment.HostAddress }, cancellationToken).ConfigureAwait(false);
+            await client.PostAsync(UrlPaths.RegisterServer, new { Name = environment.SdkAdapterName, BaseUrl = environment.HostAddress }, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Server {name} registered on {brain} ({brainAddress}).", environment.SdkAdapterName, brain.HostName, brain.ServiceEndPoint.Address);
         }
         catch (Exception e)
@@ -30,18 +30,12 @@ internal sealed class SdkRegistration(IBrain brain, IApiClient client, ISdkEnvir
     {
         try
         {
-            await this.PostAsync(UrlPaths.UnregisterServer, new { name = environment.SdkAdapterName }, cancellationToken).ConfigureAwait(false);
+            await client.PostAsync(UrlPaths.UnregisterServer, new { name = environment.SdkAdapterName }, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
         }
         catch (Exception e)
         {
             logger.LogWarning("Failed to unregister with brain - {content}.", e.Message);
         }
-    }
-
-    private Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken)
-        where TBody : notnull
-    {
-        return client.PostAsync(path, body, static (SuccessResponse response) => response.Success, cancellationToken);
     }
 }

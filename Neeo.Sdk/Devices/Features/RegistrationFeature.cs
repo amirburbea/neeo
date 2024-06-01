@@ -34,7 +34,7 @@ public interface IRegistrationFeature : IFeature
 
 internal sealed class RegistrationFeature(QueryIsRegistered queryIsRegistered, Func<Stream, Task<RegistrationResult>> register) : IRegistrationFeature
 {
-    private readonly QueryIsRegistered _queryIsRegistered= queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered));
+    private readonly QueryIsRegistered _queryIsRegistered = queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered));
 
     public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> register)
         where TPayload : struct

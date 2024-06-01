@@ -113,19 +113,13 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         public const int MaxSearchResults = 10;
     }
 
-    private sealed class DeviceAdapterContainer
+    private sealed class DeviceAdapterContainer(IDeviceAdapter adapter, ILogger logger)
     {
-        private readonly ILogger _logger;
         private Task? _task;
 
-        public DeviceAdapterContainer(IDeviceAdapter adapter, ILogger logger)
-        {
-            (this.Adapter, this.IsInitialized, this._logger) = (adapter, adapter.Initializer == null, logger);
-        }
+        public IDeviceAdapter Adapter { get; } = adapter;
 
-        public IDeviceAdapter Adapter { get; }
-
-        public bool IsInitialized { get; private set; }
+        public bool IsInitialized { get; private set; } = adapter.Initializer is null;
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
@@ -135,7 +129,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
             async Task InitializeAsync(DeviceInitializer initializer)
             {
-                this._logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", this.Adapter.DeviceName, this.Adapter.AdapterName);
+                logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", this.Adapter.DeviceName, this.Adapter.AdapterName);
                 try
                 {
                     await (this._task = initializer(cancellationToken)).ConfigureAwait(false);
@@ -144,7 +138,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
                 }
                 catch (Exception e)
                 {
-                    this._logger.LogError(e, "Error initializing adapter.");
+                    logger.LogError(e, "Error initializing adapter.");
                     this._task = null;
                 }
             }

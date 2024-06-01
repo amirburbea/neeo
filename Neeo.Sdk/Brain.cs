@@ -37,34 +37,21 @@ internal interface IBrain
 /// <summary>
 /// Returns information about and contains methods for interacting with the NEEO Brain.
 /// </summary>
-public sealed partial class Brain : IBrain
+/// <remarks>
+/// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
+/// </remarks> 
+/// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
+/// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
+/// <param name="hostName">The host name of the NEEO Brain.</param>
+/// <param name="version">The firmware version of the NEEO Brain.</param>
+public sealed partial class Brain(IPAddress ipAddress, int servicePort = 3000, string? hostName = default, string version = "0.50.0") : IBrain
 {
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(15d);
 
     /// <summary>
-    /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
-    /// </summary>
-    /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
-    /// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
-    /// <param name="hostName">The host name of the NEEO Brain.</param>
-    /// <param name="version">The firmware version of the NEEO Brain.</param>
-    public Brain(IPAddress ipAddress, int servicePort = 3000, string? hostName = default, string version = "0.50.0")
-    {
-        if (ipAddress.AddressFamily != AddressFamily.InterNetwork)
-        {
-            throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress));
-        }
-        if (Brain.VersionPrefixRegex().Match(version) is not { Success: true, Groups: { } groups } || double.Parse(groups["v"].Value, CultureInfo.InvariantCulture) < 0.5d)
-        {
-            throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
-        }
-        (this.ServiceEndPoint, this.HostName) = (new(ipAddress, servicePort), hostName ?? ipAddress.ToString());
-    }
-
-    /// <summary>
     /// The host name of the NEEO Brain.
     /// </summary>
-    public string HostName { get; }
+    public string HostName { get; } = hostName ?? ipAddress.ToString();
 
     /// <summary>
     /// The IP Address on which the NEEO Brain Service is running.
@@ -74,7 +61,19 @@ public sealed partial class Brain : IBrain
     /// <summary>
     /// The IP Address and port on which the NEEO Brain Service is running.
     /// </summary>
-    public IPEndPoint ServiceEndPoint { get; }
+    public IPEndPoint ServiceEndPoint { get; } = new(
+        ipAddress.AddressFamily == AddressFamily.InterNetwork
+            ? ipAddress
+            : throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress)),
+        servicePort
+    );
+
+    /// <summary>
+    /// The firmware version of the NEEO Brain.
+    /// </summary>
+    public string Version { get; } = Brain.VersionPrefixRegex().Match(version) is { Success: true, Groups: { } groups } && double.Parse(groups["v"].Value, CultureInfo.InvariantCulture) >= 0.5d
+        ? version
+        : throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
 
     /// <summary>
     /// Discovers all <see cref="Brain"/>s on the network.
@@ -91,6 +90,13 @@ public sealed partial class Brain : IBrain
         }
         return brains;
     }
+
+    /// <summary>
+    /// Discovers a <see cref="Brain"/> on the network, and returns the first <see cref="Brain"/> discovered (or <c>null</c> if not found).
+    /// </summary>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
+    public static Task<Brain?> DiscoverOneAsync(CancellationToken cancellationToken = default) => Brain.DiscoverOneAsync(null, cancellationToken);
 
     /// <summary>
     /// Discovers the first <see cref="Brain"/> on the network matching the specified

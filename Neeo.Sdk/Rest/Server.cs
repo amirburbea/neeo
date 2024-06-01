@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -19,8 +18,6 @@ using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
 using Neeo.Sdk.Utilities;
-using Org.BouncyCastle.Bcpg;
-using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Neeo.Sdk.Rest;
 
@@ -64,9 +61,9 @@ internal static class Server
         .AddSingleton(brain)
         .AddSingleton(devices)
         .AddSingleton((SdkAdapterName)adapterName)
-        .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
         .AddSingleton<HttpMessageHandler>(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
-        .AddSingleton(provider => new PgpPublicKeyResponse(Server.GetPublicKeyText(provider.GetRequiredService<PgpKeyPair>().PublicKey)))
+        .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
+        .AddSingleton<PgpPublicKeyResponse>()
         .AddSingleton<IApiClient, ApiClient>()
         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
         .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
@@ -103,19 +100,6 @@ internal static class Server
                 builder.UseDeveloperExceptionPage();
             }
         });
-
-    private static string GetPublicKeyText(PgpPublicKey publicKey)
-    {
-        using Stream outputStream = new MemoryStream();
-        using (ArmoredOutputStream armoredStream = new(outputStream))
-        {
-            armoredStream.SetHeader(ArmoredOutputStream.HeaderVersion, default);
-            publicKey.Encode(armoredStream);
-        }
-        outputStream.Seek(0L, SeekOrigin.Begin);
-        using StreamReader reader = new(outputStream);
-        return reader.ReadToEnd();
-    }
 
     private static class Constants
     {

@@ -63,24 +63,13 @@ public sealed class ApiClientTests : IDisposable
         Assert.Null(requestBody);
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("abcde")]
-    [InlineData("1234")]
-    public async Task PostAsync_should_transform_response_body(string data)
-    {
-        this.SetupJsonResponse(data);
-
-        Assert.Equal(data.Length, await this._client.PostAsync("/", body: new object(), static (string text) => text.Length));
-    }
-
     [Fact]
     public void PostAsync_should_use_HTTP_POST_and_serialize_body()
     {
         var body = new { A = "123" };
-        var lazy = this.SetupJsonResponse(new object());
+        var lazy = this.SetupJsonResponse(new SuccessResponse(true));
 
-        _ = this._client.PostAsync("/", body, IdentityFunction.For<object>());
+        _ = this._client.PostAsync("/", body);
 
         var (request, requestBody) = lazy.Value;
         Assert.Equal("POST", request.Method.Method);
