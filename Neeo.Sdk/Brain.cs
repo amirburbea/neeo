@@ -39,7 +39,7 @@ internal interface IBrain
 /// </summary>
 /// <remarks>
 /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
-/// </remarks> 
+/// </remarks>
 /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
 /// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
 /// <param name="hostName">The host name of the NEEO Brain.</param>
@@ -186,7 +186,7 @@ public static class BrainMethods
         IHost host = await Server.StartSdkAsync(
             brain ?? throw new ArgumentNullException(nameof(brain)),
             devices,
-            $"src-{UniqueNameGenerator.Generate(name ?? brain.HostName)}",
+            name ?? brain.HostName,
             hostIPAddress ?? await brain.GetFallbackHostIPAddressAsync(cancellationToken).ConfigureAwait(false),
             port,
             configureLogging,
@@ -234,13 +234,20 @@ public static class BrainMethods
 
     internal static async ValueTask<IPAddress> GetFallbackHostIPAddressAsync(this Brain brain, CancellationToken cancellationToken)
     {
-        if (IPAddress.IsLoopback(brain.IPAddress))
+        if (IPAddress.Loopback.Equals(brain.IPAddress))
         {
-            return brain.IPAddress;
+            // If Brain address is loopback, use that.
+            return IPAddress.Loopback;
         }
         IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-        return Array.IndexOf(addresses, brain.IPAddress) != -1 || Array.Find(addresses, address => !IPAddress.IsLoopback(address)) is not { } address
-            ? IPAddress.Loopback // If the Brain is running locally, we can just use localhost.
-            : address;
+        if (Array.IndexOf(addresses, brain.IPAddress) != -1)
+        {
+            // If Brain is running on this device, use loopback. 
+            return IPAddress.Loopback;
+        }
+        // Use the first IPv4 address found, or loopback.
+        return Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) is { } address
+            ? address
+            : IPAddress.Loopback;
     }
 }

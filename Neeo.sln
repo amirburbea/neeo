@@ -21,6 +21,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk.Tests", "Neeo.Sdk.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neeo.Sdk.Server", "Neeo.Sdk.Server\Neeo.Sdk.Server.csproj", "{FD79C921-4E13-4E7B-8206-0A7C6C00EA9F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neeo.Drivers.Plex", "Neeo.Drivers.Plex\Neeo.Drivers.Plex.csproj", "{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,10 @@ Global
 		{FD79C921-4E13-4E7B-8206-0A7C6C00EA9F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FD79C921-4E13-4E7B-8206-0A7C6C00EA9F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FD79C921-4E13-4E7B-8206-0A7C6C00EA9F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -67,6 +73,7 @@ Global
 		{64F8C1E8-C36D-4063-B302-E5994E55BC99} = {BF10C3F7-4530-4783-85B3-26E6B09CDD6F}
 		{CCF5E399-C17D-4276-8A8F-A8DF304466A3} = {93702E4F-E0FF-4847-8CE6-34CB33011F3C}
 		{FD79C921-4E13-4E7B-8206-0A7C6C00EA9F} = {93702E4F-E0FF-4847-8CE6-34CB33011F3C}
+		{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD} = {BF10C3F7-4530-4783-85B3-26E6B09CDD6F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {01A57CDF-5F63-440F-9388-1CCED77653D0}

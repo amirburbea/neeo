@@ -60,7 +60,7 @@ internal static class Server
     private static void ConfigureServices(IServiceCollection services, IBrain brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
         .AddSingleton(brain)
         .AddSingleton(devices)
-        .AddSingleton((SdkAdapterName)adapterName)
+        .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
         .AddSingleton<HttpMessageHandler>(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
         .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
         .AddSingleton<PgpPublicKeyResponse>()
@@ -106,10 +106,16 @@ internal static class Server
         public const int MaxRequestBodySize = 2 * 1024 * 1024;
     }
 
+    /// <summary>
+    /// Registers all controllers in this assembly, whether public or internal.
+    /// </summary>
     private sealed class AssemblyControllerFeatureProvider : ControllerFeatureProvider
     {
         public static readonly ControllerFeatureProvider Instance = new AssemblyControllerFeatureProvider();
 
-        protected override bool IsController(TypeInfo info) => info.Assembly == this.GetType().Assembly && info.IsAssignableTo(typeof(ControllerBase));
+        protected override bool IsController(TypeInfo info)
+        {
+            return info.Assembly == Assembly.GetExecutingAssembly() && info.IsAssignableTo(typeof(ControllerBase));
+        }
     }
 }

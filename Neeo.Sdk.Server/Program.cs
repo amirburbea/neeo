@@ -1,13 +1,13 @@
-using Microsoft.Extensions.Configuration;
-using System.Threading.Tasks;
 using System;
+using System.IO;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using System.IO;
-using System.Reflection;
-using System.Runtime.Loader;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Server;

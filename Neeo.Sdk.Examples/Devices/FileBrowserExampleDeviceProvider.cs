@@ -49,7 +49,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                 {
                     builder
                         .AddHeader(title)
-                        .AddTileRow(new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy"), new("https://neeo-sdk.neeo.io/kitten.jpg", "kitten"))
+                        .AddTileRow([new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy")])
                         .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
                         .AddButtonRow(new("Reload", "RELOAD", inverse: false, uiAction: ListUIAction.Reload), new("BACK", "BACKONE", inverse: true, uiAction: ListUIAction.GoBack), new("ROOT", "BACKTOROOT", inverse: true, uiAction: ListUIAction.GoToRoot));
                 }

@@ -15,9 +15,11 @@ public class SimpleTVExampleDeviceProvider : IDeviceProvider
         this.DeviceBuilder = Device.Create(deviceName, DeviceType.TV)
             .SetSpecificName(deviceName)
             .SetIcon(DeviceIconOverride.NeeoBrain)
+            .SetDriverVersion(1)
             .AddButton(Buttons.InputHdmi1) // Add a known button.
             .AddButton(Buttons.InputHdmi2 | Buttons.InputHdmi3) // Add multiple known buttons at once.
             .AddButton("SomeRandomName", "Randomly Named") // Add a button with a custom label.
+            .AddButton(Buttons.Home)
             .AddButtonGroup(ButtonGroups.Power)
             .AddButtonGroup(ButtonGroups.ControlPad | ButtonGroups.ChannelZapper | ButtonGroups.Volume | ButtonGroups.MenuAndBack)
             .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)

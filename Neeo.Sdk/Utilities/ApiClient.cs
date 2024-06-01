@@ -82,7 +82,8 @@ internal sealed class ApiClient(IBrain brain, HttpMessageHandler messageHandler,
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.OK)
         {
-            return transform((await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!);
+            TData payload = (await JsonSerializer.DeserializeAsync<TData>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
+            return transform(payload);
         }
         using StreamReader reader = new(stream);
         throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${reader.ReadToEnd()}");

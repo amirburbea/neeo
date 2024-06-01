@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -14,4 +14,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
   </ItemGroup>
+
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent" Condition="'$(Configuration)' == 'Debug'">
+	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Sdk.Examples\Neeo.Sdk.Examples.csproj&quot; /target:Build /property:Configuration=$(Configuration) "/>
+	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj&quot; /target:Build /property:Configuration=$(Configuration) "/>
+	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj&quot; /target:Build /property:Configuration=$(Configuration)" />
+	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Drivers.Plex\Neeo.Drivers.Plex.csproj&quot; /target:Build /property:Configuration=$(Configuration)" />
+  </Target>
 </Project>
