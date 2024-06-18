@@ -86,13 +86,6 @@ public sealed partial class Brain(IPAddress ipAddress, int servicePort = 3000, s
     }
 
     /// <summary>
-    /// Discovers a <see cref="Brain"/> on the network, and returns the first <see cref="Brain"/> discovered (or <c>null</c> if not found).
-    /// </summary>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
-    public static Task<Brain?> DiscoverOneAsync(CancellationToken cancellationToken = default) => Brain.DiscoverOneAsync(null, cancellationToken);
-
-    /// <summary>
     /// Discovers the first <see cref="Brain"/> on the network matching the specified
     /// <paramref name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the first
     /// <see cref="Brain"/> discovered.
@@ -110,32 +103,40 @@ public sealed partial class Brain(IPAddress ipAddress, int servicePort = 3000, s
         async Task ResolveAsync()
         {
             using CancellationTokenSource raceTokenSource = new();
-            using CancellationTokenSource junctionTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-                raceTokenSource.Token,
-                cancellationToken
-            );
-            // Bonjour sometimes fails to discover, perform multiple scans at once.
-            await Parallel.ForEachAsync(
-                [default(object), default],
-                junctionTokenSource.Token,
-                async (_, cancellationToken) =>
-                {
-                    try
+            try
+            {
+                using CancellationTokenSource junctionTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                    raceTokenSource.Token,
+                    cancellationToken
+                );
+                // Bonjour sometimes fails to discover, race multiple scans at once, offset by 500ms.
+                await Parallel.ForEachAsync(
+                    [0, 500],
+                    junctionTokenSource.Token,
+                    async (delay, cancellationToken) =>
                     {
-                        await ZeroconfResolver.ResolveAsync(
-                            Constants.ServiceName, 
-                            Brain._scanTime, callback: 
-                            OnHostDiscovered, 
-                            cancellationToken: cancellationToken
-                        ).ConfigureAwait(false);
+                        try
+                        {
+                            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                            await ZeroconfResolver.ResolveAsync(
+                                Constants.ServiceName,
+                                Brain._scanTime, callback:
+                                OnHostDiscovered,
+                                cancellationToken: cancellationToken
+                            ).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Expected in race.
+                        }
                     }
-                    catch (OperationCanceledException)
-                    {
-                        // Expected.
-                    }
-                }
-            ).ConfigureAwait(false);
-            tcs.TrySetResult(null);
+                ).ConfigureAwait(false);
+                tcs.TrySetResult(null);
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignore.
+            }
 
             void OnHostDiscovered(IZeroconfHost host)
             {

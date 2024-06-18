@@ -36,7 +36,7 @@ public sealed class SdkService(
                 return new(address);
             }
             logger.LogInformation("Discovering Brain...");
-            if (await Brain.DiscoverOneAsync(stoppingToken).ConfigureAwait(false) is not { } brain)
+            if (await Brain.DiscoverOneAsync(cancellationToken: stoppingToken).ConfigureAwait(false) is not { } brain)
             {
                 throw new ApplicationException("Failed to discover Brain. (If on Windows, ensure Bonjour 3x is installed).");
             }
