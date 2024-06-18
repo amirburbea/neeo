@@ -20,7 +20,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         logger.LogInformation("Beginning discovery for {adapter}...", adapter.DeviceName);
-        if (await feature.DiscoverAsync(cancellationToken: cancellationToken) is not { Length: > 0 } devices)
+        if (await feature.DiscoverAsync(cancellationToken) is not { Length: > 0 } devices)
         {
             return Array.Empty<DiscoveredDevice>();
         }
@@ -39,7 +39,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         logger.LogInformation("Querying registration for {adapter}...", adapter.DeviceName);
-        return await feature.QueryIsRegisteredAsync();
+        return await feature.QueryIsRegisteredAsync(cancellationToken);
     }
 
     [HttpPost("{adapterName}/register")]
@@ -50,7 +50,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         logger.LogInformation("Registering {adapter}...", adapter.DeviceName);
-        if (await feature.RegisterAsync(payload.Data, pgpKeys.PrivateKey) is not { IsSuccess: false, Error: { } errorMessage })
+        if (await feature.RegisterAsync(payload.Data, pgpKeys.PrivateKey, cancellationToken) is not { IsSuccess: false, Error: { } errorMessage })
         {
             return this.Ok();
         }

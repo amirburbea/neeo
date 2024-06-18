@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices.Setup;
@@ -6,15 +7,19 @@ namespace Neeo.Sdk.Devices.Setup;
 /// <summary>
 /// Attempt to register a device adapter given a <paramref name="userName"/> and <paramref name="password" />.
 /// </summary>
+/// <param name="userName">The user name.</param>
+/// <param name="password">The password.</param>
+/// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
-public delegate Task<RegistrationResult> CredentialsRegistrationProcessor(string userName, string password);
+public delegate Task<RegistrationResult> CredentialsRegistrationProcessor(string userName, string password, CancellationToken cancellationToken = default);
 
 /// <summary>
 /// Attempt to register a device adapter given a security code.
 /// </summary>
 /// <param name="securityCode">The security code.</param>
+/// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
-public delegate Task<RegistrationResult> SecurityCodeRegistrationProcessor(string securityCode);
+public delegate Task<RegistrationResult> SecurityCodeRegistrationProcessor(string securityCode, CancellationToken cancellationToken = default);
 
 /// <summary>
 /// Represents the result of a registration attempt.

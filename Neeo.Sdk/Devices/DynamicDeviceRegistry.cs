@@ -56,7 +56,7 @@ internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logge
         {
             this._lock.ExitReadLock();
         }
-        if (await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not [{ DeviceBuilder: { } builder }])
+        if (await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not { DeviceBuilder: { } builder })
         {
             return default;
         }

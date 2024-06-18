@@ -15,9 +15,9 @@ public interface IImageUrlComponent : IComponent, IComponentWithAssociatedSensor
 }
 
 internal sealed record class ImageUrlComponent(
-    String Name,
-    String? Label,
-    String Path,
+    string Name,
+    string? Label,
+    string Path,
     ImageSize Size,
     [property: JsonPropertyName("sensor")] string SensorName
 ) : Component(ComponentType.ImageUrl, Name, Label, Path), IImageUrlComponent;

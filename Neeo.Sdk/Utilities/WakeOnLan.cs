@@ -41,7 +41,7 @@ public static class WakeOnLan
             addressBytes.CopyTo(magicPacket.Memory[(index * 6)..]);
         }
         using UdpClient client = new();
-        await client.SendAsync(magicPacket.Memory[0..Constants.Length], new(IPAddress.Broadcast, 9), cancellationToken).ConfigureAwait(false);
+        await client.SendAsync(magicPacket.Memory[..Constants.Length], new(IPAddress.Broadcast, 9), cancellationToken).ConfigureAwait(false);
     }
 
     private static class Constants

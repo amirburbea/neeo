@@ -2,7 +2,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.WebSockets;
@@ -120,66 +119,78 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         this.Disposed?.Invoke(this, EventArgs.Empty);
     }
 
-    public Task<QueryData<AlbumInfo>> GetAlbumsAsync(int start = 0, int end = -1, int? artistId = default) => this.SendMessageAsync(
+    public Task<QueryData<AlbumInfo>> GetAlbumsAsync(int start = 0, int end = -1, int? artistId = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "AudioLibrary.GetAlbums",
         new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = AlbumInfo.Fields },
-        (AlbumListResult result) => QueryData.Create(result.Limits.Total, result.Albums)
+        static (AlbumListResult result) => QueryData.Create(result.Limits.Total, result.Albums),
+        cancellationToken
     );
 
-    public Task<bool> GetBooleanAsync(string boolean) => this.SendMessageAsync(
+    public Task<bool> GetBooleanAsync(string boolean, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "Xbmc.GetInfoBooleans",
         new { booleans = new[] { boolean } },
-        (JsonElement element) => element.GetProperty(boolean).GetBoolean()
+        (JsonElement element) => element.GetProperty(boolean).GetBoolean(),
+        cancellationToken
     );
 
-    public Task<QueryData<EpisodeInfo>> GetEpisodesAsync(int start = 0, int end = -1, int? tvShowId = default) => this.SendMessageAsync(
+    public Task<QueryData<EpisodeInfo>> GetEpisodesAsync(int start = 0, int end = -1, int? tvShowId = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "VideoLibrary.GetEpisodes",
         new { Sort = new SortOrder("season"), Limits = new { start, end }, Properties = EpisodeInfo.Fields, tvshowid = tvShowId },
-        (EpisodeListResult result) => QueryData.Create(result.Limits.Total, result.Episodes)
+        static (EpisodeListResult result) => QueryData.Create(result.Limits.Total, result.Episodes),
+        cancellationToken
     );
 
     public string GetImageUrl(string image) => $"http://{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
 
-    public Task<string> GetLabelAsync(string label) => this.SendMessageAsync(
+    public Task<string> GetLabelAsync(string label, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "Xbmc.GetInfoLabels",
         new { labels = new[] { label } },
-        (JsonElement element) => element.GetProperty(label).GetString()!
+        (JsonElement element) => element.GetProperty(label).GetString()!,
+        cancellationToken
     );
 
-    public Task<QueryData<VideoInfo>> GetMoviesAsync(int start = 0, int end = -1, Filter? filter = default) => this.SendMessageAsync(
+    public Task<QueryData<VideoInfo>> GetMoviesAsync(int start = 0, int end = -1, Filter? filter = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "VideoLibrary.GetMovies",
         new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = VideoInfo.Fields, Filter = filter },
-        (MoviesListResult result) => QueryData.Create(result.Limits.Total, result.Movies)
+        static (MoviesListResult result) => QueryData.Create(result.Limits.Total, result.Movies),
+        cancellationToken
     );
 
-    public Task<PlayerDescriptor[]> GetPlayersAsync() => this.SendMessageAsync("Player.GetPlayers", (PlayerDescriptor[] players) => players);
+    public Task<PlayerDescriptor[]> GetPlayersAsync(CancellationToken cancellationToken) => this.SendMessageAsync(
+        "Player.GetPlayers",
+        static (PlayerDescriptor[] players) => players,
+        cancellationToken
+    );
 
-    public Task<QueryData<TVShowInfo>> GetTVShowsAsync(int start = 0, int end = -1, Filter? filter = default) => this.SendMessageAsync(
+    public Task<QueryData<TVShowInfo>> GetTVShowsAsync(int start = 0, int end = -1, Filter? filter = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "VideoLibrary.GetTVShows",
         new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = TVShowInfo.Fields, Filter = filter },
-        (TVShowsListResult result) => QueryData.Create(result.Limits.Total, result.TVShows)
+        static (TVShowsListResult result) => QueryData.Create(result.Limits.Total, result.TVShows),
+        cancellationToken
     );
 
-    public Task<bool> OpenFileAsync(string key, int id) => this.SendMessageAsync(
+    public Task<bool> OpenFileAsync(string key, int id, CancellationToken cancellationToken) => this.SendMessageAsync(
         "Player.Open",
         new { Item = new Dictionary<string, int>(1) { { key, id } } },
-        (string result) => result == "OK"
+        static (string result) => result == "OK",
+        cancellationToken
     );
 
-    public Task<bool> SendGoToCommandAsync(bool next) => this.SendMessageAsync(
+    public Task<bool> SendGoToCommandAsync(bool next, CancellationToken cancellationToken) => this.SendMessageAsync(
         "Player.GoTo",
         new { playerid = 1, to = next ? "next" : "previous" },
-        (string result) => result == "OK"
+        static (string result) => result == "OK",
+        cancellationToken
     );
 
-    public async Task<bool> SendInputCommandAsync(InputCommand command)
+    public async Task<bool> SendInputCommandAsync(InputCommand command, CancellationToken cancellationToken = default)
     {
         if (InputCommandAttribute.GetAttribute(command) is not { } attribute)
         {
             return false;
         }
-        bool sent = await this.SendMessageAsync(attribute.Method, attribute.Action == null ? null : new { attribute.Action }, (string result) => result == "OK").ConfigureAwait(false);
-        if (!sent || !IsCursorCommand(command) || await this.GetCurrentWindowIdAsync().ConfigureAwait(false) != 12005 || await this.GetBooleanAsync("VideoPlayer.HasMenu").ConfigureAwait(false))
+        bool sent = await this.SendMessageAsync(attribute.Method, attribute.Action == null ? null : new { attribute.Action }, (string result) => result == "OK", cancellationToken).ConfigureAwait(false);
+        if (!sent || !IsCursorCommand(command) || await this.GetCurrentWindowIdAsync(cancellationToken).ConfigureAwait(false) != 12005 || await this.GetBooleanAsync("VideoPlayer.HasMenu", cancellationToken).ConfigureAwait(false))
         {
             return sent;
         }
@@ -193,7 +204,8 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 InputCommand.Up => CursorParameters(big: true, forward: true),
                 _ => default,
             },
-            (SeekResult result) => result.Percentage >= 0d
+            static (SeekResult result) => result.Percentage >= 0d,
+            cancellationToken
         ).ConfigureAwait(false);
 
         static object CursorParameters(bool big, bool forward) => new { playerid = 1, value = new { step = string.Concat(big ? "big" : "small", forward ? "forward" : "backward") } };
@@ -201,16 +213,17 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         static bool IsCursorCommand(InputCommand command) => command is InputCommand.Right or InputCommand.Left or InputCommand.Up or InputCommand.Down or InputCommand.Select;
     }
 
-    public async Task<int> SetVolumeAsync(int volume) => this.Volume = volume is >= 0 and <= 100
-        ? await this.SendMessageAsync("Application.SetVolume", new { volume }, (int volume) => volume).ConfigureAwait(false)
+    public async Task<int> SetVolumeAsync(int volume, CancellationToken cancellationToken = default) => this.Volume = volume is >= 0 and <= 100
+        ? await this.SendMessageAsync("Application.SetVolume", new { volume }, (int volume) => volume, cancellationToken).ConfigureAwait(false)
         : throw new ArgumentOutOfRangeException(nameof(volume));
 
     public Task<bool> ShowNotificationAsync(
         string title,
         string message,
         string? image = default,
-        int displayTime = 5000
-    ) => this.SendMessageAsync("GUI.ShowNotification", new Notification(title, message, image, displayTime), (string result) => result == "OK");
+        int displayTime = 5000,
+        CancellationToken cancellationToken = default
+    ) => this.SendMessageAsync("GUI.ShowNotification", new Notification(title, message, image, displayTime), static (string result) => result == "OK", cancellationToken);
 
     private void CancelOutstanding()
     {
@@ -230,10 +243,11 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         source?.Cancel();
     }
 
-    private Task<int> GetCurrentWindowIdAsync() => this.SendMessageAsync(
+    private Task<int> GetCurrentWindowIdAsync(CancellationToken cancellationToken) => this.SendMessageAsync(
         "GUI.GetProperties",
         new { Properties = new[] { "currentwindow" } },
-        (JsonElement element) => element.GetProperty("currentwindow").GetProperty("id").GetInt32()
+        static (JsonElement element) => element.GetProperty("currentwindow").GetProperty("id").GetInt32(),
+        cancellationToken
     );
 
     private async Task<PhysicalAddress> GetMacAddressAsync()
@@ -270,7 +284,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 if (previous.Length == 0 && result.EndOfMessage)
                 {
                     // Complete message was received.
-                    Process(owner.Memory.Span[0..result.Count]);
+                    Process(owner.Memory.Span[..result.Count]);
                     continue;
                 }
                 // Combine previous fragment with incoming one.
@@ -428,20 +442,25 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         this.IsMuted = muted;
     }
 
-    private Task<TResult> SendMessageAsync<TPayload, TResult>(string method, Func<TPayload, TResult> transform) => this.SendMessageAsync(
-        method,
-        default,
-        transform
-    );
+    private Task<TResult> SendMessageAsync<TPayload, TResult>(
+        string method,
+        Func<TPayload, TResult> transform,
+        CancellationToken cancellationToken = default
+    ) => this.SendMessageAsync(method, default, transform, cancellationToken);
 
-    private Task<TResult> SendMessageAsync<TPayload, TResult>(string method, object? parameters, Func<TPayload, TResult> transform)
+    private Task<TResult> SendMessageAsync<TPayload, TResult>(
+        string method,
+        object? parameters,
+        Func<TPayload, TResult> transform,
+        CancellationToken cancellationToken = default
+    )
     {
         ObjectDisposedException.ThrowIf(this.IsDisposed, this);
         if (this._webSocket is { State: WebSocketState.Open } webSocket)
         {
             return SendRequestAsync();
         }
-        _ = this.ConnectAsync();
+        _ = this.ConnectAsync(cancellationToken);
         return CreateCanceledTask();
 
         static Task<TResult> CreateCanceledTask() => Task.FromCanceled<TResult>(new(true));
@@ -451,9 +470,9 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
             JsonRpcRequest request = new(method, parameters);
             TaskCompletionSource<JsonElement> elementSource = new();
             this._taskSources.TryAdd(request.Id, elementSource);
-            await webSocket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(request, KodiClient.SerializerOptions).AsMemory(), WebSocketMessageType.Text, true, default).ConfigureAwait(false);
+            await webSocket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(request, KodiClient.SerializerOptions).AsMemory(), WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
             // Each operation can take as much as 2.5s to complete.
-            if (object.Equals(elementSource.Task, await Task.WhenAny(elementSource.Task, Task.Delay(2500)).ConfigureAwait(false)))
+            if (object.Equals(elementSource.Task, await Task.WhenAny(elementSource.Task, Task.Delay(2500, cancellationToken)).ConfigureAwait(false)))
             {
                 return transform(ExtractPayload(await elementSource.Task.ConfigureAwait(false)));
             }

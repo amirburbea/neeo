@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Lists;
@@ -23,7 +24,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static Task Browse(string deviceId, ListBuilder builder)
+    private static Task Browse(string deviceId, ListBuilder builder, CancellationToken cancellationToken)
     {
         int offset = builder.Parameters.Offset ?? 0;
         int limit = builder.Parameters.Limit;
@@ -84,7 +85,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
         }
     }
 
-    private Task OnDirectoryAction(string deviceId, string actionIdentifier)
+    private Task OnDirectoryAction(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
     {
         Console.WriteLine("DIRECTORY ACTION {0}:\"{1}\"", deviceId, actionIdentifier);
         return Task.CompletedTask;

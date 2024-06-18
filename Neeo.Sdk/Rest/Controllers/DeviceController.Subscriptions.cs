@@ -14,7 +14,7 @@ internal partial class DeviceController
     public Task<ActionResult> SubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this.HandleSubscriptionsAsync(
         adapterName,
         deviceId,
-        static feature => feature.OnDeviceAdded,
+        static feature => feature.NotifyDeviceAddedAsync,
         nameof(this.SubscribeAsync),
         cancellationToken
     );
@@ -23,12 +23,17 @@ internal partial class DeviceController
     public Task<ActionResult> UnsubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this.HandleSubscriptionsAsync(
         adapterName,
         deviceId,
-        static feature => feature.OnDeviceRemoved,
+        static feature => feature.NotifyDeviceRemovedAsync,
         nameof(this.UnsubscribeAsync),
         cancellationToken
     );
 
-    private async Task<ActionResult> HandleSubscriptionsAsync(string adapterName, string deviceId, Func<ISubscriptionFeature, DeviceSubscriptionHandler> handlerProjection, string methodName, CancellationToken cancellationToken)
+    private async Task<ActionResult> HandleSubscriptionsAsync(
+        string adapterName,
+        string deviceId,
+        Func<ISubscriptionFeature, DeviceSubscriptionHandler> handlerProjection,
+        string methodName, CancellationToken cancellationToken
+    )
     {
         if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
         {
@@ -37,7 +42,7 @@ internal partial class DeviceController
         logger.LogInformation("{method} {adapter}:{deviceId}.", methodName, adapter.DeviceName, deviceId);
         if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature && handlerProjection(feature) is { } subscriptionHandler)
         {
-            await subscriptionHandler(deviceId);
+            await subscriptionHandler(deviceId, cancellationToken);
         }
         return this.Ok();
     }

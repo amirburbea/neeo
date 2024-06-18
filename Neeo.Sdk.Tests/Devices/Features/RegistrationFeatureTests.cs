@@ -14,7 +14,6 @@ using Xunit;
 
 namespace Neeo.Sdk.Tests.Devices.Features;
 
-
 // TODO: Implement registration feature tests.
 /*
 public class RegistrationFeatureTests
@@ -36,9 +35,6 @@ public class RegistrationFeatureTests
     {
         public readonly Dictionary<string, int> _times = new();
 
-
-
-
         public override void NextBytes(byte[] buf)
         {
             this.NextBytes(buf, 0, buf.Length);
@@ -56,7 +52,6 @@ public class RegistrationFeatureTests
             PgpUtilities.GetDecoderStream(inputStream);
             PgpPublicKeyRingBundle pgpPub = new PgpPublicKeyRingBundle(inputStream);
 
-
             PgpPublicKey key = new(PublicKeyAlgorithmTag.RsaGeneral,
             //for (; off < len; off++)
             //{
@@ -65,16 +60,10 @@ public class RegistrationFeatureTests
 
             // base.NextBytes(buf, off, len);
 
-
             IAsymmetricCipherKeyPairGenerator generator
     = GeneratorUtilities.GetKeyPairGenerator("RSA");
             generator.Init(keyRingParams.RsaParams);
-
-           
         }
-
-
-
 
         public override int Next()
         {

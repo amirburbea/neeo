@@ -13,7 +13,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Rest;
-using Neeo.Sdk.Utilities;
 using Zeroconf;
 
 namespace Neeo.Sdk;
@@ -83,12 +82,7 @@ public sealed partial class Brain(IPAddress ipAddress, int servicePort = 3000, s
     public static async Task<Brain[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brain._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
-        Brain[] brains = new Brain[hosts.Count];
-        for (int index = 0; index < brains.Length; index++)
-        {
-            brains[index] = Brain.CreateBrain(hosts[index]);
-        }
-        return brains;
+        return hosts.Select(Brain.TryCreateBrain).OfType<Brain>().ToArray();
     }
 
     /// <summary>
@@ -108,30 +102,76 @@ public sealed partial class Brain(IPAddress ipAddress, int servicePort = 3000, s
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
     public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
     {
-        TaskCompletionSource<Brain?> brainTaskSource = new();
-        cancellationToken.Register(() => brainTaskSource.TrySetCanceled(cancellationToken));
-        ZeroconfResolver.Resolve(Constants.ServiceName, Brain._scanTime).Subscribe(
-            OnHostDiscovered,
-            () => brainTaskSource.TrySetResult(default),
-            cancellationToken
-        );
-        return brainTaskSource.Task;
+        TaskCompletionSource<Brain?> tcs = new();
+        cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+        _ = Task.Factory.StartNew(ResolveAsync, cancellationToken, TaskCreationOptions.None, TaskScheduler.Default);
+        return tcs.Task;
 
-        void OnHostDiscovered(IZeroconfHost host)
+        async Task ResolveAsync()
         {
-            Brain brain = Brain.CreateBrain(host);
-            if (predicate == null || predicate(brain))
+            using CancellationTokenSource raceTokenSource = new();
+            using CancellationTokenSource junctionTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                raceTokenSource.Token,
+                cancellationToken
+            );
+            // Bonjour sometimes fails to discover, perform multiple scans at once.
+            await Parallel.ForEachAsync(
+                [default(object), default],
+                junctionTokenSource.Token,
+                async (_, cancellationToken) =>
+                {
+                    try
+                    {
+                        await ZeroconfResolver.ResolveAsync(
+                            Constants.ServiceName, 
+                            Brain._scanTime, callback: 
+                            OnHostDiscovered, 
+                            cancellationToken: cancellationToken
+                        ).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected.
+                    }
+                }
+            ).ConfigureAwait(false);
+            tcs.TrySetResult(null);
+
+            void OnHostDiscovered(IZeroconfHost host)
             {
-                brainTaskSource.TrySetResult(brain);
+                if (tcs.Task.IsCompleted || tcs.Task.IsCanceled || Brain.TryCreateBrain(host) is not { } brain)
+                {
+                    return;
+                }
+                if ((predicate == null || predicate(brain)) && tcs.TrySetResult(brain))
+                {
+                    raceTokenSource.Cancel(true);
+                }
             }
         }
     }
 
-    private static Brain CreateBrain(IZeroconfHost host)
+    [GeneratedRegex(@"^(?<ip>(\d+[.]){3}\d+)[:]", RegexOptions.ExplicitCapture)]
+    private static partial Regex IPAddresRegex();
+
+    private static Brain? TryCreateBrain(IZeroconfHost host)
     {
         IService service = host.Services.Values.First();
         IReadOnlyDictionary<string, string> properties = service.Properties[0];
-        return new(IPAddress.Parse(host.IPAddress), service.Port, $"{properties["hon"]}.local", properties["rel"]);
+        IPAddress ipAddress;
+        if (host.IPAddress is { } ipString)
+        {
+            ipAddress = IPAddress.Parse(ipString);
+        }
+        else if (Brain.IPAddresRegex().Match(host.Id) is { Success: true, Groups: { } groups })
+        {
+            ipAddress = IPAddress.Parse(groups["ip"].Value);
+        }
+        else
+        {
+            return null;
+        }
+        return new(ipAddress, service.Port, $"{properties["hon"]}.local", properties["rel"]);
     }
 
     [GeneratedRegex(@"^(?<v>\d+\.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]
@@ -154,7 +194,7 @@ public static class BrainMethods
     /// <param name="brain">The NEEO Brain.</param>
     public static void OpenWebUI(this Brain brain) => Process.Start(
         startInfo: new($"http://{(brain ?? throw new ArgumentNullException(nameof(brain))).IPAddress}:3200/eui") { UseShellExecute = true }
-    )!.Dispose();
+    )?.Dispose();
 
     /// <summary>
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
@@ -242,7 +282,7 @@ public static class BrainMethods
         IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
         if (Array.IndexOf(addresses, brain.IPAddress) != -1)
         {
-            // If Brain is running on this device, use loopback. 
+            // If Brain is running on this device, use loopback.
             return IPAddress.Loopback;
         }
         // Use the first IPv4 address found, or loopback.

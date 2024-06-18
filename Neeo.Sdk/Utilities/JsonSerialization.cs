@@ -17,12 +17,4 @@ public static class JsonSerialization
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
-
-    /// <summary>
-    /// Converts the <see cref="JsonElement" /> representing a single JSON value into a <typeparamref name="TValue" />.
-    /// </summary>
-    /// <typeparam name="TValue">The type to deserialize the JSON value into.</typeparam>
-    /// <param name="element">The JSON element to deserialize.</param>
-    /// <returns>The <typeparamref name="TValue"/> representation of the JSON value.</returns>
-    internal static TValue Deserialize<TValue>(this JsonElement element) => element.Deserialize<TValue>(JsonSerialization.Options)!;
 }

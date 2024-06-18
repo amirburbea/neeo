@@ -22,8 +22,8 @@ internal partial class DeviceController
         logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
-            IButtonFeature buttonFeature => this.Ok(await buttonFeature.ExecuteAsync(deviceId)),
-            IValueFeature valueFeature => this.Ok(await valueFeature.GetValueAsync(deviceId)),
+            IButtonFeature buttonFeature => this.Ok(await buttonFeature.ExecuteAsync(deviceId, cancellationToken)),
+            IValueFeature valueFeature => this.Ok(await valueFeature.GetValueAsync(deviceId, cancellationToken)),
             _ => this.NotFound(),
         };
     }
@@ -38,8 +38,12 @@ internal partial class DeviceController
         logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
-            IFavoritesFeature favoritesFeature => this.Ok(await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<Favorite>().FavoriteId)),
-            IDirectoryFeature directoryFeature => this.Ok(await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>())),
+            IFavoritesFeature favoritesFeature => this.Ok(
+                await favoritesFeature.ExecuteAsync(deviceId, parameters.Deserialize<Favorite>(JsonSerialization.Options).FavoriteId, cancellationToken)
+            ),
+            IDirectoryFeature directoryFeature => this.Ok(
+                await directoryFeature.BrowseAsync(deviceId, parameters.Deserialize<BrowseParameters>(JsonSerialization.Options), cancellationToken)
+            ),
             _ => this.NotFound(),
         };
     }
@@ -52,7 +56,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         logger.LogInformation("Perform directory action {action} on {name}:{id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
-        return await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier);
+        return await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier, cancellationToken);
     }
 
     [HttpGet("{adapterName}/{componentName}/{deviceId}/{value}")]
@@ -63,7 +67,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         logger.LogInformation("Set {component} value to {value} on {name}:{id}", componentName, value, adapter.DeviceName, deviceId);
-        return await valueFeature.SetValueAsync(deviceId, value);
+        return await valueFeature.SetValueAsync(deviceId, value, cancellationToken);
     }
 
     private async ValueTask<(IDeviceAdapter, IFeature)> TryResolveAsync(string adapterName, string componentName, string deviceId, CancellationToken cancellationToken)

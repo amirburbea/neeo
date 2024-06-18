@@ -18,7 +18,8 @@ namespace Neeo.Sdk.Devices;
 public interface IDeviceBuilder
 {
     /// <summary>
-    /// Gets the generated unique name for the device adapter.
+    /// Gets the encoded device adapter name.
+    /// Until the device is built, this value is subject to change.
     /// </summary>
     string AdapterName { get; }
 
@@ -380,11 +381,15 @@ public interface IDeviceBuilder
     /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
     /// resources and/or remove credentials when the last device is removed.
     /// </summary>
-    /// <param name="onDeviceAdded"></param>
-    /// <param name="onDeviceRemoved"></param>
-    /// <param name="initializeDeviceList"></param>
+    /// <param name="notifyDeviceAdded"></param>
+    /// <param name="notifyDeviceRemoved"></param>
+    /// <param name="notifyDeviceList"></param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceSubscriptionHandler onDeviceAdded, DeviceSubscriptionHandler onDeviceRemoved, DeviceSubscriptionListHandler initializeDeviceList);
+    IDeviceBuilder RegisterDeviceSubscriptionCallbacks(
+        DeviceSubscriptionHandler notifyDeviceAdded,
+        DeviceSubscriptionHandler notifyDeviceRemoved,
+        DeviceSubscriptionListHandler notifyDeviceList
+    );
 
     /// <summary>
     /// Sets a callback to be invoked to initialize the device before making it available to the NEEO Brain.
@@ -430,7 +435,11 @@ public interface IDeviceBuilder
     IDeviceBuilder SetSpecificName(string? specificName);
 }
 
-internal sealed partial class DeviceBuilder : IDeviceBuilder
+internal sealed partial class DeviceBuilder(
+    string name,
+    DeviceType type,
+    string? namePrefix
+) : IDeviceBuilder
 {
     private readonly List<string> _additionalSearchTokens = [];
     private readonly Dictionary<string, ButtonParameters> _buttons = [];
@@ -448,13 +457,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
     private DeviceRouteHandler? _routeHandler;
     private UriPrefixCallback? _uriPrefixCallback;
 
-    internal DeviceBuilder(string name, DeviceType type, string? prefix)
-    {
-        (this.Type, this.Name) = (type, Validator.ValidateText(name));
-        this.AdapterName = $"apt-{UniqueNameGenerator.Generate(name, prefix)}";
-    }
-
-    public string AdapterName { get; }
+    public string AdapterName => $"apt-{UniqueNameGenerator.Generate($"{this.Name}|{this.Manufacturer}", namePrefix)}";
 
     public IReadOnlyCollection<string> AdditionalSearchTokens => this._additionalSearchTokens;
 
@@ -486,7 +489,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     public string Manufacturer { get; private set; } = "NEEO";
 
-    public string Name { get; }
+    public string Name { get; } = Validator.ValidateText(name);
 
     public DeviceNotifierCallback? NotifierCallback { get; private set; }
 
@@ -512,7 +515,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
 
     public DeviceTiming? Timing { get; private set; }
 
-    public DeviceType Type { get; }
+    public DeviceType Type => type;
 
     IDeviceBuilder IDeviceBuilder.AddAdditionalSearchTokens(IEnumerable<string> tokens) => this.AddAdditionalSearchTokens(tokens);
 
@@ -629,7 +632,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         description,
         RegistrationType.Credentials,
         queryIsRegistered,
-        (Credentials credentials) => processor(credentials.UserName, credentials.Password)
+        (Credentials credentials, CancellationToken cancellationToken) => processor(credentials.UserName, credentials.Password, cancellationToken)
     );
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
@@ -642,14 +645,14 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         description,
         RegistrationType.SecurityCode,
         queryIsRegistered,
-        (SecurityCodeContainer container) => processor(container.SecurityCode)
+        (SecurityCodeContainer container, CancellationToken cancellationToken) => processor(container.SecurityCode, cancellationToken)
     );
 
     IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionCallbacks(
-        DeviceSubscriptionHandler onDeviceAdded,
-        DeviceSubscriptionHandler onDeviceRemoved,
-        DeviceSubscriptionListHandler initializeDeviceList
-    ) => this.RegisterDeviceSubscriptionCallbacks(onDeviceAdded, onDeviceRemoved, initializeDeviceList);
+        DeviceSubscriptionHandler notifyDeviceAdded,
+        DeviceSubscriptionHandler notifyDeviceRemoved,
+        DeviceSubscriptionListHandler notifyDeviceList
+    ) => this.RegisterDeviceSubscriptionCallbacks(notifyDeviceAdded, notifyDeviceRemoved, notifyDeviceList);
 
     IDeviceBuilder IDeviceBuilder.RegisterInitializer(DeviceInitializer initializer) => this.RegisterInitializer(initializer);
 
@@ -1110,7 +1113,7 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, Task<RegistrationResult>> processor)
+    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, CancellationToken, Task<RegistrationResult>> processor)
         where TPayload : struct
     {
         if (this.Setup.RegistrationType.HasValue)
@@ -1128,13 +1131,21 @@ internal sealed partial class DeviceBuilder : IDeviceBuilder
         return this;
     }
 
-    private DeviceBuilder RegisterDeviceSubscriptionCallbacks(DeviceSubscriptionHandler onDeviceAdded, DeviceSubscriptionHandler onDeviceRemoved, DeviceSubscriptionListHandler initializeDeviceList)
+    private DeviceBuilder RegisterDeviceSubscriptionCallbacks(
+        DeviceSubscriptionHandler notifyDeviceAdded,
+        DeviceSubscriptionHandler notifyDeviceRemoved,
+        DeviceSubscriptionListHandler notifyDeviceList
+    )
     {
         if (this.SubscriptionFeature != null)
         {
             throw new InvalidOperationException($"{nameof(this.RegisterDeviceSubscriptionCallbacks)} was already called.");
         }
-        this.SubscriptionFeature = new(onDeviceAdded, onDeviceRemoved, initializeDeviceList);
+        this.SubscriptionFeature = new(
+            notifyDeviceAdded ?? throw new ArgumentNullException(nameof(notifyDeviceAdded)),
+            notifyDeviceRemoved ?? throw new ArgumentNullException(nameof(notifyDeviceRemoved)),
+            notifyDeviceList ?? throw new ArgumentNullException(nameof(notifyDeviceList))
+        );
         return this;
     }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Lists;
 
@@ -16,16 +17,18 @@ public interface IDirectoryFeature : IFeature
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
     /// <param name="parameters">The parameters relating to the directory to browse and an offset and limit if applicable.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters);
+    Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Handle a request by a user to perform an action in a directory such as opening a file.
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
     /// <param name="actionIdentifier">The identifier for the action to be performed (such as the file to be opened).</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier);
+    Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default);
 }
 
 internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? identifier = default) : IDirectoryFeature
@@ -33,16 +36,16 @@ internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryAction
     private readonly DirectoryActionHandler _actionHandler = actionHandler ?? throw new ArgumentNullException(nameof(actionHandler));
     private readonly DirectoryBrowser _browser = browser ?? throw new ArgumentNullException(nameof(browser));
 
-    public async Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters)
+    public async Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken)
     {
         ListBuilder builder = new(string.IsNullOrEmpty(parameters.BrowseIdentifier) && !string.IsNullOrEmpty(identifier) ? parameters with { BrowseIdentifier = identifier } : parameters);
-        await this._browser(deviceId, builder).ConfigureAwait(false);
+        await this._browser(deviceId, builder, cancellationToken).ConfigureAwait(false);
         return builder;
     }
 
-    public async Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier)
+    public async Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
     {
-        await this._actionHandler(deviceId, actionIdentifier).ConfigureAwait(false);
+        await this._actionHandler(deviceId, actionIdentifier, cancellationToken).ConfigureAwait(false);
         return true;
     }
 }

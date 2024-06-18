@@ -125,10 +125,10 @@ public sealed class HisenseTV : IDisposable
             : Task.FromResult(default(HisenseTV));
     }
 
-    public Task<IState> AuthenticateAsync(string code)
+    public Task<IState> AuthenticateAsync(string code, CancellationToken cancellationToken)
     {
         return this._connection is { } connection
-            ? connection.AuthenticateAsync(code)
+            ? connection.AuthenticateAsync(code, cancellationToken)
             : throw new InvalidOperationException();
     }
 
@@ -138,7 +138,7 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        await (this._connection?.ChangeSourceAsync(name) ?? Task.CompletedTask).ConfigureAwait(false);
+        await (this._connection?.ChangeSourceAsync(name, cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
     public async Task ChangeVolumeAsync(int value, CancellationToken cancellationToken = default)
@@ -147,7 +147,7 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        await (this._connection?.ChangeVolumeAsync(value) ?? Task.CompletedTask).ConfigureAwait(false);
+        await (this._connection?.ChangeVolumeAsync(value, cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
     public void Dispose()
@@ -170,7 +170,7 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        return await (this._connection?.GetAppsAsync() ?? Task.FromResult(Array.Empty<AppInfo>())).ConfigureAwait(false);
+        return await (this._connection?.GetAppsAsync(cancellationToken) ?? Task.FromResult(Array.Empty<AppInfo>())).ConfigureAwait(false);
     }
 
     public async Task<SourceInfo[]> GetSourcesAsync(CancellationToken cancellationToken = default)
@@ -179,7 +179,7 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        return await (this._connection?.GetSourcesAsync() ?? Task.FromResult(Array.Empty<SourceInfo>())).ConfigureAwait(false);
+        return await (this._connection?.GetSourcesAsync(cancellationToken) ?? Task.FromResult(Array.Empty<SourceInfo>())).ConfigureAwait(false);
     }
 
     public async Task<IState?> GetStateAsync(CancellationToken cancellationToken = default)
@@ -188,7 +188,7 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        return this._connection == null ? null : await this._connection.GetStateAsync().ConfigureAwait(false);
+        return this._connection == null ? null : await this._connection.GetStateAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<int> GetVolumeAsync(CancellationToken cancellationToken = default)
@@ -206,7 +206,7 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        await (this._connection?.LaunchAppAsync(name) ?? Task.CompletedTask).ConfigureAwait(false);
+        await (this._connection?.LaunchAppAsync(name, cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
     public Task SendKeyAsync(RemoteKey key, CancellationToken cancellationToken = default) => this.SendKeyAsync(TextAttribute.GetText(key), cancellationToken);
@@ -217,7 +217,7 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        await (this._connection?.SendKeyAsync(key) ?? Task.CompletedTask).ConfigureAwait(false);
+        await (this._connection?.SendKeyAsync(key, cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
     private static async Task<HisenseTV?> TryCreate(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool connectionRequired, bool useCertificates, string? clientIdPrefix, CancellationToken cancellationToken)
@@ -337,27 +337,27 @@ public sealed class HisenseTV : IDisposable
 
         public bool IsConnected => this._client.IsConnected;
 
-        public async Task<IState> AuthenticateAsync(string code)
+        public async Task<IState> AuthenticateAsync(string code, CancellationToken cancellationToken)
         {
-            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "authenticationcode"), new { AuthNum = code }).ConfigureAwait(false);
+            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "authenticationcode"), new { AuthNum = code }, cancellationToken: cancellationToken).ConfigureAwait(false);
             return payload.Length == 0 || JsonSerializer.Deserialize<SuccessPayload>(payload, Connection._jsonOptions).Result != 1
                 ? new State(StateType.AuthenticationRequired)
-                : await this.GetStateAsync().ConfigureAwait(false);
+                : await this.GetStateAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task ChangeSourceAsync(string name)
+        public async Task ChangeSourceAsync(string name, CancellationToken cancellationToken)
         {
-            if (Array.Find(await this.GetSourcesAsync().ConfigureAwait(false), source => source.Name == name) is { } source)
+            if (Array.Find(await this.GetSourcesAsync(cancellationToken).ConfigureAwait(false), source => source.Name == name) is { } source)
             {
-                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "changesource"), source, waitForNextMessage: false).ConfigureAwait(false);
+                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "changesource"), source, waitForNextMessage: false, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public Task ChangeVolumeAsync(int volume)
+        public Task ChangeVolumeAsync(int volume, CancellationToken cancellationToken)
         {
             return volume is < 0 or > 100
                 ? throw new ArgumentOutOfRangeException(nameof(volume), "Volume must be between 0 and 100.")
-                : this.SendMessageAsync(this.GetPublishTopic("ui_service", "changevolume"), volume.ToString());
+                : this.SendMessageAsync(this.GetPublishTopic("ui_service", "changevolume"), volume.ToString(), cancellationToken: cancellationToken);
         }
 
         public void Dispose()
@@ -366,21 +366,21 @@ public sealed class HisenseTV : IDisposable
             this._client.Dispose();
         }
 
-        public async Task<AppInfo[]> GetAppsAsync()
+        public async Task<AppInfo[]> GetAppsAsync(CancellationToken cancellationToken)
         {
-            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "applist")).ConfigureAwait(false);
+            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "applist"), cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Deserialize<AppInfo[]>(payload, Connection._jsonOptions)!;
         }
 
-        public async Task<SourceInfo[]> GetSourcesAsync()
+        public async Task<SourceInfo[]> GetSourcesAsync(CancellationToken cancellationToken)
         {
-            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "sourcelist")).ConfigureAwait(false);
+            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "sourcelist"), cancellationToken).ConfigureAwait(false);
             return JsonSerializer.Deserialize<SourceInfo[]>(payload, Connection._jsonOptions)!;
         }
 
-        public async Task<IState> GetStateAsync()
+        public async Task<IState> GetStateAsync(CancellationToken cancellationToken)
         {
-            (string topic, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "gettvstate")).ConfigureAwait(false);
+            (string topic, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "gettvstate"), cancellationToken).ConfigureAwait(false);
             return this.TranslateStateMessage(topic, payload);
         }
 
@@ -390,19 +390,24 @@ public sealed class HisenseTV : IDisposable
             return Connection.TranslateVolumePayload(payload);
         }
 
-        public async Task LaunchAppAsync(string name)
+        public async Task LaunchAppAsync(string name, CancellationToken cancellationToken)
         {
-            if (Array.Find(await this.GetAppsAsync().ConfigureAwait(false), app => string.Equals(app.Name, name, StringComparison.OrdinalIgnoreCase)) is { } app)
+            if (Array.Find(await this.GetAppsAsync(cancellationToken).ConfigureAwait(false), app => string.Equals(app.Name, name, StringComparison.OrdinalIgnoreCase)) is { } app)
             {
-                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "launchapp"), app).ConfigureAwait(false);
+                await this.SendMessageAsync(this.GetPublishTopic("ui_service", "launchapp"), app, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public Task SendKeyAsync(string key) => this.SendMessageAsync(this.GetPublishTopic("remote_service", "sendkey"), key, waitForNextMessage: false);
+        public Task SendKeyAsync(string key, CancellationToken cancellationToken = default) => this.SendMessageAsync(this.GetPublishTopic("remote_service", "sendkey"), key, waitForNextMessage: false, cancellationToken: cancellationToken);
 
-        public Task<(string, string)> SendMessageAsync(string topic, bool waitForNextMessage = true) => this.SendMessageAsync(topic, default(object), waitForNextMessage);
+        public Task<(string, string)> SendMessageAsync(string topic, bool waitForNextMessage = true, CancellationToken cancellationToken = default) => this.SendMessageAsync(
+            topic,
+            default(object),
+            waitForNextMessage,
+            cancellationToken
+        );
 
-        public async Task<(string, string)> SendMessageAsync<TBody>(string topic, TBody? body, bool waitForNextMessage = true)
+        public async Task<(string, string)> SendMessageAsync<TBody>(string topic, TBody? body, bool waitForNextMessage = true, CancellationToken cancellationToken = default)
         {
             string payload = body switch
             {
@@ -417,20 +422,23 @@ public sealed class HisenseTV : IDisposable
                 return (string.Empty, string.Empty);
             }
             TaskCompletionSource<(string, string)> taskCompletionSource = new();
+            CancellationTokenRegistration? registration = default;
             try
             {
                 this.MessageReceived += OnMessageReceived;
+                registration = cancellationToken.Register(() => taskCompletionSource.SetCanceled(cancellationToken));
                 await PublishAsync().ConfigureAwait(false);
                 return await taskCompletionSource.Task.ConfigureAwait(false);
             }
             finally
             {
                 this.MessageReceived -= OnMessageReceived;
+                registration?.Unregister();
             }
 
             void OnMessageReceived(object? sender, DataEventArgs<(string, string)> e) => taskCompletionSource.TrySetResult(e.Data);
 
-            Task PublishAsync() => this._client.PublishAsync(new() { Topic = topic, PayloadSegment = Encoding.UTF8.GetBytes(payload) });
+            Task PublishAsync() => this._client.PublishAsync(new() { Topic = topic, PayloadSegment = Encoding.UTF8.GetBytes(payload) }, cancellationToken);
         }
 
         public async Task<bool> TryConnectAsync(CancellationToken cancellationToken)

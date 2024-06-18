@@ -24,5 +24,8 @@ internal sealed class DatabaseController(IDeviceDatabase database) : ControllerB
     }
 
     [HttpGet("search")]
-    public ActionResult<SearchEntry<DeviceAdapterModel>[]> Search([FromQuery(Name = "q")] string? query) => database.Search(query);
+    public ActionResult<SearchEntry<DeviceAdapterModel>[]> Search([FromQuery(Name = "q")] string? query)
+    {
+        return database.Search(query);
+    }
 }

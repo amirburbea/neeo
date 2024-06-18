@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Lists;
 
 namespace Neeo.Sdk.Devices;
@@ -11,37 +12,37 @@ public interface IPlayerWidgetController
 
     string? RootDirectoryLabel { get; }
 
-    Task<string> GetCoverArtAsync(string deviceId);
+    Task<string> GetCoverArtAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task<string> GetDescriptionAsync(string deviceId);
+    Task<string> GetDescriptionAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task<bool> GetIsMutedAsync(string deviceId);
+    Task<bool> GetIsMutedAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task<bool> GetIsPlayingAsync(string deviceId);
+    Task<bool> GetIsPlayingAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task<bool> GetRepeatAsync(string deviceId);
+    Task<bool> GetRepeatAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task<bool> GetShuffleAsync(string deviceId);
+    Task<bool> GetShuffleAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task<string> GetTitleAsync(string deviceId);
+    Task<string> GetTitleAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task<double> GetVolumeAsync(string deviceId);
+    Task<double> GetVolumeAsync(string deviceId, CancellationToken cancellationToken = default);
 
-    Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier);
+    Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default);
 
-    Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier);
+    Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default);
 
-    Task PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder);
+    Task PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder, CancellationToken cancellationToken = default);
 
-    Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder);
+    Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder, CancellationToken cancellationToken = default);
 
-    Task SetIsMutedAsync(string deviceId, bool isMuted);
+    Task SetIsMutedAsync(string deviceId, bool isMuted, CancellationToken cancellationToken = default);
 
-    Task SetIsPlayingAsync(string deviceId, bool isPlaying);
+    Task SetIsPlayingAsync(string deviceId, bool isPlaying, CancellationToken cancellationToken = default);
 
-    Task SetRepeatAsync(string deviceId, bool repeat);
+    Task SetRepeatAsync(string deviceId, bool repeat, CancellationToken cancellationToken = default);
 
-    Task SetShuffleAsync(string deviceId, bool shuffle);
+    Task SetShuffleAsync(string deviceId, bool shuffle, CancellationToken cancellationToken = default);
 
-    Task SetVolumeAsync(string deviceId, double volume);
+    Task SetVolumeAsync(string deviceId, double volume, CancellationToken cancellationToken = default);
 }

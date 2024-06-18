@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -87,7 +87,8 @@ internal sealed class NotificationService : INotificationService, IDisposable
     {
         if (this.IsDuplicate(message))
         {
-            this._logger.LogWarning("Ignored: Duplicate message.");
+            (string key, object value) = message.ExtractTypeAndData();
+            this._logger.LogWarning("Ignored duplicate message: {key}={value}", key, JsonSerializer.Serialize(value, JsonSerialization.Options));
             return;
         }
         this._logger.LogDebug("Sending {message}", message);

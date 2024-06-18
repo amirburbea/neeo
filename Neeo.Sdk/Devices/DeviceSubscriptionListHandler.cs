@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices;
@@ -8,5 +9,6 @@ namespace Neeo.Sdk.Devices;
 /// subscriptions removing the need to save them in the driver.
 /// </summary>
 /// <param name="deviceIds">Array of identifiers for the devices of this type currently on the Brain.</param>
+/// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DeviceSubscriptionListHandler(string[] deviceIds);
+public delegate Task DeviceSubscriptionListHandler(string[] deviceIds, CancellationToken cancellationToken = default);

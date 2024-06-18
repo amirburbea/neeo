@@ -15,10 +15,11 @@
     <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
   </ItemGroup>
 
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent" Condition="'$(Configuration)' == 'Debug'">
-	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Sdk.Examples\Neeo.Sdk.Examples.csproj&quot; /target:Build /property:Configuration=$(Configuration) "/>
-	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj&quot; /target:Build /property:Configuration=$(Configuration) "/>
-	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj&quot; /target:Build /property:Configuration=$(Configuration)" />
-	  <Exec Command="dotnet build &quot;$(SolutionDir)Neeo.Drivers.Plex\Neeo.Drivers.Plex.csproj&quot; /target:Build /property:Configuration=$(Configuration)" />
-  </Target>
+  <!-- Add depdendency on the drivers in Debug for build consistency -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <ProjectReference Include="..\Neeo.Sdk.Examples\Neeo.Sdk.Examples.csproj" />
+	<ProjectReference Include="..\Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj" />
+	<ProjectReference Include="..\Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj" />
+	<ProjectReference Include="..\Neeo.Drivers.Plex\Neeo.Drivers.Plex.csproj" />
+  </ItemGroup>
 </Project>

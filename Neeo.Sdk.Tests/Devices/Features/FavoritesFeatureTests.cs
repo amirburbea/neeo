@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Moq;
 using Neeo.Sdk.Devices;
@@ -15,12 +16,13 @@ public sealed class FavoritesFeatureTests
     public async Task ExecuteAsync_should_pass_correct_arguments_to_handler(string favorite)
     {
         Mock<FavoriteHandler> mockFavoriteHandler = new(MockBehavior.Strict);
-        mockFavoriteHandler.Setup(handler => handler(It.IsAny<string>(), It.IsAny<string>())).Returns(Task.CompletedTask);
+        mockFavoriteHandler.Setup(handler => handler(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         FavoritesFeature feature = new(mockFavoriteHandler.Object);
         string deviceId = Guid.NewGuid().ToString();
-        await feature.ExecuteAsync(deviceId, favorite);
+        CancellationToken cancellationToken = new();
+        await feature.ExecuteAsync(deviceId, favorite, cancellationToken);
 
-        mockFavoriteHandler.Verify(handler => handler(deviceId, favorite), Times.Once());
+        mockFavoriteHandler.Verify(handler => handler(deviceId, favorite, cancellationToken), Times.Once());
     }
 }

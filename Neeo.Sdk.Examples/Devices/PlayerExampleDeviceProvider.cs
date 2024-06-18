@@ -108,52 +108,52 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
         string? IPlayerWidgetController.RootDirectoryLabel { get; }
 
-        public Task<string> GetCoverArtAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.CoverArt);
+        public Task<string> GetCoverArtAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<string>(PlayerKey.CoverArt);
 
-        public Task<string> GetDescriptionAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.Description);
+        public Task<string> GetDescriptionAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<string>(PlayerKey.Description);
 
-        public Task<bool> GetIsMutedAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Mute);
+        public Task<bool> GetIsMutedAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Mute);
 
-        public Task<bool> GetIsPlayingAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Playing);
+        public Task<bool> GetIsPlayingAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Playing);
 
-        public Task<bool> GetRepeatAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Repeat);
+        public Task<bool> GetRepeatAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Repeat);
 
-        public Task<bool> GetShuffleAsync(string deviceId) => this.GetValueAsync<bool>(PlayerKey.Shuffle);
+        public Task<bool> GetShuffleAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Shuffle);
 
-        public Task<string> GetTitleAsync(string deviceId) => this.GetValueAsync<string>(PlayerKey.Title);
+        public Task<string> GetTitleAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<string>(PlayerKey.Title);
 
-        public Task<double> GetVolumeAsync(string deviceId) => this.GetValueAsync<double>(PlayerKey.Volume);
+        public Task<double> GetVolumeAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<double>(PlayerKey.Volume);
 
-        public Task HandleButtonAsync(string deviceId, string button) => Button.TryResolve(button) switch
+        public Task HandleButtonAsync(string deviceId, string button, CancellationToken cancellationToken = default) => Button.TryResolve(button) switch
         {
-            Buttons.Play => this.SetIsPlayingAsync(deviceId, true),
-            Buttons.PlayPauseToggle => this.SetIsPlayingAsync(deviceId, !this._service.GetValue<bool>(PlayerKey.Playing)),
-            Buttons.Pause => this.SetIsPlayingAsync(deviceId, false),
-            Buttons.VolumeUp => this.SetVolumeAsync(deviceId, Math.Min(this._service.GetValue<double>(PlayerKey.Volume) + 5d, 100d)),
-            Buttons.VolumeDown => this.SetVolumeAsync(deviceId, Math.Max(this._service.GetValue<double>(PlayerKey.Volume) - 5d, 0d)),
+            Buttons.Play => this.SetIsPlayingAsync(deviceId, true, cancellationToken),
+            Buttons.PlayPauseToggle => this.SetIsPlayingAsync(deviceId, !this._service.GetValue<bool>(PlayerKey.Playing), cancellationToken),
+            Buttons.Pause => this.SetIsPlayingAsync(deviceId, false, cancellationToken),
+            Buttons.VolumeUp => this.SetVolumeAsync(deviceId, Math.Min(this._service.GetValue<double>(PlayerKey.Volume) + 5d, 100d), cancellationToken),
+            Buttons.VolumeDown => this.SetVolumeAsync(deviceId, Math.Max(this._service.GetValue<double>(PlayerKey.Volume) - 5d, 0d), cancellationToken),
             Buttons.NextTrack => this.ChangeTrackAsync(deviceId, (Pet)((int)this._service.Pet + 1)),
             Buttons.PreviousTrack => this.ChangeTrackAsync(deviceId, (Pet)((int)this._service.Pet - 1)),
-            Buttons.MuteToggle => this.SetIsMutedAsync(deviceId, !this._service.GetValue<bool>(PlayerKey.Mute)),
+            Buttons.MuteToggle => this.SetIsMutedAsync(deviceId, !this._service.GetValue<bool>(PlayerKey.Mute), cancellationToken),
             _ => Task.CompletedTask,
         };
 
-        Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier)
+        Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
         {
             // Queue is not supported for this demo.
             return Task.CompletedTask;
         }
 
-        public Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier)
+        public Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
         {
             return Enum.TryParse(actionIdentifier, out Pet pet) ? this.ChangeTrackAsync(deviceId, pet) : Task.CompletedTask;
         }
 
-        Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder)
+        Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
 
-        public Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder)
+        public Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
             {
@@ -175,15 +175,15 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             return Task.CompletedTask;
         }
 
-        public Task SetIsMutedAsync(string deviceId, bool isMuted) => this.SetValueAsync(PlayerKey.Mute, BooleanBoxes.GetBox(isMuted));
+        public Task SetIsMutedAsync(string deviceId, bool isMuted, CancellationToken cancellationToken) => this.SetValueAsync(PlayerKey.Mute, BooleanBoxes.GetBox(isMuted));
 
-        public Task SetIsPlayingAsync(string deviceId, bool isPlaying) => this.SetValueAsync(PlayerKey.Playing, BooleanBoxes.GetBox(isPlaying));
+        public Task SetIsPlayingAsync(string deviceId, bool isPlaying, CancellationToken cancellationToken) => this.SetValueAsync(PlayerKey.Playing, BooleanBoxes.GetBox(isPlaying));
 
-        public Task SetRepeatAsync(string deviceId, bool repeat) => this.SetValueAsync(PlayerKey.Repeat, BooleanBoxes.GetBox(repeat));
+        public Task SetRepeatAsync(string deviceId, bool repeat, CancellationToken cancellationToken) => this.SetValueAsync(PlayerKey.Repeat, BooleanBoxes.GetBox(repeat));
 
-        public Task SetShuffleAsync(string deviceId, bool shuffle) => this.SetValueAsync(PlayerKey.Shuffle, BooleanBoxes.GetBox(shuffle));
+        public Task SetShuffleAsync(string deviceId, bool shuffle, CancellationToken cancellationToken) => this.SetValueAsync(PlayerKey.Shuffle, BooleanBoxes.GetBox(shuffle));
 
-        public Task SetVolumeAsync(string deviceId, double volume) => this.SetValueAsync(PlayerKey.Volume, volume);
+        public Task SetVolumeAsync(string deviceId, double volume, CancellationToken cancellationToken) => this.SetValueAsync(PlayerKey.Volume, volume);
 
         private Task ChangeTrackAsync(string deviceId, Pet pet) => (int)pet switch
         {

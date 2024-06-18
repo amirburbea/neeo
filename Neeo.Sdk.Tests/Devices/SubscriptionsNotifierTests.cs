@@ -68,17 +68,17 @@ public sealed class SubscriptionsNotifierTests
             string[] ids = Array.ConvertAll(RandomNumberGenerator.GetBytes(5), static b => b.ToString());
             Mock<ISubscriptionFeature> mockFeature = new(MockBehavior.Strict);
             mockFeature
-                .Setup(feature => feature.InitializeDeviceListAsync(It.IsAny<string[]>()))
-                .Returns((string[] deviceIds) => DeviceSubscriptionHandler(deviceIds));
+                .Setup(feature => feature.NotifyDeviceListAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+                .Returns((string[] deviceIds, CancellationToken cancellationToken) => DeviceSubscriptionHandler(deviceIds, cancellationToken));
             this._mockClient
                 .Setup(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
                 .ReturnsTransformOf(ids);
             return mockFeature.Object;
 
-            Task DeviceSubscriptionHandler(string[] deviceIds)
+            Task DeviceSubscriptionHandler(string[] deviceIds, CancellationToken cancellationToken)
             {
                 Assert.Same(deviceIds, ids);
-                this._mockClient.Verify(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()), Times.Once());
+                this._mockClient.Verify(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), cancellationToken), Times.Once());
                 mockAdapter.Setup(adapter => adapter.SpecificName).Returns(Constants.GetAsyncCalled);
                 return Task.CompletedTask;
             }

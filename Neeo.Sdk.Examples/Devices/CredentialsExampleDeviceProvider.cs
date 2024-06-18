@@ -12,8 +12,13 @@ public class CredentialsExampleDeviceProvider : IDeviceProvider
     public CredentialsExampleDeviceProvider() => this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.Accessory)
         .SetSpecificName(Constants.DeviceName)
         .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, this.DiscoverAsync)
-        .EnableRegistration(Constants.RegistrationHeaderText, Constants.RegistrationDescription, this.QueryIsRegisteredAsync, this.RegisterAsync)
-        .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelTextAsync);
+        .EnableRegistration(
+            Constants.RegistrationHeaderText,
+            Constants.RegistrationDescription,
+            (_) => this.QueryIsRegisteredAsync(),
+            (userName, password, _) => this.RegisterAsync(userName, password)
+        )
+        .AddTextLabel(Constants.TextLabelName, "Logged In", (deviceId, _) => this.GetLabelTextAsync(deviceId));
 
     public IDeviceBuilder DeviceBuilder { get; }
 

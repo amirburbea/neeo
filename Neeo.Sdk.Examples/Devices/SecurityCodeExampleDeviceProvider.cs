@@ -14,7 +14,7 @@ public class SecurityCodeExampleDeviceProvider : IDeviceProvider
         this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.Accessory)
             .SetSpecificName(Constants.DeviceName)
             .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, this.DiscoverAsync)
-            .EnableRegistration(Constants.RegistrationHeaderText, Constants.RegistrationDescription, this.QueryIsRegisteredAsync, this.RegisterAsync)
+            .EnableRegistration(Constants.RegistrationHeaderText, Constants.RegistrationDescription, _ => this.QueryIsRegisteredAsync(), (code, _) => this.RegisterAsync(code))
             .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelTextAsync);
     }
 
@@ -25,7 +25,9 @@ public class SecurityCodeExampleDeviceProvider : IDeviceProvider
         return Task.FromResult(new[] { new DiscoveredDevice("code-device", "Security Code Device", true) });
     }
 
-    private Task<string> GetLabelTextAsync(string deviceId) => Task.FromResult($"{deviceId} {(this._isRegistered ? "successfully" : "not")} registered");
+    private Task<string> GetLabelTextAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(
+        $"{deviceId} {(this._isRegistered ? "successfully" : "not")} registered"
+    );
 
     private Task<bool> QueryIsRegisteredAsync() => Task.FromResult(this._isRegistered);
 
