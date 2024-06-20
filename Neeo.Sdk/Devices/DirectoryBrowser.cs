@@ -11,4 +11,4 @@ namespace Neeo.Sdk.Devices;
 /// <param name="list">The list builder.</param>
 /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DirectoryBrowser(string deviceId, ListBuilder list, CancellationToken cancellationToken = default);
+public delegate Task DirectoryBrowser(string deviceId, DirectoryBuilder list, CancellationToken cancellationToken = default);

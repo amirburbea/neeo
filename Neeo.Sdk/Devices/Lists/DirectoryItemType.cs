@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Sdk.Devices.Lists;
 
-public enum ListItemType
+public enum DirectoryItemType
 {
     Entry,
     Header,

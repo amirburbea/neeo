@@ -88,7 +88,7 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
 
     private static Task NotifyStateAsync(IDeviceNotifier notifier, HisenseTV tv, IState state) => notifier.SendNotificationAsync("STATE", state.ToString(), tv.DeviceId);
 
-    private async Task BrowseApps(string deviceId, ListBuilder list, CancellationToken cancellationToken)
+    private async Task BrowseApps(string deviceId, DirectoryBuilder list, CancellationToken cancellationToken)
     {
         if (this._tv is not { } tv)
         {

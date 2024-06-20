@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
     <PackageReference Include="Zeroconf" Version="3.6.11" />
   </ItemGroup>
 
@@ -15,6 +16,10 @@
 	  <Compile Update="PlexServer.*.cs">
 		  <DependentUpon>PlexServer.cs</DependentUpon>
 	  </Compile>
+	  <Compile Update="PlexSettings.*.cs">
+		  <DependentUpon>PlexSettings.settings</DependentUpon>
+	  </Compile>
+			   
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +27,20 @@
 		  <Private>false</Private>
 		  <ExcludeAssets>runtime</ExcludeAssets>
 	  </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="PlexSettings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="PlexSettings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>PlexSettings.Designer.cs</LastGenOutput>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -26,7 +26,7 @@ public class PlexRemoteDeviceProvider(
             .AddButton("INPUT PLEX", "Plex");
     }
 
-    private async Task BrowseClients(string deviceId, ListBuilder list, CancellationToken cancellationToken)
+    private async Task BrowseClients(string deviceId, DirectoryBuilder list, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }

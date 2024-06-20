@@ -1,7 +1,9 @@
 ﻿namespace Neeo.Sdk.Devices.Features;
 
 /// <summary>
-/// Describes a device feature.
+/// Interface for a device feature.
+/// 
+/// A device feature implements the REST server's functionality for the associated component(s).
 /// </summary>
 public interface IFeature
 {

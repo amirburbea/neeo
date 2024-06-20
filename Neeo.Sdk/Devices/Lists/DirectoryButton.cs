@@ -3,8 +3,8 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Lists;
 
-[JsonConverter(typeof(TextJsonConverter<ListButtonIcon>))]
-public enum ListButtonIcon
+[JsonConverter(typeof(TextJsonConverter<DirectoryButtonIcon>))]
+public enum DirectoryButtonIcon
 {
     [Text("shuffle")]
     Shuffle,
@@ -13,10 +13,16 @@ public enum ListButtonIcon
     Repeat
 }
 
-public sealed class ListButton(string title, string actionIdentifier, bool? inverse = default, ListButtonIcon? icon = default, ListUIAction? uiAction = default) : ClickableListItemBase(actionIdentifier, uiAction)
+public sealed class DirectoryButton(
+    string title, 
+    string actionIdentifier, 
+    bool? inverse = default, 
+    DirectoryButtonIcon? icon = default, 
+    DirectoryUIAction? uiAction = default
+) : ClickableDirectoryItemBase(actionIdentifier, uiAction)
 {
     [JsonPropertyName("iconName")]
-    public ListButtonIcon? Icon { get; } = icon;
+    public DirectoryButtonIcon? Icon { get; } = icon;
 
     public bool? Inverse { get; } = inverse;
 

@@ -15,6 +15,7 @@ internal sealed class PlexServerManager(
     IHttpClientFactory httpClientFactory,
     IClientIdentifier clientIdentifier,
     IFileStore fileStore,
+    IPlexSettings settings,
     ILogger<PlexServer> logger
 ) : IPlexServerManager
 {
@@ -28,7 +29,7 @@ internal sealed class PlexServerManager(
         {
             return server;
         }
-        server = new(ipAddress, this._httpClient, this._clientIdentifier, fileStore, logger);
+        server = new(ipAddress, this._httpClient, this._clientIdentifier, fileStore, settings, logger);
         this._servers.Add(ipAddress, server);
         server.Destroyed += this.Server_Destroyed;
         return server;

@@ -6,13 +6,13 @@ using Neeo.Sdk.Devices.Components;
 namespace Neeo.Sdk.Devices;
 
 /// <summary>
-/// A model for a device adapter.
+/// A model for a built device.
 /// </summary>
-public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
+public sealed class DeviceModel : IComparable<DeviceModel>
 {
     private readonly IDeviceAdapter _adapter;
 
-    internal DeviceAdapterModel(int id, IDeviceAdapter adapter)
+    internal DeviceModel(int id, IDeviceAdapter adapter)
     {
         this.Id = id;
         this.Info = new(this._adapter = adapter);
@@ -74,7 +74,7 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     /// <summary>
     /// Gets the set of delays NEEO should use when interacting with the device.
     /// </summary>
-    public DeviceTiming Timing => this._adapter.Timing;
+    public DeviceTiming? Timing => this._adapter.Timing;
 
     /// <summary>
     /// Gets a string comprised of the search tokens delimited by a space.
@@ -86,5 +86,5 @@ public sealed class DeviceAdapterModel : IComparable<DeviceAdapterModel>
     /// </summary>
     public DeviceType Type => this._adapter.Type;
 
-    int IComparable<DeviceAdapterModel>.CompareTo(DeviceAdapterModel? other) => string.Compare(this.Name, other?.Name, StringComparison.OrdinalIgnoreCase);
+    int IComparable<DeviceModel>.CompareTo(DeviceModel? other) => string.Compare(this.Name, other?.Name, StringComparison.OrdinalIgnoreCase);
 }

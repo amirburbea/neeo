@@ -29,7 +29,7 @@ public interface IDynamicDeviceRegistry
     /// <param name="rootAdapter">The root device adapter.</param>
     /// <param name="deviceId">The identifier for the created device.</param>
     /// <param name="builder">The dynamic device builder.</param>
-    void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder);
+    IDeviceAdapter RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder);
 }
 
 internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) : IDynamicDeviceRegistry
@@ -65,16 +65,15 @@ internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logge
         return adapter;
     }
 
-    public void RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder)
+    public IDeviceAdapter RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder)
     {
         if (rootAdapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature { EnableDynamicDeviceBuilder: true })
         {
             throw new ArgumentException("Device adapter must support discovery with EnableDynamicDeviceBuilder.", nameof(rootAdapter));
         }
-        this.RegisterDiscoveredDevice(
-            DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId),
-            builder.BuildAdapter()
-        );
+        IDeviceAdapter adapter = builder.BuildAdapter();
+        this.RegisterDiscoveredDevice(DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId), adapter);
+        return adapter;
     }
 
     private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";

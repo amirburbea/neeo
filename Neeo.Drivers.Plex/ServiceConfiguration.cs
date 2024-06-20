@@ -15,6 +15,7 @@ public sealed class ServiceConfiguration : IServiceConfiguration
             .AddSingleton<IPlexServerDiscovery, PlexServerDiscovery>()
             .AddSingleton<IPlexServerManager, PlexServerManager>()
             .AddSingleton<IFileStore, FileStore>()
+            .AddSingleton<IPlexSettings, PlexSettings>()
             .AddLogging(builder => builder.AddFilter((name, _) => name is null || !name.StartsWith(typeof(HttpClient).FullName!) && name != "Microsoft.Extensions.Http.DefaultHttpClientFactory"))
             .AddHttpClient(nameof(Plex), client => client.DefaultRequestHeaders.Accept.Add(new("application/json")))
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });

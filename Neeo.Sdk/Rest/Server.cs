@@ -57,7 +57,7 @@ internal static class Server
     {
         builder
             .ClearProviders()
-            .SetMinimumLevel(LogLevel.Warning)
+            //.SetMinimumLevel(LogLevel.Warning)
             .AddSimpleConsole(options => options.SingleLine = true);
         if (context.HostingEnvironment.IsDevelopment())
         {

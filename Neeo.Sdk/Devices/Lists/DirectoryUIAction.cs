@@ -4,10 +4,10 @@ using Neeo.Sdk.Utilities;
 namespace Neeo.Sdk.Devices.Lists;
 
 /// <summary>
-/// User interface actions for buttons/items in the list.
+/// User interface actions for standardized actions in a directory.
 /// </summary>
-[JsonConverter(typeof(TextJsonConverter<ListUIAction>))]
-public enum ListUIAction
+[JsonConverter(typeof(TextJsonConverter<DirectoryUIAction>))]
+public enum DirectoryUIAction
 {
     /// <summary>
     /// Close the directory browser.
@@ -28,7 +28,7 @@ public enum ListUIAction
     GoBack,
 
     /// <summary>
-    /// Reload the current list (although this can be accomplished by pulling down from the top).
+    /// Reload the current directory (this can also be accomplished by pulling down from the top).
     /// </summary>
     [Text("reload")]
     Reload

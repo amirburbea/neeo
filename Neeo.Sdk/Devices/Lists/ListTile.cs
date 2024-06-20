@@ -9,7 +9,8 @@
 /// <param name="thumbnailUri">The URI of the thumbnail to associate with the tile.</param>
 /// <param name="actionIdentifier">The (optional) action identifier.</param>
 /// <param name="uiAction">The (optional) action list UI action.</param>
-public sealed class ListTile(string thumbnailUri, string? actionIdentifier = default, ListUIAction? uiAction = default) : ClickableListItemBase(actionIdentifier, uiAction)
+public sealed class ListTile(string thumbnailUri, string? actionIdentifier = default, DirectoryUIAction? uiAction = default) 
+    : ClickableDirectoryItemBase(actionIdentifier, uiAction)
 {
     /// <summary>
     /// Tells the NEEO Brain that this is a Tile.

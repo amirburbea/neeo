@@ -985,7 +985,7 @@ internal sealed partial class DeviceBuilder(
             this._routeHandler,
             this.Setup,
             this.SpecificName,
-            this.Timing ?? new(),
+            this.Timing,
             this.AdditionalSearchTokens,
             this.Type,
             this._uriPrefixCallback

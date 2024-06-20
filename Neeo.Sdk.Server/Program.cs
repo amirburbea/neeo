@@ -55,7 +55,7 @@ public static class Program
             {
                 throw new FileNotFoundException(assemblyPath);
             }
-            foreach (Type type in new DriverAssemblyLoadContext(assemblyPath).Assembly.GetExportedTypes())
+            foreach (Type type in Program.LoadAssembly(assemblyPath).GetExportedTypes())
             {
                 if (!type.IsClass || type.IsAbstract || type.IsGenericTypeDefinition)
                 {
@@ -76,17 +76,15 @@ public static class Program
         }
     }
 
-    private sealed class DriverAssemblyLoadContext : AssemblyLoadContext
+    private static Assembly LoadAssembly(string assemblyPath)
     {
-        private readonly AssemblyDependencyResolver _resolver;
+        DriverAssemblyLoadContext loadContext = new(assemblyPath);
+        return loadContext.LoadFromAssemblyName(AssemblyName.GetAssemblyName(assemblyPath));
+    }
 
-        public DriverAssemblyLoadContext(string assemblyPath)
-        {
-            this._resolver = new(assemblyPath);
-            this.Assembly = this.LoadFromAssemblyName(AssemblyName.GetAssemblyName(assemblyPath));
-        }
-
-        public Assembly Assembly { get; }
+    private sealed class DriverAssemblyLoadContext(string assemblyPath) : AssemblyLoadContext
+    {
+        private readonly AssemblyDependencyResolver _resolver = new(assemblyPath);
 
         protected override Assembly? Load(AssemblyName assemblyName) => this._resolver.ResolveAssemblyToPath(assemblyName) is { } path
             ? this.LoadFromAssemblyPath(path)

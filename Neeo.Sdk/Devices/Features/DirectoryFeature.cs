@@ -19,7 +19,7 @@ public interface IDirectoryFeature : IFeature
     /// <param name="parameters">The parameters relating to the directory to browse and an offset and limit if applicable.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken = default);
+    Task<DirectoryBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Handle a request by a user to perform an action in a directory such as opening a file.
@@ -36,9 +36,13 @@ internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryAction
     private readonly DirectoryActionHandler _actionHandler = actionHandler ?? throw new ArgumentNullException(nameof(actionHandler));
     private readonly DirectoryBrowser _browser = browser ?? throw new ArgumentNullException(nameof(browser));
 
-    public async Task<ListBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken)
+    public async Task<DirectoryBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken)
     {
-        ListBuilder builder = new(string.IsNullOrEmpty(parameters.BrowseIdentifier) && !string.IsNullOrEmpty(identifier) ? parameters with { BrowseIdentifier = identifier } : parameters);
+        DirectoryBuilder builder = new(
+            !string.IsNullOrEmpty(parameters.BrowseIdentifier) || string.IsNullOrEmpty(identifier) 
+                ? parameters 
+                : parameters with { BrowseIdentifier = identifier } // Override.
+        );
         await this._browser(deviceId, builder, cancellationToken).ConfigureAwait(false);
         return builder;
     }

@@ -24,7 +24,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static Task Browse(string deviceId, ListBuilder builder, CancellationToken cancellationToken)
+    private static Task Browse(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
     {
         int offset = builder.Parameters.Offset ?? 0;
         int limit = builder.Parameters.Limit;
@@ -43,7 +43,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             try
             {
                 string root = builder.Parameters.BrowseIdentifier;
-                ListEntry[] array = GetEntries(root).ToArray();
+                DirectoryEntry[] array = GetEntries(root).ToArray();
                 string title = $"{root.Replace('\\', '/')} ({array.Length})";
                 builder.SetTitle(title);
                 if (offset == 0)
@@ -52,9 +52,9 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                         .AddHeader(title)
                         .AddTileRow([new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy")])
                         .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
-                        .AddButtonRow(new("Reload", "RELOAD", inverse: false, uiAction: ListUIAction.Reload), new("BACK", "BACKONE", inverse: true, uiAction: ListUIAction.GoBack), new("ROOT", "BACKTOROOT", inverse: true, uiAction: ListUIAction.GoToRoot));
+                        .AddButtonRow(new("Reload", "RELOAD", inverse: false, uiAction: DirectoryUIAction.Reload), new("BACK", "BACKONE", inverse: true, uiAction: DirectoryUIAction.GoBack), new("ROOT", "BACKTOROOT", inverse: true, uiAction: DirectoryUIAction.GoToRoot));
                 }
-                foreach (ListEntry entry in array[offset..Math.Min(offset + limit, array.Length)])
+                foreach (DirectoryEntry entry in array[offset..Math.Min(offset + limit, array.Length)])
                 {
                     builder.AddEntry(entry);
                 }
@@ -68,7 +68,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
         return Task.CompletedTask;
     }
 
-    private static IEnumerable<ListEntry> GetEntries(string directory)
+    private static IEnumerable<DirectoryEntry> GetEntries(string directory)
     {
         foreach (string fullPath in Directory.EnumerateFileSystemEntries(directory))
         {

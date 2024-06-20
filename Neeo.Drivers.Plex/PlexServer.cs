@@ -52,7 +52,14 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     private Task<bool>? _connectTask;
     private ClientWebSocket? _serverWebSocket;
 
-    public PlexServer(IPAddress ipAddress, HttpClient httpClient, string clientIdentifier, IFileStore fileStore, ILogger<PlexServer> logger)
+    public PlexServer(
+        IPAddress ipAddress,
+        HttpClient httpClient,
+        string clientIdentifier, 
+        IFileStore fileStore,
+        IPlexSettings settings,
+        ILogger<PlexServer> logger
+    )
     {
         this.IPAddress = ipAddress;
         this._uri = new($"http://{ipAddress}:32400");

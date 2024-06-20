@@ -5,9 +5,9 @@
 /// </summary>
 public readonly struct ListPageInfo
 {
-    private readonly ListBuilder _list;
+    private readonly DirectoryBuilder _list;
 
-    internal ListPageInfo(ListBuilder list, int offset)
+    internal ListPageInfo(DirectoryBuilder list, int offset)
     {
         this._list = list;
         this.Offset = offset;

@@ -148,12 +148,12 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             return Enum.TryParse(actionIdentifier, out Pet pet) ? this.ChangeTrackAsync(deviceId, pet) : Task.CompletedTask;
         }
 
-        Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, ListBuilder builder, CancellationToken cancellationToken)
+        Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
 
-        public Task PopulateRootDirectoryAsync(string deviceId, ListBuilder builder, CancellationToken cancellationToken)
+        public Task PopulateRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
             {
@@ -169,7 +169,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
                 builder.AddHeader(builder.Parameters.BrowseIdentifier);
                 foreach (Pet pet in Pets)
                 {
-                    builder.AddEntry(new(GetTitle(pet), GetDescription(pet), null, Enum.GetName(pet), thumbnailUri: GetCoverArt(pet)));
+                    builder.AddEntry(new(GetTitle(pet), GetDescription(pet), Enum.GetName(pet), thumbnailUri: GetCoverArt(pet)));
                 }
             }
             return Task.CompletedTask;
