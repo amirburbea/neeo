@@ -23,13 +23,13 @@ public static class Program
 
     private static void ConfigureAppConfiguration(IHostEnvironment environment, IConfigurationBuilder builder) => builder
         .AddEnvironmentVariables(prefix: "NEEO_")
-        .AddCommandLine(Environment.GetCommandLineArgs())
+        .AddCommandLine(Environment.GetCommandLineArgs()[1..])
         .AddJsonFile("appsettings.json", optional: true)
         .AddJsonFile($"appsettings.{environment.EnvironmentName}.json", optional: true);
 
     private static void ConfigureHostConfiguration(IConfigurationBuilder builder) => builder
         .AddEnvironmentVariables(prefix: "DOTNET_")
-        .AddCommandLine(Environment.GetCommandLineArgs());
+        .AddCommandLine(Environment.GetCommandLineArgs()[1..]);
 
     private static void ConfigureLogging(IHostEnvironment environment, ILoggingBuilder builder)
     {
@@ -50,13 +50,12 @@ public static class Program
         }
         foreach (string driverPath in driverPaths)
         {
-            string fullPath = Path.GetFullPath(driverPath);
-            if (!File.Exists(fullPath))
+            string assemblyPath = Path.GetFullPath(driverPath);
+            if (!File.Exists(assemblyPath))
             {
-                throw new FileNotFoundException(fullPath);
+                throw new FileNotFoundException(assemblyPath);
             }
-            Assembly assembly = new LoadContext(fullPath).LoadFromAssemblyName(AssemblyName.GetAssemblyName(fullPath));
-            foreach (Type type in assembly.GetExportedTypes())
+            foreach (Type type in Program.LoadAssembly(assemblyPath).GetExportedTypes())
             {
                 if (!type.IsClass || type.IsAbstract || type.IsGenericTypeDefinition)
                 {
@@ -66,18 +65,24 @@ public static class Program
                 {
                     services.Add(new(typeof(IDeviceProvider), type, ServiceLifetime.Singleton));
                 }
-                else if (type.GetCustomAttribute<ServiceAttribute>() is { } attribute)
+                else if (typeof(IServiceConfiguration).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) is { } constructor)
                 {
-                    services.Add(new(attribute.ServiceType ?? type, type, attribute.Lifetime));
+                    ((IServiceConfiguration)constructor.Invoke(null)).ConfigureServices(services);
                 }
             }
+            services
+                .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
+                .AddHostedService<SdkService>();
         }
-        services
-            .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
-            .AddHostedService<SdkService>();
     }
 
-    private sealed class LoadContext(string assemblyPath) : AssemblyLoadContext
+    private static Assembly LoadAssembly(string assemblyPath)
+    {
+        DriverAssemblyLoadContext loadContext = new(assemblyPath);
+        return loadContext.LoadFromAssemblyName(AssemblyName.GetAssemblyName(assemblyPath));
+    }
+
+    private sealed class DriverAssemblyLoadContext(string assemblyPath) : AssemblyLoadContext
     {
         private readonly AssemblyDependencyResolver _resolver = new(assemblyPath);
 

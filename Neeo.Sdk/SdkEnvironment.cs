@@ -29,7 +29,10 @@ public interface ISdkEnvironment
     Task StopAsync(CancellationToken cancellationToken = default);
 }
 
-internal sealed class SdkEnvironment(SdkAdapterName sdkAdapterName, IServer server) : ISdkEnvironment
+internal sealed class SdkEnvironment(
+    SdkAdapterName sdkAdapterName,
+    IServer server
+) : ISdkEnvironment
 {
     public string HostAddress => server.Features.Get<IServerAddressesFeature>()!.Addresses.Single();
 

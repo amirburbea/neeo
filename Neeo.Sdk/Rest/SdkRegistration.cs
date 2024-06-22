@@ -10,7 +10,12 @@ namespace Neeo.Sdk.Rest;
 /// <summary>
 /// Hosted service responsible for registering the integration server with the NEEO Brain.
 /// </summary>
-internal sealed class SdkRegistration(IBrain brain, IApiClient client, ISdkEnvironment environment, ILogger<SdkRegistration> logger) : IHostedService
+internal sealed class SdkRegistration(
+    IBrain brain,
+    IApiClient client,
+    ISdkEnvironment environment,
+    ILogger<SdkRegistration> logger
+) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {

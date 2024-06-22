@@ -12,8 +12,13 @@ public class CredentialsExampleDeviceProvider : IDeviceProvider
     public CredentialsExampleDeviceProvider() => this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.Accessory)
         .SetSpecificName(Constants.DeviceName)
         .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, this.DiscoverAsync)
-        .EnableRegistration(Constants.RegistrationHeaderText, Constants.RegistrationDescription, this.QueryIsRegisteredAsync, this.RegisterAsync)
-        .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelTextAsync);
+        .EnableRegistration(
+            Constants.RegistrationHeaderText,
+            Constants.RegistrationDescription,
+            (_) => this.QueryIsRegisteredAsync(),
+            (userName, password, _) => this.RegisterAsync(userName, password)
+        )
+        .AddTextLabel(Constants.TextLabelName, "Logged In", (deviceId, _) => this.GetLabelTextAsync(deviceId));
 
     public IDeviceBuilder DeviceBuilder { get; }
 
@@ -34,7 +39,7 @@ public class CredentialsExampleDeviceProvider : IDeviceProvider
 
     private static class Constants
     {
-        public const string DeviceName = "Credentials Registration Example";
+        public const string DeviceName = "SDK Credentials Registration Example";
         public const string DiscoveryDescription = "This example device shows the use of registration and discovery with a username and password.";
         public const string DiscoveryHeaderText = "NEEO SDK Example Registration via Credentials";
         public const string Password = "password";

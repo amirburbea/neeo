@@ -77,7 +77,8 @@ public sealed class DynamicDeviceRegistryTests
         {
             mockFeature = new(MockBehavior.Strict);
             mockFeature.Setup(feature => feature.EnableDynamicDeviceBuilder).Returns(enableDynamicDeviceBuilder);
-            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
+            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+            mockFeature.Setup(feature => feature.DiscoverAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(value: null);
         }
         else
         {

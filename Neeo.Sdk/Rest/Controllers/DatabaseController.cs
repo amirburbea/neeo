@@ -8,7 +8,7 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal sealed class DatabaseController(IDeviceDatabase database) : ControllerBase
 {
     [HttpGet("adapterdefinition/{adapterName}")]
-    public ActionResult<DeviceAdapterModel> GetDeviceByAdapterName(string adapterName)
+    public ActionResult<DeviceModel> GetDeviceByAdapterName(string adapterName)
     {
         return database.GetDeviceByAdapterName(adapterName) is not { } device
             ? this.NotFound()
@@ -16,7 +16,7 @@ internal sealed class DatabaseController(IDeviceDatabase database) : ControllerB
     }
 
     [HttpGet("{deviceId}")]
-    public ActionResult<DeviceAdapterModel> GetDeviceById(int deviceId)
+    public ActionResult<DeviceModel> GetDeviceById(int deviceId)
     {
         return database.GetDeviceById(deviceId) is not { } device
             ? this.NotFound()
@@ -24,5 +24,8 @@ internal sealed class DatabaseController(IDeviceDatabase database) : ControllerB
     }
 
     [HttpGet("search")]
-    public ActionResult<SearchEntry<DeviceAdapterModel>[]> Search([FromQuery(Name = "q")] string? query) => database.Search(query);
+    public ActionResult<SearchEntry<DeviceModel>[]> Search([FromQuery(Name = "q")] string? query)
+    {
+        return database.Search(query);
+    }
 }

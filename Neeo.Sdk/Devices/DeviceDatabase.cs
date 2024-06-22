@@ -34,34 +34,34 @@ public interface IDeviceDatabase
     /// </summary>
     /// <param name="adapterName">The name of the device adapter.</param>
     /// <returns>The device model if it exists, <see langword="null"/> otherwise.</returns>
-    DeviceAdapterModel? GetDeviceByAdapterName(string adapterName);
+    DeviceModel? GetDeviceByAdapterName(string adapterName);
 
     /// <summary>
     /// Gets the device adapter model with the specified <paramref name="id"/>.
     /// </summary>
     /// <param name="id">The device identifier.</param>
     /// <returns>The device model if it exists, <see langword="null"/> otherwise.</returns>
-    DeviceAdapterModel? GetDeviceById(int id);
+    DeviceModel? GetDeviceById(int id);
 
     /// <summary>
     /// Searches for a device with a token matching the search <paramref name="query"/>.
     /// </summary>
     /// <param name="query">The search query.</param>
     /// <returns>An array of sort entries ranked as per a similar algorithm to &quot;tokenseach.js&quot;.</returns>
-    SearchEntry<DeviceAdapterModel>[] Search(string? query);
+    SearchEntry<DeviceModel>[] Search(string? query);
 }
 
 internal sealed class DeviceDatabase : IDeviceDatabase
 {
     private readonly Dictionary<string, DeviceAdapterContainer> _containers;
-    private readonly TokenSearch<DeviceAdapterModel> _deviceIndex;
-    private readonly DeviceAdapterModel[] _devices;
+    private readonly TokenSearch<DeviceModel> _deviceIndex;
+    private readonly DeviceModel[] _devices;
     private readonly INotificationService _notificationService;
 
     public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> devices, INotificationService notificationService, ILogger<DeviceDatabase> logger)
     {
         this._notificationService = notificationService;
-        this._devices = new DeviceAdapterModel[devices.Count];
+        this._devices = new DeviceModel[devices.Count];
         this._containers = new(this._devices.Length);
         foreach (IDeviceBuilder device in devices)
         {
@@ -79,10 +79,10 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         }
         this._deviceIndex = new(
             this._devices,
-            nameof(DeviceAdapterModel.Manufacturer),
-            nameof(DeviceAdapterModel.Name),
-            nameof(DeviceAdapterModel.Tokens),
-            nameof(DeviceAdapterModel.Type)
+            nameof(DeviceModel.Manufacturer),
+            nameof(DeviceModel.Name),
+            nameof(DeviceModel.Tokens),
+            nameof(DeviceModel.Type)
         );
     }
 
@@ -90,21 +90,21 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken = default)
     {
-        if (this._containers.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container) && !container.IsInitialized)
+        if (this._containers.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container))
         {
             await container.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
         return container?.Adapter;
     }
 
-    public DeviceAdapterModel? GetDeviceByAdapterName(string name) => Array.Find(this._devices, device => device.AdapterName == name);
+    public DeviceModel? GetDeviceByAdapterName(string name) => Array.Find(this._devices, device => device.AdapterName == name);
 
-    public DeviceAdapterModel? GetDeviceById(int id)
+    public DeviceModel? GetDeviceById(int id)
     {
         return id is > -1 && id < this._devices.Length ? this._devices[id] : null;
     }
 
-    public SearchEntry<DeviceAdapterModel>[] Search(string? query) => string.IsNullOrEmpty(query)
+    public SearchEntry<DeviceModel>[] Search(string? query) => string.IsNullOrEmpty(query)
         ? []
         : this._deviceIndex.Search(query).Take(OptionConstants.MaxSearchResults).ToArray();
 
@@ -117,29 +117,28 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     {
         private Task? _task;
 
-        public IDeviceAdapter Adapter { get; } = adapter;
-
-        public bool IsInitialized { get; private set; } = adapter.Initializer is null;
+        public IDeviceAdapter Adapter => adapter;
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
-            return !this.IsInitialized && this.Adapter.Initializer is { } initializer
-                ? this._task ?? InitializeAsync(initializer)
-                : Task.CompletedTask;
+            if (adapter.Initializer == null)
+            {
+                return Task.CompletedTask;
+            }
+            return this._task is { IsFaulted: false, IsCanceled: false } task
+                ? task // Return the currently executing task.
+                : InitializeAsync(adapter.Initializer);
 
             async Task InitializeAsync(DeviceInitializer initializer)
             {
-                logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", this.Adapter.DeviceName, this.Adapter.AdapterName);
+                logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", adapter.DeviceName, adapter.AdapterName);
                 try
                 {
                     await (this._task = initializer(cancellationToken)).ConfigureAwait(false);
-                    this.IsInitialized = true;
-                    this._task = Task.CompletedTask;
                 }
                 catch (Exception e)
                 {
                     logger.LogError(e, "Error initializing adapter.");
-                    this._task = null;
                 }
             }
         }

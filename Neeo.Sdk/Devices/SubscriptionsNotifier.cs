@@ -25,7 +25,12 @@ internal sealed class SubscriptionsNotifier(IApiClient client, IDeviceDatabase d
             }
             logger.LogInformation("Getting current subscriptions for {manufacturer} {device}...", adapter.Manufacturer, adapter.DeviceName);
             string path = string.Format(UrlPaths.SubscriptionsFormat, environment.SdkAdapterName, adapter.AdapterName);
-            await client.GetAsync(path, (string[] deviceIds) => feature.InitializeDeviceListAsync(deviceIds), cancellationToken).Unwrap().ConfigureAwait(false);
+            string[] deviceIds = await client.GetAsync(
+                path,
+                static (string[] ids) => ids,
+                cancellationToken
+            ).ConfigureAwait(false);
+            await feature.NotifyDeviceListAsync(deviceIds, cancellationToken).ConfigureAwait(false);
         }
     }
 

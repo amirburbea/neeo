@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices;
 
@@ -8,6 +9,7 @@ namespace Neeo.Sdk.Devices;
 /// <typeparam name="TValue">The type of the value to set on the device.</typeparam>
 /// <param name="deviceId">The identifier of the device.</param>
 /// <param name="value">The value to set.</param>
+/// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
-public delegate Task DeviceValueSetter<TValue>(string deviceId, TValue value)
+public delegate Task DeviceValueSetter<TValue>(string deviceId, TValue value, CancellationToken cancellationToken = default)
     where TValue : notnull;

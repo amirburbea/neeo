@@ -68,7 +68,7 @@ public interface IDeviceAdapter
     /// <summary>
     /// Gets the set of delays NEEO should use when interacting with the device.
     /// </summary>
-    DeviceTiming Timing { get; }
+    DeviceTiming? Timing { get; }
 
     /// <summary>
     /// Gets the collection of additional search tokens.
@@ -114,7 +114,7 @@ internal readonly record struct DeviceAdapter(
     DeviceRouteHandler? RouteHandler,
     DeviceSetup Setup,
     string? SpecificName,
-    DeviceTiming Timing,
+    DeviceTiming? Timing,
     IReadOnlyCollection<string> Tokens,
     DeviceType Type,
     UriPrefixCallback? UriPrefixCallback

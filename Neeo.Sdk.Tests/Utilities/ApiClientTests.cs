@@ -17,18 +17,22 @@ namespace Neeo.Sdk.Tests.Utilities;
 public sealed class ApiClientTests : IDisposable
 {
     private readonly ApiClient _client;
+    private readonly HttpClient _httpClient;
+    private readonly Mock<IHttpClientFactory> _mockClientFactory = new(MockBehavior.Strict);
     private readonly Mock<HttpMessageHandler> _mockMessageHandler = new(MockBehavior.Strict);
 
     public ApiClientTests()
     {
-        Mock<IBrain> mockBrain = new(MockBehavior.Strict);
-        mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
-        this._client = new(mockBrain.Object, this._mockMessageHandler.Object, NullLogger<ApiClient>.Instance);
         // Required in strict mocks.
         this._mockMessageHandler
             .Protected()
             .As<IMessageHandlerMockedMethods>()
             .Setup(handler => handler.Dispose(true));
+        this._httpClient = new(this._mockMessageHandler.Object);
+        this._mockClientFactory.Setup((factory) => factory.CreateClient(nameof(ApiClient))).Returns(this._httpClient);
+        Mock<IBrain> mockBrain = new(MockBehavior.Strict);
+        mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(value: new(IPAddress.Loopback, 1234));
+        this._client = new(mockBrain.Object, this._mockClientFactory.Object, NullLogger<ApiClient>.Instance);
     }
 
     private interface IMessageHandlerMockedMethods
@@ -38,7 +42,7 @@ public sealed class ApiClientTests : IDisposable
         Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken);
     }
 
-    public void Dispose() => this._client.Dispose();
+    public void Dispose() => this._httpClient.Dispose();
 
     [Theory]
     [InlineData("abcde")]

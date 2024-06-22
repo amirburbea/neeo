@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices.Setup;
 
@@ -8,5 +9,6 @@ namespace Neeo.Sdk.Devices.Setup;
 /// <para />
 /// If the task result is <see langword="true"/> then the NEEO Brain will skip registration.
 /// </summary>
+/// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> to indicate completion.</returns>
-public delegate Task<bool> QueryIsRegistered();
+public delegate Task<bool> QueryIsRegistered(CancellationToken cancellationToken = default);

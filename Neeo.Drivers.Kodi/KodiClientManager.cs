@@ -12,7 +12,6 @@ using Zeroconf;
 
 namespace Neeo.Drivers.Kodi;
 
-[Service]
 public sealed class KodiClientManager(ILogger<KodiClient> logger) : IDisposable
 {
     private readonly ConcurrentDictionary<string, KodiClient> _clients = new();

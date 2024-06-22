@@ -18,6 +18,7 @@ internal static class Validator
         ? throw new ArgumentException($"Value for '{name}' must not be negative.", name)
         : value;
 
+    [return: NotNullIfNotNull(nameof(value))]
     public static int? ValidateNotNegative(int? value, [CallerArgumentExpression(nameof(value))] string name = "") => value.HasValue
         ? Validator.ValidateNotNegative(value.Value, name)
         : value;
@@ -27,10 +28,19 @@ internal static class Validator
         : [low, high];
 
     [return: NotNullIfNotNull(nameof(text))]
-    public static string? ValidateText(string? text, int minLength = 1, int maxLength = 48, bool allowNull = false, [CallerArgumentExpression(nameof(text))] string name = "") => text switch
+    public static string? ValidateText(
+        string? text,
+        int minLength = 1,
+        int maxLength = 48,
+        bool allowNull = false,
+        [CallerArgumentExpression(nameof(text))] string name = ""
+    ) => text switch
     {
-        null when !allowNull => throw new ArgumentException($"Value for '{name}' can not be null.", name),
-        { Length: int length } when length < minLength || length > maxLength => throw new ArgumentException($"Value for {name} must be between {minLength} and {maxLength} characters long.", name),
+        { Length: int length } when length < minLength || length > maxLength => throw new ArgumentException(
+            $"Value for {name} must be between {minLength} and {maxLength} characters long.",
+            name
+        ),
+        null when !allowNull => throw new ArgumentNullException(name),
         _ => text
     };
 

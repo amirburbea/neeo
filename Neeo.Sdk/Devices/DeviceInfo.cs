@@ -10,6 +10,11 @@ namespace Neeo.Sdk.Devices;
 public readonly struct DeviceInfo(IDeviceAdapter adapter)
 {
     /// <summary>
+    /// Gets the (optional) device icon override.
+    /// </summary>
+    public DeviceIconOverride? Icon => adapter.Icon;
+
+    /// <summary>
     /// Gets the device adapter name.
     /// </summary>
     public string Name => adapter.DeviceName;

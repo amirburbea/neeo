@@ -21,11 +21,17 @@ public interface IDiscoveryFeature : IFeature
     /// <summary>
     /// Asynchronously discover devices.
     /// </summary>
-    /// <param name="optionalDeviceId">The (optional) device identifier. If specified, it is expected that the method will return
-    /// either an empty array or the single device requested.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
-    Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default);
+    Task<DiscoveredDevice[]> DiscoverAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously discover a device with a specific identifier.
+    /// </summary>
+    /// <param name="deviceId">The device identifier requested.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
+    Task<DiscoveredDevice?> DiscoverAsync(string deviceId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder = false) : IDiscoveryFeature
@@ -33,6 +39,18 @@ internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDyna
     private readonly DiscoveryProcess _process = process ?? throw new ArgumentNullException(nameof(process));
 
     public bool EnableDynamicDeviceBuilder { get; } = enableDynamicDeviceBuilder;
+
+    async Task<DiscoveredDevice?> IDiscoveryFeature.DiscoverAsync(string deviceId, CancellationToken cancellationToken)
+    {
+        return await this.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is [DiscoveredDevice device]
+            ? device
+            : default;
+    }
+
+    Task<DiscoveredDevice[]> IDiscoveryFeature.DiscoverAsync(CancellationToken cancellationToken)
+    {
+        return this.DiscoverAsync(default, cancellationToken);
+    }
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default)
     {

@@ -55,7 +55,7 @@ internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment env
 
     public readonly record struct Entry(string EventKey, string Name, string? Label);
 
-    private sealed record EntryCache(Entry[] Entries)
+    private sealed class EntryCache(Entry[] entries)
     {
         private readonly Dictionary<string, string[]> _cache = [];
 
@@ -63,42 +63,18 @@ internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment env
         {
             if (!this._cache.TryGetValue(componentName, out string[]? keys))
             {
-                this._cache.Add(componentName, keys = GetKeys());
+                this._cache.Add(
+                    componentName,
+                    keys = Find(static entry => entry.Name) is { Length: > 0 } matches
+                        ? matches
+                        : Find(static entry => entry.Label)
+                );
             }
             return keys;
 
             string[] Find(Func<Entry, string?> projection)
             {
-                int index = Array.FindIndex(this.Entries, Match);
-                if (index == -1)
-                {
-                    return [];
-                }
-                if (index == this.Entries.Length - 1)
-                {
-                    return [this.Entries[index].EventKey];
-                }
-                List<string> keys = [this.Entries[index++].EventKey];
-                for (; index < this.Entries.Length; index++)
-                {
-                    Entry entry = this.Entries[index];
-                    if (Match(entry))
-                    {
-                        keys.Add(entry.EventKey);
-                    }
-                }
-                return keys is [string key] ? [key] : keys.Distinct().ToArray();
-
-                bool Match(Entry entry) => componentName == projection(entry);
-            }
-
-            string[] GetKeys()
-            {
-                if (Find(static entry => entry.Name) is not { Length: > 0 } matches)
-                {
-                    matches = Find(static entry => entry.Label);
-                }
-                return matches;
+                return [.. entries.Where(entry => componentName == projection(entry)).Select(entry => entry.EventKey).Distinct()];
             }
         }
     }

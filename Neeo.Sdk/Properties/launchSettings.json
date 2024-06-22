@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Neeo.Sdk": {
+      "commandName": "Project",
+      "remoteDebugEnabled": false
+    }
+  }
+}

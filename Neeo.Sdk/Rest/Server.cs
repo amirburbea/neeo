@@ -36,11 +36,16 @@ internal static class Server
         IHost host = new HostBuilder()
             .ConfigureWebHostDefaults(builder => Server.ConfigureWebHostDefaults(builder, hostAddress, port))
             .ConfigureLogging(configureLogging ?? Server.ConfigureLoggingDefaults)
+            .ConfigureServices(Server.ConfigureHttpClient)
             .ConfigureServices(services => Server.ConfigureServices(services, brain, devices, adapterName))
             .Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
         return host;
     }
+
+    private static void ConfigureHttpClient(IServiceCollection services) => services
+        .AddHttpClient(nameof(ApiClient))
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
 
     private static void ConfigureJsonOptions(JsonSerializerOptions options)
     {
@@ -50,7 +55,10 @@ internal static class Server
 
     private static void ConfigureLoggingDefaults(HostBuilderContext context, ILoggingBuilder builder)
     {
-        builder.ClearProviders();
+        builder
+            .ClearProviders()
+            .SetMinimumLevel(LogLevel.Warning)
+            .AddSimpleConsole(options => options.SingleLine = true);
         if (context.HostingEnvironment.IsDevelopment())
         {
             builder.AddDebug();
@@ -61,7 +69,6 @@ internal static class Server
         .AddSingleton(brain)
         .AddSingleton(devices)
         .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
-        .AddSingleton<HttpMessageHandler>(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
         .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
         .AddSingleton<PgpPublicKeyResponse>()
         .AddSingleton<IApiClient, ApiClient>()
@@ -70,6 +77,7 @@ internal static class Server
         .AddSingleton<INotificationMapping, NotificationMapping>()
         .AddSingleton<INotificationService, NotificationService>()
         .AddSingleton<ISdkEnvironment, SdkEnvironment>()
+        .AddSingleton<IBrainRecipes, BrainRecipes>()
         .AddHostedService<SdkRegistration>()
         .AddHostedService<SubscriptionsNotifier>()
         .AddHostedService<UriPrefixNotifier>();

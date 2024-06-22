@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace Neeo.Sdk.Devices.Features;
 
@@ -13,15 +14,16 @@ public interface IButtonFeature : IFeature
     /// The button has been pressed - execute the associated <see cref="ButtonHandler"/>.
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
-    Task<SuccessResponse> ExecuteAsync(string deviceId);
+    Task<SuccessResponse> ExecuteAsync(string deviceId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class ButtonFeature(ButtonHandler handler, string button) : IButtonFeature
 {
-    public async Task<SuccessResponse> ExecuteAsync(string deviceId)
+    public async Task<SuccessResponse> ExecuteAsync(string deviceId, CancellationToken cancellationToken)
     {
-        await handler(deviceId, button).ConfigureAwait(false);
+        await handler(deviceId, button, cancellationToken).ConfigureAwait(false);
         return true;
     }
 }

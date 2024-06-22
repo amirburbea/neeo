@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Utilities;
 
@@ -15,19 +16,24 @@ public interface IValueFeature : IFeature
     /// Asynchronously gets the value of the associated component for a device.
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<ValueResponse> GetValueAsync(string deviceId);
+    Task<ValueResponse> GetValueAsync(string deviceId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Asynchronously sets the <paramref name="value"/> of the associated component for a device.
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
     /// <param name="value">The value to set.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<SuccessResponse> SetValueAsync(string deviceId, string value);
+    Task<SuccessResponse> SetValueAsync(string deviceId, string value, CancellationToken cancellationToken = default);
 }
 
-internal sealed class ValueFeature(Func<string, Task<object>> getter, Func<string, string, Task>? setter = default) : IValueFeature
+internal sealed class ValueFeature(
+    Func<string, CancellationToken, Task<object>> getter,
+    Func<string, string, CancellationToken, Task>? setter = default
+) : IValueFeature
 {
     public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter) where TValue : notnull => new(
         ValueFeature.WrapGetter(getter, ObjectConverter<TValue>.Default)
@@ -47,23 +53,23 @@ internal sealed class ValueFeature(Func<string, Task<object>> getter, Func<strin
         ValueFeature.WrapSetter(setter, double.Parse)
     );
 
-    public async Task<ValueResponse> GetValueAsync(string deviceId) => new(await getter(deviceId).ConfigureAwait(false));
+    public async Task<ValueResponse> GetValueAsync(string deviceId, CancellationToken cancellationToken) => new(await getter(deviceId, cancellationToken).ConfigureAwait(false));
 
-    public async Task<SuccessResponse> SetValueAsync(string deviceId, string value)
+    public async Task<SuccessResponse> SetValueAsync(string deviceId, string value, CancellationToken cancellationToken)
     {
-        await (setter ?? throw new NotSupportedException())(deviceId, value).ConfigureAwait(false);
+        await (setter ?? throw new NotSupportedException())(deviceId, value, cancellationToken).ConfigureAwait(false);
         return true;
     }
 
-    private static Func<string, Task<object>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
+    private static Func<string, CancellationToken, Task<object>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
         where TValue : notnull => getter == null
         ? throw new ArgumentNullException(nameof(getter))
-        : async deviceId => converter(await getter(deviceId).ConfigureAwait(false));
+        : async (deviceId, cancellationToken) => converter(await getter(deviceId, cancellationToken).ConfigureAwait(false));
 
-    private static Func<string, string, Task> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
+    private static Func<string, string, CancellationToken, Task> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
         where TValue : notnull => setter == null
         ? throw new ArgumentNullException(nameof(setter))
-        : (deviceId, value) => setter(deviceId, converter(value));
+        : (deviceId, value, cancellationToken) => setter(deviceId, converter(value), cancellationToken);
 
     private static class ObjectConverter<T>
         where T : notnull
