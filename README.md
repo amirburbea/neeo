@@ -4,6 +4,14 @@ This is a port of the [NEEO SDK](https://github.com/NEEOInc/neeo-sdk) from node.
 
 While I realize this may cause an issue for some developers with extensive knowledge of the JS/TS NEEO SDK, considering the size of that developer base, I'm certain the tradeoffs are worth it for increased code clarity and readability.
 
+# NEEO SDK Server
+
+While the SDK provides methods for starting the integration server (see `IBrain..StartServerAsync`), an optional driver host server is provided. 
+
+It will automatically find the first Brain on the network, and then load the drivers listed in its `appsettings.json` file - (to ensure there are no issues loading the Neeo.Sdk.dll, specify the reference as `Private` with `CopyLocal` set to `false`).
+
+Upon startup, will resolve drivers implementing `Neeo.Sdk.Devices.IDeviceProvider`, and drivers can further configure the dependency injector via an implementation of `Neeo.Sdk.Utilities.IServiceConfiguration`.
+
 ## FAQ
 
 ### What is NEEO?

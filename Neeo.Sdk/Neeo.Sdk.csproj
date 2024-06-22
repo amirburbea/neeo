@@ -22,13 +22,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Include="..\README.md">
-	    <Pack>True</Pack>
-	    <PackagePath>\</PackagePath>
-	  </None>
-	</ItemGroup>
-
-	<ItemGroup>
 	  <PackageReference Include="BitFaster.Caching" Version="2.5.0" />
 	  <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
 	  <PackageReference Include="Zeroconf" Version="3.6.11" />

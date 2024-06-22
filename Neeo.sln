@@ -19,9 +19,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Drivers", "Drivers", "{BF10
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk.Tests", "Neeo.Sdk.Tests\Neeo.Sdk.Tests.csproj", "{CCF5E399-C17D-4276-8A8F-A8DF304466A3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neeo.Sdk.Server", "Neeo.Sdk.Server\Neeo.Sdk.Server.csproj", "{FD79C921-4E13-4E7B-8206-0A7C6C00EA9F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Sdk.Server", "Neeo.Sdk.Server\Neeo.Sdk.Server.csproj", "{FD79C921-4E13-4E7B-8206-0A7C6C00EA9F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neeo.Drivers.Plex", "Neeo.Drivers.Plex\Neeo.Drivers.Plex.csproj", "{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neeo.Drivers.Plex", "Neeo.Drivers.Plex\Neeo.Drivers.Plex.csproj", "{A96B7396-3581-4AC2-B2C7-CACAB2DDACFD}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5AF606B0-1A37-45CE-AA7F-44653AEDC380}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
