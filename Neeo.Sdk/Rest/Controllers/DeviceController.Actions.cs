@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
-using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest.Controllers;

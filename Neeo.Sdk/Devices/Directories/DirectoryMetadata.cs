@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Lists;
+﻿namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Metadata relating to the current state of a <see cref="DirectoryBuilder"/>.
@@ -7,22 +7,22 @@
 /// <param name="current">Information about the current page of data.</param>
 /// <param name="previous">Information about the previous page of data if it exists (otherwise <see langword="null"/>).</param>
 /// <param name="next">Information about the next page of data if it exists (otherwise <see langword="null"/>).</param>
-public readonly struct DirectoryMetadata(DirectoryBuilder directory, ListPageInfo current, ListPageInfo? previous = null, ListPageInfo? next = null)
+public readonly struct DirectoryMetadata(DirectoryBuilder directory, DirectoryPageInfo current, DirectoryPageInfo? previous = null, DirectoryPageInfo? next = null)
 {
     /// <summary>
     /// Gets information about the current page of data.
     /// </summary>
-    public ListPageInfo Current => current;
+    public DirectoryPageInfo Current => current;
 
     /// <summary>
     /// In a paginated directory, gets information about the next page of data if it exists (otherwise <see langword="null"/>).
     /// </summary>
-    public ListPageInfo? Next => next;
+    public DirectoryPageInfo? Next => next;
 
     /// <summary>
     /// In a paginated directory, gets information about the previous page of data if it exists (otherwise <see langword="null"/>).
     /// </summary>
-    public ListPageInfo? Previous => previous;
+    public DirectoryPageInfo? Previous => previous;
 
     /// <summary>
     /// Gets the total number of items in the directory.

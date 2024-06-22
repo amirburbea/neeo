@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Devices.Setup;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -33,15 +34,9 @@ internal partial class DeviceController
             return this.NotFound();
         }
         logger.LogInformation("Registering {adapter}...", adapter.DeviceName);
-        if (await feature.RegisterAsync(payload.Data, pgpKeys.PrivateKey, cancellationToken) is not { IsSuccess: false, Error: { } errorMessage })
-        {
-            return this.Ok();
-        }
-        return new ObjectResult(errorMessage)
-        {
-            StatusCode = (int)HttpStatusCode.Forbidden,
-            ContentTypes = { "text/plain" }
-        };
+        return await feature.RegisterAsync(payload.Data, pgpKeys.PrivateKey, cancellationToken) is { IsSuccess: false, Error: { } text }
+            ? new ObjectResult(text) { StatusCode = (int)HttpStatusCode.Forbidden, ContentTypes = { "text/plain" } }
+            : this.Ok();
     }
 
     public readonly record struct CredentialsPayload(string Data);

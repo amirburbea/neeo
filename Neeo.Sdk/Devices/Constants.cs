@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk;
+﻿namespace Neeo.Sdk.Devices;
 
 internal static class Constants
 {

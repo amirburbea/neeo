@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Examples.Devices;
@@ -18,7 +18,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
     public PlayerExampleDeviceProvider(ILogger<PlayerExampleDeviceProvider> logger)
     {
         this._controller = new(logger);
-        const string deviceName = "Player SDK Example";
+        const string deviceName = "SDK Player Example";
         this.DeviceBuilder = Device.Create(deviceName, DeviceType.MusicPlayer)
             .SetDriverVersion(3)
             .AddButtonGroup(ButtonGroups.MenuAndBack)
@@ -148,12 +148,12 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             return Enum.TryParse(actionIdentifier, out Pet pet) ? this.ChangeTrackAsync(deviceId, pet) : Task.CompletedTask;
         }
 
-        Task IPlayerWidgetController.PopulateQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+        Task IPlayerWidgetController.BrowseQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
 
-        public Task PopulateRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+        public Task BrowseRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
             {
@@ -169,7 +169,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
                 builder.AddHeader(builder.Parameters.BrowseIdentifier);
                 foreach (Pet pet in Pets)
                 {
-                    builder.AddEntry(new(GetTitle(pet), GetDescription(pet), Enum.GetName(pet), thumbnailUri: GetCoverArt(pet)));
+                    builder.AddEntry(new(GetTitle(pet), GetDescription(pet), Enum.GetName(pet), ThumbnailUri: GetCoverArt(pet)));
                 }
             }
             return Task.CompletedTask;

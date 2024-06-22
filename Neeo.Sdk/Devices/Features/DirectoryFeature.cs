@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Directories;
 
 namespace Neeo.Sdk.Devices.Features;
 
@@ -31,7 +31,7 @@ public interface IDirectoryFeature : IFeature
     Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default);
 }
 
-internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? identifier = default) : IDirectoryFeature
+internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? browseIdentifier = default) : IDirectoryFeature
 {
     private readonly DirectoryActionHandler _actionHandler = actionHandler ?? throw new ArgumentNullException(nameof(actionHandler));
     private readonly DirectoryBrowser _browser = browser ?? throw new ArgumentNullException(nameof(browser));
@@ -39,9 +39,9 @@ internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryAction
     public async Task<DirectoryBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken)
     {
         DirectoryBuilder builder = new(
-            !string.IsNullOrEmpty(parameters.BrowseIdentifier) || string.IsNullOrEmpty(identifier) 
+            !string.IsNullOrEmpty(parameters.BrowseIdentifier) || string.IsNullOrEmpty(browseIdentifier) 
                 ? parameters 
-                : parameters with { BrowseIdentifier = identifier } // Override.
+                : parameters with { BrowseIdentifier = browseIdentifier } // Override.
         );
         await this._browser(deviceId, builder, cancellationToken).ConfigureAwait(false);
         return builder;

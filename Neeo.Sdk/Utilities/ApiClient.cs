@@ -39,7 +39,11 @@ public interface IApiClient
         where TBody : notnull;
 }
 
-internal sealed class ApiClient(IBrain brain, IHttpClientFactory httpClientFactory, ILogger<ApiClient> logger) : IApiClient
+internal sealed class ApiClient(
+    IBrain brain,
+    IHttpClientFactory httpClientFactory,
+    ILogger<ApiClient> logger
+) : IApiClient
 {
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(ApiClient));
     private readonly string _uriPrefix = $"http://{brain.ServiceEndPoint}";
@@ -62,7 +66,14 @@ internal sealed class ApiClient(IBrain brain, IHttpClientFactory httpClientFacto
         return response.Success;
     }
 
-    private Uri GetUri(string path) => path.StartsWith('/')
-        ? new(this._uriPrefix + path)
-        : throw new ArgumentException("Path must start with a forward slash (\"/\").", nameof(path));
+    private Uri GetUri(string path)
+    {
+        if (path.StartsWith("http"))
+        {
+            return new(path);
+        }
+        return path.StartsWith('/')
+            ? new(this._uriPrefix + path)
+            : throw new ArgumentException("Path must start with a forward slash (\"/\").", nameof(path));
+    }
 }

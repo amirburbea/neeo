@@ -15,7 +15,7 @@ public class SimpleTVExampleDeviceProvider : IDeviceProvider
     public SimpleTVExampleDeviceProvider(ILogger<SimpleTVExampleDeviceProvider> logger)
     {
         this._logger = logger;
-        const string deviceName = "Simple TV Example Device";
+        const string deviceName = "SDK Simple TV Example Device";
         this.DeviceBuilder = Device.Create(deviceName, DeviceType.TV)
             .SetDriverVersion(2)
             .SetSpecificName(deviceName)

@@ -1,7 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Callback to perform an action when a directory item was clicked.

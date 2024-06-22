@@ -57,7 +57,7 @@ internal static class Server
     {
         builder
             .ClearProviders()
-            //.SetMinimumLevel(LogLevel.Warning)
+            .SetMinimumLevel(LogLevel.Warning)
             .AddSimpleConsole(options => options.SingleLine = true);
         if (context.HostingEnvironment.IsDevelopment())
         {
@@ -77,6 +77,7 @@ internal static class Server
         .AddSingleton<INotificationMapping, NotificationMapping>()
         .AddSingleton<INotificationService, NotificationService>()
         .AddSingleton<ISdkEnvironment, SdkEnvironment>()
+        .AddSingleton<IBrainRecipes, BrainRecipes>()
         .AddHostedService<SdkRegistration>()
         .AddHostedService<SubscriptionsNotifier>()
         .AddHostedService<UriPrefixNotifier>();

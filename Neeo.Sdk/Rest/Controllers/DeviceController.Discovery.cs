@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +15,7 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapterName}/discover")]
-    public async Task<ActionResult<object>> DiscoverAsync(string adapterName, CancellationToken cancellationToken)
+    public async Task<ActionResult<Array>> DiscoverAsync(string adapterName, CancellationToken cancellationToken)
     {
         if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
@@ -22,7 +23,7 @@ internal partial class DeviceController
         }
         logger.LogInformation("Performing discovery for {adapter}...", adapter.DeviceName);
         DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken);
-        if (devices.Length == 0 || !feature.EnableDynamicDeviceBuilder)
+        if (!feature.EnableDynamicDeviceBuilder || devices.Length == 0)
         {
             return devices;
         }
@@ -30,6 +31,7 @@ internal partial class DeviceController
         for (int index = 0; index < devices.Length; index++)
         {
             (string id, string name, bool? reachable, string? room, IDeviceBuilder? builder) = devices[index];
+            // We don't need to check because DiscoveryFeature validated that the IDeviceBuilder instance is not null.
             IDeviceAdapter deviceAdapter = dynamicDeviceRegistry.RegisterDiscoveredDevice(adapter, id, builder!);
             dynamicDevices[index] = new(id, name, reachable, room, new(deviceAdapter));
         }

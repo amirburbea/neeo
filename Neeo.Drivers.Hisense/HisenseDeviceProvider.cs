@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
@@ -94,7 +94,7 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         {
             return;
         }
-        list.AddTileRow(new ListTile("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png"));
+        list.AddTileRow(new DirectoryTile("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png"));
         AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync(cancellationToken).ConfigureAwait(false), static app => !app.IsUninstalled);
         Array.Sort(apps, (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
         (_, int limit, int? offset) = list.Parameters;
@@ -105,7 +105,7 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         }
         foreach ((string name, string url, _) in apps)
         {
-            list.AddEntry(new(name, url, actionIdentifier: name));
+            list.AddEntry(new(name, url, ActionIdentifier: name));
         }
     }
 

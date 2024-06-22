@@ -1,6 +1,6 @@
 ﻿using Neeo.Sdk.Utilities;
 
-namespace Neeo.Sdk.Devices.Lists;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Interface for a directory item.

@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -10,13 +7,15 @@ using Neeo.Sdk.Devices.Setup;
 
 namespace Neeo.Sdk.Examples.Devices;
 
-public sealed class DynamicDeviceBuilderExampleProvider(ILogger<DynamicDeviceBuilderExampleProvider> logger) : IDeviceProvider
+public sealed class DynamicDeviceBuilderExampleProvider(
+    ILogger<DynamicDeviceBuilderExampleProvider> logger
+) : IDeviceProvider
 {
     private readonly DeviceInfo[] _dummyDevices = [
-        new("unique-device-id-001","PRO: 1st device","I live in ROOM A",IsPro: true),
-        new("unique-device-id-002","PRO: 2nd device, unreachable","I live in ROOM A",IsPro:true,IsReachable:false),
-        new("unique-device-id-003","STANDARD: 3rd device, unreachable","I live in ROOM B",IsPro:false,IsReachable:false),
-        new("unique-device-id-004","STANDARD: 4th device, unreachable","I live in ROOM B",IsPro:false,IsReachable:true),
+        new("unique-device-id-001", "PRO: 1st device", "I live in ROOM A", IsPro: true),
+        new("unique-device-id-002", "PRO: 2nd device, unreachable", "I live in ROOM A", IsPro: true, IsReachable: false),
+        new("unique-device-id-003", "STANDARD: 3rd device, unreachable", "I live in ROOM B", IsPro: false, IsReachable: false),
+        new("unique-device-id-004", "STANDARD: 4th device", "I live in ROOM B", IsPro: false),
     ];
 
     private IDeviceBuilder? _deviceBuilder;
@@ -25,18 +24,28 @@ public sealed class DynamicDeviceBuilderExampleProvider(ILogger<DynamicDeviceBui
 
     public IDeviceBuilder DeviceBuilder => _deviceBuilder ??= this.CreateDevice();
 
-    private IDeviceBuilder CreateDevice()
-    {
-        return Device.Create(Constants.DeviceName, DeviceType.Light)
-            .SetSpecificName(Constants.DeviceName)
-            .EnableDiscovery(Constants.DeviceName, "This SDK example shows how devices can share code the next screen will discover some of the light devices", this.DiscoverAsync, enableDynamicDeviceBuilder: true);
-    }
+    private IDeviceBuilder BuildProDevice() => Device.Create(Constants.DeviceName, DeviceType.Light)
+        .SetSpecificName("PRO Light")
+        .AddCharacteristic(DeviceCharacteristic.DynamicDevice)
+        .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValueAsync, this.SetSwitchValueAsync)
+        .AddSlider(Constants.DimmerName, null, this.GetSliderValueAsync, this.SetSliderValueAsync);
 
-    private async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
-    {
-        DeviceInfo[] devices = this.GetDeviceInfos(optionalDeviceId);
-        return Array.ConvertAll(devices, this.CreateDiscoveredDevice);
-    }
+    private IDeviceBuilder BuildStandardDevice() => Device.Create(Constants.DeviceName, DeviceType.Light)
+        .SetSpecificName("STANDARD Light")
+        .AddCharacteristic(DeviceCharacteristic.DynamicDevice)
+        .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValueAsync, this.SetSwitchValueAsync);
+
+    private IDeviceBuilder CreateDevice() => Device.Create(Constants.DeviceName, DeviceType.Accessory)
+        .SetSpecificName(Constants.DeviceName)
+        .AddCharacteristic(DeviceCharacteristic.AddAnotherDevice)
+        .AddCharacteristic(DeviceCharacteristic.BridgeDevice)
+        .EnableDiscovery(
+            Constants.DeviceName,
+            "This example shows how devices can share code. The next screen will discover some example light devices.",
+            this.DiscoverAsync,
+            enableDynamicDeviceBuilder: true
+        )
+        .EnableRegistration("SDK Example", "SDK Dynamic Device Builder Example", (_) => Task.FromResult(true), (_, _) => Task.FromResult(RegistrationResult.Success));
 
     private DiscoveredDevice CreateDiscoveredDevice(DeviceInfo info)
     {
@@ -44,21 +53,10 @@ public sealed class DynamicDeviceBuilderExampleProvider(ILogger<DynamicDeviceBui
         return new DiscoveredDevice(id, name, isReachable, room, isPro ? this.BuildProDevice() : this.BuildStandardDevice());
     }
 
-    private IDeviceBuilder BuildProDevice()
+    private Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
-        return Device.Create(Constants.DeviceName, DeviceType.Light)
-            .SetSpecificName("PRO Light")
-            .AddCharacteristic(DeviceCharacteristic.DynamicDevice)
-            .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValueAsync, this.SetSwitchValueAsync)
-            .AddSlider(Constants.DimmerName, null, this.GetSliderValueAsync, this.SetSliderValueAsync);
-    }
-
-    private IDeviceBuilder BuildStandardDevice()
-    {
-        return Device.Create(Constants.DeviceName, DeviceType.Light)
-            .SetSpecificName("STANDARD Light")
-            .AddCharacteristic(DeviceCharacteristic.DynamicDevice)
-            .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValueAsync, this.SetSwitchValueAsync);
+        DeviceInfo[] devices = this.GetDeviceInfos(optionalDeviceId);
+        return Task.FromResult(Array.ConvertAll(devices, this.CreateDiscoveredDevice));
     }
 
     private DeviceInfo[] GetDeviceInfos(string? optionalDeviceId)
@@ -94,11 +92,17 @@ public sealed class DynamicDeviceBuilderExampleProvider(ILogger<DynamicDeviceBui
         return Task.CompletedTask;
     }
 
-    private readonly record struct DeviceInfo(string Id, string Name, string Room, bool IsPro, bool? IsReachable = null);
+    private readonly record struct DeviceInfo(
+        string Id,
+        string Name,
+        string Room,
+        bool IsPro,
+        bool? IsReachable = null
+    );
 
     private static class Constants
     {
-        public const string DeviceName = "Dynamic Device Builder Example";
+        public const string DeviceName = "SDK Dynamic Device Builder Example";
         public const string DimmerName = "brightness-slider";
         public const string PowerSwitch = "power-switch";
     }

@@ -115,21 +115,23 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     private sealed class DeviceAdapterContainer(IDeviceAdapter adapter, ILogger logger)
     {
-        private Task? _task = adapter.Initializer == null ? Task.CompletedTask : null;
+        private Task? _task;
 
         public IDeviceAdapter Adapter => adapter;
 
-        public bool IsInitialized => this._task is { IsCompletedSuccessfully: true };
-
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
+            if (adapter.Initializer == null)
+            {
+                return Task.CompletedTask;
+            }
             return this._task is { IsFaulted: false, IsCanceled: false } task
-                ? task
-                : InitializeAsync(adapter.Initializer!);
+                ? task // Return the currently executing task.
+                : InitializeAsync(adapter.Initializer);
 
             async Task InitializeAsync(DeviceInitializer initializer)
             {
-                logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", this.Adapter.DeviceName, this.Adapter.AdapterName);
+                logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", adapter.DeviceName, adapter.AdapterName);
                 try
                 {
                     await (this._task = initializer(cancellationToken)).ConfigureAwait(false);

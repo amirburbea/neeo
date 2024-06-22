@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Kodi.Models;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
@@ -168,7 +168,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     {
         if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
         {
-            builder.AddEntry(new("Kodi is not connected!", "Try reloading the list.", thumbnailUri: Images.Kodi, uiAction: DirectoryUIAction.Reload));
+            builder.AddEntry(new("Kodi is not connected!", "Try reloading the list.", ThumbnailUri: Images.Kodi, UIAction: DirectoryUIAction.Reload));
             return;
         }
         EmbeddedImages images = new(this._uriPrefix);
@@ -180,7 +180,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     {
         if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
         {
-            builder.AddEntry(new("Kodi is not connected!", "Click to attempt reloading the list", thumbnailUri: Images.Kodi, uiAction: DirectoryUIAction.Reload));
+            builder.AddEntry(new("Kodi is not connected!", "Click to attempt reloading the list", ThumbnailUri: Images.Kodi, UIAction: DirectoryUIAction.Reload));
             return;
         }
         EmbeddedImages images = new(this._uriPrefix);
@@ -253,9 +253,9 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         return new(
             media.GetTitle(),
             media.GetDescription(),
-            browseIdentifier: isAction ? null : id,
-            actionIdentifier: isAction ? id : null,
-            thumbnailUri: client.GetImageUrl(media.GetCoverArt())
+            BrowseIdentifier: isAction ? null : id,
+            ActionIdentifier: isAction ? id : null,
+            ThumbnailUri: client.GetImageUrl(media.GetCoverArt())
         );
     }
 
@@ -292,7 +292,10 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
             {
                 builder.AddHeader(tvShowLabel);
             }
-            builder.AddButtonRow(new("Library", ".root", inverse: true, uiAction: DirectoryUIAction.GoToRoot), new("Close", ".close", inverse: true, uiAction: DirectoryUIAction.Close));
+            builder.AddButtonRow(
+                new("Library", ActionIdentifier: ".root", Inverse: true, UIAction: DirectoryUIAction.GoToRoot),
+                new("Close", ActionIdentifier: ".close", Inverse: true, UIAction: DirectoryUIAction.Close)
+            );
         }
         foreach (EpisodeInfo episode in episodes)
         {
@@ -302,11 +305,11 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     private static void PopulateLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
-        .AddTileRow(new ListTile(Images.Kodi))
-        .AddEntry(new("Movies", thumbnailUri: images.Movie, browseIdentifier: ".movies"))
-        .AddEntry(new("Music", thumbnailUri: images.Music, browseIdentifier: ".music"))
-        .AddEntry(new("TV Shows", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows"))
-        .AddEntry(new("PVR", thumbnailUri: images.Pvr, browseIdentifier: ".pvr"));
+        .AddTileRow(new DirectoryTile(Images.Kodi))
+        .AddEntry(new("Movies", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies"))
+        .AddEntry(new("Music", ThumbnailUri: images.Music, BrowseIdentifier: ".music"))
+        .AddEntry(new("TV Shows", ThumbnailUri: images.TVShow, BrowseIdentifier: ".tvshows"))
+        .AddEntry(new("PVR", ThumbnailUri: images.Pvr, BrowseIdentifier: ".pvr"));
 
     private static async Task PopulateMoviesLibraryAsync(KodiClient client, DirectoryBuilder builder, int offset, int limit, Filter? filter = default)
     {
@@ -316,7 +319,10 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             builder
                 .AddHeader(id == ".movies" ? "Movies" : $"Movies ({id[8..]})")
-                .AddButtonRow(new("Library", ".root", inverse: true, uiAction: DirectoryUIAction.GoToRoot), new("Close", ".close", inverse: true, uiAction: DirectoryUIAction.Close));
+                .AddButtonRow(
+                    new("Library", ActionIdentifier: ".root", Inverse: true, UIAction: DirectoryUIAction.GoToRoot),
+                    new("Close", ActionIdentifier: ".close", Inverse: true, UIAction: DirectoryUIAction.Close)
+                );
         }
         foreach (VideoInfo video in videos)
         {
@@ -327,22 +333,22 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private static void PopulateMoviesLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("Movies")
-        .AddEntry(new("Movies", thumbnailUri: images.Movie, browseIdentifier: ".movies.movies"))
-        .AddEntry(new("Movies - In Progress", thumbnailUri: images.Movie, browseIdentifier: ".movies.inprogress"))
-        .AddEntry(new("Movies - Unwatched", thumbnailUri: images.Movie, browseIdentifier: ".movies.unwatched"))
-        .AddEntry(new("Movies - Watched", thumbnailUri: images.Movie, browseIdentifier: ".movies.watched"))
-        .AddEntry(new("Movies - Recent", thumbnailUri: images.Movie, browseIdentifier: ".movies.recent"));
+        .AddEntry(new("Movies", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.movies"))
+        .AddEntry(new("Movies - In Progress", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.inprogress"))
+        .AddEntry(new("Movies - Unwatched", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.unwatched"))
+        .AddEntry(new("Movies - Watched", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.watched"))
+        .AddEntry(new("Movies - Recent", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.recent"));
 
     private static void PopulateMusicLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("Music")
-        .AddEntry(new("Albums", thumbnailUri: images.Music, browseIdentifier: ".music.albums"))
-        .AddEntry(new("Albums - Recent", thumbnailUri: images.Music, browseIdentifier: ".music.albums.recent"))
-        .AddEntry(new("Artists", thumbnailUri: images.Music, browseIdentifier: ".music.artists"));
+        .AddEntry(new("Albums", ThumbnailUri: images.Music, BrowseIdentifier: ".music.albums"))
+        .AddEntry(new("Albums - Recent", ThumbnailUri: images.Music, BrowseIdentifier: ".music.albums.recent"))
+        .AddEntry(new("Artists", ThumbnailUri: images.Music, BrowseIdentifier: ".music.artists"));
 
     private static void PopulatePvrLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("PVR")
-        .AddEntry(new("TV Channels", thumbnailUri: images.Pvr, browseIdentifier: ".pvr.tvchannels"))
-        .AddEntry(new("Radio Stations", thumbnailUri: images.Pvr, browseIdentifier: ".pvr.radiostations"));
+        .AddEntry(new("TV Channels", ThumbnailUri: images.Pvr, BrowseIdentifier: ".pvr.tvchannels"))
+        .AddEntry(new("Radio Stations", ThumbnailUri: images.Pvr, BrowseIdentifier: ".pvr.radiostations"));
 
     private static async Task PopulateTVShowsLibraryAsync(KodiClient client, DirectoryBuilder builder, int offset, int limit, Filter? filter = default, CancellationToken cancellationToken = default)
     {
@@ -352,7 +358,9 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             builder
                 .AddHeader(id == ".tvshows" ? "TV Shows" : $"TV Shows ({id[9..]})")
-                .AddButtonRow(new("Library", ".root", inverse: true, uiAction: DirectoryUIAction.GoToRoot), new("Close", ".close", inverse: true, uiAction: DirectoryUIAction.Close));
+                .AddButtonRow(
+                    new("Library", ActionIdentifier: ".root", Inverse: true, UIAction: DirectoryUIAction.GoToRoot),
+                    new("Close", ActionIdentifier: ".close", Inverse: true, UIAction: DirectoryUIAction.Close));
         }
         foreach (TVShowInfo show in shows)
         {
@@ -363,8 +371,8 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private static void PopulateTVShowsLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("TV Shows")
-        .AddEntry(new("TV Shows", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.tvshows"))
-        .AddEntry(new("TV Shows - Recent", thumbnailUri: images.TVShow, browseIdentifier: ".tvshows.recent"));
+        .AddEntry(new("TV Shows", ThumbnailUri: images.TVShow, BrowseIdentifier: ".tvshows.tvshows"))
+        .AddEntry(new("TV Shows - Recent", ThumbnailUri: images.TVShow, BrowseIdentifier: ".tvshows.recent"));
 
     private static Identifier? TryTranslate(string identifier) => KodiDeviceProviderBase.IdentifierRegex().Match(identifier) is { Success: true, Groups: { } groups }
         ? new(groups["key"].Value, int.Parse(groups["id"].Value), groups["suffix"].Value ?? string.Empty)

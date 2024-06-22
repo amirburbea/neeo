@@ -1,6 +1,6 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
-using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Directories;
 
 namespace Neeo.Sdk.Devices;
 
@@ -25,6 +25,24 @@ public interface IPlayerWidgetController
     /// Defaulted to "Root" if <see langword="null" />.
     /// </summary>
     string? RootDirectoryLabel { get; }
+
+    /// <summary>
+    /// If supported (via <see cref="IsQueueSupported"/>), asynchronously handles a request by the NEEO Brain to browse the queue directory.
+    /// </summary>
+    /// <param name="deviceId">The device identifier.</param>
+    /// <param name="builder">Directory builder which can be used to populate the directory entries.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task BrowseQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asynchronously handles a request by the NEEO Brain to browse the root directory.
+    /// </summary>
+    /// <param name="deviceId">The device identifier.</param>
+    /// <param name="builder">Directory builder which can be used to populate the directory entries.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task BrowseRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Asynchronously gets the URL of the cover art for the currently playing item.
@@ -100,28 +118,13 @@ public interface IPlayerWidgetController
     Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Asynchronously gets the URL of the current cover art.
+    /// Asynchronously handles an action from the root directory.
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
+    /// <param name="actionIdentifier">The identifier for the action</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Asynchronously gets the URL of the current cover art.
-    /// </summary>
-    /// <param name="deviceId">The device identifier.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task PopulateQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Asynchronously gets the URL of the current cover art.
-    /// </summary>
-    /// <param name="deviceId">The device identifier.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task PopulateRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Asynchronously sets if the device should be muted.

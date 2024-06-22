@@ -11,7 +11,7 @@ public sealed class FavoritesExampleDeviceProvider : IDeviceProvider
 
     public FavoritesExampleDeviceProvider(ILogger<FavoritesExampleDeviceProvider> logger)
     {
-        const string deviceName = "Favorites Example";
+        const string deviceName = "SDK Favorites Example";
         this.DeviceBuilder = Device.Create(deviceName, DeviceType.TV)
             .SetSpecificName(deviceName)
             .AddButtonGroup(ButtonGroups.Power | ButtonGroups.NumberPad | ButtonGroups.Volume)

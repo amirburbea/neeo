@@ -43,7 +43,12 @@ internal interface IBrain
 /// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
 /// <param name="hostName">The host name of the NEEO Brain.</param>
 /// <param name="version">The firmware version of the NEEO Brain.</param>
-public sealed partial class Brain(IPAddress ipAddress, int servicePort = 3000, string? hostName = default, string version = "0.50.0") : IBrain
+public sealed partial class Brain(
+    IPAddress ipAddress,
+    int servicePort = 3000,
+    string? hostName = default,
+    string version = "0.50.0"
+) : IBrain
 {
     private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(15d);
 

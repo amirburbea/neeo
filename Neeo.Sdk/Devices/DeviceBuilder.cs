@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Components;
+using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
@@ -165,8 +166,8 @@ public interface IDeviceBuilder
     /// <para />
     /// Note that manufacturer, type, and device name are already included by default as search tokens.
     /// </summary>
-    /// <param name="tokens"></param>
-    /// <returns></returns>
+    /// <param name="tokens">The search tokens to add.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddAdditionalSearchTokens(params string[] tokens) => this.AddAdditionalSearchTokens((IEnumerable<string>)tokens);
 
     /// <summary>
@@ -174,8 +175,8 @@ public interface IDeviceBuilder
     /// <para />
     /// Note that manufacturer, type, and device name are already included by default as search tokens.
     /// </summary>
-    /// <param name="tokens"></param>
-    /// <returns></returns>
+    /// <param name="tokens">The set of tokens to add.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddAdditionalSearchTokens(IEnumerable<string> tokens);
 
     /// <summary>
@@ -220,7 +221,24 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddCharacteristic(DeviceCharacteristic characteristic);
 
-    IDeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DirectoryBrowser populator, DirectoryActionHandler actionHandler, string? identifier = default);
+    /// <summary>
+    /// Adds a directory to the device.
+    /// </summary>
+    /// <param name="name">The name of the directory to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="role">Optional - the role to assign to the directory (mainly used in the player widget).</param>
+    /// <param name="browser">A callback used to populate the directory contents.</param>
+    /// <param name="actionHandler">A callback used to perform an action when a directory item is clicked.</param>
+    /// <param name="browseIdentifier">Optional - the root identifier to pass to the directory</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddDirectory(
+        string name,
+        string? label,
+        DirectoryRole? role,
+        DirectoryBrowser browser,
+        DirectoryActionHandler actionHandler,
+        string? browseIdentifier = default
+    );
 
     /// <summary>
     /// Sets a callback to be invoked in response to calls from the NEEO Brain to handle launching favorites.
@@ -260,15 +278,75 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
 
-    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow = 0d, double rangeHigh = 100d, string unit = "%");
+    /// <summary>
+    /// Adds a range sensor to the device.
+    /// </summary>
+    /// <param name="name">The name of the sensor to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value of the sensor.</param>
+    /// <param name="rangeLow">Defines the lower end of the range (defaulted to 0).</param>
+    /// <param name="rangeHigh">Defines the higher end of the range (defaulted to 100).</param>
+    /// <param name="unit">Allows specifying a custom unit indicator (defaulted to <c>'%'</c>).</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddSensor(
+        string name,
+        string? label,
+        DeviceValueGetter<double> getter,
+        double rangeLow = 0d,
+        double rangeHigh = 100d,
+        string unit = "%"
+    );
 
+    /// <summary>
+    /// Adds a sensor for boolean values to the device.
+    /// </summary>
+    /// <param name="name">The name of the sensor to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value for the sensor.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter);
 
+    /// <summary>
+    /// Adds a sensor for string values to the device.
+    /// </summary>
+    /// <param name="name">The name of the sensor to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value for the sensor.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter);
 
+    /// <summary>
+    /// Adds a custom object sensor to the device.
+    /// </summary>
+    /// <param name="name">The name of the sensor to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value for the sensor.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    /// <remarks>
+    /// There can be issues when using this with objects that are not fully JSON serializable.
+    /// </remarks>
     IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter);
 
-    IDeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow = 0d, double rangeHigh = 100d, string unit = "%");
+    /// <summary>
+    /// Adds a range slider to the device.
+    /// </summary>
+    /// <param name="name">The name of the slider to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value of the slider.</param>
+    /// <param name="setter">A callback used to set the value of the slider.</param>
+    /// <param name="rangeLow">Defines the lower end of the range (defaulted to 0).</param>
+    /// <param name="rangeHigh">Defines the higher end of the range (defaulted to 100).</param>
+    /// <param name="unit">Allows specifying a custom unit indicator (defaulted to <c>'%'</c>).</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddSlider(
+        string name,
+        string? label,
+        DeviceValueGetter<double> getter,
+        DeviceValueSetter<double> setter,
+        double rangeLow = 0d,
+        double rangeHigh = 100d,
+        string unit = "%"
+    );
 
     /// <summary>
     /// Add a smart application button (or bitwise combination of buttons) to the device.
@@ -289,7 +367,35 @@ public interface IDeviceBuilder
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
 
-    IDeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool? isLabelVisible = default);
+    /// <summary>
+    /// Adds a text label to the device.
+    /// </summary>
+    /// <param name="name">The name of the label to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback to get the text of the label.</param>
+    /// <param name="isLabelVisible">Optional - used to create the label as hidden for triggers.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddTextLabel(
+        string name,
+        string? label,
+        DeviceValueGetter<string> getter,
+        bool? isLabelVisible = default
+    );
+
+    /// <summary>
+    /// Adds a text label to the device.
+    /// </summary>
+    /// <param name="name">The name of the label to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="text">The static text to display in the label.</param>
+    /// <param name="isLabelVisible">Optional - used to create the label as hidden for triggers.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddTextLabel(
+        string name,
+        string? label,
+        string text,
+        bool? isLabelVisible
+    ) => this.AddTextLabel(name, label, DeviceValueGetter.FromValue(text), isLabelVisible);
 
     /// <summary>
     /// Builds a device adapter based on this instance.
@@ -322,6 +428,8 @@ public interface IDeviceBuilder
     /// starting with a specific prefix. This prefix is supplied to the device adapter via the <paramref name="uriPrefixCallback"/>.
     /// <para/>
     /// This could be used for serving images to the remote, or when integration with the underlying device itself requires an HTTP server.
+    /// <para/>
+    /// Note that devices with <see cref="DeviceCharacteristic.DynamicDevice"/> can not use device routes.
     /// </summary>
     /// <param name="uriPrefixCallback">Callback invoked upon starting the REST server indicating which prefix to use for requests to be handled by this device.</param>
     /// <param name="routeHandler">Callback to handle HTTP requests with the URI prefix.</param>
@@ -381,9 +489,9 @@ public interface IDeviceBuilder
     /// This can be used to avoid sending Brain notifications for devices not added on the Brain, to free up
     /// resources and/or remove credentials when the last device is removed.
     /// </summary>
-    /// <param name="notifyDeviceAdded"></param>
-    /// <param name="notifyDeviceRemoved"></param>
-    /// <param name="notifyDeviceList"></param>
+    /// <param name="notifyDeviceAdded">Callback to be invoked by the Brain when a device is added.</param>
+    /// <param name="notifyDeviceRemoved">Callback to be invoked by the Brain when a device is removed.</param>
+    /// <param name="notifyDeviceList">Upon startup, the integration server queries the Brain for the list of devices and will invoke this callback with the results.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
     IDeviceBuilder RegisterDeviceSubscriptionCallbacks(
         DeviceSubscriptionHandler notifyDeviceAdded,
@@ -533,10 +641,10 @@ internal sealed partial class DeviceBuilder(
         string name,
         string? label,
         DirectoryRole? role,
-        DirectoryBrowser populator,
+        DirectoryBrowser browser,
         DirectoryActionHandler actionHandler,
-        string? identifier
-    ) => this.AddDirectory(name, label, role, populator, actionHandler, identifier);
+        string? browseIdentifier
+    ) => this.AddDirectory(name, label, role, browser, actionHandler, browseIdentifier);
 
     IDeviceBuilder IDeviceBuilder.AddFavoriteHandler(FavoriteHandler handler) => this.AddFavoriteHandler(handler);
 
@@ -711,7 +819,14 @@ internal sealed partial class DeviceBuilder(
         return this;
     }
 
-    private DeviceBuilder AddDirectory(string name, string? label, DirectoryRole? role, DirectoryBrowser browser, DirectoryActionHandler actionHandler, string? identifier = default)
+    private DeviceBuilder AddDirectory(
+        string name,
+        string? label,
+        DirectoryRole? role,
+        DirectoryBrowser browser,
+        DirectoryActionHandler actionHandler,
+        string? browseIdentifier = default
+    )
     {
         if (role.HasValue && Interlocked.Exchange(ref this._roles, this._roles | (int)role.Value) == this._roles)
         {
@@ -721,7 +836,7 @@ internal sealed partial class DeviceBuilder(
            Validator.ValidateText(name),
            Validator.ValidateText(label, allowNull: true),
            role,
-           new(browser, actionHandler, identifier)
+           new(browser, actionHandler, browseIdentifier)
         );
         if (!this._directories.TryAdd(name, parameters))
         {
@@ -772,12 +887,12 @@ internal sealed partial class DeviceBuilder(
         this._hasPlayerWidget = true;
         if (controller.IsQueueSupported)
         {
-            this.AddDirectory(PlayerWidgetConstants.QueueDirectoryName, controller.QueueDirectoryLabel ?? "Queue", DirectoryRole.Queue, controller.PopulateQueueDirectoryAsync, controller.HandleQueueDirectoryActionAsync);
+            this.AddDirectory(PlayerWidgetConstants.QueueDirectoryName, controller.QueueDirectoryLabel ?? "Queue", DirectoryRole.Queue, controller.BrowseQueueDirectoryAsync, controller.HandleQueueDirectoryActionAsync);
         }
         return this
            .AddButton(PlayerWidgetConstants.PlayerButtons)
            .AddSlider(PlayerWidgetConstants.VolumeSliderName, null, controller.GetVolumeAsync, controller.SetVolumeAsync, 0d, 100d, "%")
-           .AddDirectory(PlayerWidgetConstants.RootDirectoryName, controller.RootDirectoryLabel ?? "Library", DirectoryRole.Root, controller.PopulateRootDirectoryAsync, controller.HandleRootDirectoryActionAsync)
+           .AddDirectory(PlayerWidgetConstants.RootDirectoryName, controller.RootDirectoryLabel ?? "Library", DirectoryRole.Root, controller.BrowseRootDirectoryAsync, controller.HandleRootDirectoryActionAsync)
            .AddSensor(PlayerWidgetConstants.CoverArtSensorName, null, controller.GetCoverArtAsync)
            .AddSensor(PlayerWidgetConstants.TitleSensorName, null, controller.GetTitleAsync)
            .AddSensor(PlayerWidgetConstants.DescriptionSensorName, null, controller.GetDescriptionAsync)
@@ -900,6 +1015,10 @@ internal sealed partial class DeviceBuilder(
         if (this.Characteristics.Contains(DeviceCharacteristic.BridgeDevice) && this.Setup.RegistrationType is null)
         {
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.BridgeDevice} must support registration (by calling {nameof(IDeviceBuilder.EnableRegistration)}).");
+        }
+        if (this.Characteristics.Contains(DeviceCharacteristic.DynamicDevice) && this._routeHandler is not null)
+        {
+            throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.DynamicDevice} can not support custom routes.");
         }
         List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic).ToList();
         string pathPrefix = $"/device/{this.AdapterName}/";

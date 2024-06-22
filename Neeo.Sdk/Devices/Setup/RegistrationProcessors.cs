@@ -24,24 +24,22 @@ public delegate Task<RegistrationResult> SecurityCodeRegistrationProcessor(strin
 /// <summary>
 /// Represents the result of a registration attempt.
 /// </summary>
-public readonly struct RegistrationResult
+public readonly struct RegistrationResult(string? error = default)
 {
     /// <summary>
     /// Gets a registration result for a successful attempt.
     /// </summary>
     public static readonly RegistrationResult Success = new();
 
-    private RegistrationResult(string? error = default) => this.Error = error;
-
     /// <summary>
     /// Gets the error encountered if the operation was not succcessful, (<see langword="null"/> if successful).
     /// </summary>
-    public string? Error { get; }
+    public string? Error => error;
 
     /// <summary>
     /// Gets a value indicating if the registration attempt was successful.
     /// </summary>
-    public bool IsSuccess => this.Error is null;
+    public bool IsSuccess => error is null;
 
     /// <summary>
     /// Creates an instance of the <see cref="RegistrationResult"/> class with an error message.

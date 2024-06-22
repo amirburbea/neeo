@@ -39,7 +39,7 @@ public class CredentialsExampleDeviceProvider : IDeviceProvider
 
     private static class Constants
     {
-        public const string DeviceName = "Credentials Registration Example";
+        public const string DeviceName = "SDK Credentials Registration Example";
         public const string DiscoveryDescription = "This example device shows the use of registration and discovery with a username and password.";
         public const string DiscoveryHeaderText = "NEEO SDK Example Registration via Credentials";
         public const string Password = "password";

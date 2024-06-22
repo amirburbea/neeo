@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Sdk.Devices.Lists;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// User interface actions for standardized actions in a directory.

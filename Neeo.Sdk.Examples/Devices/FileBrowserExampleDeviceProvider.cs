@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Lists;
+using Neeo.Sdk.Devices.Directories;
 
 namespace Neeo.Sdk.Examples.Devices;
 
@@ -13,13 +13,13 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 {
     public FileBrowserExampleDeviceProvider()
     {
-        const string deviceName = "File Browser Example";
+        const string deviceName = "SDK File Browser Example";
         this.DeviceBuilder = Device.Create(deviceName, DeviceType.MediaPlayer)
             .SetSpecificName(deviceName)
             .SetIcon(DeviceIconOverride.NeeoBrain)
             .AddAdditionalSearchTokens("explorer")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-            .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, populator: Browse, actionHandler: this.OnDirectoryAction);
+            .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, browser: Browse, actionHandler: this.OnDirectoryAction);
     }
 
     public IDeviceBuilder DeviceBuilder { get; }
@@ -35,7 +35,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 string text = drive.Name.Replace('\\', '/');
-                builder.AddEntry(new(title: text, label: text, browseIdentifier: drive.Name));
+                builder.AddEntry(new(Title: text, Label: text, BrowseIdentifier: drive.Name));
             }
         }
         else
@@ -52,7 +52,11 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                         .AddHeader(title)
                         .AddTileRow([new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy")])
                         .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
-                        .AddButtonRow(new("Reload", "RELOAD", inverse: false, uiAction: DirectoryUIAction.Reload), new("BACK", "BACKONE", inverse: true, uiAction: DirectoryUIAction.GoBack), new("ROOT", "BACKTOROOT", inverse: true, uiAction: DirectoryUIAction.GoToRoot));
+                        .AddButtonRow(
+                            new("Reload", ActionIdentifier: "RELOAD", Inverse: false, UIAction: DirectoryUIAction.Reload),
+                            new("BACK", ActionIdentifier: "BACKONE", Inverse: true, UIAction: DirectoryUIAction.GoBack),
+                            new("ROOT", ActionIdentifier: "BACKTOROOT", Inverse: true, UIAction: DirectoryUIAction.GoToRoot)
+                        );
                 }
                 foreach (DirectoryEntry entry in array[offset..Math.Min(offset + limit, array.Length)])
                 {
@@ -75,12 +79,12 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             string fileName = Path.GetFileName(fullPath);
             bool isDirectory = (File.GetAttributes(fullPath) & FileAttributes.Directory) == FileAttributes.Directory;
             yield return new(
-                title: fileName.Replace('\\', '/'),
-                label: fullPath.Replace('\\', '/'),
-                browseIdentifier: isDirectory ? fullPath : null,
-                actionIdentifier: isDirectory ? null : fullPath,
-                isQueueable: isDirectory ? null : true,
-                thumbnailUri: isDirectory ? "https://neeo-sdk.neeo.io/folder.jpg" : "https://neeo-sdk.neeo.io/file.jpg"
+                Title: fileName.Replace('\\', '/'),
+                Label: fullPath.Replace('\\', '/'),
+                BrowseIdentifier: isDirectory ? fullPath : null,
+                ActionIdentifier: isDirectory ? null : fullPath,
+                IsQueueable: isDirectory ? null : true,
+                ThumbnailUri: isDirectory ? "https://neeo-sdk.neeo.io/folder.jpg" : "https://neeo-sdk.neeo.io/file.jpg"
             );
         }
     }
