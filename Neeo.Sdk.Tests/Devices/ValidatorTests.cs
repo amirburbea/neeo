@@ -84,6 +84,6 @@ public sealed class ValidatorTests
     [Fact]
     public void ValidateText_should_throw_if_null_and_not_allowNull()
     {
-        Assert.Throws<ArgumentException>(() => Validator.ValidateText(null, allowNull: false));
+        Assert.Throws<ArgumentNullException>(() => Validator.ValidateText(null, allowNull: false));
     }
 }
