@@ -55,33 +55,40 @@ internal sealed class BrainRecipes(
     ) : IRecipe
     {
         public bool CanBePoweredOff => recipe.Urls.SetPowerOff is { };
+
         public bool IsCustom => recipe.IsCustom;
+
         public bool IsPoweredOn => recipe.IsPoweredOn;
+
         public string? Manufacturer => recipe.Detail.Manufacturer;
+
         public string? Model => recipe.Detail.Model;
+
         public string Name => recipe.Detail.DeviceName;
+
         public string PowerKey => recipe.PowerKey;
+
         public string RoomName => recipe.Detail.RoomName;
+
         public string Type => recipe.Type;
 
-        public Task<bool> GetPowerStateAsync(CancellationToken cancellationToken)
-        {
-            return client.GetAsync(recipe.Urls.GetPowerState, (JsonElement element) => element.GetProperty("active").GetBoolean(), cancellationToken);
-        }
+        public Task<bool> GetPowerStateAsync(CancellationToken cancellationToken) => client.GetAsync(
+            recipe.Urls.GetPowerState,
+            (JsonElement element) => element.GetProperty("active").GetBoolean(),
+            cancellationToken
+        );
 
-        public Task PowerOffAsync(CancellationToken cancellationToken)
+        public Task PowerOffAsync(CancellationToken cancellationToken) => recipe.Urls.SetPowerOff switch
         {
-            if (recipe.Urls.SetPowerOff is not { } pathSuffix)
-            {
-                throw new NotSupportedException("Recipe can not be powered off.");
-            }
-            return client.GetAsync(pathSuffix, EmptyObject.Transform, cancellationToken);
-        }
+            { } url => client.GetAsync(url, EmptyObject.Transform, cancellationToken),
+            _ => throw new NotSupportedException("Recipe can not be powered off."),
+        };
 
-        public Task PowerOnAsync(CancellationToken cancellationToken)
-        {
-            return client.GetAsync(recipe.Urls.SetPowerOn, EmptyObject.Transform, cancellationToken);
-        }
+        public Task PowerOnAsync(CancellationToken cancellationToken) => client.GetAsync(
+            recipe.Urls.SetPowerOn,
+            EmptyObject.Transform,
+            cancellationToken
+        );
 
         private readonly struct EmptyObject
         {
