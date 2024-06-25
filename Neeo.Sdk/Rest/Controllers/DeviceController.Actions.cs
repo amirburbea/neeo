@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Devices.Directories;
+using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest.Controllers;
@@ -28,16 +28,20 @@ internal partial class DeviceController
         logger.LogInformation("Execute {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
-            IFavoritesFeature favoritesFeature => this.Ok(await favoritesFeature.ExecuteAsync(
-                deviceId,
-                parameters.GetProperty("favoriteId").GetString()!,
-                cancellationToken
-            )),
-            IDirectoryFeature directoryFeature => this.Ok(await directoryFeature.BrowseAsync(
-                deviceId,
-                parameters.Deserialize<BrowseParameters>(JsonSerialization.Options),
-                cancellationToken
-            )),
+            IDirectoryFeature directoryFeature => this.Ok(
+                await directoryFeature.BrowseAsync(
+                    deviceId, 
+                    parameters.Deserialize<BrowseParameters>(JsonSerialization.WebOptions),
+                    cancellationToken
+                )
+            ),
+            IFavoritesFeature favoritesFeature => this.Ok(
+                await favoritesFeature.ExecuteAsync(
+                    deviceId,
+                    parameters.GetProperty("favoriteId").GetString()!,
+                    cancellationToken
+                )
+            ),
             _ => this.NotFound(),
         };
     }
@@ -104,7 +108,7 @@ internal partial class DeviceController
         CancellationToken cancellationToken
     )
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
         {
             return default;
         }

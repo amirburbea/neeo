@@ -78,7 +78,7 @@ public sealed class ApiClientTests : IDisposable
         var (request, requestBody) = lazy.Value;
         Assert.Equal("POST", request.Method.Method);
         Assert.NotNull(requestBody);
-        Assert.Equal(JsonSerializer.Serialize(body, JsonSerialization.Options), requestBody);
+        Assert.Equal(JsonSerializer.Serialize(body, JsonSerialization.WebOptions), requestBody);
     }
 
     [Theory]
@@ -116,7 +116,7 @@ public sealed class ApiClientTests : IDisposable
                 }
                 return new()
                 {
-                    Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options))
+                    Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.WebOptions))
                 };
             });
         return new(() => (captured.Single(), requestBody));

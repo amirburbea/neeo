@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -63,7 +64,7 @@ public abstract class PlexDeviceProviderBase(
         .EnableDeviceRoute(this.SetUriPrefix, this.HandleRouteAsync)
         .EnableDiscovery("Plex Discovery", "Select Plex Server", this.DiscoverServersAsync)
         .EnableRegistration("Plex Registration", "Enter Plex Credentials", this.IsRegisteredAsync, this.RegisterAsync)
-        .RegisterInitializer(this.GetServerAsync)
+        .RegisterInitializer(this.InitializeAsync)
         .RegisterDeviceSubscriptionCallbacks(this.HandleDeviceAddedAsync, this.HandleDeviceRemovedAsync, this.InitializeDeviceListAsync);
 
     private static string GetContentType(string fileName)
@@ -96,7 +97,7 @@ public abstract class PlexDeviceProviderBase(
         this.Logger.LogInformation("Device added: {deviceId}", deviceId);
         if (await this.GetServerAsync(cancellationToken).ConfigureAwait(false) is { } server && server.DeviceId == deviceId)
         {
-            await server.ConnectAsync(cancellationToken).ConfigureAwait(false);
+            await server.SubscribeAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -114,12 +115,17 @@ public abstract class PlexDeviceProviderBase(
         throw new NotImplementedException();
     }
 
+    private async Task InitializeAsync(CancellationToken cancellationToken)
+    {        
+        await this.GetServerAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task InitializeDeviceListAsync(string[] deviceIds, CancellationToken cancellationToken)
     {
         this.Logger.LogInformation("Initialized with [{deviceIds}]", string.Join(',', deviceIds));
         if (deviceIds is [string deviceId] && await this.GetServerAsync(cancellationToken).ConfigureAwait(false) is { } server && server.DeviceId == deviceId)
         {
-            await server.ConnectAsync(cancellationToken).ConfigureAwait(false);
+            await server.SubscribeAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 

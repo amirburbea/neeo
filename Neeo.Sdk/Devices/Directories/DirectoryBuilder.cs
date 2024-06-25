@@ -26,6 +26,7 @@ public sealed class DirectoryBuilder
     /// <summary>
     /// Gets a value indicating if the current directory page is not full.
     /// </summary>
+    [JsonIgnore]
     public bool CanAddEntry => this.Items.Count == 0 || this.Items.Count(item => item.Type == DirectoryItemType.Entry) < this.Limit;
 
     /// <summary>
@@ -78,9 +79,11 @@ public sealed class DirectoryBuilder
     /// <returns><see cref="DirectoryBuilder"/> instance for chaining.</returns>
     public DirectoryBuilder AddButtonRow(params DirectoryButton[] buttons)
     {
-        return buttons is { Length: > 0 and <= Constants.MaxButtonsPerRow }
-            ? this.AddItem(new DirectoryButtonRow(buttons))
-            : throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxButtonsPerRow}.", nameof(buttons));
+        if (buttons is not { Length: > 0 and <= Constants.MaxButtonsPerRow })
+        {
+            throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxButtonsPerRow}.", nameof(buttons));
+        }
+        return this.AddItem(new DirectoryButtonRow(buttons));
     }
 
     /// <summary>
@@ -104,14 +107,21 @@ public sealed class DirectoryBuilder
     }
 
     /// <summary>
-    /// Adds an info item to the directory.
+    /// Adds an info item dialog to the directory.
     /// </summary>
-    /// <param name="infoItem">The info item to add.</param>
+    /// <param name="triggerText">The text of the button to trigger the dialog.</param>
+    /// <param name="dialogText">The text of the info dialog.</param>
+    /// <param name="actionIdentifier">Optional action identifier for the button.</param>
+    /// <param name="affirmativeButtonText">Text for the "OK" button.</param>
+    /// <param name="negativeButtonText">Text for the Cancel/Close button.</param>
     /// <returns><see cref="DirectoryBuilder"/> instance for chaining.</returns>
-    public DirectoryBuilder AddInfoItem(DirectoryInfoItem infoItem)
-    {
-        return this.AddItem(infoItem ?? throw new ArgumentNullException(nameof(infoItem)));
-    }
+    public DirectoryBuilder AddInfoItem(
+        string triggerText,
+        string dialogText,
+        string? actionIdentifier = null,
+        string? affirmativeButtonText = null,
+        string? negativeButtonText = null
+    ) => this.AddItem(new DirectoryInfoItem(triggerText, dialogText, actionIdentifier, affirmativeButtonText, negativeButtonText));
 
     /// <summary>
     /// Adds a row of tiles (pictures) to the directory.
@@ -120,9 +130,11 @@ public sealed class DirectoryBuilder
     /// <returns><see cref="DirectoryBuilder"/> instance for chaining.</returns>
     public DirectoryBuilder AddTileRow(params DirectoryTile[] tiles)
     {
-        return tiles is { Length: > 0 and <= Constants.MaxTilesPerRow }
-            ? this.AddItem(new DirectoryTileRow(tiles))
-            : throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxTilesPerRow}.", nameof(tiles));
+        if (tiles is not { Length: > 0 and <= Constants.MaxTilesPerRow })
+        {
+            throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxTilesPerRow}.", nameof(tiles));
+        }
+        return this.AddItem(new DirectoryTileRow(tiles));
     }
 
     /// <summary>

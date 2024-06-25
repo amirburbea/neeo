@@ -35,9 +35,11 @@ internal sealed class ValueFeature(
     Func<string, string, CancellationToken, Task>? setter = default
 ) : IValueFeature
 {
-    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter) where TValue : notnull => new(
-        ValueFeature.WrapGetter(getter, ObjectConverter<TValue>.Default)
-    );
+    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter)
+        where TValue : notnull
+    {
+        return new(ValueFeature.WrapGetter(getter, static value => value));
+    }
 
     public static ValueFeature Create(DeviceValueGetter<bool> getter) => new(
         ValueFeature.WrapGetter(getter, BooleanBoxes.GetBox)
@@ -49,11 +51,13 @@ internal sealed class ValueFeature(
     );
 
     public static ValueFeature Create(DeviceValueGetter<double> getter, DeviceValueSetter<double> setter) => new(
-        ValueFeature.WrapGetter(getter, ObjectConverter<double>.Default),
+        ValueFeature.WrapGetter(getter, static value => value),
         ValueFeature.WrapSetter(setter, double.Parse)
     );
 
-    public async Task<ValueResponse> GetValueAsync(string deviceId, CancellationToken cancellationToken) => new(await getter(deviceId, cancellationToken).ConfigureAwait(false));
+    public async Task<ValueResponse> GetValueAsync(string deviceId, CancellationToken cancellationToken) => new(
+        await getter(deviceId, cancellationToken).ConfigureAwait(false)
+    );
 
     public async Task<SuccessResponse> SetValueAsync(string deviceId, string value, CancellationToken cancellationToken)
     {
@@ -62,18 +66,18 @@ internal sealed class ValueFeature(
     }
 
     private static Func<string, CancellationToken, Task<object>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
-        where TValue : notnull => getter == null
-        ? throw new ArgumentNullException(nameof(getter))
-        : async (deviceId, cancellationToken) => converter(await getter(deviceId, cancellationToken).ConfigureAwait(false));
+        where TValue : notnull
+    {
+        return getter == null
+            ? throw new ArgumentNullException(nameof(getter))
+            : async (deviceId, cancellationToken) => converter(await getter(deviceId, cancellationToken).ConfigureAwait(false));
+    }
 
     private static Func<string, string, CancellationToken, Task> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
-        where TValue : notnull => setter == null
-        ? throw new ArgumentNullException(nameof(setter))
-        : (deviceId, value, cancellationToken) => setter(deviceId, converter(value), cancellationToken);
-
-    private static class ObjectConverter<T>
-        where T : notnull
+        where TValue : notnull
     {
-        public static readonly Converter<T, object> Default = static value => value;
+        return setter == null
+            ? throw new ArgumentNullException(nameof(setter))
+            : (deviceId, value, cancellationToken) => setter(deviceId, converter(value), cancellationToken);
     }
 }

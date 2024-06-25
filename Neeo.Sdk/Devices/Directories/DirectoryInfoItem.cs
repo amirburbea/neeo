@@ -10,7 +10,7 @@ namespace Neeo.Sdk.Devices.Directories;
 /// <param name="ActionIdentifier">Optional action identifier for the button.</param>
 /// <param name="AffirmativeButtonText">Text for the "OK" button.</param>
 /// <param name="NegativeButtonText">Text for the Cancel/Close button.</param>
-public sealed record class DirectoryInfoItem(
+internal sealed record class DirectoryInfoItem(
     string Title,
     string Text,
     string? ActionIdentifier = null,

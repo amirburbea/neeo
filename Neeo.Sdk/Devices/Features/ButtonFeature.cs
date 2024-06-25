@@ -11,7 +11,7 @@ public interface IButtonFeature : IFeature
     FeatureType IFeature.Type => FeatureType.Button;
 
     /// <summary>
-    /// The button has been pressed - execute the associated <see cref="ButtonHandler"/>.
+    /// Executes the associated <see cref="ButtonHandler"/> when the button is pressed.
     /// </summary>
     /// <param name="deviceId">The device identifier.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>

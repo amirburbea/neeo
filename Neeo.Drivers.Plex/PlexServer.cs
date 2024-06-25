@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.NetworkInformation;
 using System.Net.WebSockets;
 using System.Reflection;
 using System.Text;
@@ -13,6 +11,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Drivers.Plex.ServerNotifications;
 using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 
@@ -28,72 +27,30 @@ public interface IPlexServer : IDisposable
 
     IPAddress IPAddress { get; }
 
-    bool IsConnected { get; }
+    Task<HttpStatusCode> GetStatusCodeAsync(CancellationToken cancellationToken = default);
 
-    Task ConnectAsync(CancellationToken cancellationToken = default);
+    Task InitializeAsync(CancellationToken cancellationToken = default);
 
-    Task<HttpStatusCode?> GetStatusCodeAsync(CancellationToken cancellationToken = default);
+    Task SubscribeAsync(CancellationToken cancellationToken = default);
 
     Task TryLoginAsync(string userName, string password, CancellationToken cancellationToken = default);
 }
 
-internal sealed partial class PlexServer : IPlexServer, IDisposable
+internal sealed partial class PlexServer(
+    IPAddress ipAddress,
+    string? dnsSuffix,
+    HttpClient httpClient,
+    IPlexDriverSettings driverSettings,
+    ILogger<PlexServer> logger
+) : IPlexServer, IDisposable
 {
     private static readonly Uri _signInUri = new("https://plex.tv/users/sign_in.json");
 
-    private readonly string _clientIdentifier;
-    private readonly string _fileName;
-    private readonly IFileStore _fileStore;
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<PlexServer> _logger;
-    private readonly Uri _uri;
-    private string? _authToken;
+    private readonly Uri _uri = new($"http://{ipAddress}:32400");
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
-    private ClientWebSocket? _serverWebSocket;
-
-    public PlexServer(
-        IPAddress ipAddress,
-        HttpClient httpClient,
-        string clientIdentifier, 
-        IFileStore fileStore,
-        IPlexSettings settings,
-        ILogger<PlexServer> logger
-    )
-    {
-        this.IPAddress = ipAddress;
-        this._uri = new($"http://{ipAddress}:32400");
-        this._httpClient = httpClient;
-        this._fileStore = fileStore;
-        this._logger = logger;
-        this._clientIdentifier = clientIdentifier;
-        string hostName;
-        string displayName;
-        try
-        {
-            hostName = Dns.GetHostEntry(ipAddress).HostName;
-            displayName = PlexServer.GetDnsSuffix() is { Length: not 0 } suffix && hostName.EndsWith($".{suffix}")
-                ? hostName[..^(1 + suffix.Length)]
-                : hostName;
-        }
-        catch (Exception)
-        {
-            displayName = hostName = ipAddress.ToString();
-        }
-        this._fileName = StringMethods.TitleCaseToSnakeCase(hostName.Replace('-', '_').Replace('.', '_'));
-        try
-        {
-            if (fileStore.HasFile(this._fileName))
-            {
-                this._authToken = fileStore.ReadText(this._fileName);
-            }
-        }
-        catch (Exception)
-        {
-            // Do nothing.
-        }
-        this.DeviceDescriptor = new(hostName, displayName, true);
-    }
+    private string? _hostName;
+    private ClientWebSocket? _webSocket;
 
     internal event EventHandler? Destroyed;
 
@@ -112,7 +69,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         Timeline = 4,
 
         [Text("playqueues")]
-        Playqueues = 8,
+        PlayQueues = 8,
 
         [Text("provider-playback")]
         ProviderPlayback = 16,
@@ -120,34 +77,31 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     public string? AuthToken
     {
-        get => this._authToken;
+        get => this.ServerSettings.AuthToken;
         set
         {
-            if (value == this._authToken)
+            if (value != this.AuthToken)
             {
-                return;
-            }
-            this._authToken = value;
-            if (value is null)
-            {
-                this._fileStore.DeleteFile(this._fileName);
-            }
-            else
-            {
-                this._fileStore.WriteText(this._fileName, value);
+                this.ServerSettings = this.ServerSettings with { AuthToken = value };
             }
         }
     }
 
-    public DiscoveredDevice DeviceDescriptor { get; }
+    public DiscoveredDevice DeviceDescriptor => new(this.DeviceId, this.DisplayName);
 
-    public string DeviceId => this.DeviceDescriptor.Id;
+    public string DeviceId => this._hostName ?? this.IPAddress.ToString();
 
-    public IPAddress IPAddress { get; }
+    public string DisplayName => dnsSuffix is { Length: > 0 } suffix && this._hostName is { } name && name.EndsWith($".{suffix}")
+        ? name[..^(1 + suffix.Length)]
+        : this.DeviceId;
 
-    public bool IsConnected => false;
+    public IPAddress IPAddress => ipAddress;
 
-    Task IPlexServer.ConnectAsync(CancellationToken cancellationToken) => this.ConnectAsync(cancellationToken);
+    public PlexServerSettings ServerSettings
+    {
+        get => driverSettings.Servers.GetOrAdd(this.DeviceId);
+        private set => driverSettings.Servers[this.DeviceId] = value;
+    }
 
     public void Dispose()
     {
@@ -155,35 +109,22 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         this.Destroyed?.Invoke(this, EventArgs.Empty);
     }
 
-    public async Task<HttpStatusCode?> GetStatusCodeAsync(CancellationToken cancellationToken)
+    Task<HttpStatusCode> IPlexServer.GetStatusCodeAsync(CancellationToken cancellationToken) => this.GetStatusCodeAsync(true, cancellationToken: cancellationToken);
+
+    public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        try
+        await this.GetStatusCodeAsync(false, cancellationToken).ConfigureAwait(false);
+        if (this._hostName is null)
         {
-            using CancellationTokenSource timeoutTokenSource = new(TimeSpan.FromSeconds(1d));
-            using CancellationTokenSource junctionTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                timeoutTokenSource.Token
-            );
-            return await this._httpClient.HeadAsync(this._uri, this.ConfigureRequest, cancellationToken: junctionTokenSource.Token).ConfigureAwait(false);
+            await this.ResolveHostNameAsync(ipAddress, logger, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
-        {
-            // We either previously found a server or had a connection timeout.
-        }
-        catch (HttpRequestException)
-        {
-            // Failed to connect to the server.
-        }
-        catch (Exception e)
-        {
-            this._logger.LogError(e, "Unexpected error while checking {address}", this.IPAddress);
-        }
-        return null;
     }
+
+    Task IPlexServer.SubscribeAsync(CancellationToken cancellationToken) => this.ConnectAsync(cancellationToken);
 
     public async Task TryLoginAsync(string userName, string password, CancellationToken cancellationToken)
     {
-        JsonElement element = await this._httpClient.PostAsync<JsonElement>(
+        JsonElement element = await httpClient.PostAsync<JsonElement>(
             PlexServer._signInUri,
             configureRequest: ConfigureRequest,
             cancellationToken: cancellationToken
@@ -195,107 +136,22 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             request.Headers.Authorization = new("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{userName}:{password}")));
             request.Headers.Add("X-Plex-Version", "1");
             request.Headers.Add("X-Plex-Product", Assembly.GetExecutingAssembly().GetName().Name);
-            request.Headers.Add("X-Plex-Client-Identifier", this._clientIdentifier);
+            request.Headers.Add("X-Plex-Client-Identifier", driverSettings.ClientIdentifier);
         }
-    }
-
-    private static string GetDnsSuffix()
-    {
-        foreach (NetworkInterface adapter in NetworkInterface.GetAllNetworkInterfaces())
-        {
-            if (adapter.OperationalStatus is OperationalStatus.Up && adapter.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211)
-            {
-                return adapter.GetIPProperties().DnsSuffix;
-            }
-        }
-        return "";
-    }
-
-    private static async Task MessageLoop<TMessage>(
-        WebSocket webSocket,
-        Func<TMessage, CancellationToken, Task> processMessage,
-        Action onDisconnected,
-        CancellationToken cancellationToken = default
-    ) where TMessage : notnull
-    {
-        byte[] previous = [];
-        try
-        {
-            int previousLength = 0;
-            using IMemoryOwner<byte> owner = MemoryPool<byte>.Shared.Rent(32768);
-            while (webSocket.State == WebSocketState.Open && await webSocket.ReceiveAsync(owner.Memory, cancellationToken).ConfigureAwait(false) is { MessageType: not WebSocketMessageType.Close } result)
-            {
-                // If a complete message was received in a single read, process it.
-                if (result.EndOfMessage && previous is [])
-                {
-                    await ProcessAsync(owner.Memory.Span[..result.Count]).ConfigureAwait(false);
-                    continue;
-                }
-                // Combine previous fragment with incoming one.
-                int nextLength = previousLength + result.Count;
-                byte[] next = ArrayPool<byte>.Shared.Rent(nextLength);
-                if (previous is not [])
-                {
-                    previous.AsSpan(0, previousLength).CopyTo(next);
-                    ArrayPool<byte>.Shared.Return(previous);
-                }
-                owner.Memory[..result.Count].CopyTo(next.AsMemory(previousLength));
-                // If we still did not receive the complete
-                if (!result.EndOfMessage)
-                {
-                    (previous, previousLength) = (next, nextLength);
-                    continue;
-                }
-                (previous, previousLength) = ([], 0);
-                try
-                {
-                    await ProcessAsync(next.AsSpan(0, nextLength)).ConfigureAwait(false);
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(next);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // PlexServer was disposed.
-            return;
-        }
-        catch (WebSocketException)
-        {
-            onDisconnected();
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.ToString());
-        }
-        finally
-        {
-            if (previous is not [])
-            {
-                ArrayPool<byte>.Shared.Return(previous);
-            }
-        }
-
-        Task ProcessAsync(ReadOnlySpan<byte> span) => processMessage(
-            JsonSerializer.Deserialize<TMessage>(span, JsonSerialization.Options)!,
-            cancellationToken
-        );
     }
 
     private void CleanUp()
     {
-        using WebSocket? webSocket = Interlocked.Exchange(ref this._serverWebSocket, default);
+        using WebSocket? webSocket = Interlocked.Exchange(ref this._webSocket, default);
         using CancellationTokenSource? source = Interlocked.Exchange(ref this._cancellationTokenSource, default);
         source?.Cancel();
     }
 
     private void ConfigureRequest(HttpRequestMessage request)
     {
-        if (!string.IsNullOrEmpty(this.AuthToken))
+        if (this.AuthToken is { Length: not 0 } token)
         {
-            request.Headers.Add("X-Plex-Token", this.AuthToken);
+            request.Headers.Add("X-Plex-Token", token);
         }
     }
 
@@ -307,22 +163,22 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         {
             // ClientWebSocket's keep-alive process is unsupported by the Plex Server, causing the server to close connections.
             // Set the keep-alive interval to infinite.
-            string url = $"ws://{this.IPAddress}:32400/:/websockets/notifications";
+            string url = $"ws://{ipAddress}:32400/:/websockets/notifications";
             ClientWebSocket webSocket = new() { Options = { KeepAliveInterval = Timeout.InfiniteTimeSpan } };
             CancellationTokenSource cts = new();
             try
             {
-                this._logger.LogInformation("Connecting to Plex server @ {url}...", url);
+                logger.LogInformation("Connecting to Plex server @ {url}...", url);
                 await webSocket.ConnectAsync(new($"{url}?X-Plex-Token={this.AuthToken}"), cancellationToken).ConfigureAwait(false);
-                this._serverWebSocket = webSocket;
+                this._webSocket = webSocket;
                 this._cancellationTokenSource = cts;
-                _ = Task.Factory.StartNew(this.ServerMessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                _ = Task.Factory.StartNew(ServerMessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
                 await this.OnConnectedAsync().ConfigureAwait(false);
                 return true;
             }
             catch (WebSocketException)
             {
-                this._logger.LogWarning("Failed to connect to Plex server {ipAddress}:32400!", this.IPAddress);
+                logger.LogWarning("Failed to connect to Plex server {ipAddress}:32400!", ipAddress);
                 cts.Dispose();
                 webSocket.Dispose();
                 return false;
@@ -332,11 +188,78 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 this._connectTask = null;
             }
         }
+
+        async Task ServerMessageLoop()
+        {
+            if (this._cancellationTokenSource is not { Token: { } cancellationToken } || this._webSocket is not { State: WebSocketState.Open } webSocket)
+            {
+                return;
+            }
+            byte[] previous = [];
+            try
+            {
+                int previousLength = 0;
+                using IMemoryOwner<byte> owner = MemoryPool<byte>.Shared.Rent(32 * 1024); // 32K
+                do
+                {
+                    if (await webSocket.ReceiveAsync(owner.Memory, cancellationToken).ConfigureAwait(false) is not { MessageType: not WebSocketMessageType.Close } result)
+                    {
+                        break;
+                    }
+                    // If a complete message was received in a single read, process it.
+                    if (result.EndOfMessage && previous.Length is 0)
+                    {
+                        await this.ProcessMessageAsync(owner.Memory.Span[..result.Count], cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+                    // Combine previous fragment with incoming one.
+                    int nextLength = previousLength + result.Count;
+                    byte[] next = ArrayPool<byte>.Shared.Rent(nextLength);
+                    if (previous.Length is not 0)
+                    {
+                        previous.AsSpan(0, previousLength).CopyTo(next);
+                        ArrayPool<byte>.Shared.Return(previous);
+                    }
+                    owner.Memory[..result.Count].CopyTo(next.AsMemory(previousLength));
+                    // If we still did not receive the complete message.
+                    if (!result.EndOfMessage)
+                    {
+                        (previous, previousLength) = (next, nextLength);
+                        continue;
+                    }
+                    (previous, previousLength) = ([], 0);
+                    try
+                    {
+                        await this.ProcessMessageAsync(next.AsSpan(0, nextLength), cancellationToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(next);
+                    }
+                } while (webSocket.State == WebSocketState.Open);
+            }
+            catch (OperationCanceledException)
+            {
+                // PlexServer was disposed.
+                return;
+            }
+            catch (WebSocketException)
+            {
+                this.OnDisconnected();
+            }
+            finally
+            {
+                if (previous.Length is not 0)
+                {
+                    ArrayPool<byte>.Shared.Return(previous);
+                }
+            }
+        }
     }
 
     private async Task<ClientServer[]> GetClientsAsync(CancellationToken cancellationToken)
     {
-        ClientsResponse response = await this._httpClient.GetAsync<ClientsResponse>(
+        ClientsResponse response = await httpClient.GetAsync<ClientsResponse>(
             this._uri.Combine("clients"),
             this.ConfigureRequest,
             cancellationToken
@@ -344,14 +267,19 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         return response.MediaContainer.Clients ?? [];
     }
 
+    private Task<HttpStatusCode> GetStatusCodeAsync(bool configureRequest, CancellationToken cancellationToken = default)
+    {
+        return httpClient.HeadAsync(this._uri, configureRequest ? this.ConfigureRequest : null, cancellationToken);
+    }
+
     private async Task OnConnectedAsync()
     {
-        if (this._serverWebSocket is not { } webSocket || this._cancellationTokenSource is not { Token: { } cancellationToken })
+        if (this._webSocket is not { } webSocket || this._cancellationTokenSource is not { Token: { } cancellationToken })
         {
             return;
         }
-        this._logger.LogInformation("Connected to Plex server {ipAddress}:32400", this.IPAddress);
-        var clients = await this.GetClientsAsync(cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Connected to Plex server {ipAddress}:32400", ipAddress);
+        ClientServer[] clients = await this.GetClientsAsync(cancellationToken).ConfigureAwait(false);
         Console.WriteLine($"[{string.Join(',', clients.Where(client => (client.ProtocolCapabilities & ProtocolCapabilities.Playback) != 0))}]");
     }
 
@@ -360,41 +288,44 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         this.CleanUp();
     }
 
-    private async Task ServerMessageLoop()
+    private Task ProcessMessageAsync(ReadOnlySpan<byte> bytes, CancellationToken cancellationToken)
     {
-        if (this._cancellationTokenSource is { } cts && this._serverWebSocket is { State: WebSocketState.Open } webSocket)
+        NotificationContainer container = JsonSerializer.Deserialize<ServerMessage>(bytes, JsonSerialization.WebOptions).Notifications;
+        switch (container.Type)
         {
-            await PlexServer.MessageLoop<ServerMessage>(
-                webSocket,
-                ProcessNotificatons,
-                this.OnDisconnected,
-                cts.Token
-            ).ConfigureAwait(false);
+            case ServerNotificationType.Activity:
+                Console.WriteLine(">>>ACTIVITY");
+                Console.WriteLine(string.Join(',', container.ActivityNotifications!));
+                break;
+            case ServerNotificationType.Playing:
+                Console.WriteLine(">>>PLAYING");
+                Console.WriteLine(string.Join(',', container.PlaySessionStateNotifications!));
+                break;
+            case ServerNotificationType.StateChange:
+                Console.WriteLine(">>>STATECHANGE");
+                Console.WriteLine(string.Join(',', container.StatusNotifications!));
+                break;
+
+            default:
+                Console.WriteLine("???" + container.Type + ": " + string.Join(",", container.AdditionalData.Select(pair => $"{pair.Key}={pair.Value}")));
+                break;
         }
+        return Task.CompletedTask;
+    }
 
-        static Task ProcessNotificatons(ServerMessage message, CancellationToken cancellationToken)
+    private async Task ResolveHostNameAsync(IPAddress ipAddress, ILogger<PlexServer> logger, CancellationToken cancellationToken)
+    {
+        try
         {
-            NotificationContainer container = message.Notifications;
-            switch (container.Type)
-            {
-                case ServerNotificationType.Activity:
-                    Console.WriteLine(">>>ACTIVITY");
-                    Console.WriteLine(string.Join(',', container.ActivityNotifications!));
-                    break;
-                case ServerNotificationType.Playing:
-                    Console.WriteLine(">>>PLAYING");
-                    Console.WriteLine(string.Join(',', container.PlaySessionStateNotifications!));
-                    break;
-                case ServerNotificationType.StateChange:
-                    Console.WriteLine(">>>STATECHANGE");
-                    Console.WriteLine(string.Join(',', container.StatusNotifications!));
-                    break;
-
-                default:
-                    Console.WriteLine("???" + container.Type + ": " + string.Join(",", container.AdditionalData.Select(pair => $"{pair.Key}={pair.Value}")));
-                    break;
-            }
-            return Task.CompletedTask;
+            logger.LogInformation("Resolving host entry for {address}...", ipAddress);
+            // Resolving host name is usually quick enough to be used synchronously but occasionally hangs. Use a 1 second timeout.
+            using CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            source.CancelAfter(TimeSpan.FromSeconds(1d));
+            this._hostName = (await Dns.GetHostEntryAsync(ipAddress.ToString(), source.Token).ConfigureAwait(false)).HostName;
+        }
+        catch (Exception)
+        {
+            this._hostName = ipAddress.ToString();
         }
     }
 

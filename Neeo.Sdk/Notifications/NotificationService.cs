@@ -88,7 +88,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         if (this.IsDuplicate(message))
         {
             (string key, object value) = message.ExtractTypeAndData();
-            this._logger.LogWarning("Ignored duplicate message: {key}={value}", key, JsonSerializer.Serialize(value, JsonSerialization.Options));
+            this._logger.LogWarning("Ignored duplicate message: {key}={value}", key, JsonSerializer.Serialize(value, JsonSerialization.WebOptions));
             return;
         }
         this._logger.LogDebug("Sending {message}", message);

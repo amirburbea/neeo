@@ -10,7 +10,7 @@ internal partial class DeviceController
     [Route("{adapterName}/custom/{**suffix}")]
     public async Task<ActionResult> HandleCustomRouteAsync(string adapterName, string suffix, CancellationToken cancellationToken)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.RouteHandler is not { } handler)
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.RouteHandler is not { } handler)
         {
             return this.NotFound();
         }

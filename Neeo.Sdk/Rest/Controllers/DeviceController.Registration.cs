@@ -14,7 +14,7 @@ internal partial class DeviceController
     [HttpGet("{adapterName}/registered")]
     public async Task<ActionResult<IsRegisteredResponse>> QueryIsRegisteredAsync(string adapterName, CancellationToken cancellationToken)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
             return this.NotFound();
         }
@@ -29,7 +29,7 @@ internal partial class DeviceController
         CancellationToken cancellationToken
     )
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Registration) is not IRegistrationFeature feature)
         {
             return this.NotFound();
         }

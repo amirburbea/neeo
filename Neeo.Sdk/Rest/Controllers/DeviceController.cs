@@ -1,6 +1,4 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Org.BouncyCastle.Bcpg.OpenPgp;
@@ -15,5 +13,4 @@ internal sealed partial class DeviceController(
     ILogger<DeviceController> logger
 ) : ControllerBase
 {
-    private ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken) => database.GetAdapterAsync(adapterName, cancellationToken);
 }

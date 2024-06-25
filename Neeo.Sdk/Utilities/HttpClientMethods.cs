@@ -38,13 +38,13 @@ public static class HttpClientMethods
     }
 
     /// <summary>
-    /// Makes a HEAD request to the server and returns the HTTP status code of the response.
+    /// Makes a HEAD request to the server and returns the HTTP response status code.
     /// </summary>
     /// <param name="client">The <see cref="HttpClient"/> instance.</param>
     /// <param name="uri">The request URI.</param>
     /// <param name="configureRequest">Optional callback that can be used to further configure the request, such as adding request headers.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns>The http status code returned by the server.</returns>
+    /// <returns>The http response status code returned by the server.</returns>
     public static async Task<HttpStatusCode> HeadAsync(
         this HttpClient client,
         Uri uri,
@@ -98,7 +98,7 @@ public static class HttpClientMethods
         using MemoryStream stream = new();
         if (body is not null)
         {
-            await JsonSerializer.SerializeAsync(stream, body, JsonSerialization.Options, cancellationToken).ConfigureAwait(false);
+            await JsonSerializer.SerializeAsync(stream, body, JsonSerialization.WebOptions, cancellationToken).ConfigureAwait(false);
             stream.Position = 0L;
         }
         using StreamContent content = new(stream) { Headers = { ContentType = HttpClientMethods._applicationJson } };
@@ -134,6 +134,6 @@ public static class HttpClientMethods
             throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}");
         }
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return (await JsonSerializer.DeserializeAsync<TValue>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
+        return (await JsonSerializer.DeserializeAsync<TValue>(stream, JsonSerialization.WebOptions, cancellationToken).ConfigureAwait(false))!;
     }
 }

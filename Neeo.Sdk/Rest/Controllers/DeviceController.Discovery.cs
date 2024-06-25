@@ -17,7 +17,7 @@ internal partial class DeviceController
     [HttpGet("{adapterName}/discover")]
     public async Task<ActionResult<Array>> DiscoverAsync(string adapterName, CancellationToken cancellationToken)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
             return this.NotFound();
         }

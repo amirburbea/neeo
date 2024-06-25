@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,24 +39,64 @@ internal sealed class PlexServerDiscovery(
         async Task DiscoverAsync()
         {
             logger.LogInformation("Discovering local plex server...");
-            using CancellationTokenSource searchCancellationToken = new(); // Set when a server is found.
-            await Parallel.ForEachAsync(
-                NetworkMethods.GetNetworkDevices().Select(pair => pair.Key),
-                cancellationToken,
-                async (address, cancellationToken) =>
-                {
-                    IPlexServer plexServer = plexServerManager.GetServer(address);
-                    if (await plexServer.GetStatusCodeAsync(cancellationToken).ConfigureAwait(false) is null)
+            // Set when a server is found, or when we timeout after 1 second.
+            using CancellationTokenSource searchCancellationTokenSource = new(TimeSpan.FromSeconds(1d));
+            try
+            {
+
+                await Parallel.ForEachAsync(
+                    NetworkMethods.GetNetworkDevices().Select(pair => pair.Key),
+                    cancellationToken,
+                    async (address, cancellationToken) =>
                     {
+                        logger.LogInformation("Checking address {address}...", address);
+                        using CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(
+                            cancellationToken,
+                            searchCancellationTokenSource.Token
+                        );
+                        IPlexServer plexServer = plexServerManager.GetServer(address);
+                        try
+                        {
+                            await plexServer.InitializeAsync(source.Token).ConfigureAwait(false);
+                            logger.LogInformation("Discovered server {id} at {address}", plexServer.DeviceId, plexServer.IPAddress);
+                            tcs.TrySetResult(plexServer);
+                            searchCancellationTokenSource.Cancel();
+                            return;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Expected when another server is found.
+                        }
+                        catch (HttpRequestException)
+                        {
+                            // Expected when server is not found.
+                        }
+                        catch (Exception e)
+                        {
+                            logger.LogError("Exception occurred: {error}", e);
+                        }
                         plexServer.Dispose();
-                        return;
                     }
-                    logger.LogInformation("Discovered server {hostname} at {address}", plexServer.DeviceDescriptor.Id, plexServer.IPAddress);
-                    tcs.TrySetResult(plexServer);
-                    searchCancellationToken.Cancel();
+                ).ConfigureAwait(false);
+                if (tcs.TrySetResult(null))
+                {
+                    logger.LogInformation("Did not find plex server.");
                 }
-            ).ConfigureAwait(false);
-            tcs.TrySetResult(null);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                tcs.TrySetCanceled(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignore.
+                logger.LogInformation("Dafuq");
+            }
+            catch (Exception e)
+            {
+                logger.LogError("Error: {error}", e.Message);
+                Debugger.Break();
+            }
         }
     }
 

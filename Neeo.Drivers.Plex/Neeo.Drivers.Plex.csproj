@@ -13,34 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
-	  <Compile Update="PlexServer.*.cs">
-		  <DependentUpon>PlexServer.cs</DependentUpon>
-	  </Compile>
-	  <Compile Update="PlexSettings.*.cs">
-		  <DependentUpon>PlexSettings.settings</DependentUpon>
-	  </Compile>
-			   
-  </ItemGroup>
-
-  <ItemGroup>
 	  <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj">
 		  <Private>false</Private>
 		  <ExcludeAssets>runtime</ExcludeAssets>
 	  </ProjectReference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="PlexSettings.Designer.cs">
-      <DesignTimeSharedInput>True</DesignTimeSharedInput>
-      <AutoGen>True</AutoGen>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="PlexSettings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>PlexSettings.Designer.cs</LastGenOutput>
-    </None>
   </ItemGroup>
 
 </Project>

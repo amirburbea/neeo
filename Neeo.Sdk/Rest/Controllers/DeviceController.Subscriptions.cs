@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -11,38 +10,31 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal partial class DeviceController
 {
     [HttpGet("{adapterName}/subscribe/{deviceId}/{_}")]
-    public Task<ActionResult> SubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this.HandleSubscriptionsAsync(
-        adapterName,
-        deviceId,
-        static feature => feature.NotifyDeviceAddedAsync,
-        nameof(this.SubscribeAsync),
-        cancellationToken
-    );
-
-    [HttpGet("{adapterName}/unsubscribe/{deviceId}")]
-    public Task<ActionResult> UnsubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => this.HandleSubscriptionsAsync(
-        adapterName,
-        deviceId,
-        static feature => feature.NotifyDeviceRemovedAsync,
-        nameof(this.UnsubscribeAsync),
-        cancellationToken
-    );
-
-    private async Task<ActionResult> HandleSubscriptionsAsync(
-        string adapterName,
-        string deviceId,
-        Func<ISubscriptionFeature, DeviceSubscriptionHandler> handlerProjection,
-        string methodName, CancellationToken cancellationToken
-    )
+    public async Task<ActionResult> SubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
         {
             return this.NotFound();
         }
-        logger.LogInformation("{method} {adapter}:{deviceId}.", methodName, adapter.DeviceName, deviceId);
-        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature && handlerProjection(feature) is { } subscriptionHandler)
+        logger.LogInformation("{name} {adapter}:{deviceId}.", nameof(ISubscriptionFeature.NotifyDeviceAddedAsync), adapter.DeviceName, deviceId);
+        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
         {
-            await subscriptionHandler(deviceId, cancellationToken);
+            await feature.NotifyDeviceAddedAsync(deviceId, cancellationToken);
+        }
+        return this.Ok();
+    }
+
+    [HttpGet("{adapterName}/unsubscribe/{deviceId}")]
+    public async Task<ActionResult> UnsubscribeAsync(string adapterName, string deviceId, CancellationToken cancellationToken)
+    {
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
+        {
+            return this.NotFound();
+        }
+        logger.LogInformation("{name} {adapter}:{deviceId}.", nameof(ISubscriptionFeature.NotifyDeviceRemovedAsync), adapter.DeviceName, deviceId);
+        if (adapter.GetFeature(ComponentType.Subscription) is ISubscriptionFeature feature)
+        {
+            await feature.NotifyDeviceRemovedAsync(deviceId, cancellationToken);
         }
         return this.Ok();
     }

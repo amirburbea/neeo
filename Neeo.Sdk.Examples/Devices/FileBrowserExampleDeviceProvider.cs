@@ -51,7 +51,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                     builder
                         .AddHeader(title)
                         .AddTileRow([new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy")])
-                        .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
+                        .AddInfoItem("Click me!", "These pics are cute, right?", affirmativeButtonText: "Definitely!", negativeButtonText: "No!", actionIdentifier:"INFO-OK")
                         .AddButtonRow(
                             new("Reload", ActionIdentifier: "RELOAD", Inverse: false, UIAction: DirectoryUIAction.Reload),
                             new("BACK", ActionIdentifier: "BACKONE", Inverse: true, UIAction: DirectoryUIAction.GoBack),
@@ -66,7 +66,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             }
             catch (Exception e)
             {
-                builder.AddInfoItem(new("Error Occurred", e.Message, "Close", "I Don't Care"));
+                builder.AddInfoItem("Error Occurred", e.Message, "Close", "I Don't Care");
             }
         }
         return Task.CompletedTask;

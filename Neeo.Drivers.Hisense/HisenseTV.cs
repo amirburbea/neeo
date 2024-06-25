@@ -304,7 +304,6 @@ public sealed class HisenseTV : IDisposable
     private sealed class Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix) : IDisposable
     {
         private static readonly MqttFactory _clientFactory = new();
-        private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
         private readonly IMqttClient _client = Connection._clientFactory.CreateMqttClient();
 
         private readonly MqttClientOptions _options = new MqttClientOptionsBuilder()
@@ -340,7 +339,7 @@ public sealed class HisenseTV : IDisposable
         public async Task<IState> AuthenticateAsync(string code, CancellationToken cancellationToken)
         {
             (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "authenticationcode"), new { AuthNum = code }, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return payload.Length == 0 || JsonSerializer.Deserialize<SuccessPayload>(payload, Connection._jsonOptions).Result != 1
+            return payload.Length == 0 || JsonSerializer.Deserialize<SuccessPayload>(payload, JsonSerialization.WebOptions).Result != 1
                 ? new State(StateType.AuthenticationRequired)
                 : await this.GetStateAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -369,13 +368,13 @@ public sealed class HisenseTV : IDisposable
         public async Task<AppInfo[]> GetAppsAsync(CancellationToken cancellationToken)
         {
             (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "applist"), cancellationToken).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<AppInfo[]>(payload, Connection._jsonOptions)!;
+            return JsonSerializer.Deserialize<AppInfo[]>(payload, JsonSerialization.WebOptions)!;
         }
 
         public async Task<SourceInfo[]> GetSourcesAsync(CancellationToken cancellationToken)
         {
             (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "sourcelist"), cancellationToken).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<SourceInfo[]>(payload, Connection._jsonOptions)!;
+            return JsonSerializer.Deserialize<SourceInfo[]>(payload, JsonSerialization.WebOptions)!;
         }
 
         public async Task<IState> GetStateAsync(CancellationToken cancellationToken)
@@ -413,7 +412,7 @@ public sealed class HisenseTV : IDisposable
             {
                 null => string.Empty,
                 string text => text,
-                _ => JsonSerializer.Serialize(body, Connection._jsonOptions)
+                _ => JsonSerializer.Serialize(body, JsonSerialization.WebOptions)
             };
             logger.LogInformation("Sending message '{payload}' to topic '{topic}'.", payload, topic);
             if (!waitForNextMessage)
@@ -469,7 +468,7 @@ public sealed class HisenseTV : IDisposable
             return X509Certificate2.CreateFromPem(certPem: certificateReader.ReadToEnd(), keyPem: privateKeyReader.ReadToEnd());
         }
 
-        private static int TranslateVolumePayload(string payload) => JsonSerializer.Deserialize<VolumeData>(payload, Connection._jsonOptions).Value;
+        private static int TranslateVolumePayload(string payload) => JsonSerializer.Deserialize<VolumeData>(payload, JsonSerialization.WebOptions).Value;
 
         private string GetDataTopic(string service, string action) => $"/remoteapp/mobile/{this._options.ClientId}/{service}/data/{action}";
 
@@ -518,7 +517,7 @@ public sealed class HisenseTV : IDisposable
                     return new State(StateType.Settings);
 
                 case BroadcastTopics.State:
-                    StateData data = JsonSerializer.Deserialize<StateData>(payload, Connection._jsonOptions);
+                    StateData data = JsonSerializer.Deserialize<StateData>(payload, JsonSerialization.WebOptions);
                     return data.Type switch
                     {
                         "livetv" => new State(StateType.LiveTV),

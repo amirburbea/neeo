@@ -1,7 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
+using System.Net.NetworkInformation;
 using Microsoft.Extensions.Logging;
 
 namespace Neeo.Drivers.Plex;
@@ -13,27 +14,23 @@ public interface IPlexServerManager
 
 internal sealed class PlexServerManager(
     IHttpClientFactory httpClientFactory,
-    IClientIdentifier clientIdentifier,
-    IFileStore fileStore,
-    IPlexSettings settings,
+    IPlexDriverSettings driverSettings,
     ILogger<PlexServer> logger
 ) : IPlexServerManager
 {
-    private readonly string _clientIdentifier = clientIdentifier.Value;
+    private readonly string? _dnsSuffix = Array.Find(
+        NetworkInterface.GetAllNetworkInterfaces(),
+        adapter => adapter.OperationalStatus is OperationalStatus.Up && adapter.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211
+    )?.GetIPProperties().DnsSuffix;
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
-    private readonly Dictionary<IPAddress, PlexServer> _servers = [];
+    private readonly ConcurrentDictionary<IPAddress, PlexServer> _servers = [];
 
-    public PlexServer GetServer(IPAddress ipAddress)
+    public PlexServer GetServer(IPAddress ipAddress) => this._servers.GetOrAdd(ipAddress, (address) =>
     {
-        if (this._servers.TryGetValue(ipAddress, out PlexServer? server))
-        {
-            return server;
-        }
-        server = new(ipAddress, this._httpClient, this._clientIdentifier, fileStore, settings, logger);
-        this._servers.Add(ipAddress, server);
+        PlexServer server = new(address, this._dnsSuffix, this._httpClient, driverSettings, logger);
         server.Destroyed += this.Server_Destroyed;
         return server;
-    }
+    });
 
     IPlexServer IPlexServerManager.GetServer(IPAddress ipAddress) => this.GetServer(ipAddress);
 
@@ -41,6 +38,6 @@ internal sealed class PlexServerManager(
     {
         PlexServer server = (PlexServer)sender!;
         server.Destroyed -= this.Server_Destroyed;
-        this._servers.Remove(server.IPAddress);
+        this._servers.TryRemove(server.IPAddress, out _);
     }
 }

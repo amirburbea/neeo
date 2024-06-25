@@ -100,10 +100,9 @@ public sealed partial class Brain(
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
     public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
     {
-        TaskCompletionSource<Brain?> tcs = new();
-        cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+        TaskCompletionSource<Brain?> output = new();
         _ = Task.Factory.StartNew(ResolveAsync, cancellationToken, TaskCreationOptions.None, TaskScheduler.Default);
-        return tcs.Task;
+        return output.Task;
 
         async Task ResolveAsync()
         {
@@ -116,7 +115,7 @@ public sealed partial class Brain(
                 );
                 // Bonjour sometimes fails to discover, race multiple scans at once, offset by 500ms.
                 await Parallel.ForEachAsync(
-                    [0, 500],
+                    [TimeSpan.Zero, TimeSpan.FromMilliseconds(500)],
                     junctionTokenSource.Token,
                     async (delay, cancellationToken) =>
                     {
@@ -125,8 +124,8 @@ public sealed partial class Brain(
                             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                             await ZeroconfResolver.ResolveAsync(
                                 Constants.ServiceName,
-                                Brain._scanTime, callback:
-                                OnHostDiscovered,
+                                Brain._scanTime,
+                                callback: OnHostDiscovered,
                                 cancellationToken: cancellationToken
                             ).ConfigureAwait(false);
                         }
@@ -136,20 +135,24 @@ public sealed partial class Brain(
                         }
                     }
                 ).ConfigureAwait(false);
-                tcs.TrySetResult(null);
+                output.TrySetResult(null);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                output.TrySetCanceled(cancellationToken);
             }
             catch (OperationCanceledException)
             {
-                // Ignore.
+                // Do nothing.
             }
 
             void OnHostDiscovered(IZeroconfHost host)
             {
-                if (tcs.Task.IsCompleted || tcs.Task.IsCanceled || Brain.TryCreateBrain(host) is not { } brain)
+                if (output.Task.IsCompleted || output.Task.IsCanceled || Brain.TryCreateBrain(host) is not { } brain)
                 {
                     return;
                 }
-                if ((predicate == null || predicate(brain)) && tcs.TrySetResult(brain))
+                if ((predicate == null || predicate(brain)) && output.TrySetResult(brain))
                 {
                     raceTokenSource.Cancel(true);
                 }

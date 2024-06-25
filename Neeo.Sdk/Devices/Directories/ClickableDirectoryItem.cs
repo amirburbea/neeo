@@ -7,7 +7,7 @@ namespace Neeo.Sdk.Devices.Directories;
 /// </summary>
 /// <param name="ActionIdentifier">The (optional) action identifier.</param>
 /// <param name="UIAction">The (optional) standardized directory UI action.</param>
-public abstract record ClickableDirectoryItem(
+public abstract record class ClickableDirectoryItem(
     string? ActionIdentifier = null,
     [property: JsonPropertyName("uiAction")] DirectoryUIAction? UIAction = null
 );

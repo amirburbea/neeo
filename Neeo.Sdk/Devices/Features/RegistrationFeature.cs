@@ -46,7 +46,7 @@ internal sealed class RegistrationFeature(QueryIsRegistered queryIsRegistered, F
 
         async Task<RegistrationResult> RegisterAsync(Stream stream, CancellationToken cancellationToken)
         {
-            TPayload payload = await JsonSerializer.DeserializeAsync<TPayload>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false);
+            TPayload payload = await JsonSerializer.DeserializeAsync<TPayload>(stream, JsonSerialization.WebOptions, cancellationToken).ConfigureAwait(false);
             return await register(payload, cancellationToken).ConfigureAwait(false);
         }
     }
