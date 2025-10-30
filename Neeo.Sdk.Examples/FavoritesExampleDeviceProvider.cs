@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public sealed class FavoritesExampleDeviceProvider : IDeviceProvider
 {

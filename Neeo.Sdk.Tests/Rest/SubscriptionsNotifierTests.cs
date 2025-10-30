@@ -6,10 +6,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Rest;
 using Neeo.Sdk.Utilities;
 using Xunit;
 
-namespace Neeo.Sdk.Tests.Devices;
+namespace Neeo.Sdk.Tests.Rest;
 
 public sealed class SubscriptionsNotifierTests
 {
@@ -71,14 +72,14 @@ public sealed class SubscriptionsNotifierTests
                 .Setup(feature => feature.NotifyDeviceListAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
                 .Returns((string[] deviceIds, CancellationToken cancellationToken) => DeviceSubscriptionHandler(deviceIds, cancellationToken));
             this._mockClient
-                .Setup(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
-                .ReturnsTransformOf(ids);
+                .Setup(client => client.GetAsync<string[]>(path, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(ids);
             return mockFeature.Object;
 
             Task DeviceSubscriptionHandler(string[] deviceIds, CancellationToken cancellationToken)
             {
                 Assert.Same(deviceIds, ids);
-                this._mockClient.Verify(client => client.GetAsync(path, It.IsAny<Func<string[], It.IsAnyType>>(), cancellationToken), Times.Once());
+                this._mockClient.Verify(client => client.GetAsync<string[]>(path, cancellationToken), Times.Once());
                 mockAdapter.Setup(adapter => adapter.SpecificName).Returns(Constants.GetAsyncCalled);
                 return Task.CompletedTask;
             }

@@ -7,7 +7,7 @@ using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 {
@@ -102,7 +102,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
         public bool IsQueueSupported => false;
 
-        public IDeviceNotifier Notifier { get; set; } = new DummyDeviceNotifier();
+        public IDeviceNotifier? Notifier { get; set; }
 
         string? IPlayerWidgetController.QueueDirectoryLabel { get; }
 
@@ -212,17 +212,8 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
         private async Task SetValueAsync(PlayerKey key, object value)
         {
             logger.LogInformation("Setting component {key} to {value}", key, value);
-            await this.Notifier.SendNotificationAsync(TextAttribute.GetText(key), value).ConfigureAwait(false);
+            await (this.Notifier?.SendNotificationAsync(TextAttribute.GetText(key), value) ?? Task.CompletedTask).ConfigureAwait(false);
             this._service.SetValue(key, value);
-        }
-
-        private sealed class DummyDeviceNotifier : IDeviceNotifier
-        {
-            bool IDeviceNotifier.SupportsPowerNotifications => true;
-
-            Task IDeviceNotifier.SendNotificationAsync(string componentName, object value, string deviceId, CancellationToken cancellationToken) => Task.CompletedTask;
-
-            Task IDeviceNotifier.SendPowerNotificationAsync(bool powerState, string deviceId, CancellationToken cancellationToken) => Task.CompletedTask;
         }
     }
 }

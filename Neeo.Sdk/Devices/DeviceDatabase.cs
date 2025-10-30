@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,7 +98,10 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         return container?.Adapter;
     }
 
-    public DeviceModel? GetDeviceByAdapterName(string name) => Array.Find(this._devices, device => device.AdapterName == name);
+    public DeviceModel? GetDeviceByAdapterName(string name)
+    {
+        return Array.Find(this._devices, device => device.AdapterName == name);
+    }
 
     public DeviceModel? GetDeviceById(int id)
     {
@@ -106,7 +110,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     public SearchEntry<DeviceModel>[] Search(string? query) => string.IsNullOrEmpty(query)
         ? []
-        : this._deviceIndex.Search(query).Take(OptionConstants.MaxSearchResults).ToArray();
+        : [.. this._deviceIndex.Search(query).Take(OptionConstants.MaxSearchResults)];
 
     private static class OptionConstants
     {
@@ -115,26 +119,30 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     private sealed class DeviceAdapterContainer(IDeviceAdapter adapter, ILogger logger)
     {
-        private Task? _task;
+        private readonly Lock _lock = new();
+        private Task? _initializationTask;
 
         public IDeviceAdapter Adapter => adapter;
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
-            if (adapter.Initializer == null)
+            if (adapter.Initializer is not { } initializer)
             {
                 return Task.CompletedTask;
             }
-            return this._task is { IsFaulted: false, IsCanceled: false } task
-                ? task // Return the currently executing task.
-                : InitializeAsync(adapter.Initializer);
-
-            async Task InitializeAsync(DeviceInitializer initializer)
+            if (this._initializationTask != null)
             {
-                logger.LogInformation("Initializing adapter {deviceName} ({adapterName})...", adapter.DeviceName, adapter.AdapterName);
+                return this._initializationTask;
+            }
+            using Lock.Scope scope = this._lock.EnterScope();
+            return this._initializationTask ??= InitializeAsync();
+
+            async Task InitializeAsync()
+            {
+                logger.LogInformation("Initializing adapter {DeviceName} ({AdapterName})...", adapter.DeviceName, adapter.AdapterName);
                 try
                 {
-                    await (this._task = initializer(cancellationToken)).ConfigureAwait(false);
+                    await initializer(cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {

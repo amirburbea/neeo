@@ -485,7 +485,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         await this._clientManager.DiscoverAsync(1000, client => client.DeviceId == deviceId, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(deviceId))
         {
-            return this._clientManager.Clients.Select(this.CreateDiscoveredDevice).ToArray();
+            return [.. this._clientManager.Clients.Select(this.CreateDiscoveredDevice)];
         }
         if ((client = this.GetClientOrDefault(deviceId)) != null)
         {

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Setup;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public sealed class DynamicDeviceBuilderExampleProvider(
     ILogger<DynamicDeviceBuilderExampleProvider> logger

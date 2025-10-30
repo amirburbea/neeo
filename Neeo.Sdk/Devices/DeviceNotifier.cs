@@ -13,12 +13,6 @@ namespace Neeo.Sdk.Devices;
 public interface IDeviceNotifier
 {
     /// <summary>
-    /// Gets a value indicating if the device supports power notifications.
-    /// This value will be <see langword="true"/> for devices where a call was made to <see cref="IDeviceBuilder.AddPowerStateSensor"/> and <see langword="false"/> otherwise.
-    /// </summary>
-    bool SupportsPowerNotifications { get; }
-
-    /// <summary>
     /// Sends a notification to the NEEO Brain that the <paramref name="value"/> of a component
     /// has changed on a device with the given <paramref name="deviceId"/>.
     /// </summary>
@@ -60,8 +54,6 @@ public interface IDeviceNotifier
 
 internal sealed class DeviceNotifier(IDeviceAdapter adapter, INotificationService notificationService, bool supportsPowerNotifications) : IDeviceNotifier
 {
-    public bool SupportsPowerNotifications => supportsPowerNotifications;
-
     public Task SendNotificationAsync(string componentName, object value, string deviceId, CancellationToken cancellationToken)
     {
         return notificationService.SendSensorNotificationAsync(

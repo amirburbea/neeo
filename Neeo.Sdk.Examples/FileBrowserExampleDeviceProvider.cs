@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public class FileBrowserExampleDeviceProvider : IDeviceProvider
 {
@@ -43,7 +43,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             try
             {
                 string root = builder.Parameters.BrowseIdentifier;
-                DirectoryEntry[] array = GetEntries(root).ToArray();
+                DirectoryEntry[] array = [.. GetEntries(root)];
                 string title = $"{root.Replace('\\', '/')} ({array.Length})";
                 builder.SetTitle(title);
                 if (offset == 0)

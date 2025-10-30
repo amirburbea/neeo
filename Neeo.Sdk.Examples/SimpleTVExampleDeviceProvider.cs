@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public class SimpleTVExampleDeviceProvider : IDeviceProvider
 {
@@ -35,7 +35,7 @@ public class SimpleTVExampleDeviceProvider : IDeviceProvider
 
     private Task InitializeDeviceList(string[] deviceIds, CancellationToken cancellationToken)
     {
-        this._logger.LogInformation("Initialized with [{deviceIds}]", string.Join(',', deviceIds));
+        this._logger.LogInformation("Set device list: [{DeviceIds}]", string.Join(',', deviceIds));
         return Task.CompletedTask;
     }
 

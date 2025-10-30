@@ -29,7 +29,6 @@ public interface INotificationMapping
 internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment environment, ILogger<NotificationMapping> logger) : INotificationMapping
 {
     private readonly ConcurrentDictionary<string, EntryCache> _cache = new();
-    private readonly string _sdkAdapterName = environment.SdkAdapterName;
 
     public async ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken)
     {
@@ -42,13 +41,13 @@ internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment env
         {
             return keys;
         }
-        logger.LogWarning("Component {deviceName} {component} not found.", adapter.DeviceName, componentName); // Maybe our definition is out of date?
-        this._cache.TryRemove(cacheKey, out _);
+        logger.LogWarning("Component {deviceName} {component} not found.", adapter.DeviceName, componentName);
+        this._cache.TryRemove(cacheKey, out _); // Maybe our definition is out of date? Remove it.
         return [];
     }
 
     private Task<EntryCache> FetchEntriesAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => client.GetAsync(
-        string.Format(UrlPaths.NotificationKeyFormat, this._sdkAdapterName, adapterName, deviceId),
+        string.Format(UrlPaths.NotificationKeyFormat, environment.SdkAdapterName, adapterName, deviceId),
         static (Entry[] entries) => new EntryCache(entries),
         cancellationToken
     );
@@ -57,24 +56,22 @@ internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment env
 
     private sealed class EntryCache(Entry[] entries)
     {
-        private readonly Dictionary<string, string[]> _cache = [];
+        private readonly Dictionary<string, string[]> _keyCache = [];
 
         public string[] GetNotificationKeys(string componentName)
         {
-            if (!this._cache.TryGetValue(componentName, out string[]? keys))
+            if (!this._keyCache.TryGetValue(componentName, out string[]? keys))
             {
-                this._cache.Add(
+                this._keyCache.Add(
                     componentName,
-                    keys = Find(static entry => entry.Name) is { Length: > 0 } matches
-                        ? matches
-                        : Find(static entry => entry.Label)
+                    keys = Find(static entry => entry.Name) is { Length: not 0 } matches ? matches : Find(static entry => entry.Label)
                 );
             }
             return keys;
 
             string[] Find(Func<Entry, string?> projection)
             {
-                return [.. entries.Where(entry => componentName == projection(entry)).Select(entry => entry.EventKey).Distinct()];
+                return [.. entries.Where(entry => componentName == projection(entry)).Select(static entry => entry.EventKey).Distinct()];
             }
         }
     }

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Setup;
 
-namespace Neeo.Sdk.Examples.Devices;
+namespace Neeo.Sdk.Examples;
 
 public class CredentialsExampleDeviceProvider : IDeviceProvider
 {
