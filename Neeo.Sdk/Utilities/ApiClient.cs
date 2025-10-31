@@ -13,6 +13,17 @@ public interface IApiClient
 {
     /// <summary>
     /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
+    /// <paramref name="path"/>.
+    /// </summary>
+    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
+    /// <param name="path">The API path on the NEEO Brain.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
+    Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken = default)
+        where TData : notnull;
+
+    /// <summary>
+    /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
     /// <paramref name="path"/> and return the output of the specified <paramref name="transform"/>.
     /// </summary>
     /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
@@ -47,6 +58,8 @@ internal sealed class ApiClient(
 {
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(ApiClient));
     private readonly string _uriPrefix = $"http://{brain.ServiceEndPoint}";
+
+    Task<TData> IApiClient.GetAsync<TData>(string path, CancellationToken cancellationToken) => this.GetAsync(path, static (TData data) => data, cancellationToken);
 
     public async Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
         where TData : notnull

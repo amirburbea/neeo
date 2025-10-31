@@ -79,8 +79,8 @@ internal static class Server
         .AddSingleton<ISdkEnvironment, SdkEnvironment>()
         .AddSingleton<IBrainRecipes, BrainRecipes>()
         .AddHostedService<SdkRegistration>()
-        .AddHostedService<SubscriptionsNotifier>()
-        .AddHostedService<UriPrefixNotifier>();
+        .AddHostedService<UriPrefixNotifier>()
+        .AddHostedService<SubscriptionsNotifier>();
 
     private static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPAddress hostAddress, int port) => builder
         .ConfigureKestrel(options =>

@@ -18,7 +18,16 @@ public sealed class SdkService(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Brain brain = await GetBrainAsync().ConfigureAwait(false);
+        Brain brain;
+        try
+        {
+            brain = await GetBrainAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogInformation("Brain discovery was cancelled.");
+            return;
+        }
         logger.LogInformation("Using Brain {name} at {endpoint}...", brain.HostName, brain.ServiceEndPoint);
         ISdkEnvironment environment = await brain.StartServerAsync(
             [.. providers],
@@ -28,7 +37,7 @@ public sealed class SdkService(
         logger.LogInformation("Started server at address {address}...", environment.HostAddress);
         stoppingToken.Register(StopServerAsync);
         logger.LogInformation("Brain WebUI is running at http://{ipAddress}:3200/eui", brain.IPAddress);
-        
+
         async ValueTask<Brain> GetBrainAsync()
         {
             if (configuration.GetValue<string>(nameof(Brain)) is { } text && IPAddress.TryParse(text, out IPAddress? address))

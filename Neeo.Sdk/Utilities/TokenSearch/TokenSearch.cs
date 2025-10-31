@@ -18,11 +18,10 @@ internal sealed class TokenSearch<T>(T[] items, params string[] searchProperties
 
     public IEnumerable<SearchEntry<T>> Search(string query)
     {
-        string[] searchTokens = (query ?? throw new ArgumentNullException(nameof(query)))
+        string[] searchTokens = [.. (query ?? throw new ArgumentNullException(nameof(query)))
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Distinct()
-            .Take(5)
-            .ToArray();
+            .Take(5)];
         List<SearchEntry<T>> list = [];
         int maxScore = 0;
         foreach (T item in items)

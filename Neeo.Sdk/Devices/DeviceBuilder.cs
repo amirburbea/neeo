@@ -1020,7 +1020,7 @@ internal sealed partial class DeviceBuilder(
         {
             throw new InvalidOperationException($"A device with characteristic {DeviceCharacteristic.DynamicDevice} can not support custom routes.");
         }
-        List<DeviceCapability> deviceCapabilities = this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic).ToList();
+        List<DeviceCapability> deviceCapabilities = [.. this.Characteristics.Select(static characteristic => (DeviceCapability)characteristic)];
         string pathPrefix = $"/device/{this.AdapterName}/";
         HashSet<string> paths = [];
         List<Component> components = [];

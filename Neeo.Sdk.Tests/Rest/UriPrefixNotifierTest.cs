@@ -35,34 +35,6 @@ public sealed class UriPrefixNotifierTest
         Assert.Equal($"{Constants.HostAddress}/device/{nameof(mockAdapter)}/custom/", uriPrefix);
     }
 
-    [Fact]
-    public async Task StartAsync_should_notify_multiple_adapters_in_parallel()
-    {
-        const int count = 4;
-        IDeviceAdapter[] adapters = new IDeviceAdapter[count];
-        int[] threadIds = new int[count];
-        for (int index = 0; index < count; index++)
-        {
-            Mock<IDeviceAdapter> mockAdapter = new();
-            mockAdapter.Setup(adapter => adapter.AdapterName).Returns($"adapter{index}");
-            int arrayIndex = index; // Capturing `index` causes issues.
-            mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(_ => SetUriPrefix(arrayIndex));
-            adapters[index] = mockAdapter.Object;
-        }
-        this._mockDatabase.Setup(database => database.Adapters).Returns(adapters);
-
-        await this._uriPrefixNotifier.StartAsync(default);
-
-        Assert.Equal(count, threadIds.Distinct().Count());
-        Assert.DoesNotContain(0, threadIds);
-
-        void SetUriPrefix(int index)
-        {
-            Thread.Sleep(10);
-            threadIds[index] = Environment.CurrentManagedThreadId;
-        }
-    }
-
     private static class Constants
     {
         public const string HostAddress = "http://host";

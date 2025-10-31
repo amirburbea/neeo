@@ -87,7 +87,7 @@ public sealed partial class Brain(
     public static async Task<Brain[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brain._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return hosts.Select(Brain.TryCreateBrain).OfType<Brain>().ToArray();
+        return [.. hosts.Select(Brain.TryCreateBrain).OfType<Brain>()];
     }
 
     /// <summary>
@@ -125,8 +125,8 @@ public sealed partial class Brain(
                             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                             await ZeroconfResolver.ResolveAsync(
                                 Constants.ServiceName,
-                                Brain._scanTime, callback:
-                                OnHostDiscovered,
+                                Brain._scanTime,
+                                 callback: OnHostDiscovered,
                                 cancellationToken: cancellationToken
                             ).ConfigureAwait(false);
                         }
@@ -162,22 +162,19 @@ public sealed partial class Brain(
 
     private static Brain? TryCreateBrain(IZeroconfHost host)
     {
-        IService service = host.Services.Values.First();
-        IReadOnlyDictionary<string, string> properties = service.Properties[0];
-        IPAddress ipAddress;
-        if (host.IPAddress is { } ipString)
+        return host.IPAddress switch
         {
-            ipAddress = IPAddress.Parse(ipString);
-        }
-        else if (Brain.IPAddresRegex().Match(host.Id) is { Success: true, Groups: { } groups })
+            { Length: > 0 } address => TryCreateBrain(address),
+            null when Brain.IPAddresRegex().Match(host.Id) is { Success: true, Groups: { } groups } => TryCreateBrain(groups["ip"].Value),
+            _ => null,
+        };
+
+        Brain? TryCreateBrain(string ipAddress)
         {
-            ipAddress = IPAddress.Parse(groups["ip"].Value);
+            return host.Services.Values.FirstOrDefault() is { Port: int port, Properties: [{ } properties, ..] }
+                ? new(IPAddress.Parse(ipAddress), port, $"{properties["hon"]}.local", properties["rel"])
+                : null;
         }
-        else
-        {
-            return null;
-        }
-        return new(ipAddress, service.Port, $"{properties["hon"]}.local", properties["rel"]);
     }
 
     [GeneratedRegex(@"^(?<v>\d+\.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]
