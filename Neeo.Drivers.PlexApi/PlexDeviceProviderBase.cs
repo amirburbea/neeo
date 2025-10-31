@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reactive;
+using System.Reactive.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -33,6 +36,7 @@ public abstract class PlexDeviceProviderBase(
     private static readonly Uri _userUri = new($"https://plex.tv/api/v2/user");
 
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient("Plex");
+    private readonly Dictionary<IPlexServer, CancellationTokenSource> _serverCancellationTokens = [];
     private readonly ConcurrentDictionary<string, IPlexServer> _servers = [];
     private string[]? _initialDeviceIds;
     private IDeviceNotifier? _notifier;
@@ -160,18 +164,32 @@ public abstract class PlexDeviceProviderBase(
             return;
         }
         logger.LogInformation("Plex device added: {ServerName} ({HostName})", serverName, server.Info.HostName);
-        this._servers.TryAdd(serverName, server);
-        server.SelectedPlayerChanged += this.OnSelectedPlayerChanged;
+        if (!this._servers.TryAdd(serverName, server))
+        {
+            return;
+        }
+        CancellationTokenSource source = new();
+        server.SelectedPlayerChanged
+            .SelectMany(player => Observable.FromAsync(() => this.OnSelectedPlayerChanged(server, player)))
+            .TakeUntil(source.Token)
+            .Subscribe(
+                onNext: _ => { },
+                onError: ex => logger.LogError(ex, "Error in player changed handler")
+            );
+        this._serverCancellationTokens.Add(server, source);
     }
 
     private async Task HandleDeviceRemovedAsync(string deviceId, CancellationToken cancellationToken)
     {
         (string serverName, _) = (DeviceId)deviceId;
-        if (this._servers.TryRemove(serverName, out IPlexServer? server))
+        if (!this._servers.TryRemove(serverName, out IPlexServer? server))
         {
-            logger.LogInformation("Plex device removed: {serverName}", serverName);
-            server.Dispose();
+            return;
         }
+        logger.LogInformation("Plex device removed: {serverName}", serverName);
+        using CancellationTokenSource source = this._serverCancellationTokens[server];
+        source.Cancel();
+        server.Dispose();
     }
 
     private async Task<ActionResult> HandleDeviceRouteAsync(HttpRequest request, string path, CancellationToken cancellationToken)
@@ -188,11 +206,11 @@ public abstract class PlexDeviceProviderBase(
         }
     }
 
-    private async void OnSelectedPlayerChanged(object? sender, DataEventArgs<PlexPlayerInfo> e)
+    private async Task OnSelectedPlayerChanged(IPlexServer server, PlexPlayerInfo player)
     {
-        if (this._notifier is { } notifier && sender is IPlexServer { ServerName: { } serverName })
+        if (this._notifier is { } notifier)
         {
-            await notifier.SendNotificationAsync(Components.GetSensor(Components.Player), e.Data.Name, new DeviceId(serverName, deviceType)).ConfigureAwait(false);
+            await notifier.SendNotificationAsync(Components.GetSensor(Components.Player), player.Name, new DeviceId(server.ServerName, deviceType)).ConfigureAwait(false);
         }
     }
 

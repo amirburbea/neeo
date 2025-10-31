@@ -5,6 +5,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.WebSockets;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -24,6 +26,7 @@ internal class PlexServerConnection(
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly Lock _lock = new();
+    private readonly BehaviorSubject<PlexPlayerInfo?> _selectedPlayer = new(null);
     private Task? _serverMessageLoopTask;
     private Task<WebSocket>? _notificationsSocketTask;
 
@@ -32,9 +35,13 @@ internal class PlexServerConnection(
 
     public PlexServerInfo Info => discovery.Servers.GetValueOrDefault(serverName);
 
-    public PlexPlayerInfo? SelectedPlayer { get; private set; }
+    public PlexPlayerInfo? SelectedPlayer => this._selectedPlayer.Value;
 
-    public EventHandler<DataEventArgs<PlexPlayerInfo>>? SelectedPlayerChanged;
+    public IObservable<PlexPlayerInfo> SelectedPlayerChanged => this._selectedPlayer.SelectMany(
+        value => value is { } player
+            ? Observable.Return(player)
+            : Observable.Empty<PlexPlayerInfo>()
+    );
 
     public string ServerName => serverName;
 
@@ -46,20 +53,22 @@ internal class PlexServerConnection(
         {
             this._serverMessageLoopTask?.Wait();
         }
-        catch (OperationCanceledException) { }
-        catch (Exception e)
+        catch (Exception)
         {
-            logger.LogDebug(e, "Error waiting for message loop to exit during Dispose.");
+            // Ignore.
         }
-        if (this._notificationsSocketTask is { IsCompletedSuccessfully: true } task)
+        finally
         {
-            try
+            if (this._notificationsSocketTask is { IsCompletedSuccessfully: true } task)
             {
-                task.Result.Dispose();
-            }
-            catch (Exception e)
-            {
-                logger.LogDebug(e, "Error closing WebSocket during Dispose.");
+                try
+                {
+                    task.Result.Dispose();
+                }
+                catch (Exception e)
+                {
+                    logger.LogDebug(e, "Error closing WebSocket during Dispose.");
+                }
             }
         }
     }
@@ -142,6 +151,19 @@ internal class PlexServerConnection(
         }
     }
 
+    private async Task ProcessNotificationsAsync(ActivityNotification[] notifications)
+    {
+
+    }
+
+    private async Task ProcessNotificationsAsync(PlaySessionStateNotification[] notifications)
+    {
+    }
+
+    private async Task ProcessNotificationsAsync(StatusNotification[] notifications)
+    {
+    }
+
     public async Task SelectPlayerAsync(string machineIdentifier, CancellationToken cancellationToken)
     {
         if (this.SelectedPlayer?.MachineIdentifier == machineIdentifier)
@@ -150,42 +172,23 @@ internal class PlexServerConnection(
         }
         PlexPlayerInfo[] players = await this.GetPlayersAsync(cancellationToken).ConfigureAwait(false);
         int index = Array.FindIndex(players, player => player.MachineIdentifier == machineIdentifier);
-        if (index < 0)
+        if (index >= 0)
         {
-            return;
+            this._selectedPlayer.OnNext(players[index]);
         }
-        PlexPlayerInfo info = players[index];
-        this.SelectedPlayer = info;
-        this.SelectedPlayerChanged?.Invoke(this, info);
     }
 
-    private Task ProcessNotificationsAsync(ServerNotificationContainer container)
+    private Task ProcessNotificationsAsync(ServerNotificationContainer container) => container.Type switch
     {
-        return container.Type switch
-        {
-            ServerNotificationType.Activity when container.ActivityNotifications is { } notifications => ProcessActivityNotificationsAsync(notifications),
-            ServerNotificationType.Playing when container.PlaySessionStateNotifications is { } notifications => ProcessPlayStateNotificationsAsync(notifications),
-            ServerNotificationType.Timeline when container.TimelineEntries is { } entries => ProcessTimelineEntriesAsync(entries),
+        ServerNotificationType.Activity when container.ActivityNotifications is { } notifications => this.ProcessNotificationsAsync(notifications),
+        ServerNotificationType.Playing when container.PlaySessionStateNotifications is { } notifications => this.ProcessNotificationsAsync(notifications),
+        ServerNotificationType.Timeline when container.TimelineEntries is { } entries => this.ProcessTimelineEntriesAsync(entries),
+        ServerNotificationType.StateChange when container.StatusNotifications is { } notifications => this.ProcessNotificationsAsync(notifications),
+        _ => Task.CompletedTask
+    };
 
-
-
-
-            _ => Task.CompletedTask
-        };
-
-
-
-        async Task ProcessActivityNotificationsAsync(ActivityNotification[] notifications)
-        {
-        }
-
-        async Task ProcessPlayStateNotificationsAsync(PlaySessionStateNotification[] notifications)
-        {
-        }
-
-        async Task ProcessTimelineEntriesAsync(TimelineEntry[] entries)
-        {
-        }
+    private async Task ProcessTimelineEntriesAsync(TimelineEntry[] entries)
+    {
     }
 
     private async Task ServerMessageLoop(WebSocket webSocket)
@@ -328,7 +331,6 @@ internal class PlexServerConnection(
         string Event,
         string Uuid
     );
-
 
     private record struct ClientServer(
         string Name,
