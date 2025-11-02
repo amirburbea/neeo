@@ -69,8 +69,7 @@ internal static class Server
         .AddSingleton(brain)
         .AddSingleton(devices)
         .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
-        .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
-        .AddSingleton<PgpPublicKeyResponse>()
+        .AddSingleton<IPgpEncryption, PgpEncryption>()
         .AddSingleton<IApiClient, ApiClient>()
         .AddSingleton<IDeviceDatabase, DeviceDatabase>()
         .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()

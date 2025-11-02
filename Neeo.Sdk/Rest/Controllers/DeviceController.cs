@@ -11,7 +11,7 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal sealed partial class DeviceController(
     IDeviceDatabase database,
     IDynamicDeviceRegistry dynamicDeviceRegistry,
-    PgpKeyPair pgpKeys,
+    IPgpEncryption pgpEncryption,
     ILogger<DeviceController> logger
 ) : ControllerBase
 {

@@ -4,17 +4,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
+	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <OutputType>Library</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
     <None Remove="appsettings.Development.json" />
     <None Remove="appsettings.json" />
+    <None Remove="Images\plex_logo.png" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="appsettings.Development.json">
+    <Content Include="appsettings.*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  <DependentUpon>appsettings.json</DependentUpon>
     </Content>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -22,12 +25,26 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BitFaster.Caching" Version="2.5.4" />
+    <EmbeddedResource Include="Images\plex_logo.png" />
+    <EmbeddedResource Include="Images\player.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="PlexServer.*.cs">
+	  <DependentUpon>PlexServer.cs</DependentUpon>
+	</Compile>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Neeo.Sdk.Server.Drivers\Neeo.Sdk.Server.Drivers.csproj">
+		<Private>false</Private>
+		<ExcludeAssets>runtime</ExcludeAssets>
+	</ProjectReference>
     <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj">
 		<Private>false</Private>
 		<ExcludeAssets>runtime</ExcludeAssets>

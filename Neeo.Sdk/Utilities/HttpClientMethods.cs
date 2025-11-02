@@ -98,7 +98,7 @@ public static class HttpClientMethods
         using MemoryStream stream = new();
         if (body is not null)
         {
-            await JsonSerializer.SerializeAsync(stream, body, JsonSerialization.Options, cancellationToken).ConfigureAwait(false);
+            await JsonSerializer.SerializeAsync(stream, body, JsonSerializerOptions.Web, cancellationToken).ConfigureAwait(false);
             stream.Position = 0L;
         }
         using StreamContent content = new(stream) { Headers = { ContentType = HttpClientMethods._applicationJson } };
@@ -134,6 +134,6 @@ public static class HttpClientMethods
             throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}");
         }
         using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return (await JsonSerializer.DeserializeAsync<TValue>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
+        return (await JsonSerializer.DeserializeAsync<TValue>(stream, JsonSerializerOptions.Web, cancellationToken).ConfigureAwait(false))!;
     }
 }

@@ -2,22 +2,17 @@
 using System.IO;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 
 namespace Neeo.Drivers.PlexApi;
 
 public interface IPlexSettingsManager
 {
-    T? Deserialize<T>(string settingsFile) where T : notnull;
-
     bool HasFile(string settingsFile);
 
     byte[] ReadAllBytes(string settingsFile);
 
     string ReadAllText(string settingsFile) => Encoding.UTF8.GetString(this.ReadAllBytes(settingsFile));
-
-    void Serialize<T>(string settingsFile, T value) where T : notnull;
 
     void WriteAllBytes(string settingsFile, ReadOnlySpan<byte> bytes);
 
@@ -28,23 +23,9 @@ internal sealed class PlexSettingsManager : IPlexSettingsManager
 {
     private readonly string _settingsPath = PlexSettingsManager.DetermineSettingsPath();
 
-    public T? Deserialize<T>(string settingsFile)
-        where T : notnull
-    {
-        using FileStream stream = File.OpenRead(Path.Combine(this._settingsPath, settingsFile));
-        return JsonSerializer.Deserialize<T>(stream, JsonSerializerOptions.Web);
-    }
-
     public bool HasFile(string settingsFile)
     {
         return File.Exists(Path.Combine(this._settingsPath, settingsFile));
-    }
-
-    public void Serialize<T>(string settingsFile, T value)
-        where T : notnull
-    {
-        using FileStream stream = File.Create(Path.Combine(this._settingsPath, settingsFile));
-        JsonSerializer.Serialize(stream, value, JsonSerializerOptions.Web);
     }
 
     public byte[] ReadAllBytes(string settingsFile)

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.Hosting;
 
 namespace Neeo.Sdk;
 
@@ -31,12 +32,17 @@ public interface ISdkEnvironment
 
 internal sealed class SdkEnvironment(
     SdkAdapterName sdkAdapterName,
-    IServer server
+    IServer server,
+    IHost host
 ) : ISdkEnvironment
 {
-    public string HostAddress => server.Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+    public string HostAddress => server.Features.Get<IServerAddressesFeature>()?.Addresses is { } addresses ? addresses.First() : string.Empty;
 
     public string SdkAdapterName { get; } = (string)sdkAdapterName;
 
-    public Task StopAsync(CancellationToken cancellationToken) => server.StopAsync(cancellationToken);
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await server.StopAsync(cancellationToken).ConfigureAwait(false);
+        await host.StopAsync(cancellationToken).ConfigureAwait(false);
+    }
 }

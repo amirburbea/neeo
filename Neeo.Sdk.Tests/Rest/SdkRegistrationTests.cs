@@ -32,7 +32,7 @@ public sealed class SdkRegistrationTests
         mockApiClient
             .Setup(client => client.PostAsync(Capture.In(path), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true)
-            .Callback(new InvocationAction(invocation => body.Add(JsonSerializer.Serialize(invocation.Arguments[1], JsonSerialization.Options))));
+            .Callback(new InvocationAction(invocation => body.Add(JsonSerializer.Serialize(invocation.Arguments[1], JsonSerializerOptions.Web))));
         this._path = new(path.Single);
         this._body = new(body.Single);
         Mock<ISdkEnvironment> mockSdkEnvironment = new(MockBehavior.Strict);
@@ -53,7 +53,7 @@ public sealed class SdkRegistrationTests
     [Fact]
     public async Task StopAsync_should_unregister_using_correct_parameters()
     {
-        await this._sdkRegistration.StopAsync(default);
+        await ((Microsoft.Extensions.Hosting.IHostedService)this._sdkRegistration).StopAsync(default);
 
         Assert.Equal(UrlPaths.UnregisterServer, this._path.Value);
         Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\"}}", this._body.Value);

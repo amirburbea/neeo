@@ -18,11 +18,6 @@ namespace Neeo.Drivers.Kodi;
 
 public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger) : IDisposable
 {
-    internal static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
@@ -225,6 +220,56 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         CancellationToken cancellationToken = default
     ) => this.SendMessageAsync("GUI.ShowNotification", new Notification(title, message, image, displayTime), static (string result) => result == "OK", cancellationToken);
 
+    private Task<TResult> SendMessageAsync<TPayload, TResult>(
+        string method,
+        object? parameters,
+        Func<TPayload, TResult> transform,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ObjectDisposedException.ThrowIf(this.IsDisposed, this);
+        if (this._webSocket is { State: WebSocketState.Open } webSocket)
+        {
+            return SendRequestAsync();
+        }
+        _ = this.ConnectAsync(cancellationToken);
+        return CreateCanceledTask();
+
+        static Task<TResult> CreateCanceledTask() => Task.FromCanceled<TResult>(new(true));
+
+        async Task<TResult> SendRequestAsync()
+        {
+            JsonRpcRequest request = new(method, parameters);
+            TaskCompletionSource<JsonElement> elementSource = new();
+            this._taskSources.TryAdd(request.Id, elementSource);
+            await webSocket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(request, JsonSerializerOptions.Web).AsMemory(), WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
+            // Each operation can take as much as 2.5s to complete.
+            if (object.Equals(elementSource.Task, await Task.WhenAny(elementSource.Task, Task.Delay(2500, cancellationToken)).ConfigureAwait(false)))
+            {
+                return transform(ExtractPayload(await elementSource.Task.ConfigureAwait(false)));
+            }
+            logger.LogWarning("Something went wrong (SendMessageAsync timed out)");
+            return await CreateCanceledTask().ConfigureAwait(false);
+
+            TPayload ExtractPayload(JsonElement element)
+            {
+                if (typeof(TPayload) == typeof(JsonElement))
+                {
+                    return Unsafe.As<JsonElement, TPayload>(ref element);
+                }
+                try
+                {
+                    return element.Deserialize<TPayload>(JsonSerializerOptions.Web)!;
+                }
+                catch (JsonException)
+                {
+                    logger.LogError("Failed to deserialize to {payload} from {element}.", typeof(TPayload), element);
+                    throw;
+                }
+            }
+        }
+    }
+
     private void CancelOutstanding()
     {
         if (this._taskSources.IsEmpty)
@@ -270,81 +315,36 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     private async Task MessageLoop()
     {
-        byte[] previous = [];
         try
         {
-            if (this._cancellationTokenSource is not { } cts || this._webSocket is not { State: WebSocketState.Open } webSocket)
+            if (this._cancellationTokenSource is { Token: { } token } && this._webSocket is { State: WebSocketState.Open } webSocket)
             {
-                return;
+                await JsonWebSocket.MessageLoop<JsonRpcResponse>(
+                    webSocket,
+                    (response, _) =>
+                    {
+                        if (response.Error is { Message: { } errorMessage })
+                        {
+                            this.Error?.Invoke(this, errorMessage);
+                        }
+                        else if (response is { Id: { } id } && this._taskSources.TryRemove(id, out TaskCompletionSource<JsonElement>? taskSource) && response.Result is { } element)
+                        {
+                            taskSource.TrySetResult(element);
+                        }
+                        else if (response is { Method: { } method, Parameters.Data: { } responseData })
+                        {
+                            this.ProcessIncomingMessage(method, responseData);
+                        }
+                        return ValueTask.CompletedTask;
+                    },
+                    this.OnDisconnected,
+                    token
+                ).ConfigureAwait(false);
             }
-            int previousLength = 0;
-            using IMemoryOwner<byte> owner = MemoryPool<byte>.Shared.Rent(32768);
-            while (webSocket.State == WebSocketState.Open && await webSocket.ReceiveAsync(owner.Memory, cts.Token).ConfigureAwait(false) is { MessageType: not WebSocketMessageType.Close } result)
-            {
-                if (previous.Length == 0 && result.EndOfMessage)
-                {
-                    // Complete message was received.
-                    Process(owner.Memory.Span[..result.Count]);
-                    continue;
-                }
-                // Combine previous fragment with incoming one.
-                int nextLength = previousLength + result.Count;
-                byte[] next = ArrayPool<byte>.Shared.Rent(nextLength);
-                if (previous.Length != 0)
-                {
-                    previous.AsSpan(0, previousLength).CopyTo(next);
-                    ArrayPool<byte>.Shared.Return(previous);
-                }
-                owner.Memory[0..result.Count].CopyTo(next.AsMemory(previousLength));
-                if (!result.EndOfMessage)
-                {
-                    (previous, previousLength) = (next, nextLength);
-                    continue;
-                }
-                (previous, previousLength) = ([], 0);
-                try
-                {
-                    Process(next.AsSpan(0, nextLength));
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(next);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // KodiClient was disposed.
-            return;
-        }
-        catch (WebSocketException)
-        {
-            this.OnDisconnected();
         }
         finally
         {
-            if (previous.Length != 0)
-            {
-                ArrayPool<byte>.Shared.Return(previous);
-            }
             this.CancelOutstanding();
-        }
-
-        void Process(ReadOnlySpan<byte> message)
-        {
-            JsonRpcResponse response = JsonSerializer.Deserialize<JsonRpcResponse>(message, KodiClient.SerializerOptions);
-            if (response.Error is { Message: { } errorMessage })
-            {
-                this.Error?.Invoke(this, errorMessage);
-            }
-            else if (response is { Id: { } id } && this._taskSources.TryRemove(id, out TaskCompletionSource<JsonElement>? taskSource) && response.Result is { } element)
-            {
-                taskSource.TrySetResult(element);
-            }
-            else if (response is { Method: { } method, Parameters.Data: { } responseData })
-            {
-                this.ProcessIncomingMessage(method, responseData);
-            }
         }
     }
 
@@ -395,15 +395,15 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         ).ConfigureAwait(false);
         this.PlayerState = parameters.Item.Type switch
         {
-            ItemType.Picture when element.Deserialize<PictureInfo>(KodiClient.SerializerOptions) is { } picture => new(
+            ItemType.Picture when element.Deserialize<PictureInfo>(JsonSerializerOptions.Web) is { } picture => new(
                PlayState.Playing,
                picture.Label,
                parameters.Item.File ?? parameters.Item.ToString(),
                this.GetImageUrl(picture.Thumbnail)
             ),
-            ItemType.Episode when element.Deserialize<EpisodeInfo>(KodiClient.SerializerOptions) is { } episode => CreatePlayerState(episode),
-            ItemType.Song when element.Deserialize<SongInfo>(KodiClient.SerializerOptions) is { } song => CreatePlayerState(song),
-            _ when element.Deserialize<VideoInfo>(KodiClient.SerializerOptions) is { } video => CreatePlayerState(video),
+            ItemType.Episode when element.Deserialize<EpisodeInfo>(JsonSerializerOptions.Web) is { } episode => CreatePlayerState(episode),
+            ItemType.Song when element.Deserialize<SongInfo>(JsonSerializerOptions.Web) is { } song => CreatePlayerState(song),
+            _ when element.Deserialize<VideoInfo>(JsonSerializerOptions.Web) is { } video => CreatePlayerState(video),
 
             _ => this.PlayerState,
         };
@@ -424,13 +424,13 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 this.PlayerState = PlayerState.Defaults;
                 break;
             case "Application.OnVolumeChanged":
-                this.ProcessVolumeInfo(parameters.Deserialize<VolumeInfo>(KodiClient.SerializerOptions));
+                this.ProcessVolumeInfo(parameters.Deserialize<VolumeInfo>(JsonSerializerOptions.Web));
                 break;
             case "Player.OnPause":
                 this.PlayerState = this.PlayerState with { PlayState = PlayState.Paused };
                 break;
             case "Player.OnPlay":
-                this.OnPlay(parameters.Deserialize<PlayParameters>(KodiClient.SerializerOptions));
+                this.OnPlay(parameters.Deserialize<PlayParameters>(JsonSerializerOptions.Web));
                 break;
         }
     }
@@ -447,56 +447,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         Func<TPayload, TResult> transform,
         CancellationToken cancellationToken = default
     ) => this.SendMessageAsync(method, default, transform, cancellationToken);
-
-    private Task<TResult> SendMessageAsync<TPayload, TResult>(
-        string method,
-        object? parameters,
-        Func<TPayload, TResult> transform,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ObjectDisposedException.ThrowIf(this.IsDisposed, this);
-        if (this._webSocket is { State: WebSocketState.Open } webSocket)
-        {
-            return SendRequestAsync();
-        }
-        _ = this.ConnectAsync(cancellationToken);
-        return CreateCanceledTask();
-
-        static Task<TResult> CreateCanceledTask() => Task.FromCanceled<TResult>(new(true));
-
-        async Task<TResult> SendRequestAsync()
-        {
-            JsonRpcRequest request = new(method, parameters);
-            TaskCompletionSource<JsonElement> elementSource = new();
-            this._taskSources.TryAdd(request.Id, elementSource);
-            await webSocket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(request, KodiClient.SerializerOptions).AsMemory(), WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
-            // Each operation can take as much as 2.5s to complete.
-            if (object.Equals(elementSource.Task, await Task.WhenAny(elementSource.Task, Task.Delay(2500, cancellationToken)).ConfigureAwait(false)))
-            {
-                return transform(ExtractPayload(await elementSource.Task.ConfigureAwait(false)));
-            }
-            logger.LogWarning("Something went wrong (SendMessageAsync timed out)");
-            return await CreateCanceledTask().ConfigureAwait(false);
-
-            TPayload ExtractPayload(JsonElement element)
-            {
-                if (typeof(TPayload) == typeof(JsonElement))
-                {
-                    return Unsafe.As<JsonElement, TPayload>(ref element);
-                }
-                try
-                {
-                    return element.Deserialize<TPayload>(KodiClient.SerializerOptions)!;
-                }
-                catch (JsonException)
-                {
-                    logger.LogError("Failed to deserialize to {payload} from {element}.", typeof(TPayload), element);
-                    throw;
-                }
-            }
-        }
-    }
 
     private void SetValue<TValue>(ref TValue field, TValue value, EventHandler<DataEventArgs<TValue>>? valueChanged)
     {

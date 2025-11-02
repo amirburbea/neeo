@@ -38,19 +38,14 @@ internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDyna
 {
     private readonly DiscoveryProcess _process = process ?? throw new ArgumentNullException(nameof(process));
 
-    public bool EnableDynamicDeviceBuilder { get; } = enableDynamicDeviceBuilder;
+    public bool EnableDynamicDeviceBuilder => enableDynamicDeviceBuilder;
 
     async Task<DiscoveredDevice?> IDiscoveryFeature.DiscoverAsync(string deviceId, CancellationToken cancellationToken)
     {
-        return await this.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is [DiscoveredDevice device]
-            ? device
-            : default;
+        return await this.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is [{ } device] ? device : default;
     }
 
-    Task<DiscoveredDevice[]> IDiscoveryFeature.DiscoverAsync(CancellationToken cancellationToken)
-    {
-        return this.DiscoverAsync(default, cancellationToken);
-    }
+    Task<DiscoveredDevice[]> IDiscoveryFeature.DiscoverAsync(CancellationToken cancellationToken) => this.DiscoverAsync(default, cancellationToken);
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default)
     {
@@ -58,23 +53,20 @@ internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDyna
         {
             return [];
         }
-        this.Validate(optionalDeviceId, devices);
-        return devices;
-    }
-
-    /// <summary>
-    /// Validate the array of discovered devices (with length not equal to zero).
-    /// </summary>
-    private void Validate(string? optionalDeviceId, DiscoveredDevice[] discoveredDevices)
-    {
-        if (optionalDeviceId != null && (discoveredDevices is not [{ Id: string deviceId }] || deviceId != optionalDeviceId))
+        if (optionalDeviceId != null && (devices is not [{ Id: { } deviceId }] || deviceId != optionalDeviceId))
         {
             throw new InvalidOperationException($"Discovery was to return at most one device with the id: {optionalDeviceId}");
         }
-        HashSet<string> ids = new(discoveredDevices.Length);
-        foreach ((string id, string name, _, _, IDeviceBuilder? device) in discoveredDevices)
+        this.ValidateDevices(devices);
+        return devices;
+    }
+
+    private void ValidateDevices(DiscoveredDevice[] devices)
+    {
+        HashSet<string> uniqueIds = new(devices.Length);
+        foreach ((string deviceId, string name, _, _, IDeviceBuilder? builder) in devices)
         {
-            if (string.IsNullOrEmpty(id) || !ids.Add(id))
+            if (string.IsNullOrEmpty(deviceId) || !uniqueIds.Add(deviceId))
             {
                 throw new InvalidOperationException("Ids can not be null or blank and must be unique.");
             }
@@ -82,12 +74,12 @@ internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDyna
             {
                 throw new InvalidOperationException("Names can not be null or blank.");
             }
-            if (this.EnableDynamicDeviceBuilder == device is null)
+            if (enableDynamicDeviceBuilder == builder is null)
             {
-                throw new InvalidOperationException($"{name}: " + (device is null
-                    ? "EnableDynamicDeviceBuilder was specified but a device was not supplied."
-                    : "EnableDynamicDeviceBuilder was not specified but a device was supplied."
-                ));
+                throw new InvalidOperationException(
+                    $"EnableDynamicDeviceBuilder was {(enableDynamicDeviceBuilder ? string.Empty : "not ")}specified " +
+                    $"but a device was {(enableDynamicDeviceBuilder ? "not " : string.Empty)}supplied."
+                );
             }
         }
     }

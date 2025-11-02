@@ -12,13 +12,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Neeo.Sdk.Server.Drivers\Neeo.Sdk.Server.Drivers.csproj" />
     <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
   </ItemGroup>
 
   <!-- Add depdendency on the drivers in Debug for build consistency -->
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
     <ProjectReference Include="..\Neeo.Sdk.Examples\Neeo.Sdk.Examples.csproj" />
-	<ProjectReference Include="..\Neeo.Drivers.Hisense\Neeo.Drivers.Hisense.csproj" />
-	<ProjectReference Include="..\Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj" />
   </ItemGroup>
 </Project>

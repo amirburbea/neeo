@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -11,25 +11,30 @@ using Microsoft.Extensions.Logging;
 
 namespace Neeo.Drivers.PlexApi;
 
-public interface IPlexDiscovery
+public interface IPlexServerDiscovery
 {
     IReadOnlyDictionary<string, PlexServerInfo> Servers { get; }
 
     Task InitializeAsync();
 }
 
-public readonly record struct PlexServerInfo(string Name, string HostName, IPAddress IPAddress);
-
-internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) : IPlexDiscovery, IDisposable
+internal sealed class PlexServerDiscovery : IPlexServerDiscovery, IDisposable
 {
     private static readonly byte[] _requestBytes = Encoding.ASCII.GetBytes("M-SEARCH * HTTP/1.0\r\n\r\n");
 
-    private readonly ConcurrentDictionary<string, PlexServerInfo> _discoveredServers = [];
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    private Task? _discoveryTask;
+    private readonly ConcurrentDictionary<string, PlexServerInfo> _discoveredServers = [];
+    private readonly Lazy<Task> _discoveryTask;
     private readonly TaskCompletionSource _initialDiscoverySource = new();
+    private readonly ILogger _logger;
 
-    IReadOnlyDictionary<string, PlexServerInfo> IPlexDiscovery.Servers => this._discoveredServers;
+    public PlexServerDiscovery(ILogger<PlexServerDiscovery> logger)
+    {
+        this._discoveryTask = new(() => Task.Run(this.DiscoverServers, this.CancellationToken), true);
+        this._logger = logger;
+    }
+
+    IReadOnlyDictionary<string, PlexServerInfo> IPlexServerDiscovery.Servers => this._discoveredServers;
 
     private CancellationToken CancellationToken => this._cancellationTokenSource.Token;
 
@@ -37,24 +42,23 @@ internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) :
     {
         using CancellationTokenSource cts = this._cancellationTokenSource;
         cts.Cancel();
-        this._discoveryTask?.Wait();
+        if (this._discoveryTask.IsValueCreated)
+        {
+            this._discoveryTask.Value.Wait();
+        }
     }
 
     public async Task InitializeAsync()
     {
-        if (this._discoveryTask == null)
+        if (this._discoveryTask.Value.Status is not TaskStatus.Canceled or TaskStatus.Faulted)
         {
-            lock (this._initialDiscoverySource)
-            {
-                this._discoveryTask ??= Task.Run(this.DiscoverServers, this.CancellationToken);
-            }
+            await this._initialDiscoverySource.Task.ConfigureAwait(false);
         }
-        await this._initialDiscoverySource.Task.ConfigureAwait(false);
     }
 
     private async Task DiscoverServers()
     {
-        logger.LogInformation("Starting Plex server discovery...");
+        this._logger.LogInformation("Starting Plex server discovery...");
         using PeriodicTimer timer = new(TimeSpan.FromMinutes(5));
         try
         {
@@ -81,7 +85,7 @@ internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) :
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error during Plex server discovery.");
+            this._logger.LogError(ex, "Error during Plex server discovery.");
         }
         finally
         {
@@ -93,7 +97,7 @@ internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) :
     private async Task DiscoverServersAsync()
     {
         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(this.CancellationToken);
-        cts.CancelAfter(TimeSpan.FromSeconds(2d));
+        cts.CancelAfter(TimeSpan.FromSeconds(1.5d));
         using UdpClient udpClient = new() { Client = { EnableBroadcast = true } };
         await udpClient.SendAsync(PlexServerDiscovery._requestBytes, new(IPAddress.Broadcast, Constants.DiscoveryPort), cts.Token).ConfigureAwait(false);
         while (!cts.Token.IsCancellationRequested)
@@ -102,12 +106,25 @@ internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) :
             {
                 UdpReceiveResult result = await udpClient.ReceiveAsync(cts.Token).ConfigureAwait(false);
                 string response = Encoding.UTF8.GetString(result.Buffer);
-                if (response.StartsWith("HTTP/1.0 200 OK") && response.Split("\r\n", StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(line => line.StartsWith(Constants.NamePrefix)) is { } line)
+                if (!response.StartsWith("HTTP/1.0 200 OK"))
                 {
-                    string name = line[Constants.NamePrefix.Length..].Trim();
-                    IPAddress ipAddress = result.RemoteEndPoint.Address;
-                    IPHostEntry entry = await Dns.GetHostEntryAsync(ipAddress.ToString(), cts.Token).ConfigureAwait(false);
-                    this.ProcessDiscoveredServer(new(name, entry.HostName, ipAddress));
+                    continue;
+                }
+                string? name = null;
+                using (StringReader reader = new(response))
+                {
+                    while (reader.ReadLine() is { } line)
+                    {
+                        if (line.StartsWith(Constants.NamePrefix))
+                        {
+                            name = line[Constants.NamePrefix.Length..].Trim();
+                            break;
+                        }
+                    }
+                }
+                if (name != null)
+                {
+                    this.ProcessDiscoveredServer(new(name, result.RemoteEndPoint.Address));
                 }
             }
             catch (OperationCanceledException)
@@ -120,7 +137,7 @@ internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) :
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error receiving data");
+                this._logger.LogError(ex, "Error receiving data");
                 break;
             }
         }
@@ -132,16 +149,15 @@ internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) :
             server.Name,
             (_) =>
             {
-                logger.LogInformation("Discovered Plex server '{Name}' ({HostName})", server.Name, server.HostName);
+                this._logger.LogInformation("Discovered Plex server '{Name}' ({IPAddress})", server.Name, server.IPAddress);
                 return server;
             },
             (_, existing) =>
             {
-                if (existing.Equals(server))
+                if (!existing.Equals(server))
                 {
-                    return existing;
+                    this._logger.LogInformation("Plex server '{Name}' ({IPAddress}) updated", server.Name, server.IPAddress);
                 }
-                logger.LogInformation("Plex server '{Name}' ({HostName}) updated", server.Name, server.HostName);
                 return server;
             }
         );
@@ -150,7 +166,7 @@ internal sealed class PlexServerDiscovery(ILogger<PlexServerDiscovery> logger) :
     private static class Constants
     {
         public const int DiscoveryPort = 32414;
-
         public const string NamePrefix = "Name:";
+        public const string ResourceIdentifier = "Resource-Identifier:";
     }
 }

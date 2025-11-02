@@ -395,7 +395,7 @@ public interface IDeviceBuilder
         string? label,
         string text,
         bool? isLabelVisible
-    ) => this.AddTextLabel(name, label, DeviceValueGetter.FromValue(text), isLabelVisible);
+    ) => this.AddTextLabel(name, label, (_, _) => Task.FromResult(text), isLabelVisible);
 
     /// <summary>
     /// Builds a device adapter based on this instance.

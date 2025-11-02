@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Neeo.Sdk.Server.Drivers\Neeo.Sdk.Server.Drivers.csproj">
+      <Private>False</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
     <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj">
 		<Private>false</Private>
 		<ExcludeAssets>runtime</ExcludeAssets>

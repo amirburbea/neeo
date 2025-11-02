@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
-namespace Neeo.Sdk.Server.Shared;
+namespace Neeo.Sdk.Server.Drivers;
 
 /// <summary>
 /// When implemented in libraries loaded in the integration server <c>Neeo.Sdk.Server</c>,

@@ -13,6 +13,7 @@ using Neeo.Drivers.Kodi.Models;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Devices.Setup;
+using Neeo.Sdk.Server.Drivers;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;

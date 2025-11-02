@@ -3,9 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Reactive;
 using System.Reactive.Linq;
-using System.Reactive.Subjects;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -14,98 +12,64 @@ namespace Neeo.Drivers.PlexApi;
 
 public interface IPlexServerManager
 {
-    Task<IPlexServer?> GetServerAsync(string serverName, CancellationToken cancellationToken = default);
+    Task<IPlexServer?> GetServerAsync(string name, CancellationToken cancellationToken = default);
 }
 
 internal partial class PlexServerManager(
-    IPlexDiscovery discovery,
+    IPlexServerDiscovery discovery,
     IPlexTokenStore tokenStore,
     IHttpClientFactory httpClientFactory,
+    IPlexSettingsManager settingsManager,
     ILogger<PlexServerManager> logger
 ) : IPlexServerManager, IDisposable
 {
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient("Plex");
-    private readonly ConcurrentDictionary<string, (PlexServerConnection, ICollection<PlexServerConsumer>)> _servers = [];
+    private readonly ConcurrentDictionary<string, (PlexServer, List<PlexServerConsumer>)> _servers = [];
 
     public void Dispose()
     {
-        foreach ((_, ICollection<PlexServerConsumer> consumers) in this._servers.Values)
-        {
-            foreach (PlexServerConsumer consumer in consumers.ToList())
-            {
-                consumer.Dispose();
-            }
-        }
+        // Dispose removes items, so a .ToList() is mandatory.
+        Parallel.ForEach(
+            this._servers.Values.SelectMany(tuple => tuple is (_, { } consumers) ? consumers : []).ToList(),
+            consumer => consumer.Dispose()
+        );
         this._httpClient.Dispose();
     }
 
-    public async Task<IPlexServer?> GetServerAsync(string serverName, CancellationToken cancellationToken = default)
+    public async Task<IPlexServer?> GetServerAsync(string name, CancellationToken cancellationToken)
     {
-        if (!discovery.Servers.ContainsKey(serverName))
+        if (!discovery.Servers.ContainsKey(name))
         {
             return null;
         }
         PlexServerConsumer consumer;
-        if (this._servers.TryGetValue(serverName, out (PlexServerConnection Connection, ICollection<PlexServerConsumer> Consumers) tuple))
+        if (this._servers.GetValueOrDefault(name) is ({ } server, { } consumers))
         {
-            tuple.Consumers.Add(consumer = new(tuple.Connection));
+            consumers.Add(consumer = new(server));
         }
         else
         {
-            PlexServerConnection connection = new(serverName, discovery, tokenStore, this._httpClient, logger);
-            this._servers[serverName] = (connection, [consumer = new(connection)]);
-            await connection.InitializeAsync(cancellationToken).ConfigureAwait(false);
+            server = new(name, discovery, tokenStore, this._httpClient, settingsManager, logger);
+            this._servers[name] = (server, [consumer = new(server)]);
+            await server.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
         consumer.Disposed
-            .Take(1)
-            .Subscribe((_) => this.OnPlexConsumerDisposed(consumer));
+           .Take(1)
+           .Subscribe((_) => this.OnPlexConsumerDisposed(consumer));
         return consumer;
     }
 
     private void OnPlexConsumerDisposed(PlexServerConsumer consumer)
     {
-        if (!this._servers.TryGetValue(consumer.ServerName, out (PlexServerConnection Connection, ICollection<PlexServerConsumer> Consumers) tuple) ||
-            !tuple.Consumers.Remove(consumer))
+        if (this._servers.GetValueOrDefault(consumer.Name) is not ({ } server, { } consumers))
         {
             return;
         }
-        // Check if there are no remaining consumers.
-        if (tuple.Consumers.Count == 0)
+        if (consumers.Remove(consumer) && consumers.Count == 0)
         {
             // After removing the last consumer, dispose of the connection.
-            tuple.Connection.Dispose();
-            this._servers.TryRemove(consumer.ServerName, out _);
-        }
-    }
-
-    private sealed class PlexServerConsumer(PlexServerConnection connection) : IPlexServer, IDisposable
-    {
-        private readonly Subject<Unit> _disposed = new();
-
-        public IObservable<Unit> Disposed => this._disposed;
-
-        public PlexServerInfo Info => connection.Info;
-
-        public string ServerName => connection.ServerName;
-
-        public PlexPlayerInfo? SelectedPlayer => connection.SelectedPlayer;
-
-        public IObservable<PlexPlayerInfo> SelectedPlayerChanged => connection.SelectedPlayerChanged;
-
-        public void Dispose()
-        {
-            this._disposed.OnNext(Unit.Default);
-            this._disposed.Dispose();
-        }
-
-        public Task<PlexPlayerInfo[]> GetPlayersAsync(CancellationToken cancellationToken)
-        {
-            return connection.GetPlayersAsync(cancellationToken);
-        }
-
-        public Task SelectPlayerAsync(string machineIdentifier, CancellationToken cancellationToken)
-        {
-            return connection.SelectPlayerAsync(machineIdentifier, cancellationToken);
+            server.Dispose();
+            this._servers.TryRemove(consumer.Name, out _);
         }
     }
 }

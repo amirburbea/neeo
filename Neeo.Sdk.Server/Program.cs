@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
+using Neeo.Sdk.Server.Drivers;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Server;

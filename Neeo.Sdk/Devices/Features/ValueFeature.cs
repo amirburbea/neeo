@@ -69,7 +69,7 @@ internal sealed class ValueFeature(
     private static Func<string, string, CancellationToken, Task> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
         where TValue : notnull => setter == null
         ? throw new ArgumentNullException(nameof(setter))
-        : (deviceId, value, cancellationToken) => setter(deviceId, converter(value), cancellationToken);
+        : async (deviceId, value, cancellationToken) => await setter(deviceId, converter(value), cancellationToken).ConfigureAwait(false);
 
     private static class ObjectConverter<T>
         where T : notnull

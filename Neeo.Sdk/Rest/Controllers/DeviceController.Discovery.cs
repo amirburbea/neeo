@@ -38,7 +38,7 @@ internal partial class DeviceController
         return dynamicDevices;
     }
 
-    public readonly record struct DynamicDiscoveredDevice(
+    private readonly record struct DynamicDiscoveredDevice(
         string Id,
         string Name,
         bool? Reachable,
@@ -46,7 +46,7 @@ internal partial class DeviceController
         DynamicDevice Device
     );
 
-    public readonly struct DynamicDevice(IDeviceAdapter adapter)
+    private readonly struct DynamicDevice(IDeviceAdapter adapter)
     {
         public string AdapterName { get; } = adapter.AdapterName;
 

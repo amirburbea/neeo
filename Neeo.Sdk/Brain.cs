@@ -238,59 +238,18 @@ public static class BrainMethods
         return host.Services.GetRequiredService<ISdkEnvironment>();
     }
 
-    /// <summary>
-    /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
-    /// </summary>
-    /// <param name="brain">The NEEO Brain.</param>
-    /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
-    /// <param name="providers">An array of device providers from which to register devices with the NEEO Brain.</param>
-    /// <param name="hostIPAddress">
-    /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
-    /// </param>
-    /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
-    /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public static Task<ISdkEnvironment> StartServerAsync(
-        this Brain brain,
-        IDeviceProvider[] providers,
-        string? name = default,
-        IPAddress? hostIPAddress = null,
-        ushort port = 0,
-        Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
-        CancellationToken cancellationToken = default
-    )
-    {
-        if (providers is not { Length: > 0 })
-        {
-            throw new ArgumentException("At least one device is required.", nameof(providers));
-        }
-        return brain.StartServerAsync(
-            Array.ConvertAll(providers, static provider => provider.DeviceBuilder),
-            name,
-            hostIPAddress,
-            port,
-            configureLogging,
-            cancellationToken
-        );
-    }
-
     internal static async ValueTask<IPAddress> GetFallbackHostIPAddressAsync(this Brain brain, CancellationToken cancellationToken)
     {
-        if (IPAddress.Loopback.Equals(brain.IPAddress))
+        if (!brain.IPAddress.Equals(IPAddress.Loopback))
         {
-            // If Brain address is loopback, use that.
-            return IPAddress.Loopback;
+            // Get IPv4 addresses for the current device.
+            IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
+            // If the Brain IP is not contained, the Brain is a separate device. Return the first non-loopback IP address on this host.
+            if (Array.IndexOf(addresses, brain.IPAddress) == -1 && Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) is { } ipAddress)
+            {
+                return ipAddress;
+            }
         }
-        IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-        if (Array.IndexOf(addresses, brain.IPAddress) != -1)
-        {
-            // If Brain is running on this device, use loopback.
-            return IPAddress.Loopback;
-        }
-        // Use the first IPv4 address found, or loopback.
-        return Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) is { } address
-            ? address
-            : IPAddress.Loopback;
+        return IPAddress.Loopback;
     }
 }
