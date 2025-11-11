@@ -16,7 +16,8 @@ namespace Neeo.Sdk.Notifications;
 public interface INotificationMapping
 {
     /// <summary>
-    /// Given an adapter, device identifier and component name, get the associated notification keys from the NEEO Brain.
+    /// Given an adapter, device identifier and component name, get the associated notification keys
+    /// from the NEEO Brain.
     /// </summary>
     /// <param name="adapter">The device adapter.</param>
     /// <param name="deviceId">The device identifier.</param>
@@ -26,18 +27,28 @@ public interface INotificationMapping
     ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken = default);
 }
 
-internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment environment, ILogger<NotificationMapping> logger) : INotificationMapping
+internal sealed class NotificationMapping(
+    IApiClient client,
+    ISdkEnvironment environment,
+    ILogger<NotificationMapping> logger
+) : INotificationMapping
 {
-    private readonly ConcurrentDictionary<string, EntryCache> _cache = new();
+    private static readonly Func<Entry[], Dictionary<string, string[]>> _groupEntriesByName = entries => new(
+        from entry in entries
+        group entry by entry.Name into grouping
+        select KeyValuePair.Create(grouping.Key, grouping.Select(static item => item.EventKey).ToArray())
+    );
+
+    private readonly ConcurrentDictionary<string, Dictionary<string, string[]>> _cache = new();
 
     public async ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken)
     {
         string cacheKey = string.Concat(adapter.AdapterName, "|", deviceId);
-        if (!this._cache.TryGetValue(cacheKey, out EntryCache? entries))
+        if (this._cache.GetValueOrDefault(cacheKey) is not { } keysByName)
         {
-            this._cache[cacheKey] = entries = await this.FetchEntriesAsync(adapter.AdapterName, deviceId, cancellationToken).ConfigureAwait(false);
+            keysByName = this._cache[cacheKey] = await this.FetchNotificationKeysAsync(adapter.AdapterName, deviceId, cancellationToken).ConfigureAwait(false);
         }
-        if (entries.GetNotificationKeys(componentName) is { Length: not 0 } keys)
+        if (keysByName.TryGetValue(componentName, out string[]? keys))
         {
             return keys;
         }
@@ -46,33 +57,11 @@ internal sealed class NotificationMapping(IApiClient client, ISdkEnvironment env
         return [];
     }
 
-    private Task<EntryCache> FetchEntriesAsync(string adapterName, string deviceId, CancellationToken cancellationToken) => client.GetAsync(
-        string.Format(UrlPaths.NotificationKeyFormat, environment.SdkAdapterName, adapterName, deviceId),
-        static (Entry[] entries) => new EntryCache(entries),
-        cancellationToken
-    );
-
-    public readonly record struct Entry(string EventKey, string Name, string? Label);
-
-    private sealed class EntryCache(Entry[] entries)
+    private Task<Dictionary<string, string[]>> FetchNotificationKeysAsync(string adapterName, string deviceId, CancellationToken cancellationToken)
     {
-        private readonly Dictionary<string, string[]> _keyCache = [];
-
-        public string[] GetNotificationKeys(string componentName)
-        {
-            if (!this._keyCache.TryGetValue(componentName, out string[]? keys))
-            {
-                this._keyCache.Add(
-                    componentName,
-                    keys = Find(static entry => entry.Name) is { Length: not 0 } matches ? matches : Find(static entry => entry.Label)
-                );
-            }
-            return keys;
-
-            string[] Find(Func<Entry, string?> projection)
-            {
-                return [.. entries.Where(entry => componentName == projection(entry)).Select(static entry => entry.EventKey).Distinct()];
-            }
-        }
+        string url = string.Format(BrainUrlPaths.NotificationKeyFormat, environment.SdkAdapterName, adapterName, deviceId);
+        return client.GetAsync(url, NotificationMapping._groupEntriesByName, cancellationToken);
     }
+
+    public readonly record struct Entry(string EventKey, string Name);
 }

@@ -22,16 +22,19 @@ public interface IDeviceDatabase
     IEnumerable<IDeviceAdapter> Adapters { get; }
 
     /// <summary>
-    /// Get the adapter with the specified <paramref name="adapterName"/>. If the adapter
-    /// has a registered initializer, ensures the adapter is initialized.
+    /// Get the adapter with the specified <paramref name="adapterName"/>. If the adapter has a
+    /// registered initializer, ensures the adapter is initialized.
     /// </summary>
     /// <param name="adapterName">The name of the adapter.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests (defaults to <see cref="CancellationToken.None"/>).</param>
+    /// <param name="cancellationToken">
+    /// A token to monitor for cancellation requests (defaults to <see cref="CancellationToken.None"/>).
+    /// </param>
     /// <returns><see cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets the associated model for an adapter with the specified <paramref name="adapterName"/>, or <see langword="null"/> if not found.
+    /// Gets the associated model for an adapter with the specified <paramref name="adapterName"/>,
+    /// or <see langword="null"/> if not found.
     /// </summary>
     /// <param name="adapterName">The name of the device adapter.</param>
     /// <returns>The device model if it exists, <see langword="null"/> otherwise.</returns>
@@ -48,7 +51,7 @@ public interface IDeviceDatabase
     /// Searches for a device with a token matching the search <paramref name="query"/>.
     /// </summary>
     /// <param name="query">The search query.</param>
-    /// <returns>An array of sort entries ranked as per a similar algorithm to &quot;tokenseach.js&quot;.</returns>
+    /// <returns>An array of sort entries ranked as per a similar algorithm to "tokenseach.js".</returns>
     SearchEntry<DeviceModel>[] Search(string? query);
 }
 
@@ -87,15 +90,19 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         );
     }
 
-    public IEnumerable<IDeviceAdapter> Adapters => this._containers.Values.Select(static container => container.Adapter);
+    public IEnumerable<IDeviceAdapter> Adapters => from container in this._containers.Values select container.Adapter;
 
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken = default)
     {
-        if (this._containers.TryGetValue(adapterName ?? throw new ArgumentNullException(nameof(adapterName)), out DeviceAdapterContainer? container))
+        if (this._containers.GetValueOrDefault(adapterName ?? throw new ArgumentNullException(nameof(adapterName))) is not { } container)
+        {
+            return null;
+        }
+        if (container.IsUnitialized)
         {
             await container.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
-        return container?.Adapter;
+        return container.Adapter;
     }
 
     public DeviceModel? GetDeviceByAdapterName(string name)
@@ -124,13 +131,15 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
         public IDeviceAdapter Adapter => adapter;
 
+        public bool IsUnitialized => adapter.Initializer is { } && this._initializationTask is not { IsCompletedSuccessfully: true };
+
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
             if (adapter.Initializer is not { } initializer)
             {
                 return Task.CompletedTask;
             }
-            if (this._initializationTask != null)
+            if (this._initializationTask is not null)
             {
                 return this._initializationTask;
             }

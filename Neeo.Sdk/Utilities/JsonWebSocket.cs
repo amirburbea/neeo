@@ -15,19 +15,19 @@ public static class JsonWebSocket
     /// <summary>
     /// Listens to messages received from the <paramref name="webSocket"/>,
     /// deserializing them as JSON to <typeparamref name="TMessage"/>,
-    /// and processes them via <paramref name="processMessageAsync"/>.
+    /// and processes them via <paramref name="processMessage"/>.
     /// 
     /// In the event of an unexpected disconnection, invokes <paramref name="onDisconnected"/>.
     /// </summary>
     /// <typeparam name="TMessage">Type of the JSON messages received.</typeparam>
     /// <param name="webSocket">The websocket on which to listen for messages.</param>
-    /// <param name="processMessageAsync">Callback to asynchronously process received messages.</param>
+    /// <param name="processMessage">Callback to asynchronously process received messages.</param>
     /// <param name="onDisconnected">Optional callback invoked upon disconnection.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     public static async Task MessageLoop<TMessage>(
         WebSocket webSocket,
-        Func<TMessage, CancellationToken, ValueTask> processMessageAsync,
+        Func<TMessage, CancellationToken, Task> processMessage,
         Action? onDisconnected = null,
         CancellationToken cancellationToken = default
     ) where TMessage : notnull
@@ -91,8 +91,8 @@ public static class JsonWebSocket
             }
         }
 
-        ValueTask ProcessAsync(ReadOnlySpan<byte> span) => JsonSerializer.Deserialize<TMessage>(span, JsonSerializerOptions.Web) is { } message
-            ? processMessageAsync(message, cancellationToken)
-            : ValueTask.CompletedTask;
+        Task ProcessAsync(ReadOnlySpan<byte> span) => JsonSerializer.Deserialize<TMessage>(span, JsonSerializerOptions.Web) is { } message
+            ? processMessage(message, cancellationToken)
+            : Task.CompletedTask;
     }
 }

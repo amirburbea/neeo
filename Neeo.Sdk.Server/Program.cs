@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Threading.Tasks;
@@ -8,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Server.Drivers;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Server;
@@ -36,7 +36,8 @@ public static class Program
     {
         builder
             .ClearProviders()
-            .AddSimpleConsole(options => options.SingleLine = true);
+            .AddSimpleConsole(options => options.SingleLine = true)
+            .AddFilter((_, name, level) => level >= LogLevel.Information && (name is null || !name.StartsWith(typeof(HttpClient).FullName!)));
         if (!environment.IsProduction())
         {
             builder.AddDebug();
@@ -71,10 +72,12 @@ public static class Program
                     ((IServiceConfiguration)constructor.Invoke(null)).ConfigureServices(services);
                 }
             }
-            services
-                .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
-                .AddHostedService<SdkService>();
         }
+        services
+            .AddSingleton<TaskCompletionSource<ISdkEnvironment>>()
+            .AddSingleton(provider => provider.GetRequiredService<TaskCompletionSource<ISdkEnvironment>>().Task)
+            .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
+            .AddHostedService<SdkService>();
     }
 
     private static Assembly LoadAssembly(string assemblyPath)

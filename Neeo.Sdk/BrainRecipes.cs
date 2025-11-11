@@ -34,13 +34,13 @@ internal sealed class BrainRecipes(
 {
     public Task<string[]> GetActiveRecipeKeysAsync(CancellationToken cancellationToken)
     {
-        return client.GetAsync<string[]>(UrlPaths.ActiveRecipes, cancellationToken);
+        return client.GetAsync<string[]>(BrainUrlPaths.ActiveRecipes, cancellationToken);
     }
 
     public async Task<IRecipe[]> GetAllRecipesAsync(CancellationToken cancellationToken)
     {
         return await client.GetAsync(
-            UrlPaths.RecipeDefinitions,
+            BrainUrlPaths.RecipeDefinitions,
             (RecipeDefinition[] definitions) => Array.ConvertAll(
                 definitions,
                 definition => new Recipe(definition, client)

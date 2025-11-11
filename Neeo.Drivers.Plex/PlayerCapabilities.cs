@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Drivers.PlexApi;
+namespace Neeo.Drivers.Plex;
 
 [Flags, JsonConverter(typeof(TextJsonConverter<PlayerCapabilities>))]
 public enum PlayerCapabilities

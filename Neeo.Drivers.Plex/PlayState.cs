@@ -1,23 +1,23 @@
 ﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Drivers.PlexApi;
+namespace Neeo.Drivers.Plex;
 
 [JsonConverter(typeof(TextJsonConverter<PlayState>))]
 public enum PlayState
 {
+    [Text("stopped")]
+    Stopped = 0,
+
     [Text("playing")]
-    Playing,
+    Playing = 1,
 
     [Text("paused")]
-    Paused,
-
-    [Text("stopped")]
-    Stopped,
+    Paused = 2,
 
     [Text("buffering")]
-    Buffering,
+    Buffering = 3,
 
     [Text("error")]
-    Error
+    Error = 4,
 }

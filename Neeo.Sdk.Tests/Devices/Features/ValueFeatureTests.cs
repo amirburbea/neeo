@@ -16,12 +16,11 @@ public sealed class ValueFeatureTests
     [InlineData(false)]
     public async Task GetValueAsync_should_use_BooleanBoxes_for_boolean_values(bool value)
     {
-        Mock<DeviceValueGetter<bool>> mockGetter = new(MockBehavior.Strict);
+        Mock<AsyncDeviceValueGetter<bool>> mockGetter = new(MockBehavior.Strict);
         mockGetter.Setup(getter => getter(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(value);
 
-        var feature = ValueFeature.Create(mockGetter.Object);
-        var cancellationToken = new CancellationToken();
-        var response = await feature.GetValueAsync(string.Empty, cancellationToken);
+        ValueFeature feature = ValueFeature.Create(mockGetter.Object);
+        ValueResponse response = await feature.GetValueAsync(string.Empty, default);
 
         Assert.Same(BooleanBoxes.GetBox(value), response.Value);
     }
@@ -31,15 +30,14 @@ public sealed class ValueFeatureTests
     [InlineData(false, "false")]
     public async Task SetValueAsync_should_parse_boolean_values(bool value, string text)
     {
-        Mock<DeviceValueSetter<bool>> mockSetter = new(MockBehavior.Strict);
+        Mock<AsyncDeviceValueSetter<bool>> mockSetter = new(MockBehavior.Strict);
         mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict), mockSetter.Object);
-        string deviceId = Guid.NewGuid().ToString();
-        var cancellationToken = new CancellationToken();
-        await feature.SetValueAsync(deviceId, text, cancellationToken);
+        ValueFeature feature = ValueFeature.Create(Mock.Of<AsyncDeviceValueGetter<bool>>(MockBehavior.Strict), mockSetter.Object);
+        string deviceId = Guid.NewGuid().ToString("N");
+        await feature.SetValueAsync(deviceId, text, default);
 
-        mockSetter.Verify(setter => setter(deviceId, value, cancellationToken), Times.Once());
+        mockSetter.Verify(setter => setter(deviceId, value, default), Times.Once());
     }
 
     [Theory]
@@ -48,21 +46,20 @@ public sealed class ValueFeatureTests
     [InlineData(12345.0001, "00012345.00010000")]
     public async Task SetValueAsync_should_parse_double_values(double value, string text)
     {
-        Mock<DeviceValueSetter<double>> mockSetter = new(MockBehavior.Strict);
+        Mock<AsyncDeviceValueSetter<double>> mockSetter = new(MockBehavior.Strict);
         mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<double>>(MockBehavior.Strict), mockSetter.Object);
-        string deviceId = Guid.NewGuid().ToString();
-        var cancellationToken = new CancellationToken();
-        await feature.SetValueAsync(deviceId, text, cancellationToken);
+        ValueFeature feature = ValueFeature.Create(Mock.Of<AsyncDeviceValueGetter<double>>(MockBehavior.Strict), mockSetter.Object);
+        string deviceId = Guid.NewGuid().ToString("N");
+        await feature.SetValueAsync(deviceId, text, default);
 
-        mockSetter.Verify(setter => setter(deviceId, value, cancellationToken), Times.Once());
+        mockSetter.Verify(setter => setter(deviceId, value, default), Times.Once());
     }
 
     [Fact]
     public Task SetValueAsync_should_throw_when_created_without_setter()
     {
-        var feature = ValueFeature.Create(Mock.Of<DeviceValueGetter<bool>>(MockBehavior.Strict));
+        ValueFeature feature = ValueFeature.Create(Mock.Of<AsyncDeviceValueGetter<bool>>(MockBehavior.Strict));
 
         return Assert.ThrowsAsync<NotSupportedException>(() => feature.SetValueAsync(string.Empty, string.Empty, default));
     }

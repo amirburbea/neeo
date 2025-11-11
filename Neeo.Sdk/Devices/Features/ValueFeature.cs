@@ -35,20 +35,20 @@ internal sealed class ValueFeature(
     Func<string, string, CancellationToken, Task>? setter = default
 ) : IValueFeature
 {
-    public static ValueFeature Create<TValue>(DeviceValueGetter<TValue> getter) where TValue : notnull => new(
+    public static ValueFeature Create<TValue>(AsyncDeviceValueGetter<TValue> getter) where TValue : notnull => new(
         ValueFeature.WrapGetter(getter, ObjectConverter<TValue>.Default)
     );
 
-    public static ValueFeature Create(DeviceValueGetter<bool> getter) => new(
+    public static ValueFeature Create(AsyncDeviceValueGetter<bool> getter) => new(
         ValueFeature.WrapGetter(getter, BooleanBoxes.GetBox)
     );
 
-    public static ValueFeature Create(DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter) => new(
+    public static ValueFeature Create(AsyncDeviceValueGetter<bool> getter, AsyncDeviceValueSetter<bool> setter) => new(
         ValueFeature.WrapGetter(getter, BooleanBoxes.GetBox),
         ValueFeature.WrapSetter(setter, bool.Parse)
     );
 
-    public static ValueFeature Create(DeviceValueGetter<double> getter, DeviceValueSetter<double> setter) => new(
+    public static ValueFeature Create(AsyncDeviceValueGetter<double> getter, AsyncDeviceValueSetter<double> setter) => new(
         ValueFeature.WrapGetter(getter, ObjectConverter<double>.Default),
         ValueFeature.WrapSetter(setter, double.Parse)
     );
@@ -61,12 +61,12 @@ internal sealed class ValueFeature(
         return true;
     }
 
-    private static Func<string, CancellationToken, Task<object>> WrapGetter<TValue>(DeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
+    private static Func<string, CancellationToken, Task<object>> WrapGetter<TValue>(AsyncDeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
         where TValue : notnull => getter == null
         ? throw new ArgumentNullException(nameof(getter))
         : async (deviceId, cancellationToken) => converter(await getter(deviceId, cancellationToken).ConfigureAwait(false));
 
-    private static Func<string, string, CancellationToken, Task> WrapSetter<TValue>(DeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
+    private static Func<string, string, CancellationToken, Task> WrapSetter<TValue>(AsyncDeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
         where TValue : notnull => setter == null
         ? throw new ArgumentNullException(nameof(setter))
         : async (deviceId, value, cancellationToken) => await setter(deviceId, converter(value), cancellationToken).ConfigureAwait(false);

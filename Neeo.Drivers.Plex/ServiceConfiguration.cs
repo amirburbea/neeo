@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Neeo.Sdk.Server.Drivers;
+using Neeo.Sdk.Utilities;
 
-namespace Neeo.Drivers.PlexApi;
+namespace Neeo.Drivers.Plex;
 
 public sealed class ServiceConfiguration : IServiceConfiguration
 {

@@ -16,12 +16,11 @@ using Entry = NotificationMapping.Entry;
 
 public sealed class NotificationMappingTests
 {
-    private static readonly Entry[] _entries =
-    [
-        new("key0", Name: "name0", Label: "name1"),
-        new("key1", Name: "name1", Label: "name1"),
-        new("key2", Name: "name2", Label: "label2"),
-        new("key3", Name: "name3", Label: "label2"),
+    private static readonly Entry[] _entries = [
+        new("key0", Name: "name0"),
+        new("key1", Name: "name1"),
+        new("key2", Name: "name2"),
+        new("key3", Name: "name3"),
     ];
 
     private readonly NotificationMapping _notificationMapping;
@@ -49,14 +48,6 @@ public sealed class NotificationMappingTests
     }
 
     [Fact]
-    public async Task Should_get_keys_via_fallback_to_label_when_not_matching_by_name()
-    {
-        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
-
-        Assert.Equal<string>(["key2", "key3"], keys);
-    }
-
-    [Fact]
     public async Task Should_make_API_request_to_correct_path()
     {
         await this.GetNotificationKeysAsync("myAdapter", "myDevice", "myComponent");
@@ -69,7 +60,7 @@ public sealed class NotificationMappingTests
         Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
-        return this._notificationMapping.GetNotificationKeysAsync(mockAdapter.Object, deviceId, componentName, default);
+        return this._notificationMapping.GetNotificationKeysAsync(mockAdapter.Object, deviceId, componentName, CancellationToken.None);
     }
 
     private static class Constants

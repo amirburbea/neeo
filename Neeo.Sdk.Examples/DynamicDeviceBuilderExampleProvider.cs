@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Setup;
-using Neeo.Sdk.Server.Drivers;
 
 namespace Neeo.Sdk.Examples;
 
@@ -18,23 +17,21 @@ public sealed class DynamicDeviceBuilderExampleProvider(
         new("unique-device-id-003", "STANDARD: 3rd device, unreachable", "I live in ROOM B", IsPro: false, IsReachable: false),
         new("unique-device-id-004", "STANDARD: 4th device", "I live in ROOM B", IsPro: false),
     ];
-
-    private IDeviceBuilder? _deviceBuilder;
     private double _sliderValue = 0d;
     private bool _switchValue = true;
 
-    public IDeviceBuilder DeviceBuilder => _deviceBuilder ??= this.CreateDevice();
+    public IDeviceBuilder DeviceBuilder => field ??= this.CreateDevice();
 
     private IDeviceBuilder BuildProDevice() => Device.Create(Constants.DeviceName, DeviceType.Light)
         .SetSpecificName("PRO Light")
         .AddCharacteristic(DeviceCharacteristic.DynamicDevice)
-        .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValueAsync, this.SetSwitchValueAsync)
-        .AddSlider(Constants.DimmerName, null, this.GetSliderValueAsync, this.SetSliderValueAsync);
+        .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValue, this.SetSwitchValue)
+        .AddSlider(Constants.DimmerName, null, this.GetSliderValue, this.SetSliderValue);
 
     private IDeviceBuilder BuildStandardDevice() => Device.Create(Constants.DeviceName, DeviceType.Light)
         .SetSpecificName("STANDARD Light")
         .AddCharacteristic(DeviceCharacteristic.DynamicDevice)
-        .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValueAsync, this.SetSwitchValueAsync);
+        .AddSwitch(Constants.PowerSwitch, null, this.GetSwitchValue, this.SetSwitchValue);
 
     private IDeviceBuilder CreateDevice() => Device.Create(Constants.DeviceName, DeviceType.Accessory)
         .SetSpecificName(Constants.DeviceName)
@@ -46,6 +43,7 @@ public sealed class DynamicDeviceBuilderExampleProvider(
             this.DiscoverAsync,
             enableDynamicDeviceBuilder: true
         )
+        .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.NotifyDeviceList)
         .EnableRegistration("SDK Example", "SDK Dynamic Device Builder Example", (_) => Task.FromResult(true), (_, _) => Task.FromResult(RegistrationResult.Success));
 
     private DiscoveredDevice CreateDiscoveredDevice(DeviceInfo info)
@@ -67,30 +65,42 @@ public sealed class DynamicDeviceBuilderExampleProvider(
             : Array.FindAll(this._dummyDevices, device => device.Id == optionalDeviceId);
     }
 
-    private Task<double> GetSliderValueAsync(string deviceId, CancellationToken cancellationToken)
+    private double GetSliderValue(string deviceId)
     {
         logger.LogInformation("GET SLIDER VALUE: {deviceId}", deviceId);
-        return Task.FromResult(this._sliderValue);
+        return this._sliderValue;
     }
 
-    private Task<bool> GetSwitchValueAsync(string deviceId, CancellationToken cancellationToken)
+    private bool GetSwitchValue(string deviceId)
     {
         logger.LogInformation("GET SWITCH VALUE: {deviceId}", deviceId);
-        return Task.FromResult(this._switchValue);
+        return this._switchValue;
     }
 
-    private Task SetSliderValueAsync(string deviceId, double value, CancellationToken cancellationToken)
+    private Task NotifyDeviceList(string[] deviceIds, CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    private Task OnDeviceAdded(string deviceId, CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    private Task OnDeviceRemoved(string deviceId, CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+    private void SetSliderValue(string deviceId, double value)
     {
         logger.LogInformation("SET SLIDER VALUE: {deviceId}", deviceId);
         this._sliderValue = value;
-        return Task.CompletedTask;
     }
 
-    private Task SetSwitchValueAsync(string deviceId, bool value, CancellationToken cancellationToken)
+    private void SetSwitchValue(string deviceId, bool value)
     {
         logger.LogInformation("SET SWITCH VALUE: {deviceId}", deviceId);
         this._switchValue = value;
-        return Task.CompletedTask;
     }
 
     private readonly record struct DeviceInfo(

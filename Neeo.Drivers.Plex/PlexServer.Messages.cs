@@ -1,7 +1,10 @@
-﻿using System.Text.Json.Serialization;
+﻿using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using System.Xml;
 using Neeo.Sdk.Utilities;
 
-namespace Neeo.Drivers.PlexApi;
+namespace Neeo.Drivers.Plex;
 
 partial class PlexServer
 {
@@ -59,13 +62,17 @@ partial class PlexServer
         PlayerCapabilities ProtocolCapabilities
     );
 
-    private record struct PlaySessionStateNotification(
+    private readonly record struct LibrarySectionsMediaContainer(
+        [property: JsonPropertyName("Directory")] LibrarySection[] Sections
+    );
+
+    private record struct PlayStateNotification(
         string ClientIdentifier,
         string Guid,
         string Key,
         [property: JsonPropertyName("playQueueID")] int PlayQueueId,
         [property: JsonPropertyName("playQueueItemID")] int PlayQueueItemId,
-        string RatingKey,
+        int RatingKey,
         string SessionKey,
         PlayState State,
         string Url,
@@ -73,17 +80,39 @@ partial class PlexServer
     );
 
     private record struct Response<TContainer>(
-        [property: JsonPropertyName("MediaContainer")]
-        TContainer MediaContainer
+        [property: JsonPropertyName("MediaContainer")] TContainer MediaContainer
     ) where TContainer : struct;
 
     private record struct ServerMessage(
-        [property: JsonPropertyName("NotificationContainer")] ServerNotificationContainer? Notifications
+        [property: JsonPropertyName("NotificationContainer")] ServerNotificationContainer? Container
     );
 
     private record struct ServerNotificationContainer(
         int Size,
         [property: JsonPropertyName("Type")] ServerNotificationType Type,
-        [property: JsonPropertyName("PlaySessionStateNotification")] PlaySessionStateNotification[]? PlaySessionStateNotifications
+        [property: JsonPropertyName("PlaySessionStateNotification")] PlayStateNotification[]? Notifications
     );
+
+    private record struct MediaItemDetailContainer(
+        [property: JsonPropertyName("Metadata")] MediaItemMetadata[]? Metadata
+    );
+
+    private record struct MediaItemMetadata
+    (
+        int RatingKey,
+        MediaType Type,
+        string Title,
+        string? Summary = null,
+        [property: JsonPropertyName("thumb")] string? Thumbnail = null
+    );
+
+    [JsonConverter(typeof(TextJsonConverter<VideoType>))]
+    private enum VideoType
+    {
+        [Text("episode")]
+        Episode = 0,
+
+        [Text("movie")]
+        Movie = 1,
+    }
 }

@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
-using Neeo.Sdk.Server.Drivers;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Examples;

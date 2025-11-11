@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 
-namespace Neeo.Drivers.PlexApi;
+namespace Neeo.Drivers.Plex;
 
 public interface IPlexSettingsManager
 {
@@ -23,20 +23,11 @@ internal sealed class PlexSettingsManager : IPlexSettingsManager
 {
     private readonly string _settingsPath = PlexSettingsManager.DetermineSettingsPath();
 
-    public bool HasFile(string settingsFile)
-    {
-        return File.Exists(Path.Combine(this._settingsPath, settingsFile));
-    }
+    public bool HasFile(string settingsFile) => File.Exists(Path.Combine(this._settingsPath, settingsFile));
 
-    public byte[] ReadAllBytes(string settingsFile)
-    {
-        return File.ReadAllBytes(Path.Combine(this._settingsPath, settingsFile));
-    }
+    public byte[] ReadAllBytes(string settingsFile) => File.ReadAllBytes(Path.Combine(this._settingsPath, settingsFile));
 
-    public void WriteAllBytes(string settingsFile, ReadOnlySpan<byte> bytes)
-    {
-        File.WriteAllBytes(Path.Combine(this._settingsPath, settingsFile), bytes);
-    }
+    public void WriteAllBytes(string settingsFile, ReadOnlySpan<byte> bytes) => File.WriteAllBytes(Path.Combine(this._settingsPath, settingsFile), bytes);
 
     private static string DetermineSettingsPath()
     {
@@ -46,13 +37,14 @@ internal sealed class PlexSettingsManager : IPlexSettingsManager
             "Production";
         IConfigurationRoot config = new ConfigurationBuilder()
             .SetBasePath(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile($"appsettings.{environment}.json", optional: true)
             .Build();
         string directory = config["settingsPath"] ?? fallbackDirectory;
         if (!IsWritable(directory))
         {
-            // If we received a non-default path that is not writable, fall back to the default path if it is writable.
+            // If we received a non-default path that is not writable, fall back to the default path
+            // if it is writable.
             if (directory == fallbackDirectory || !IsWritable(fallbackDirectory))
             {
                 throw new UnauthorizedAccessException($"The configured settings path '{directory}' is not writable.");
@@ -69,8 +61,10 @@ internal sealed class PlexSettingsManager : IPlexSettingsManager
                 {
                     Directory.CreateDirectory(directoryPath);
                 }
-                using FileStream _ = File.Create(Path.Combine(directoryPath, Path.GetRandomFileName()), 1, FileOptions.DeleteOnClose);
-                return true;
+                using (File.Create(Path.Combine(directoryPath, Path.GetRandomFileName()), bufferSize: 1, FileOptions.DeleteOnClose))
+                {
+                    return true;
+                }
             }
             catch
             {

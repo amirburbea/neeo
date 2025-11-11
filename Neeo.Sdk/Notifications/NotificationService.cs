@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -22,13 +22,12 @@ public interface INotificationService
     /// <param name="notification">The notification to send to the Brain.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to represent the asynchronous operation.</returns>
-    /// <remarks>
-    /// This method is only used to send power notifications.
-    /// </remarks>
+    /// <remarks>This method is only used to send power notifications.</remarks>
     Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Send a notification to the NEEO Brain that a change in a component's associated sensor value has occurred.
+    /// Send a notification to the NEEO Brain that a change in a component's associated sensor value
+    /// has occurred.
     /// </summary>
     /// <param name="adapter">The adapter for the device with an updated power state.</param>
     /// <param name="notification">The notification to send to the Brain.</param>
@@ -63,40 +62,62 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._actionBlock.Complete();
     }
 
-    public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.SendNotificationAsync(
+    public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.QueueNotificationAsync(
         adapter,
         notification,
         false,
         cancellationToken
     );
 
-    public Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.SendNotificationAsync(
+    public Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.QueueNotificationAsync(
         adapter,
         notification,
         true,
         cancellationToken
     );
 
-    private bool IsDuplicate(Message message)
+    private async Task QueueNotificationAsync(IDeviceAdapter adapter, Notification notification, bool isSensorNotification, CancellationToken cancellationToken)
     {
-        (string key, object data) = message.ExtractTypeAndData();
-        return this._cache.TryGet(key, out object? value) && value.Equals(data);
+        (string deviceId, string component, object value) = notification;
+        if (deviceId == null || component == null || value == null)
+        {
+            throw new ArgumentException("Invalid notification data.", nameof(notification));
+        }
+        if (this._logger.IsEnabled(LogLevel.Information))
+        {
+            this._logger.LogInformation("Send notification: {Notification}", notification);
+        }
+        if (await this._notificationMapping.GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken).ConfigureAwait(false) is { Length: > 0 } keys)
+        {
+            await Parallel.ForEachAsync(
+                keys,
+                cancellationToken,
+                async (notificationKey, cancellationToken) =>
+                {
+                    Message message = Message.Create(notificationKey, value, isSensorNotification);
+                    // We try to post synchronously, but if not we wait to send asynchronously.
+                    if (!this._actionBlock.Post(message) && !await this._actionBlock.SendAsync(message, cancellationToken).ConfigureAwait(false))
+                    {
+                        this._logger.LogWarning("Postpone failed {Message}", message);
+                    }
+                }
+            ).ConfigureAwait(false);
+        }
     }
 
     private async Task SendAsync(Message message)
     {
-        if (this.IsDuplicate(message))
+        (string key, object data) = message.CacheData;
+        if (this._cache.TryGet(key, out object? value) && value.Equals(data))
         {
-            (string key, object value) = message.ExtractTypeAndData();
-            this._logger.LogWarning("Ignored duplicate message: {key}={value}", key, JsonSerializer.Serialize(value, JsonSerializerOptions.Web));
+            // This message is a duplicate of a notification message recently sent.
             return;
         }
-        this._logger.LogDebug("Sending {message}", message);
         try
         {
-            if (await this._client.PostAsync(UrlPaths.Notifications, message, this._cancellationSource.Token).ConfigureAwait(false))
+            if (await this._client.PostAsync(BrainUrlPaths.Notifications, message, this._cancellationSource.Token).ConfigureAwait(false))
             {
-                this.UpdateCache(message);
+                this._cache.AddOrUpdate(key, data);
             }
         }
         catch (Exception e)
@@ -105,54 +126,26 @@ internal sealed class NotificationService : INotificationService, IDisposable
         }
     }
 
-    private async Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, bool isSensorNotification, CancellationToken cancellationToken)
-    {
-        (string deviceId, string component, object value) = notification;
-        if (deviceId == null || component == null || value == null)
-        {
-            throw new ArgumentException("Invalid notification data.", nameof(notification));
-        }
-        this._logger.LogInformation("Send notification:{notification}", notification);
-        if (await this._notificationMapping.GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken).ConfigureAwait(false) is not { Length: > 0 } keys)
-        {
-            return;
-        }
-        Parallel.ForEach(keys, new() { CancellationToken = cancellationToken }, notificationKey =>
-        {
-            Message message = isSensorNotification
-                ? Message.SensorUpdate(notificationKey, value)
-                : new(notificationKey, value);
-            if (!this._actionBlock.Post(message))
-            {
-                this._logger.LogWarning("Failed to send notification:{message}", message);
-            }
-        });
-    }
-
-    private void UpdateCache(Message message)
-    {
-        (string key, object data) = message.ExtractTypeAndData();
-        this._cache.AddOrUpdate(key, data);
-    }
-
     private static class Constants
     {
         public const string DeviceSensorUpdateKey = "DEVICE_SENSOR_UPDATE";
         public const int MaxCachedEntries = 50;
-        public const int MaxConcurrency = 20;
+        public const int MaxConcurrency = 25;
     }
 
     public readonly record struct Message(string Type, object Data)
     {
-        public static Message SensorUpdate(string notificationKey, object value) => new(Constants.DeviceSensorUpdateKey, new SensorData(notificationKey, value));
+        public static Message Create(string type, object data, bool isSensorNotification) => isSensorNotification
+            ? new(Constants.DeviceSensorUpdateKey, new SensorData(type, data))
+            : new(type, data);
 
-        public (string, object) ExtractTypeAndData()
+        [JsonIgnore]
+        public (string, object) CacheData => this.Data switch
         {
-            return this.Data is SensorData { SensorEventKey: { } key, SensorValue: { } value }
-                ? (key, value)
-                : (this.Type, this.Data);
-        }
+            SensorData({ } key, { } value) => (key, value),
+            _ => (this.Type, this.Data)
+        };
 
-        private sealed record class SensorData(string SensorEventKey, object SensorValue);
+        private record struct SensorData(string SensorEventKey, object SensorValue);
     }
 }

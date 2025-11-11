@@ -20,7 +20,7 @@ namespace Neeo.Sdk;
 /// <summary>
 /// Minimal information about a NEEO Brain.
 /// </summary>
-internal interface IBrain
+public interface IBrain
 {
     /// <summary>
     /// The host name of the NEEO Brain.
@@ -236,6 +236,41 @@ public static class BrainMethods
             cancellationToken
         ).ConfigureAwait(false);
         return host.Services.GetRequiredService<ISdkEnvironment>();
+    }
+
+    /// <summary>
+    /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
+    /// </summary>
+    /// <param name="brain">The NEEO Brain.</param>
+    /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
+    /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
+    /// <param name="hostIPAddress">
+    /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
+    /// </param>
+    /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
+    /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see cref="Task"/> to indicate completion.</returns>
+    public static Task<ISdkEnvironment> StartServerAsync(
+        this Brain brain,
+        IDeviceProvider[] devices,
+        string? name = default,
+        IPAddress? hostIPAddress = null,
+        ushort port = 0,
+        Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return brain.StartServerAsync(
+            devices is not { Length: > 0 } providers 
+                ? throw new ArgumentException("At least one device is required.", nameof(devices))
+                : [.. providers.Select(provider => provider.DeviceBuilder)],
+            name,
+            hostIPAddress,
+            port,
+            configureLogging,
+            cancellationToken
+        );
     }
 
     internal static async ValueTask<IPAddress> GetFallbackHostIPAddressAsync(this Brain brain, CancellationToken cancellationToken)

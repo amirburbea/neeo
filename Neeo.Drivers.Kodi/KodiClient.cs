@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -21,9 +20,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
-    private bool _isMuted;
-    private PlayerState _playerState = PlayerState.Defaults;
-    private int _volume;
     private ClientWebSocket? _webSocket;
 
     public event EventHandler? Connected;
@@ -42,9 +38,9 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     public string DeviceId => this.MacAddress.ToString();
 
-    public string DisplayName { get; } = displayName;
+    public string DisplayName => displayName;
 
-    public IPAddress IPAddress { get; } = ipAddress;
+    public IPAddress IPAddress => ipAddress;
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open };
 
@@ -52,22 +48,22 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     public bool IsMuted
     {
-        get => this._isMuted;
-        private set => this.SetValue(ref this._isMuted, value, this.IsMutedChanged);
+        get;
+        private set => this.SetValue(ref field, value, this.IsMutedChanged);
     }
 
     public PhysicalAddress MacAddress { get; private set; } = PhysicalAddress.None;
 
     public PlayerState PlayerState
     {
-        get => this._playerState;
-        private set => this.SetValue(ref this._playerState, value, this.PlayerStateChanged);
-    }
+        get;
+        private set => this.SetValue(ref field, value, this.PlayerStateChanged);
+    } = PlayerState.Defaults;
 
     public int Volume
     {
-        get => this._volume;
-        private set => this.SetValue(ref this._volume, value, this.VolumeChanged);
+        get;
+        private set => this.SetValue(ref field, value, this.VolumeChanged);
     }
 
     public Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
@@ -335,7 +331,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                         {
                             this.ProcessIncomingMessage(method, responseData);
                         }
-                        return ValueTask.CompletedTask;
+                        return Task.CompletedTask;
                     },
                     this.OnDisconnected,
                     token

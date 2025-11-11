@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Sdk;
 
-internal static class UrlPaths
+internal static class BrainUrlPaths
 {
     public const string ActiveRecipes = "/v1/api/activeRecipes";
 

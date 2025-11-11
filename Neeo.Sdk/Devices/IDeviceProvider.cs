@@ -1,9 +1,12 @@
-﻿using System;
-using System.Net;
-using System.Threading;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+﻿namespace Neeo.Sdk.Devices;
 
-namespace Neeo.Sdk.Devices;
-
-
+/// <summary>
+/// Describes a class responsible for providing an <see cref="IDeviceBuilder"/> for use in the REST server.
+/// </summary>
+public interface IDeviceProvider
+{
+    /// <summary>
+    /// Gets the device builder.
+    /// </summary>
+    IDeviceBuilder DeviceBuilder { get; }
+}

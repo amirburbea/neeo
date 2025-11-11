@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace Neeo.Drivers.PlexApi;
+namespace Neeo.Drivers.Plex;
 
 public interface IPlexTokenStore
 {
@@ -17,31 +17,20 @@ internal sealed class PlexTokenStore : IPlexTokenStore
 {
     private static readonly byte[] _key = PlexTokenStore.DeriveKey();
 
-    private string? _authToken;
     private readonly IPlexSettingsManager _settingsManager;
-
-    string? IPlexTokenStore.AuthToken
-    {
-        get => this._authToken;
-        set
-        {
-            this._authToken = value;
-            this.Serialize();
-        }
-    }
-
-    public string ClientIdentifier { get; private set; }
 
     public PlexTokenStore(IPlexSettingsManager settingsManager)
     {
         this._settingsManager = settingsManager;
-        if (!settingsManager.HasFile(Constants.FileName) || TryDeserialize(settingsManager.ReadAllBytes(Constants.FileName)) is not { } tokens)
+        if (settingsManager.HasFile(Constants.FileName) && TryDeserialize(settingsManager.ReadAllBytes(Constants.FileName)) is { } tokens)
+        {
+            (this.ClientIdentifier, this.AuthToken) = tokens;
+        }
+        else
         {
             this.ClientIdentifier = Guid.NewGuid().ToString("N");
             this.Serialize();
-            return;
         }
-        (this.ClientIdentifier, this._authToken) = tokens;
 
         static PlexTokens? TryDeserialize(byte[] encryptedData)
         {
@@ -50,12 +39,13 @@ internal sealed class PlexTokenStore : IPlexTokenStore
             try
             {
                 Span<byte> decryptedBytes = buffer.AsSpan(0, cipherText.Length);
-                using (AesGcm aes = new(PlexTokenStore._key, Constants.TagLength))
-                {
-                    ReadOnlySpan<byte> iv = encryptedData.AsSpan(0, Constants.IvLength);
-                    ReadOnlySpan<byte> tag = encryptedData.AsSpan(Constants.IvLength, Constants.TagLength);
-                    aes.Decrypt(iv, cipherText, tag, decryptedBytes);
-                }
+                using AesGcm aes = new(PlexTokenStore._key, Constants.TagLength);
+                aes.Decrypt(
+                    nonce: encryptedData.AsSpan(0, Constants.IvLength),
+                    ciphertext: cipherText,
+                    tag: encryptedData.AsSpan(Constants.IvLength, Constants.TagLength),
+                    plaintext: decryptedBytes
+                );
                 return JsonSerializer.Deserialize<PlexTokens?>(decryptedBytes, JsonSerializerOptions.Web);
             }
             catch (CryptographicException)
@@ -73,19 +63,33 @@ internal sealed class PlexTokenStore : IPlexTokenStore
         }
     }
 
+    public string? AuthToken { get; private set; }
+
+    public string ClientIdentifier { get; private set; }
+
+    string? IPlexTokenStore.AuthToken
+    {
+        get => this.AuthToken;
+        set
+        {
+            this.AuthToken = value;
+            this.Serialize();
+        }
+    }
+
     private static byte[] DeriveKey()
     {
         byte[] output = new byte[32]; // 256 bits
-        ReadOnlySpan<char> passwordChars = Environment.MachineName;
+        ReadOnlySpan<char> password = Environment.MachineName;
         ReadOnlySpan<char> saltChars = typeof(PlexTokenStore).FullName!;
         int maxSaltBytes = Encoding.UTF8.GetMaxByteCount(saltChars.Length);
         Span<byte> saltBytes = stackalloc byte[maxSaltBytes];
-        int actualSaltLength = Encoding.UTF8.GetBytes(saltChars, saltBytes);
+        int byteCount = Encoding.UTF8.GetBytes(saltChars, saltBytes);
         Rfc2898DeriveBytes.Pbkdf2(
-            password: passwordChars,
-            salt: saltBytes[..actualSaltLength],
+            password: password,
+            salt: saltBytes[..byteCount],
             destination: output,
-            iterations: 10000,
+            iterations: 50000,
             hashAlgorithm: HashAlgorithmName.SHA256
         );
         return output;
@@ -93,23 +97,22 @@ internal sealed class PlexTokenStore : IPlexTokenStore
 
     private void Serialize()
     {
-        byte[] jsonBytes = JsonSerializer.SerializeToUtf8Bytes(new PlexTokens(this.ClientIdentifier, this._authToken), JsonSerializerOptions.Web);
+        PlexTokens tokens = new(this.ClientIdentifier, this.AuthToken);
+        byte[] jsonBytes = JsonSerializer.SerializeToUtf8Bytes(tokens, JsonSerializerOptions.Web);
         int size = Constants.IvLength + Constants.TagLength + jsonBytes.Length;
         byte[] buffer = ArrayPool<byte>.Shared.Rent(size);
         try
         {
             Span<byte> result = buffer.AsSpan(0, size);
-            Span<byte> ivSpan = result[..Constants.IvLength];
-            RandomNumberGenerator.Fill(ivSpan);
-            using (AesGcm aes = new(PlexTokenStore._key, Constants.TagLength))
-            {
-                aes.Encrypt(
-                    ivSpan,
-                    jsonBytes,
-                    result[(Constants.IvLength + Constants.TagLength)..],
-                    result.Slice(Constants.IvLength, Constants.TagLength)
-                );
-            }
+            Span<byte> iv = result[..Constants.IvLength];
+            RandomNumberGenerator.Fill(iv);
+            using AesGcm aes = new(PlexTokenStore._key, Constants.TagLength);
+            aes.Encrypt(
+                nonce: iv,
+                plaintext: jsonBytes,
+                ciphertext: result[(Constants.IvLength + Constants.TagLength)..],
+                tag: result.Slice(Constants.IvLength, Constants.TagLength)
+            );
             this._settingsManager.WriteAllBytes(Constants.FileName, result);
         }
         finally
@@ -120,7 +123,7 @@ internal sealed class PlexTokenStore : IPlexTokenStore
 
     private static class Constants
     {
-        public const string FileName = "plex_auth.json";
+        public const string FileName = "plex_auth.tokens";
 
         public const int IvLength = 12;
 

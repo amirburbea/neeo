@@ -1,19 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Server.Drivers;
+using Neeo.Sdk.Devices;
 
 namespace Neeo.Sdk.Server;
 
 public sealed class SdkService(
     IEnumerable<IDeviceProvider> providers,
     IConfiguration configuration,
+    TaskCompletionSource<ISdkEnvironment> environmentSource,
     ILogger<SdkService> logger
 ) : BackgroundService
 {
@@ -30,16 +30,17 @@ public sealed class SdkService(
             return;
         }
         logger.LogInformation("Using Brain {Name} at {Endpoint}...", brain.HostName, brain.ServiceEndPoint);
-        ISdkEnvironment environment = await brain.StartServerAsync([.. providers.Select(provider => provider.DeviceBuilder)], name: configuration.GetValue<string>("ServerName"), cancellationToken: stoppingToken).ConfigureAwait(false);
+        ISdkEnvironment environment = await brain.StartServerAsync([.. providers], name: configuration.GetValue<string>("ServerName"), cancellationToken: stoppingToken).ConfigureAwait(false);
+        environmentSource.TrySetResult(environment);
         logger.LogInformation("Started server at address {Address}...", environment.HostAddress);
-        TaskCompletionSource source = new();
+        TaskCompletionSource completionSource = new();
         stoppingToken.Register(async delegate
         {
             await environment.StopAsync(default).ConfigureAwait(false);
-            source.TrySetResult();
+            completionSource.TrySetResult();
         });
         logger.LogInformation("Brain WebUI is running at http://{IPAddress}:3200/eui", brain.IPAddress);
-        await source.Task.ConfigureAwait(false);
+        await completionSource.Task.ConfigureAwait(false);
 
         async ValueTask<Brain> GetBrainAsync()
         {

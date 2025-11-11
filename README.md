@@ -1,12 +1,12 @@
 # C# NEEO SDK & Drivers
 
-This is a port of the [NEEO SDK](https://github.com/NEEOInc/neeo-sdk) from node.js to modern C# 12 and (cross-platform) .NET 8; that said, the feature set has made the transition but some of the idioms and semantics have changed.  
+This is a port of the [NEEO SDK](https://github.com/NEEOInc/neeo-sdk) from node.js to modern C# 12 and (cross-platform) .NET 10; that said, the feature set has made the transition but some of the idioms and semantics have changed.  
 
 While I realize this may cause an issue for some developers with extensive knowledge of the JS/TS NEEO SDK, considering the size of that developer base, I'm certain the tradeoffs are worth it for increased code clarity and readability.
 
 # NEEO SDK Server
 
-While the SDK provides methods for starting the integration server (see `IBrain..StartServerAsync`), an optional driver host server is provided. 
+While the SDK provides methods for starting the integration server (see `Brain.StartServerAsync`), an optional driver host server is provided. 
 
 It will automatically find the first Brain on the network, and then load the drivers listed in its `appsettings.json` file - (to ensure there are no issues loading the Neeo.Sdk.dll, specify the reference as `Private` with `CopyLocal` set to `false`).
 
@@ -22,7 +22,7 @@ Upon startup, will resolve drivers implementing `Neeo.Sdk.Devices.IDeviceProvide
 
 ### Why did you build this? What's wrong with the node.js SDK?
 
-*Technically, nothing is wrong with the node.js SDK. That said, it's not been updated in 6+ years - an eternity in the node ecosystem. It's difficult (though not impossible) to build a newer application using dependencies that don't break with the old versions required for the original SDK (several dependencies have newer non-backwards-compatible versions).*
+*Technically, nothing is wrong with the node.js SDK. That said, it's not been updated in 7+ years - an eternity in the node ecosystem. It's difficult (though not impossible) to build a newer application using dependencies that don't break with the old versions required for the original SDK (several dependencies have newer non-backwards-compatible versions).*
 
 *The other thing is that I don't get to do C# in my day job and it's my favorite programming environment.*
 

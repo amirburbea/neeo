@@ -65,7 +65,7 @@ public sealed class SubscriptionsNotifierTests
             {
                 return default;
             }
-            string path = string.Format(UrlPaths.SubscriptionsFormat, Constants.SdkAdapterName, adapterName);
+            string path = string.Format(BrainUrlPaths.SubscriptionsFormat, Constants.SdkAdapterName, adapterName);
             string[] ids = Array.ConvertAll(RandomNumberGenerator.GetBytes(5), static b => b.ToString());
             Mock<ISubscriptionFeature> mockFeature = new(MockBehavior.Strict);
             mockFeature

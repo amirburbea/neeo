@@ -46,16 +46,16 @@ public sealed class SdkRegistrationTests
     {
         await this._sdkRegistration.StartAsync(default);
 
-        Assert.Equal(UrlPaths.RegisterServer, this._path.Value);
+        Assert.Equal(BrainUrlPaths.RegisterServer, this._path.Value);
         Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\",\"baseUrl\":\"{Constants.HostAddress}\"}}", this._body.Value);
     }
 
     [Fact]
     public async Task StopAsync_should_unregister_using_correct_parameters()
     {
-        await ((Microsoft.Extensions.Hosting.IHostedService)this._sdkRegistration).StopAsync(default);
+        await this._sdkRegistration.StopAsync(default);
 
-        Assert.Equal(UrlPaths.UnregisterServer, this._path.Value);
+        Assert.Equal(BrainUrlPaths.UnregisterServer, this._path.Value);
         Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\"}}", this._body.Value);
     }
 

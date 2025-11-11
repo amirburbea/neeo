@@ -1,13 +1,8 @@
 ﻿using System;
-using System.IO;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Setup;
-using Neeo.Sdk.Utilities;
-using Org.BouncyCastle.Bcpg;
-using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Neeo.Sdk.Devices.Features;
 

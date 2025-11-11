@@ -13,12 +13,19 @@ namespace Neeo.Sdk;
 public interface ISdkEnvironment
 {
     /// <summary>
+    /// The NEEO Brain for the integration server.
+    /// </summary>
+    IBrain Brain { get; }
+
+    /// <summary>
     /// The host server address.
     /// </summary>
     string HostAddress { get; }
 
     /// <summary>
     /// The encoded SDK adapter name as registered on the NEEO Brain.
+    /// 
+    /// 
     /// </summary>
     string SdkAdapterName { get; }
 
@@ -32,11 +39,14 @@ public interface ISdkEnvironment
 
 internal sealed class SdkEnvironment(
     SdkAdapterName sdkAdapterName,
+    IBrain brain,
     IServer server,
     IHost host
 ) : ISdkEnvironment
 {
-    public string HostAddress => server.Features.Get<IServerAddressesFeature>()?.Addresses is { } addresses ? addresses.First() : string.Empty;
+    public IBrain Brain => brain;
+
+    public string HostAddress => server.Features.Get<IServerAddressesFeature>()?.Addresses is { Count: not 0 } addresses ? addresses.First() : string.Empty;
 
     public string SdkAdapterName { get; } = (string)sdkAdapterName;
 

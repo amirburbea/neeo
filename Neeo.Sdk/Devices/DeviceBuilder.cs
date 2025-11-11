@@ -168,16 +168,7 @@ public interface IDeviceBuilder
     /// </summary>
     /// <param name="tokens">The search tokens to add.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddAdditionalSearchTokens(params string[] tokens) => this.AddAdditionalSearchTokens((IEnumerable<string>)tokens);
-
-    /// <summary>
-    /// Adds one or more tokens to help find this device in search.
-    /// <para />
-    /// Note that manufacturer, type, and device name are already included by default as search tokens.
-    /// </summary>
-    /// <param name="tokens">The set of tokens to add.</param>
-    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddAdditionalSearchTokens(IEnumerable<string> tokens);
+    IDeviceBuilder AddAdditionalSearchTokens(params IEnumerable<string> tokens);
 
     /// <summary>
     /// Add a button to the device.
@@ -237,7 +228,7 @@ public interface IDeviceBuilder
         DirectoryRole? role,
         DirectoryBrowser browser,
         DirectoryActionHandler actionHandler,
-        string? browseIdentifier = default
+        string browseIdentifier = ""
     );
 
     /// <summary>
@@ -255,7 +246,22 @@ public interface IDeviceBuilder
     /// <param name="size">The size of the image.</param>
     /// <param name="getter">A callback to get the URI of the image.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter);
+    IDeviceBuilder AddImageUrl(string name, string? label, ImageSize size, AsyncDeviceValueGetter<string> getter);
+
+    /// <summary>
+    /// Adds an image to the device.
+    /// </summary>
+    /// <param name="name">The name of the image to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="size">The size of the image.</param>
+    /// <param name="getter">A callback to get the URI of the image.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddImageUrl(
+        string name,
+        string? label,
+        ImageSize size,
+        DeviceValueGetter<string> getter
+    ) => this.AddImageUrl(name, label, size, getter.AsAsync());
 
     /// <summary>
     /// Adds support for the player widget to the device.
@@ -276,7 +282,37 @@ public interface IDeviceBuilder
     /// </summary>
     /// <param name="sensor">A callback that can be used to determine if the device is on or off.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor);
+    IDeviceBuilder AddPowerStateSensor(AsyncDeviceValueGetter<bool> sensor);
+
+    /// <summary>
+    /// Defines a sensor by which NEEO can detemine if the device is powered on/off. This is useful in
+    /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot;.
+    ///
+    /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
+    /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
+    /// </summary>
+    /// <param name="sensor">A callback that can be used to determine if the device is on or off.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor.AsAsync());
+
+    /// <summary>
+    /// Adds a range sensor to the device.
+    /// </summary>
+    /// <param name="name">The name of the sensor to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value of the sensor.</param>
+    /// <param name="rangeLow">Defines the lower end of the range (defaulted to 0).</param>
+    /// <param name="rangeHigh">Defines the higher end of the range (defaulted to 100).</param>
+    /// <param name="unit">Allows specifying a custom unit indicator (defaulted to <c>'%'</c>).</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddSensor(
+        string name,
+        string? label,
+        AsyncDeviceValueGetter<double> getter,
+        double rangeLow = 0d,
+        double rangeHigh = 100d,
+        string unit = "%"
+    );
 
     /// <summary>
     /// Adds a range sensor to the device.
@@ -295,7 +331,7 @@ public interface IDeviceBuilder
         double rangeLow = 0d,
         double rangeHigh = 100d,
         string unit = "%"
-    );
+    ) => this.AddSensor(name, label, getter.AsAsync(), rangeLow, rangeHigh, unit);
 
     /// <summary>
     /// Adds a sensor for boolean values to the device.
@@ -304,7 +340,20 @@ public interface IDeviceBuilder
     /// <param name="label">Optional - the label to use in place of the name.</param>
     /// <param name="getter">A callback used to get the value for the sensor.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter);
+    IDeviceBuilder AddSensor(string name, string? label, AsyncDeviceValueGetter<bool> getter);
+
+    /// <summary>
+    /// Adds a sensor for boolean values to the device.
+    /// </summary>
+    /// <param name="name">The name of the sensor to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value for the sensor.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddSensor(
+        string name,
+        string? label,
+        DeviceValueGetter<bool> getter
+    ) => this.AddSensor(name, label, getter.AsAsync());
 
     /// <summary>
     /// Adds a sensor for string values to the device.
@@ -313,7 +362,20 @@ public interface IDeviceBuilder
     /// <param name="label">Optional - the label to use in place of the name.</param>
     /// <param name="getter">A callback used to get the value for the sensor.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter);
+    IDeviceBuilder AddSensor(string name, string? label, AsyncDeviceValueGetter<string> getter);
+
+    /// <summary>
+    /// Adds a sensor for string values to the device.
+    /// </summary>
+    /// <param name="name">The name of the sensor to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value for the sensor.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddSensor(
+        string name,
+        string? label,
+        DeviceValueGetter<string> getter
+    ) => this.AddSensor(name, label, getter.AsAsync());
 
     /// <summary>
     /// Adds a custom object sensor to the device.
@@ -325,7 +387,28 @@ public interface IDeviceBuilder
     /// <remarks>
     /// There can be issues when using this with objects that are not fully JSON serializable.
     /// </remarks>
-    IDeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter);
+    IDeviceBuilder AddSensor(string name, string? label, AsyncDeviceValueGetter<object> getter);
+
+    /// <summary>
+    /// Adds a range slider to the device.
+    /// </summary>
+    /// <param name="name">The name of the slider to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback used to get the value of the slider.</param>
+    /// <param name="setter">A callback used to set the value of the slider.</param>
+    /// <param name="rangeLow">Defines the lower end of the range (defaulted to 0).</param>
+    /// <param name="rangeHigh">Defines the higher end of the range (defaulted to 100).</param>
+    /// <param name="unit">Allows specifying a custom unit indicator (defaulted to <c>'%'</c>).</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddSlider(
+        string name,
+        string? label,
+        AsyncDeviceValueGetter<double> getter,
+        AsyncDeviceValueSetter<double> setter,
+        double rangeLow = 0d,
+        double rangeHigh = 100d,
+        string unit = "%"
+    );
 
     /// <summary>
     /// Adds a range slider to the device.
@@ -346,7 +429,7 @@ public interface IDeviceBuilder
         double rangeLow = 0d,
         double rangeHigh = 100d,
         string unit = "%"
-    );
+    ) => this.AddSlider(name, label, getter.AsAsync(), setter.AsAsync(), rangeLow, rangeHigh, unit);
 
     /// <summary>
     /// Add a smart application button (or bitwise combination of buttons) to the device.
@@ -365,7 +448,32 @@ public interface IDeviceBuilder
     /// <param name="getter">A callback to get the value of the toggle switch.</param>
     /// <param name="setter">A callback to set the value of the toggle switch.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter);
+    IDeviceBuilder AddSwitch(string name, string? label, AsyncDeviceValueGetter<bool> getter, AsyncDeviceValueSetter<bool> setter);
+
+    /// <summary>
+    /// Adds a boolean toggle switch to the device.
+    /// </summary>
+    /// <param name="name">The name of the switch to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback to get the value of the toggle switch.</param>
+    /// <param name="setter">A callback to set the value of the toggle switch.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddSwitch(
+        string name,
+        string? label,
+        DeviceValueGetter<bool> getter,
+        DeviceValueSetter<bool> setter
+    ) => this.AddSwitch(name, label, getter.AsAsync(), setter.AsAsync());
+
+    /// <summary>
+    /// Adds a text label to the device.
+    /// </summary>
+    /// <param name="name">The name of the label to add.</param>
+    /// <param name="label">Optional - the label to use in place of the name.</param>
+    /// <param name="getter">A callback to get the text of the label.</param>
+    /// <param name="isLabelVisible">Optional - used to create the label as hidden for triggers.</param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddTextLabel(string name, string? label, AsyncDeviceValueGetter<string> getter, bool? isLabelVisible = default);
 
     /// <summary>
     /// Adds a text label to the device.
@@ -380,22 +488,7 @@ public interface IDeviceBuilder
         string? label,
         DeviceValueGetter<string> getter,
         bool? isLabelVisible = default
-    );
-
-    /// <summary>
-    /// Adds a text label to the device.
-    /// </summary>
-    /// <param name="name">The name of the label to add.</param>
-    /// <param name="label">Optional - the label to use in place of the name.</param>
-    /// <param name="text">The static text to display in the label.</param>
-    /// <param name="isLabelVisible">Optional - used to create the label as hidden for triggers.</param>
-    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
-    IDeviceBuilder AddTextLabel(
-        string name,
-        string? label,
-        string text,
-        bool? isLabelVisible
-    ) => this.AddTextLabel(name, label, (_, _) => Task.FromResult(text), isLabelVisible);
+    ) => this.AddTextLabel(name, label, getter.AsAsync(), isLabelVisible);
 
     /// <summary>
     /// Builds a device adapter based on this instance.
@@ -643,7 +736,7 @@ internal sealed partial class DeviceBuilder(
         DirectoryRole? role,
         DirectoryBrowser browser,
         DirectoryActionHandler actionHandler,
-        string? browseIdentifier
+        string browseIdentifier
     ) => this.AddDirectory(name, label, role, browser, actionHandler, browseIdentifier);
 
     IDeviceBuilder IDeviceBuilder.AddFavoriteHandler(FavoriteHandler handler) => this.AddFavoriteHandler(handler);
@@ -652,17 +745,17 @@ internal sealed partial class DeviceBuilder(
         string name,
         string? label,
         ImageSize size,
-        DeviceValueGetter<string> getter
+        AsyncDeviceValueGetter<string> getter
     ) => this.AddImageUrl(name, label, size, getter);
 
     IDeviceBuilder IDeviceBuilder.AddPlayerWidget(IPlayerWidgetController controller) => this.AddPlayerWidget(controller);
 
-    IDeviceBuilder IDeviceBuilder.AddPowerStateSensor(DeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor);
+    IDeviceBuilder IDeviceBuilder.AddPowerStateSensor(AsyncDeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor);
 
     IDeviceBuilder IDeviceBuilder.AddSensor(
         string name,
         string? label,
-        DeviceValueGetter<double> getter,
+        AsyncDeviceValueGetter<double> getter,
         double rangeLow,
         double rangeHigh,
         string units
@@ -671,26 +764,26 @@ internal sealed partial class DeviceBuilder(
     IDeviceBuilder IDeviceBuilder.AddSensor(
         string name,
         string? label,
-        DeviceValueGetter<string> getter
+        AsyncDeviceValueGetter<string> getter
     ) => this.AddSensor(name, label, getter);
 
     IDeviceBuilder IDeviceBuilder.AddSensor(
         string name,
         string? label,
-        DeviceValueGetter<bool> getter
+        AsyncDeviceValueGetter<bool> getter
     ) => this.AddSensor(name, label, getter);
 
     IDeviceBuilder IDeviceBuilder.AddSensor(
         string name,
         string? label,
-        DeviceValueGetter<object> getter
+        AsyncDeviceValueGetter<object> getter
     ) => this.AddSensor(name, label, getter);
 
     IDeviceBuilder IDeviceBuilder.AddSlider(
         string name,
         string? label,
-        DeviceValueGetter<double> getter,
-        DeviceValueSetter<double> setter,
+        AsyncDeviceValueGetter<double> getter,
+        AsyncDeviceValueSetter<double> setter,
         double rangeLow,
         double rangeHigh,
         string unit
@@ -701,14 +794,14 @@ internal sealed partial class DeviceBuilder(
     IDeviceBuilder IDeviceBuilder.AddSwitch(
         string name,
         string? label,
-        DeviceValueGetter<bool> getter,
-        DeviceValueSetter<bool> setter
+        AsyncDeviceValueGetter<bool> getter,
+        AsyncDeviceValueSetter<bool> setter
     ) => this.AddSwitch(name, label, getter, setter);
 
     IDeviceBuilder IDeviceBuilder.AddTextLabel(
        string name,
        string? label,
-       DeviceValueGetter<string> getter,
+       AsyncDeviceValueGetter<string> getter,
        bool? isLabelVisible) => this.AddTextLabel(name, label, getter, isLabelVisible);
 
     IDeviceAdapter IDeviceBuilder.BuildAdapter() => this.BuildAdapter();
@@ -825,7 +918,7 @@ internal sealed partial class DeviceBuilder(
         DirectoryRole? role,
         DirectoryBrowser browser,
         DirectoryActionHandler actionHandler,
-        string? browseIdentifier = default
+        string browseIdentifier = ""
     )
     {
         if (role.HasValue && Interlocked.Exchange(ref this._roles, this._roles | (int)role.Value) == this._roles)
@@ -859,7 +952,7 @@ internal sealed partial class DeviceBuilder(
         return this;
     }
 
-    private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, DeviceValueGetter<string> getter)
+    private DeviceBuilder AddImageUrl(string name, string? label, ImageSize size, AsyncDeviceValueGetter<string> getter)
     {
         ImageUrlParameters parameters = new(
             Validator.ValidateText(name),
@@ -902,7 +995,7 @@ internal sealed partial class DeviceBuilder(
            .AddSwitch(PlayerWidgetConstants.RepeatSwitchName, null, controller.GetRepeatAsync, controller.SetRepeatAsync);
     }
 
-    private DeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> getter)
+    private DeviceBuilder AddPowerStateSensor(AsyncDeviceValueGetter<bool> getter)
     {
         SensorParameters parameters = new(
             SensorType.Power,
@@ -917,18 +1010,18 @@ internal sealed partial class DeviceBuilder(
         return this;
     }
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<bool> getter) => this.AddSensor(name, SensorType.Binary, label, ValueFeature.Create(getter));
+    private DeviceBuilder AddSensor(string name, string? label, AsyncDeviceValueGetter<bool> getter) => this.AddSensor(name, SensorType.Binary, label, ValueFeature.Create(getter));
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<string> getter) => this.AddSensor(name, SensorType.String, label, ValueFeature.Create(getter));
+    private DeviceBuilder AddSensor(string name, string? label, AsyncDeviceValueGetter<string> getter) => this.AddSensor(name, SensorType.String, label, ValueFeature.Create(getter));
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<object> getter) => this.AddSensor(name, SensorType.Custom, label, ValueFeature.Create(getter));
+    private DeviceBuilder AddSensor(string name, string? label, AsyncDeviceValueGetter<object> getter) => this.AddSensor(name, SensorType.Custom, label, ValueFeature.Create(getter));
 
     private DeviceBuilder AddSensor(string name, SensorType type, string? label, ValueFeature valueFeature) => this.AddSensorParameters(
         name,
         new(type, Validator.ValidateText(name), Validator.ValidateText(label, allowNull: true), valueFeature)
     );
 
-    private DeviceBuilder AddSensor(string name, string? label, DeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string unit) => this.AddSensorParameters(
+    private DeviceBuilder AddSensor(string name, string? label, AsyncDeviceValueGetter<double> getter, double rangeLow, double rangeHigh, string unit) => this.AddSensorParameters(
         name,
         new RangeSensorParameters(
             Validator.ValidateText(name),
@@ -952,7 +1045,7 @@ internal sealed partial class DeviceBuilder(
         return this;
     }
 
-    private DeviceBuilder AddSlider(string name, string? label, DeviceValueGetter<double> getter, DeviceValueSetter<double> setter, double rangeLow, double rangeHigh, string unit)
+    private DeviceBuilder AddSlider(string name, string? label, AsyncDeviceValueGetter<double> getter, AsyncDeviceValueSetter<double> setter, double rangeLow, double rangeHigh, string unit)
     {
         SliderParameters parameters = new(
             Validator.ValidateText(name),
@@ -973,7 +1066,7 @@ internal sealed partial class DeviceBuilder(
         static (builder, name) => builder.AddButton(name)
     );
 
-    private DeviceBuilder AddSwitch(string name, string? label, DeviceValueGetter<bool> getter, DeviceValueSetter<bool> setter)
+    private DeviceBuilder AddSwitch(string name, string? label, AsyncDeviceValueGetter<bool> getter, AsyncDeviceValueSetter<bool> setter)
     {
         SwitchParameters parameters = new(
             Validator.ValidateText(name),
@@ -987,7 +1080,7 @@ internal sealed partial class DeviceBuilder(
         return this;
     }
 
-    private DeviceBuilder AddTextLabel(string name, string? label, DeviceValueGetter<string> getter, bool? isLabelVisible)
+    private DeviceBuilder AddTextLabel(string name, string? label, AsyncDeviceValueGetter<string> getter, bool? isLabelVisible)
     {
         TextLabelParameters parameters = new(
             Validator.ValidateText(name),

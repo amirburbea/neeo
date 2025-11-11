@@ -2,7 +2,6 @@
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Setup;
-using Neeo.Sdk.Server.Drivers;
 
 namespace Neeo.Sdk.Examples;
 

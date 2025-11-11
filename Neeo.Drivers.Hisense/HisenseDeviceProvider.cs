@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Devices.Setup;
-using Neeo.Sdk.Server.Drivers;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Hisense;
@@ -50,11 +49,10 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
     private readonly HashSet<string> _deviceIds = [];
     private HisenseTV[] _candidates = [];
     private bool _connected;
-    private IDeviceBuilder? _deviceBuilder;
     private IDeviceNotifier? _notifier;
     private HisenseTV? _tv;
 
-    public IDeviceBuilder DeviceBuilder => this._deviceBuilder ??= Device.Create(Constants.DeviceName, DeviceType.TV)
+    public IDeviceBuilder DeviceBuilder => field ??= Device.Create(Constants.DeviceName, DeviceType.TV)
         .SetManufacturer(Constants.Manufacturer)
         .SetSpecificName($"{Constants.Manufacturer} {Constants.DeviceName}")
         .AddButtonHandler(this.OnButtonPressed)
