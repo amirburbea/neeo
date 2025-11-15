@@ -3,7 +3,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 
@@ -11,12 +10,10 @@ namespace Neeo.Drivers.Plex;
 
 public sealed class PlexMediaPlayerDeviceProvider(
     IHttpClientFactory httpClientFactory,
-    IPlexServerDiscovery discovery,
     IPlexTokenStore tokenStore,
     IPlexServerManager serverManager,
-    Task<ISdkEnvironment> sdkStartupTask,
     ILogger<PlexMediaPlayerDeviceProvider> logger
-) : PlexDeviceProviderBase(httpClientFactory, discovery, tokenStore, serverManager, sdkStartupTask, logger, DeviceType.MediaPlayer, "Media Player"), IPlayerWidgetController
+) : PlexDeviceProviderBase(httpClientFactory, tokenStore, serverManager, logger, DeviceType.MediaPlayer, "Media Player"), IPlayerWidgetController
 {
     bool IPlayerWidgetController.IsQueueSupported => false;
 
@@ -24,51 +21,103 @@ public sealed class PlexMediaPlayerDeviceProvider(
 
     string? IPlayerWidgetController.RootDirectoryLabel => null;
 
-    Task IPlayerWidgetController.BrowseQueueDirectoryAsync(string serverName, DirectoryBuilder builder, CancellationToken cancellationToken) => throw new NotSupportedException();
+    Task IPlayerWidgetController.BrowseQueueDirectoryAsync(
+        string machineIdentifier,
+        DirectoryBuilder builder,
+        CancellationToken cancellationToken
+    ) => throw new NotSupportedException();
 
-    Task IPlayerWidgetController.BrowseRootDirectoryAsync(string serverName, DirectoryBuilder builder, CancellationToken cancellationToken)
+    Task IPlayerWidgetController.BrowseRootDirectoryAsync(
+        string machineIdentifier,
+        DirectoryBuilder builder,
+        CancellationToken cancellationToken
+    ) => this.BrowseDirectoryAsync(machineIdentifier, builder, cancellationToken);
+
+    Task<string> IPlayerWidgetController.GetCoverArtAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(this.GetCoverArt(machineIdentifier));
+
+    Task<string> IPlayerWidgetController.GetDescriptionAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(this.GetDescription(machineIdentifier));
+
+    Task<bool> IPlayerWidgetController.GetIsMutedAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(false);
+
+    Task<bool> IPlayerWidgetController.GetIsPlayingAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(this.IsPlaying(machineIdentifier));
+
+    Task<bool> IPlayerWidgetController.GetRepeatAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(false);
+
+    Task<bool> IPlayerWidgetController.GetShuffleAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(false);
+
+    Task<string> IPlayerWidgetController.GetTitleAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(this.GetTitle(machineIdentifier));
+
+    Task<double> IPlayerWidgetController.GetVolumeAsync(
+        string machineIdentifier,
+        CancellationToken cancellationToken
+    ) => Task.FromResult(0d);
+
+    Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(
+        string machineIdentifier,
+        string actionIdentifier,
+        CancellationToken cancellationToken
+    ) => throw new NotSupportedException();
+
+    Task IPlayerWidgetController.HandleRootDirectoryActionAsync(
+        string machineIdentifier,
+        string actionIdentifier,
+        CancellationToken cancellationToken
+    ) => this.HandleDirectoryActionAsync(machineIdentifier, actionIdentifier, cancellationToken);
+
+    Task IPlayerWidgetController.SetIsMutedAsync(
+        string machineIdentifier,
+        bool isMuted,
+        CancellationToken cancellationToken
+    ) => Task.CompletedTask;
+
+    Task IPlayerWidgetController.SetIsPlayingAsync(
+        string machineIdentifier,
+        bool value,
+        CancellationToken cancellationToken
+    ) => this.GetServer(machineIdentifier) switch
     {
-        return this.BrowseDirectoryAsync(serverName, builder, cancellationToken);
-    }
+        { } server => server.SendPlaybackCommandAsync(value ? PlaybackCommand.Play : PlaybackCommand.Pause, cancellationToken),
+        _ => Task.CompletedTask
+    };
 
-    Task<string> IPlayerWidgetController.GetCoverArtAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(this.GetCoverArt(serverName));
+    Task IPlayerWidgetController.SetRepeatAsync(
+        string machineIdentifier,
+        bool repeat,
+        CancellationToken cancellationToken
+    ) => Task.CompletedTask;
 
-    Task<string> IPlayerWidgetController.GetDescriptionAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(this.GetDescription(serverName));
+    Task IPlayerWidgetController.SetShuffleAsync(
+        string machineIdentifier,
+        bool shuffle,
+        CancellationToken cancellationToken
+    ) => Task.CompletedTask;
 
-    Task<bool> IPlayerWidgetController.GetIsMutedAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(false);
-
-    Task<bool> IPlayerWidgetController.GetIsPlayingAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(this.IsPlaying(serverName));
-
-    Task<bool> IPlayerWidgetController.GetRepeatAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(false);
-
-    Task<bool> IPlayerWidgetController.GetShuffleAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(false);
-
-    Task<string> IPlayerWidgetController.GetTitleAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(this.GetTitle(serverName));
-
-    Task<double> IPlayerWidgetController.GetVolumeAsync(string serverName, CancellationToken cancellationToken) => Task.FromResult(0d);
-
-    Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(string serverName, string actionIdentifier, CancellationToken cancellationToken) => throw new NotSupportedException();
-
-    Task IPlayerWidgetController.HandleRootDirectoryActionAsync(string serverName, string actionIdentifier, CancellationToken cancellationToken)
-    {
-        return this.HandleDirectoryActionAsync(serverName, actionIdentifier, cancellationToken);
-    }
-
-    Task IPlayerWidgetController.SetIsMutedAsync(string serverName, bool isMuted, CancellationToken cancellationToken) => Task.CompletedTask;
-
-    async Task IPlayerWidgetController.SetIsPlayingAsync(string serverName, bool value, CancellationToken cancellationToken)
-    {
-        if (this.GetServer(serverName) is { } server)
-        {
-            await server.SendPlaybackCommandAsync(value ? PlaybackCommand.Play : PlaybackCommand.Pause, cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    Task IPlayerWidgetController.SetRepeatAsync(string serverName, bool repeat, CancellationToken cancellationToken) => Task.CompletedTask;
-
-    Task IPlayerWidgetController.SetShuffleAsync(string serverName, bool shuffle, CancellationToken cancellationToken) => Task.CompletedTask;
-
-    Task IPlayerWidgetController.SetVolumeAsync(string serverName, double volume, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task IPlayerWidgetController.SetVolumeAsync(
+        string machineIdentifier,
+        double volume,
+        CancellationToken cancellationToken
+    ) => Task.CompletedTask;
 
     protected override IDeviceBuilder CreateDevice() => base.CreateDevice()
         .AddPlayerWidget(this)

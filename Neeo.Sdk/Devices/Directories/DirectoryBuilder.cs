@@ -26,6 +26,7 @@ public sealed class DirectoryBuilder
     /// <summary>
     /// Gets a value indicating if the current directory page is not full.
     /// </summary>
+    [JsonIgnore]
     public bool CanAddEntry => this.Items.Count == 0 || this.Items.Count(item => item.Type == DirectoryItemType.Entry) < this.Limit;
 
     /// <summary>
@@ -36,7 +37,7 @@ public sealed class DirectoryBuilder
     /// <summary>
     /// For pagination, gets the upper limit for number of entries to return in a single page.
     /// </summary>
-    public int Limit => this.Parameters.Limit is int limit and > 0 and <= Constants.MaxItems
+    public int Limit => this.Parameters.Limit is > 0 and <= Constants.MaxItems and {} limit
         ? limit
         : Constants.MaxItems;
 

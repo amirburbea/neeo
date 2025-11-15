@@ -6,7 +6,8 @@ namespace Neeo.Drivers.Plex;
 public readonly record struct LibrarySection(
     string Key,
     string Title,
-    LibraryType Type
+    LibraryType Type,
+    [property: JsonPropertyName("thumb")] string? Thumbnail = default
 );
 
 [JsonConverter(typeof(TextJsonConverter<LibraryType>))]

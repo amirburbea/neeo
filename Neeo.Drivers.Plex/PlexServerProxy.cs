@@ -128,7 +128,7 @@ internal static class PlexServerProxy
         generator.Emit(OpCodes.Ldfld, server);
         for (int index = 0; index < parameters.Length; index++)
         {
-            generator.Emit(OpCodes.Ldarg, index + 1);
+            generator.Emit(OpCodes.Ldarg_S, (short)(index + 1));
         }
         generator.Emit(OpCodes.Callvirt, declaredMethod);
         generator.Emit(OpCodes.Ret);

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -50,8 +51,6 @@ public sealed partial class Brain(
     string version = "0.50.0"
 ) : IBrain
 {
-    private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(15d);
-
     /// <summary>
     /// The host name of the NEEO Brain.
     /// </summary>
@@ -80,101 +79,125 @@ public sealed partial class Brain(
         : throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
 
     /// <summary>
-    /// Discovers all <see cref="Brain"/>s on the network.
+    /// Discovers all <see cref="Brain"/> s on the network.
     /// </summary>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>s.</returns>
+    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/> s.</returns>
     public static async Task<Brain[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brain._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!Brain.IsNetworkConnected())
+        {
+            throw new ApplicationException("Brain discovery requires network connectivity");
+        }
+        IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(
+            Constants.ServiceName,
+            scanTime: TimeSpan.FromSeconds(15),
+            retries: 1,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
         return [.. hosts.Select(Brain.TryCreateBrain).OfType<Brain>()];
     }
 
     /// <summary>
-    /// Discovers the first <see cref="Brain"/> on the network matching the specified
-    /// <paramref name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the first
-    /// <see cref="Brain"/> discovered.
+    /// Discovers the first <see cref="Brain"/> on the network matching the specified <paramref
+    /// name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the
+    /// first <see cref="Brain"/> discovered.
     /// </summary>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <param name="predicate">Optional predicate that must be matched by the Brain (if not <see langword="null"/>).</param>
+    /// <param name="predicate">
+    /// Optional predicate that must be matched by the Brain (if not <see langword="null"/>).
+    /// </param>
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
     public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
     {
         TaskCompletionSource<Brain?> tcs = new();
         cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
-        _ = Task.Factory.StartNew(ResolveAsync, cancellationToken, TaskCreationOptions.None, TaskScheduler.Default);
+        if (!Brain.IsNetworkConnected())
+        {
+            tcs.TrySetException(new ApplicationException("Brain discovery requires network connectivity"));
+        }
+        else
+        {
+            _ = Task.Run(ResolveAsync, cancellationToken);
+        }
         return tcs.Task;
 
         async Task ResolveAsync()
         {
-            using CancellationTokenSource raceTokenSource = new();
             try
             {
-                using CancellationTokenSource junctionTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-                    raceTokenSource.Token,
-                    cancellationToken
-                );
-                // Bonjour sometimes fails to discover, race multiple scans at once, offset by 500ms.
-                await Parallel.ForEachAsync(
-                    [0, 500],
-                    junctionTokenSource.Token,
-                    async (delay, cancellationToken) =>
+                // Running for up to 1 + 2 + 4 + 8 = 15 seconds.
+                for (int seconds = 1; !tcs.Task.IsCompleted && seconds <= 8; seconds *= 2)
+                {
+                    TimeSpan timeSpan = TimeSpan.FromSeconds(seconds);
+                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    cts.CancelAfter(timeSpan);
+                    try
                     {
-                        try
-                        {
-                            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                            await ZeroconfResolver.ResolveAsync(
-                                Constants.ServiceName,
-                                Brain._scanTime,
-                                 callback: OnHostDiscovered,
-                                cancellationToken: cancellationToken
-                            ).ConfigureAwait(false);
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // Expected in race.
-                        }
+                        await ZeroconfResolver.ResolveAsync(
+                            Constants.ServiceName,
+                            scanTime: timeSpan,
+                            retries: 1,
+                            callback: host => OnHostDiscovered(host, cts),
+                            cancellationToken: cts.Token
+                        ).ConfigureAwait(false);
                     }
-                ).ConfigureAwait(false);
-                tcs.TrySetResult(null);
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        tcs.TrySetCanceled(cancellationToken);
+                        break;
+                    }
+                    catch (Exception)
+                    {
+                        // Retry on other errors.
+                    }
+                }
             }
-            catch (OperationCanceledException)
+            finally
             {
-                // Ignore.
+                if (!tcs.Task.IsCompleted)
+                {
+                    tcs.TrySetResult(null);
+                }
             }
 
-            void OnHostDiscovered(IZeroconfHost host)
+            void OnHostDiscovered(IZeroconfHost host, CancellationTokenSource cancellationTokenSource)
             {
-                if (tcs.Task.IsCompleted || tcs.Task.IsCanceled || Brain.TryCreateBrain(host) is not { } brain)
+                if (Brain.TryCreateBrain(host) is { } brain && (predicate == null || predicate(brain)) && tcs.TrySetResult(brain))
                 {
-                    return;
-                }
-                if ((predicate == null || predicate(brain)) && tcs.TrySetResult(brain))
-                {
-                    raceTokenSource.Cancel(true);
+                    // Cancel to break out of the discovery process.
+                    cancellationTokenSource.Cancel(true);
                 }
             }
         }
     }
 
-    [GeneratedRegex(@"^(?<ip>(\d+[.]){3}\d+)[:]", RegexOptions.ExplicitCapture)]
+    [GeneratedRegex(@"^(?<ip>(\d+[.]){3}\d+)[:]", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]
     private static partial Regex IPAddresRegex();
+
+    private static bool IsNetworkConnected() => Enumerable.Any(
+        from netInterface in NetworkInterface.GetAllNetworkInterfaces()
+        where (netInterface.OperationalStatus, netInterface.NetworkInterfaceType) is (OperationalStatus.Up, NetworkInterfaceType.Ethernet or NetworkInterfaceType.Wireless80211)
+        where netInterface.GetIPProperties().GatewayAddresses.Count != 0
+        select netInterface
+    );
 
     private static Brain? TryCreateBrain(IZeroconfHost host)
     {
-        return host.IPAddress switch
+        if (host.Services.Values.FirstOrDefault() is not { Port: int port, Properties: [{ } properties, ..] })
         {
-            { Length: > 0 } address => TryCreateBrain(address),
-            null when Brain.IPAddresRegex().Match(host.Id) is { Success: true, Groups: { } groups } => TryCreateBrain(groups["ip"].Value),
-            _ => null,
+            return null;
+        }
+        string hostName = $"{properties["hon"]}.local";
+        string version = properties["rel"];
+        return (host.IPAddress, host.Id) switch
+        {
+            ({ Length: > 0 } ip, _) => CreateBrain(ip),
+            (_, { } id) when Brain.IPAddresRegex().Match(id) is { Success: true, Groups: { } groups } => CreateBrain(groups["ip"].Value),
+            _ => null
         };
 
-        Brain? TryCreateBrain(string ipAddress)
-        {
-            return host.Services.Values.FirstOrDefault() is { Port: int port, Properties: [{ } properties, ..] }
-                ? new(IPAddress.Parse(ipAddress), port, $"{properties["hon"]}.local", properties["rel"])
-                : null;
-        }
+        Brain CreateBrain(string ip) => new(IPAddress.Parse(ip), port, hostName, version);
     }
 
     [GeneratedRegex(@"^(?<v>\d+\.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]
@@ -187,7 +210,6 @@ public sealed partial class Brain(
 }
 
 /// <summary>
-///
 /// </summary>
 public static class BrainMethods
 {
@@ -203,13 +225,20 @@ public static class BrainMethods
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
     /// <param name="brain">The NEEO Brain.</param>
-    /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
+    /// <param name="name">
+    /// A name for your integration server. This name should be consistent upon restarting the
+    /// driver host server.
+    /// </param>
     /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
     /// <param name="hostIPAddress">
-    /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
+    /// The IP Address on which to bind the integration server. If not specified, falls back to the
+    /// first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
     /// </param>
     /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
-    /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
+    /// <param name="configureLogging">
+    /// By default, the integration server logs via debug in development. This allows overriding the
+    /// behavior with a custom log configuration.
+    /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     public static async Task<ISdkEnvironment> StartServerAsync(
@@ -242,13 +271,20 @@ public static class BrainMethods
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
     /// <param name="brain">The NEEO Brain.</param>
-    /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
+    /// <param name="name">
+    /// A name for your integration server. This name should be consistent upon restarting the
+    /// driver host server.
+    /// </param>
     /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
     /// <param name="hostIPAddress">
-    /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
+    /// The IP Address on which to bind the integration server. If not specified, falls back to the
+    /// first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
     /// </param>
     /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
-    /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
+    /// <param name="configureLogging">
+    /// By default, the integration server logs via debug in development. This allows overriding the
+    /// behavior with a custom log configuration.
+    /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     public static Task<ISdkEnvironment> StartServerAsync(
@@ -262,7 +298,7 @@ public static class BrainMethods
     )
     {
         return brain.StartServerAsync(
-            devices is not { Length: > 0 } providers 
+            devices is not { Length: > 0 } providers
                 ? throw new ArgumentException("At least one device is required.", nameof(devices))
                 : [.. providers.Select(provider => provider.DeviceBuilder)],
             name,
@@ -279,7 +315,8 @@ public static class BrainMethods
         {
             // Get IPv4 addresses for the current device.
             IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-            // If the Brain IP is not contained, the Brain is a separate device. Return the first non-loopback IP address on this host.
+            // If the Brain IP is not contained, the Brain is a separate device. Return the first
+            // non-loopback IP address on this host.
             if (Array.IndexOf(addresses, brain.IPAddress) == -1 && Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) is { } ipAddress)
             {
                 return ipAddress;

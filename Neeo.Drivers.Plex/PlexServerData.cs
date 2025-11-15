@@ -2,4 +2,9 @@
 
 namespace Neeo.Drivers.Plex;
 
-public readonly record struct PlexServerData(string Name, string MachineIdentifier, IPAddress IPAddress);
+public readonly record struct PlexServerData(
+    string Name,
+    string MachineIdentifier,
+    IPAddress IPAddress,
+    int Port
+);

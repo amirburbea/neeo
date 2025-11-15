@@ -13,7 +13,8 @@ namespace Neeo.Sdk.Server;
 public sealed class SdkService(
     IEnumerable<IDeviceProvider> providers,
     IConfiguration configuration,
-    TaskCompletionSource<ISdkEnvironment> environmentSource,
+    TaskCompletionSource<ISdkEnvironment> environmentTaskSource,
+    IHostApplicationLifetime applicationLifetime,
     ILogger<SdkService> logger
 ) : BackgroundService
 {
@@ -27,20 +28,27 @@ public sealed class SdkService(
         catch (OperationCanceledException)
         {
             logger.LogInformation("Brain discovery was cancelled!");
+            environmentTaskSource.TrySetCanceled(stoppingToken);
+            applicationLifetime.StopApplication();
+            return;
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to discover Brain. Shutting down...\n");
+            environmentTaskSource.TrySetException(e);
+            applicationLifetime.StopApplication();
             return;
         }
         logger.LogInformation("Using Brain {Name} at {Endpoint}...", brain.HostName, brain.ServiceEndPoint);
         ISdkEnvironment environment = await brain.StartServerAsync([.. providers], name: configuration.GetValue<string>("ServerName"), cancellationToken: stoppingToken).ConfigureAwait(false);
-        environmentSource.TrySetResult(environment);
+        environmentTaskSource.TrySetResult(environment);
         logger.LogInformation("Started server at address {Address}...", environment.HostAddress);
-        TaskCompletionSource completionSource = new();
-        stoppingToken.Register(async delegate
+        TaskCompletionSource stoppingTaskSource = new();
+        stoppingToken.Register(ProcessStopRequestAsync);
         {
-            await environment.StopAsync(default).ConfigureAwait(false);
-            completionSource.TrySetResult();
-        });
-        logger.LogInformation("Brain WebUI is running at http://{IPAddress}:3200/eui", brain.IPAddress);
-        await completionSource.Task.ConfigureAwait(false);
+            logger.LogInformation("Brain WebUI is running at http://{IPAddress}:3200/eui", brain.IPAddress);
+            await stoppingTaskSource.Task.ConfigureAwait(false);
+        }
 
         async ValueTask<Brain> GetBrainAsync()
         {
@@ -51,9 +59,15 @@ public sealed class SdkService(
             logger.LogInformation("Discovering Brain...");
             if (await Brain.DiscoverOneAsync(cancellationToken: stoppingToken).ConfigureAwait(false) is not { } brain)
             {
-                throw new ApplicationException("Failed to discover Brain.");
+                throw new ApplicationException("Discovery failed, host stopping.");
             }
             return brain;
+        }
+
+        async void ProcessStopRequestAsync()
+        {
+            await environment.StopAsync(default).ConfigureAwait(false);
+            stoppingTaskSource.TrySetResult();
         }
     }
 }

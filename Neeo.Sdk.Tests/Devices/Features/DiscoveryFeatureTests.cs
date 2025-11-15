@@ -13,7 +13,7 @@ public sealed class DiscoveryFeatureTests
     [Fact]
     public async Task DiscoverAsync_should_validate_DeviceBuilder_is_null_if_not_EnableDynamicDeviceBuilder()
     {
-        DiscoveredDevice deviceWithBuilder = new("id", "", DeviceBuilder: Device.Create("abc", DeviceType.Accessory));
+        DiscoveredDevice deviceWithBuilder = new("id", "", deviceBuilder: Device.Create("abc", DeviceType.Accessory));
         DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithBuilder }), enableDynamicDeviceBuilder: false);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());

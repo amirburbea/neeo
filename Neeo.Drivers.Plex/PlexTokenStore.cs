@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -39,8 +40,8 @@ internal sealed class PlexTokenStore : IPlexTokenStore
             try
             {
                 Span<byte> decryptedBytes = buffer.AsSpan(0, cipherText.Length);
-                using AesGcm aes = new(PlexTokenStore._key, Constants.TagLength);
-                aes.Decrypt(
+                using AesGcm decyptor = new(PlexTokenStore._key, Constants.TagLength);
+                decyptor.Decrypt(
                     nonce: encryptedData.AsSpan(0, Constants.IvLength),
                     ciphertext: cipherText,
                     tag: encryptedData.AsSpan(Constants.IvLength, Constants.TagLength),
@@ -81,7 +82,7 @@ internal sealed class PlexTokenStore : IPlexTokenStore
     {
         byte[] output = new byte[32]; // 256 bits
         ReadOnlySpan<char> password = Environment.MachineName;
-        ReadOnlySpan<char> saltChars = typeof(PlexTokenStore).FullName!;
+        ReadOnlySpan<char> saltChars = Assembly.GetExecutingAssembly().GetName().Name!;
         int maxSaltBytes = Encoding.UTF8.GetMaxByteCount(saltChars.Length);
         Span<byte> saltBytes = stackalloc byte[maxSaltBytes];
         int byteCount = Encoding.UTF8.GetBytes(saltChars, saltBytes);
@@ -106,8 +107,8 @@ internal sealed class PlexTokenStore : IPlexTokenStore
             Span<byte> result = buffer.AsSpan(0, size);
             Span<byte> iv = result[..Constants.IvLength];
             RandomNumberGenerator.Fill(iv);
-            using AesGcm aes = new(PlexTokenStore._key, Constants.TagLength);
-            aes.Encrypt(
+            using AesGcm encryptor = new(PlexTokenStore._key, Constants.TagLength);
+            encryptor.Encrypt(
                 nonce: iv,
                 plaintext: jsonBytes,
                 ciphertext: result[(Constants.IvLength + Constants.TagLength)..],

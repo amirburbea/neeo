@@ -96,7 +96,7 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         list.AddTileRow(new DirectoryTile("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png"));
         AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync(cancellationToken).ConfigureAwait(false), static app => !app.IsUninstalled);
         Array.Sort(apps, (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
-        (_, int limit, int? offset) = list.Parameters;
+        (_, int? offset, int limit) = list.Parameters;
         if (offset is > 0 && limit < apps.Length)
         {
             int start = offset ?? 0;

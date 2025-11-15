@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
-using System.Xml;
+﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Plex;
