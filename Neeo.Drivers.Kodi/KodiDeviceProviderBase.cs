@@ -164,7 +164,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    protected async Task PopulateQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+    protected async Task PopulateQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
         {
@@ -176,7 +176,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         throw new NotImplementedException();
     }
 
-    protected async Task PopulateRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+    protected async Task PopulateRootDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
         {
@@ -276,13 +276,13 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     [GeneratedRegex("^(?<key>[a-z]+)[:](?<id>[\\d]+)([:](?<suffix>.+))?$", RegexOptions.ExplicitCapture | RegexOptions.Compiled)]
     private static partial Regex IdentifierRegex();
 
-    private static async Task PopulateAlbumLibraryAsync(KodiClient client, DirectoryBuilder builder, int offset, int limit)
+    private static async Task PopulateAlbumLibraryAsync(KodiClient client, IDirectoryBuilder builder, int offset, int limit)
     {
         int end = offset + limit;
         (int total, AlbumInfo[] albums) = await client.GetAlbumsAsync(offset, end).ConfigureAwait(false);
     }
 
-    private static async Task PopulateEpisodesLibraryAsync(KodiClient client, DirectoryBuilder builder, int offset, int limit, int? tvShowId = default, string? tvShowLabel = default)
+    private static async Task PopulateEpisodesLibraryAsync(KodiClient client, IDirectoryBuilder builder, int offset, int limit, int? tvShowId = default, string? tvShowLabel = default)
     {
         int end = offset + limit;
         (int total, EpisodeInfo[] episodes) = await client.GetEpisodesAsync(offset, end, tvShowId).ConfigureAwait(false);
@@ -304,14 +304,14 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         builder.SetTotalMatchingItems(total);
     }
 
-    private static void PopulateLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
+    private static void PopulateLibraryRoot(IDirectoryBuilder list, EmbeddedImages images) => list
         .AddTileRow(new DirectoryTile(Images.Kodi))
         .AddEntry(new("Movies", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies"))
         .AddEntry(new("Music", ThumbnailUri: images.Music, BrowseIdentifier: ".music"))
         .AddEntry(new("TV Shows", ThumbnailUri: images.TVShow, BrowseIdentifier: ".tvshows"))
         .AddEntry(new("PVR", ThumbnailUri: images.Pvr, BrowseIdentifier: ".pvr"));
 
-    private static async Task PopulateMoviesLibraryAsync(KodiClient client, DirectoryBuilder builder, int offset, int limit, Filter? filter = default)
+    private static async Task PopulateMoviesLibraryAsync(KodiClient client, IDirectoryBuilder builder, int offset, int limit, Filter? filter = default)
     {
         int end = offset + limit;
         (int total, VideoInfo[] videos) = await client.GetMoviesAsync(offset, end, filter).ConfigureAwait(false);
@@ -331,7 +331,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         builder.SetTotalMatchingItems(total);
     }
 
-    private static void PopulateMoviesLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
+    private static void PopulateMoviesLibraryRoot(IDirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("Movies")
         .AddEntry(new("Movies", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.movies"))
         .AddEntry(new("Movies - In Progress", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.inprogress"))
@@ -339,18 +339,18 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddEntry(new("Movies - Watched", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.watched"))
         .AddEntry(new("Movies - Recent", ThumbnailUri: images.Movie, BrowseIdentifier: ".movies.recent"));
 
-    private static void PopulateMusicLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
+    private static void PopulateMusicLibraryRoot(IDirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("Music")
         .AddEntry(new("Albums", ThumbnailUri: images.Music, BrowseIdentifier: ".music.albums"))
         .AddEntry(new("Albums - Recent", ThumbnailUri: images.Music, BrowseIdentifier: ".music.albums.recent"))
         .AddEntry(new("Artists", ThumbnailUri: images.Music, BrowseIdentifier: ".music.artists"));
 
-    private static void PopulatePvrLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
+    private static void PopulatePvrLibraryRoot(IDirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("PVR")
         .AddEntry(new("TV Channels", ThumbnailUri: images.Pvr, BrowseIdentifier: ".pvr.tvchannels"))
         .AddEntry(new("Radio Stations", ThumbnailUri: images.Pvr, BrowseIdentifier: ".pvr.radiostations"));
 
-    private static async Task PopulateTVShowsLibraryAsync(KodiClient client, DirectoryBuilder builder, int offset, int limit, Filter? filter = default, CancellationToken cancellationToken = default)
+    private static async Task PopulateTVShowsLibraryAsync(KodiClient client, IDirectoryBuilder builder, int offset, int limit, Filter? filter = default, CancellationToken cancellationToken = default)
     {
         int end = offset + limit;
         (int total, TVShowInfo[] shows) = await client.GetTVShowsAsync(offset, end, filter, cancellationToken).ConfigureAwait(false);
@@ -369,7 +369,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         builder.SetTotalMatchingItems(total);
     }
 
-    private static void PopulateTVShowsLibraryRoot(DirectoryBuilder list, EmbeddedImages images) => list
+    private static void PopulateTVShowsLibraryRoot(IDirectoryBuilder list, EmbeddedImages images) => list
         .AddHeader("TV Shows")
         .AddEntry(new("TV Shows", ThumbnailUri: images.TVShow, BrowseIdentifier: ".tvshows.tvshows"))
         .AddEntry(new("TV Shows - Recent", ThumbnailUri: images.TVShow, BrowseIdentifier: ".tvshows.recent"));

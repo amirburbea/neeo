@@ -39,6 +39,20 @@ public sealed class SdkService(
             applicationLifetime.StopApplication();
             return;
         }
+
+        AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+        {
+            Exception exception = (Exception)eventArgs.ExceptionObject;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"\n🚨 Unhandled Exception caught by AppDomain:");
+            Console.WriteLine($"IsTerminating: {eventArgs.IsTerminating}");
+            Console.WriteLine($"Type: {exception.GetType().FullName}");
+            Console.WriteLine($"Message: {exception.Message}");
+            Console.WriteLine($"StackTrace:\n{exception.StackTrace}");
+            Console.ResetColor();
+        };
+
+
         logger.LogInformation("Using Brain {Name} at {Endpoint}...", brain.HostName, brain.ServiceEndPoint);
         ISdkEnvironment environment = await brain.StartServerAsync([.. providers], name: configuration.GetValue<string>("ServerName"), cancellationToken: stoppingToken).ConfigureAwait(false);
         environmentTaskSource.TrySetResult(environment);

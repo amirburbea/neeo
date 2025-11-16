@@ -7,10 +7,11 @@ namespace Neeo.Drivers.Plex;
 
 public sealed class PlexRemoteDeviceProvider(
     IHttpClientFactory httpClientFactory,
-    IPlexTokenStore tokenStore,
+    IPlexServerDiscovery serverDiscovery,
     IPlexServerManager serverManager,
+    IPlexTokenStore tokenStore,
     ILogger<PlexRemoteDeviceProvider> logger
-) : PlexDeviceProviderBase(httpClientFactory, tokenStore, serverManager, logger, DeviceType.TV, "Remote")
+) : PlexDeviceProviderBase(httpClientFactory, serverDiscovery, serverManager, tokenStore, logger, DeviceType.TV, "Remote")
 {
     protected override IDeviceBuilder CreateDevice() => base.CreateDevice()
         .AddSensor(Components.Playing.SensorName, null, this.IsPlaying)

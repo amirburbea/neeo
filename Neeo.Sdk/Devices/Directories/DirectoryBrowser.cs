@@ -10,4 +10,4 @@ namespace Neeo.Sdk.Devices.Directories;
 /// <param name="builder">The directory builder.</param>
 /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
 /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-public delegate Task DirectoryBrowser(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken = default);
+public delegate Task DirectoryBrowser(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken = default);

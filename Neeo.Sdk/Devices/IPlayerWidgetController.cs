@@ -33,7 +33,7 @@ public interface IPlayerWidgetController
     /// <param name="builder">Directory builder which can be used to populate the directory entries.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task BrowseQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken = default);
+    Task BrowseQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Asynchronously handles a request by the NEEO Brain to browse the root directory.
@@ -42,7 +42,7 @@ public interface IPlayerWidgetController
     /// <param name="builder">Directory builder which can be used to populate the directory entries.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task BrowseRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken = default);
+    Task BrowseRootDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Asynchronously gets the URL of the cover art for the currently playing item.

@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace Neeo.Sdk.Devices.Directories;
+﻿namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Defines a (clickable) image tile.
@@ -17,6 +15,5 @@ public sealed record class DirectoryTile(
     /// <summary>
     /// Tells the NEEO Brain that this is a Tile.
     /// </summary>
-    [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
     public bool IsTile { get; } = true;
 }

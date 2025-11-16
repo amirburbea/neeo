@@ -10,10 +10,11 @@ namespace Neeo.Drivers.Plex;
 
 public sealed class PlexMediaPlayerDeviceProvider(
     IHttpClientFactory httpClientFactory,
-    IPlexTokenStore tokenStore,
+    IPlexServerDiscovery serverDiscovery,
     IPlexServerManager serverManager,
+    IPlexTokenStore tokenStore,
     ILogger<PlexMediaPlayerDeviceProvider> logger
-) : PlexDeviceProviderBase(httpClientFactory, tokenStore, serverManager, logger, DeviceType.MediaPlayer, "Media Player"), IPlayerWidgetController
+) : PlexDeviceProviderBase(httpClientFactory, serverDiscovery, serverManager, tokenStore, logger, DeviceType.MediaPlayer, "Media Player"), IPlayerWidgetController
 {
     bool IPlayerWidgetController.IsQueueSupported => false;
 
@@ -23,13 +24,13 @@ public sealed class PlexMediaPlayerDeviceProvider(
 
     Task IPlayerWidgetController.BrowseQueueDirectoryAsync(
         string machineIdentifier,
-        DirectoryBuilder builder,
+        IDirectoryBuilder builder,
         CancellationToken cancellationToken
     ) => throw new NotSupportedException();
 
     Task IPlayerWidgetController.BrowseRootDirectoryAsync(
         string machineIdentifier,
-        DirectoryBuilder builder,
+        IDirectoryBuilder builder,
         CancellationToken cancellationToken
     ) => this.BrowseDirectoryAsync(machineIdentifier, builder, cancellationToken);
 

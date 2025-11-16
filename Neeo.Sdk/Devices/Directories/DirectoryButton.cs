@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Directories;
@@ -42,6 +41,5 @@ public sealed record class DirectoryButton(
     /// <summary>
     /// Tells the NEEO Brain that this is a Button.
     /// </summary>
-    [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
     public bool IsButton { get; } = true;
 }

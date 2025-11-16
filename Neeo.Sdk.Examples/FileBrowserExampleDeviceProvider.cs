@@ -23,7 +23,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static Task Browse(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+    private static Task Browse(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         int offset = builder.Parameters.Offset ?? 0;
         int limit = builder.Parameters.Limit;

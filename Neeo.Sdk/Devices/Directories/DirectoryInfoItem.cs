@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace Neeo.Sdk.Devices.Directories;
+﻿namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Represents an info item dialog in a directory.
@@ -21,7 +19,6 @@ public sealed record class DirectoryInfoItem(
     /// <summary>
     /// Tells the NEEO Brain that this is an info item.
     /// </summary>
-    [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
     public bool IsInfoItem { get; } = true;
 
     DirectoryItemType IDirectoryItem.Type => DirectoryItemType.InfoItem;

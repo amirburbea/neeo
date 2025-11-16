@@ -21,7 +21,7 @@ public interface IDirectoryFeature : IFeature
     /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<DirectoryBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken = default);
+    Task<DirectoryData> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Handle a request by a user to perform an action in a directory such as opening a file.
@@ -37,15 +37,15 @@ public interface IDirectoryFeature : IFeature
 
 internal sealed class DirectoryFeature(DirectoryBrowser browser, DirectoryActionHandler actionHandler, string browseIdentifier) : IDirectoryFeature
 {
-    public async Task<DirectoryBuilder> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken)
+    public async Task<DirectoryData> BrowseAsync(string deviceId, BrowseParameters parameters, CancellationToken cancellationToken)
     {
         DirectoryBuilder builder = new(
-            string.IsNullOrEmpty(browseIdentifier) || parameters.BrowseIdentifier is { Length: > 0 }
+            parameters.BrowseIdentifier is { Length: > 0 }
               ? parameters
               : parameters with { BrowseIdentifier = browseIdentifier } // Override.
         );
         await browser(deviceId, builder, cancellationToken).ConfigureAwait(false);
-        return builder;
+        return builder.Build();
     }
 
     public async Task<SuccessResponse> PerformActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)

@@ -1,13 +1,20 @@
 ﻿namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
-/// Metadata relating to the current state of a <see cref="DirectoryBuilder"/>.
+/// Metadata relating to the current state of a directory.
 /// </summary>
-/// <param name="directory">The directory instance.</param>
+/// <param name="totalItems">The total number of items in the directory.</param>
+/// <param name="totalMatchingItems">The total matching item count for the query (including data not on the current page).</param>
 /// <param name="current">Information about the current page of data.</param>
 /// <param name="previous">Information about the previous page of data if it exists (otherwise <see langword="null"/>).</param>
 /// <param name="next">Information about the next page of data if it exists (otherwise <see langword="null"/>).</param>
-public readonly struct DirectoryMetadata(DirectoryBuilder directory, DirectoryPageInfo current, DirectoryPageInfo? previous = null, DirectoryPageInfo? next = null)
+public readonly struct DirectoryMetadata(
+    int totalItems, 
+    int totalMatchingItems,
+    DirectoryPageInfo current, 
+    DirectoryPageInfo? previous = null, 
+    DirectoryPageInfo? next = null
+)
 {
     /// <summary>
     /// Gets information about the current page of data.
@@ -27,10 +34,10 @@ public readonly struct DirectoryMetadata(DirectoryBuilder directory, DirectoryPa
     /// <summary>
     /// Gets the total number of items in the directory.
     /// </summary>
-    public int TotalItems => directory.Items.Count;
+    public int TotalItems => totalItems;
 
     /// <summary>
     /// Gets the total matching item count for the query (including data not on the current page).
     /// </summary>
-    public int? TotalMatchingItems => directory.TotalMatchingItems;
+    public int TotalMatchingItems => totalMatchingItems;
 }

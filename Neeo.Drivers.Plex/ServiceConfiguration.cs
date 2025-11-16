@@ -6,9 +6,10 @@ namespace Neeo.Drivers.Plex;
 public sealed class ServiceConfiguration : IServiceConfiguration
 {
     public void ConfigureServices(IServiceCollection services) => services
+        .AddSingleton<IPlexServerDiscovery, PlexServerDiscovery>()
+        .AddSingleton<IPlexServerFactory, PlexServer.Factory>()
+        .AddSingleton<IPlexServerManager, PlexServerManager>()
         .AddSingleton<IPlexSettingsManager, PlexSettingsManager>()
         .AddSingleton<IPlexTokenStore, PlexTokenStore>()
-        .AddSingleton<IPlexServerManager, PlexServerManager>()
-        .AddSingleton<IPlexPlayerManagerFactory, PlexPlayerManager.Factory>()
         .AddHttpClient("plex", client => client.DefaultRequestHeaders.Accept.Add(new("application/json")));
 }

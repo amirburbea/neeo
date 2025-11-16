@@ -148,12 +148,12 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             return Enum.TryParse(actionIdentifier, out Pet pet) ? this.ChangeTrackAsync(deviceId, pet) : Task.CompletedTask;
         }
 
-        Task IPlayerWidgetController.BrowseQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+        Task IPlayerWidgetController.BrowseQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
 
-        public Task BrowseRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+        public Task BrowseRootDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
             {
