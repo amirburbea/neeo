@@ -6,6 +6,9 @@ namespace Neeo.Drivers.Plex;
 [JsonConverter(typeof(TextJsonConverter<MediaType>))]
 public enum MediaType
 {
+    [Text("movie")]
+    Movie = 0,
+
     [Text("episode")]
     Episode,
 

@@ -9,6 +9,7 @@ using System.Reactive.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -22,7 +23,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Plex;
 
-public abstract class PlexDeviceProviderBase(
+public abstract partial class PlexDeviceProviderBase(
     IHttpClientFactory httpClientFactory,
     IPlexServerDiscovery serverDiscovery,
     IPlexServerManager serverManager,
@@ -36,11 +37,11 @@ public abstract class PlexDeviceProviderBase(
     {
         { Buttons.Pause, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.Pause, token) },
         { Buttons.Play, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.Play, token) },
-        { Buttons.Stop, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.Stop, token) },
         { Buttons.Forward, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.StepForward, token) },
         { Buttons.Back, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.StepBack, token) },
         { Buttons.SkipForward,  (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.SkipNext, token) },
         { Buttons.SkipBackward, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.SkipPrevious, token) },
+        { Buttons.Stop, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.Stop, token) },
         { Buttons.CursorUp, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.MoveUp, token) },
         { Buttons.CursorDown, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.MoveDown, token) },
         { Buttons.CursorLeft, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.MoveLeft, token) },
@@ -68,15 +69,15 @@ public abstract class PlexDeviceProviderBase(
 
     protected Task BrowseDirectoryAsync(string machineIdentifier, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
-        if (this.GetServer(machineIdentifier) is not { } server)
+        if (this.GetServer(machineIdentifier) is not { } server || builder.BrowseIdentifier is not { } browseIdentifier)
         {
             return Task.CompletedTask;
         }
-        return builder.BrowseIdentifier switch
+        return browseIdentifier.IndexOf('.') is int index and > -1 ? browseIdentifier[..index] : browseIdentifier switch
         {
-            not { Length: > 0 } => this.BrowseRootMenuAsync(server, builder, cancellationToken),
-            ".player" => this.BrowsePlayersAsync(server, refresh: false, builder, cancellationToken),
-            ".player.refresh" => this.BrowsePlayersAsync(server, refresh: true, builder, cancellationToken),
+            "" => this.BrowseRootMenuAsync(server, builder,, cancellationToken),
+            "player" => this.BrowsePlayersAsync(server, refresh: browseIdentifier == "player.refresh", builder, cancellationToken),
+            "library" => this.BrowseLibraryAsync(server, LibraryBrowseIdentifier.Parse(browseIdentifier), builder, cancellationToken),
             _ => Task.CompletedTask,
         };
     }
@@ -93,7 +94,8 @@ public abstract class PlexDeviceProviderBase(
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, async (serverIds, _) => this._initialServerIds = serverIds)
         .RegisterInitializer(this.InitializeAsync)
         .AddButtonGroup(ButtonGroups.Power)
-        .SetManufacturer("Plex");
+        .SetManufacturer("Plex")
+        .SetDriverVersion(2);
 
     protected string GetCoverArt(string machineIdentifier) => this.GetCoverArt(this.GetServer(machineIdentifier)?.ActiveMedia);
 
@@ -185,12 +187,20 @@ public abstract class PlexDeviceProviderBase(
         _ => string.Empty,
     };
 
+    [GeneratedRegex(@"^library.(?<type>\d+)[.](?<library>\d+)(?<subKeys>([.]\w+)+)?$", RegexOptions.ExplicitCapture | RegexOptions.Compiled)]
+    private static partial Regex LibraryBrowseIdentifierRegex();
+
+    private Task BrowseLibraryAsync(IPlexServer server, LibraryBrowseIdentifier identifier, IDirectoryBuilder builder, CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
     private async Task BrowsePlayersAsync(IPlexServer server, bool refresh, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         var players = await server.ListPlayersAsync(refresh, cancellationToken).ConfigureAwait(false);
         if (players.Length == 0)
         {
-            builder.AddEntry(new(Title: "Clients not found!", Label: "Click to attempt reloading the list", BrowseIdentifier: ".player.refresh"));
+            builder.AddEntry(new(Title: "Clients not found!", Label: "Click to attempt reloading the list", BrowseIdentifier: "player.refresh"));
             return;
         }
         builder.AddHeader("Available Players");
@@ -198,7 +208,7 @@ public abstract class PlexDeviceProviderBase(
         {
             builder.AddEntry(new(
                 player.Name,
-                Label: player.IsOnline ? null : "(Offline)",
+                Label: player.IsOnline ? default : "(Offline)",
                 ThumbnailUri: this.GetEmbeddedResourceUrl(EmbeddedImage.Player),
                 ActionIdentifier: $"player.{player.MachineIdentifier}",
                 UIAction: DirectoryUIAction.Close
@@ -209,28 +219,29 @@ public abstract class PlexDeviceProviderBase(
     private async Task BrowseRootMenuAsync(IPlexServer server, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         builder
+            .SetTitle("Plex")
             .AddTileRow([new(this.GetEmbeddedResourceUrl(EmbeddedImage.Logo))])
             .AddEntry(new(
                 server.SelectedPlayerName is { } name ? $"Switch player ({name})" : "Select player",
-                BrowseIdentifier: ".player",
+                BrowseIdentifier: "player",
                 ThumbnailUri: this.GetEmbeddedResourceUrl(EmbeddedImage.Player)
             ));
         if (server.SelectedPlayer == null)
         {
             return;
         }
-        foreach (LibrarySection section in await server.GetLibrarySectionsAsync(cancellationToken).ConfigureAwait(false))
+        foreach (LibrarySectionInfo section in await server.GetLibrarySectionsAsync(cancellationToken).ConfigureAwait(false))
         {
             builder.AddEntry(new(
                 section.Title,
-                ThumbnailUri: this.GetEmbeddedResourceUrl(section.Type.GetMediaType() switch
+                ThumbnailUri: this.GetEmbeddedResourceUrl(section.Type switch
                 {
-                    MediaType.Music => EmbeddedImage.Music,
-                    MediaType.Video => EmbeddedImage.Movie,
-                    MediaType.Episode => EmbeddedImage.TVShow,
+                    LibrarySectionType.Artist => EmbeddedImage.Music,
+                    LibrarySectionType.Movie => EmbeddedImage.Movie,
+                    LibrarySectionType.Show => EmbeddedImage.TVShow,
                     _ => EmbeddedImage.Menu,
                 }),
-                BrowseIdentifier: $".library.{section.Key}"
+                BrowseIdentifier: new LibraryBrowseIdentifier(section.Type, section.Key)
             ));
         }
     }
@@ -457,6 +468,32 @@ public abstract class PlexDeviceProviderBase(
         }
     }
 
+    private readonly record struct LibraryBrowseIdentifier(LibrarySectionType SectionType, int Library, params string[] SubKeys)
+    {
+        public static implicit operator string(LibraryBrowseIdentifier identifier) => identifier.ToString();
+
+        public static LibraryBrowseIdentifier Parse(string identifier)
+        {
+            if (PlexDeviceProviderBase.LibraryBrowseIdentifierRegex().Match(identifier) is not { Success: true, Groups: { } groups })
+            {
+                return new();
+            }
+            return new LibraryBrowseIdentifier(
+                (LibrarySectionType)int.Parse(groups["type"].Value),
+                int.Parse(groups["library"].Value),
+                groups["subKeys"].Value is { Length: not 0 } subKeys ? subKeys[1..].Split('.') : []
+            );
+        }
+
+        public override string ToString() => new StringBuilder("library")
+            .Append('.')
+            .Append((int)this.SectionType)
+            .Append('.')
+            .Append(this.Library)
+            .Append(string.Join('.', this.SubKeys))
+            .ToString();
+    }
+
     protected enum EmbeddedImage
     {
         [Text("plex_logo.png")]
@@ -480,6 +517,8 @@ public abstract class PlexDeviceProviderBase(
 
     protected static class Components
     {
+        public const string RootDirectory = "ROOT_DIRECTORY";
+
         public static readonly PlexComponent CoverArt = "COVER_ART";
         public static readonly PlexComponent Description = "DESCRIPTION";
         public static readonly PlexComponent Player = "PLAYER";

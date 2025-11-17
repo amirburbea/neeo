@@ -55,12 +55,12 @@ partial class PlexServer
         string Protocol,
         string Product,
         string DeviceClass,
-        double ProtocolVersion,
+        int ProtocolVersion,
         PlayerCapabilities ProtocolCapabilities
     );
 
     private readonly record struct LibrarySectionsMediaContainer(
-        [property: JsonPropertyName("Directory")] LibrarySection[] Sections
+        [property: JsonPropertyName("Directory")] LibrarySectionInfo[] Sections
     );
 
     private record struct PlayStateNotification(

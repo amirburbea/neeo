@@ -18,7 +18,7 @@ public sealed class PlexRemoteDeviceProvider(
         .AddImageUrl(Components.CoverArt, "Cover Art", ImageSize.Large, this.GetCoverArt)
         .AddTextLabel(Components.Description, "Description", this.GetDescription)
         .AddTextLabel(Components.Title, "Title", this.GetTitle)
-        .AddDirectory("ROOT_DIRECTORY", "Menu", DirectoryRole.Root, this.BrowseDirectoryAsync, this.HandleDirectoryActionAsync)
+        .AddDirectory(Components.RootDirectory, "Menu", DirectoryRole.Root, this.BrowseDirectoryAsync, this.HandleDirectoryActionAsync)
         .AddButton(PlexRemoteDeviceProvider.ButtonHandlers.Keys.Aggregate(default(Buttons), (x, y) => x | y))
         // TV requires an input, so we add one though it remains unused.
         .AddButton("INPUT PLEX");
