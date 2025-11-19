@@ -18,6 +18,24 @@ public sealed class SdkService(
     ILogger<SdkService> logger
 ) : BackgroundService
 {
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (environmentTaskSource.Task.IsCompletedSuccessfully)
+            {
+                logger.LogInformation("Stopping server...");
+                ISdkEnvironment environment = await environmentTaskSource.Task.ConfigureAwait(false);
+                await environment.StopAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.UnhandledException -= SdkService.OnAppDomainUnhandledException;
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Brain brain;
@@ -39,30 +57,13 @@ public sealed class SdkService(
             applicationLifetime.StopApplication();
             return;
         }
-
-        AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
-        {
-            Exception exception = (Exception)eventArgs.ExceptionObject;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n🚨 Unhandled Exception caught by AppDomain:");
-            Console.WriteLine($"IsTerminating: {eventArgs.IsTerminating}");
-            Console.WriteLine($"Type: {exception.GetType().FullName}");
-            Console.WriteLine($"Message: {exception.Message}");
-            Console.WriteLine($"StackTrace:\n{exception.StackTrace}");
-            Console.ResetColor();
-        };
-
-
+        AppDomain.CurrentDomain.UnhandledException += SdkService.OnAppDomainUnhandledException;
         logger.LogInformation("Using Brain {Name} at {Endpoint}...", brain.HostName, brain.ServiceEndPoint);
         ISdkEnvironment environment = await brain.StartServerAsync([.. providers], name: configuration.GetValue<string>("ServerName"), cancellationToken: stoppingToken).ConfigureAwait(false);
         environmentTaskSource.TrySetResult(environment);
         logger.LogInformation("Started server at address {Address}...", environment.HostAddress);
-        TaskCompletionSource stoppingTaskSource = new();
-        stoppingToken.Register(ProcessStopRequestAsync);
-        {
-            logger.LogInformation("Brain WebUI is running at http://{IPAddress}:3200/eui", brain.IPAddress);
-            await stoppingTaskSource.Task.ConfigureAwait(false);
-        }
+        logger.LogInformation("Brain WebUI is running at http://{IPAddress}:3200/eui", brain.IPAddress);
+        await Task.Delay(Timeout.Infinite, stoppingToken).ConfigureAwait(false);
 
         async ValueTask<Brain> GetBrainAsync()
         {
@@ -77,11 +78,17 @@ public sealed class SdkService(
             }
             return brain;
         }
+    }
 
-        async void ProcessStopRequestAsync()
-        {
-            await environment.StopAsync(default).ConfigureAwait(false);
-            stoppingTaskSource.TrySetResult();
-        }
+    private static void OnAppDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
+    {
+        Exception exception = (Exception)e.ExceptionObject;
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"\n🚨 Unhandled Exception caught by AppDomain:");
+        Console.WriteLine($"IsTerminating: {e.IsTerminating}");
+        Console.WriteLine($"Type: {exception.GetType().FullName}");
+        Console.WriteLine($"Message: {exception.Message}");
+        Console.WriteLine($"StackTrace:\n{exception.StackTrace}");
+        Console.ResetColor();
     }
 }

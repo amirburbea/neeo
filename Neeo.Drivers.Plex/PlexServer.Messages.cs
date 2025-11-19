@@ -1,10 +1,34 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
+using Org.BouncyCastle.Asn1.Cms;
 
 namespace Neeo.Drivers.Plex;
 
 partial class PlexServer
 {
+    [JsonConverter(typeof(TextJsonConverter<LibraryDirectoryType>))]
+    public enum LibraryDirectoryType
+    {
+        [Text("movie")]
+        Movie = 0,
+
+        [Text("show")]
+        Show,
+
+        [Text("artist")]
+        Artist,
+
+        [Text("photo")]
+        Photo,
+
+        [Text("album")]
+        Album,
+
+        [Text("Season")]
+        Season,
+    }
+
     [JsonConverter(typeof(TextJsonConverter<ServerNotificationType>))]
     private enum ServerNotificationType
     {
@@ -59,10 +83,6 @@ partial class PlexServer
         PlayerCapabilities ProtocolCapabilities
     );
 
-    private readonly record struct LibrarySectionsMediaContainer(
-        [property: JsonPropertyName("Directory")] LibrarySectionInfo[] Sections
-    );
-
     private record struct PlayStateNotification(
         string ClientIdentifier,
         string Guid,
@@ -103,13 +123,30 @@ partial class PlexServer
         [property: JsonPropertyName("thumb")] string? Thumbnail = null
     );
 
-    [JsonConverter(typeof(TextJsonConverter<VideoType>))]
-    private enum VideoType
+    private record struct LibraryDirectory(
+        string Key,
+        string Title,
+        bool Secondary = false,
+        int? RatingKey = null,
+        [property: JsonPropertyName("thumb")] string? Thumbnail = null,
+        LibraryDirectoryType? Type = null,
+        int? Size = null
+    )
     {
-        [Text("episode")]
-        Episode = 0,
-
-        [Text("movie")]
-        Movie = 1,
+        [JsonExtensionData]
+        public Dictionary<string, object> ExtensionData { get; set; } = [];
     }
+
+    private record struct LibraryMediaContainer(
+        [property: JsonPropertyName("title1")] string Title,
+        [property: JsonPropertyName("Directory")] LibraryDirectory[]? Directories,
+        [property: JsonPropertyName("Metadata")] MediaItemMetadata[]? Metadata,
+        int TotalSize,
+        [property: JsonPropertyName("title2")] string? Subtitle = null,
+        [property: JsonPropertyName("thumb")] string? Thumbnail = null,
+        [property: JsonPropertyName("librarySectionID")] int? LibrarySectionId = null,
+        string? ViewGroup = null,
+        string? Art = null
+    );
+
 }

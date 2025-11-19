@@ -4,8 +4,13 @@ namespace Neeo.Drivers.Plex;
 
 public enum NavigationCommand
 {
+    [Text("back")]
     Back,
+
+    [Text("contextMenu")]
     ContextMenu,
+
+    [Text("home")]
     Home,
 
     [Text("moveUp")]
@@ -23,8 +28,15 @@ public enum NavigationCommand
     [Text("select")]
     Select,
 
+    [Text("nextLetter")]
     NextLetter,
+
+    [Text("previousLetter")]
     PreviousLetter,
-    PageUp, 
+
+    [Text("pageUp")]
+    PageUp,
+
+    [Text("pageDown")]
     PageDown,
 }

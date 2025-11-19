@@ -1,6 +1,6 @@
 # C# NEEO SDK & Drivers
 
-This is a port of the [NEEO SDK](https://github.com/NEEOInc/neeo-sdk) from node.js to modern C# 12 and (cross-platform) .NET 10; that said, the feature set has made the transition but some of the idioms and semantics have changed.  
+This is a port of the [NEEO SDK](https://github.com/NEEOInc/neeo-sdk) from node.js to modern C# 14 and (cross-platform) .NET 10; that said, the feature set has made the transition but some of the idioms and semantics have changed.  
 
 While I realize this may cause an issue for some developers with extensive knowledge of the JS/TS NEEO SDK, considering the size of that developer base, I'm certain the tradeoffs are worth it for increased code clarity and readability.
 

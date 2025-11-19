@@ -16,7 +16,7 @@ public interface IDirectoryBuilder
     /// <summary>
     /// Gets a value indicating if the current directory page is not full.
     /// </summary>
-    bool CanAddEntry => this.EntryCount < this.Limit;
+    bool CanAddEntry => this.EntryCount < this.Parameters.Limit;
 
     /// <summary>
     /// Gets the number of entries in the directory.
@@ -27,16 +27,6 @@ public interface IDirectoryBuilder
     /// Gets the items within the directory.
     /// </summary>
     IReadOnlyCollection<IDirectoryItem> Items { get; }
-
-    /// <summary>
-    /// For pagination, gets the upper limit for number of entries to return in a single page.
-    /// </summary>
-    int Limit { get; }
-
-    /// <summary>
-    /// For pagination, gets the offset from 0.
-    /// </summary>
-    int Offset { get; }
 
     /// <summary>
     /// The parameters used to construct this directory.
@@ -115,14 +105,14 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
     public string Title { get; private set; } = string.Empty;
     public int TotalMatchingItems { get; private set; }
     public string BrowseIdentifier => parameters.BrowseIdentifier;
-    public int Limit => parameters.Limit is > 0 and <= Constants.MaxItems and { } limit ? limit : Constants.MaxItems;
-    public int Offset => parameters.Offset is int startIndex and > 0 ? startIndex : 0;
 
     public DirectoryBuilder AddButtonRow(params DirectoryButton[] buttons)
     {
-        return buttons is { Length: > 0 and <= Constants.MaxButtonsPerRow }
-            ? this.AddItem(new DirectoryButtonRow(buttons))
-            : throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxButtonsPerRow}.", nameof(buttons));
+        if (buttons is not { Length: > 0 and <= Constants.MaxButtonsPerRow })
+        {
+            throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxButtonsPerRow}.", nameof(buttons));
+        }
+        return this.AddItem(new DirectoryButtonRow(buttons));
     }
 
     public DirectoryBuilder AddEntry(DirectoryEntry entry)
@@ -142,9 +132,11 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
 
     public DirectoryBuilder AddTileRow(params DirectoryTile[] tiles)
     {
-        return tiles is { Length: > 0 and <= Constants.MaxTilesPerRow }
-            ? this.AddItem(new DirectoryTileRow(tiles))
-            : throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxTilesPerRow}.", nameof(tiles));
+        if (tiles is not { Length: > 0 and <= Constants.MaxTilesPerRow })
+        {
+            throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxTilesPerRow}.", nameof(tiles));
+        }
+        return this.AddItem(new DirectoryTileRow(tiles));
     }
 
     public DirectoryData Build() => new(
@@ -168,22 +160,16 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
     }
 
     IDirectoryBuilder IDirectoryBuilder.AddButtonRow(params DirectoryButton[] buttons) => this.AddButtonRow(buttons);
-
     IDirectoryBuilder IDirectoryBuilder.AddEntry(DirectoryEntry entry) => this.AddEntry(entry);
-
     IDirectoryBuilder IDirectoryBuilder.AddHeader(string title) => this.AddHeader(title);
-
     IDirectoryBuilder IDirectoryBuilder.AddInfoItem(DirectoryInfoItem infoItem) => this.AddInfoItem(infoItem);
-
     IDirectoryBuilder IDirectoryBuilder.AddTileRow(params DirectoryTile[] tiles) => this.AddTileRow(tiles);
-
     IDirectoryBuilder IDirectoryBuilder.SetTitle(string title) => this.SetTitle(title);
-
     IDirectoryBuilder IDirectoryBuilder.SetTotalMatchingItems(int totalMatchingItems) => this.SetTotalMatchingItems(totalMatchingItems);
 
     private DirectoryBuilder AddItem(IDirectoryItem item)
     {
-        if (this.EntryCount == this.Limit)
+        if (this.EntryCount == this.Parameters.Limit)
         {
             throw new InvalidOperationException("Can not add more entries");
         }

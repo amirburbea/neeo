@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.WebSockets;
 using System.Reactive;
@@ -25,6 +24,7 @@ public interface IPlexServer : IDisposable
     IObservable<Unit> Disposed { get; }
     bool IsConnected { get; }
     IObservable<bool> IsConnectedChanged { get; }
+    IMediaLibrary Library { get; }
     string MachineIdentifier { get; }
     string Name { get; }
     PlayState PlayState { get; }
@@ -34,11 +34,9 @@ public interface IPlexServer : IDisposable
     string? SelectedPlayerName { get; }
     ServerData ServerData { get; }
 
-    Task<LibrarySectionInfo[]> GetLibrarySectionsAsync(CancellationToken cancellationToken = default);
+    Task<PlayerData[]> GetPlayersAsync(bool refresh = false, CancellationToken cancellationToken = default);
 
     Task InitializeAsync(CancellationToken cancellationToken = default);
-
-    Task<PlayerData[]> ListPlayersAsync(bool refresh = false, CancellationToken cancellationToken = default);
 
     Task PlayMediaAsync(MediaItem item, CancellationToken cancellationToken = default);
 
@@ -51,22 +49,31 @@ public interface IPlexServer : IDisposable
     Task SendPlaybackCommandAsync(PlaybackCommand command, CancellationToken cancellationToken = default);
 }
 
-public interface IPlexServerFactory
+public enum LibrarySectionType
 {
-    IPlexServer Create(string machineIdentifier);
+    Movie = 0,
+    Show,
+    Artist,
 }
+
+public record struct MediaDirectory(
+    string Title,
+    int TotalSize,
+    MediaItem[] Items,
+    Uri? Thumbnail
+);
 
 internal sealed partial class PlexServer : IPlexServer, IDisposable
 {
     private readonly BehaviorSubject<MediaItem?> _activeMedia = new(null);
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    private readonly Lazy<Task> _connectionTask;
     private readonly CompositeDisposable _disposable;
     private readonly string _fileName;
     private readonly HttpClient _httpClient;
     private readonly TaskCompletionSource _initializationTaskSource = new();
     private readonly BehaviorSubject<bool> _isConnected = new(false);
     private readonly Subject<Unit> _isDisposed = new();
+    private readonly MediaLibrary _library;
     private readonly ILogger _logger;
     private readonly Lazy<IDisposable> _playerDiscoverySubscription;
     private readonly TaskCompletionSource _playerDiscoveryTaskSource = new();
@@ -74,27 +81,29 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     private readonly BehaviorSubject<PlayState> _playState = new(PlayState.Stopped);
     private readonly BehaviorSubject<int?> _ratingKey = new(null);
     private readonly BehaviorSubject<string?> _selectedPlayerId = new(null);
-    private readonly IPlexServerDiscovery _serverDiscovery;
+    private readonly Func<ServerData> _serverDataLookup;
     private readonly IPlexSettingsManager _settingsManager;
+    private readonly Lazy<Task> _socketTask;
     private readonly IPlexTokenStore _tokenStore;
     private long _commandId;
 
-    private PlexServer(
+    public PlexServer(
         string machineIdentifier,
         HttpClient httpClient,
         IPlexSettingsManager settingsManager,
-        IPlexServerDiscovery serverDiscovery,
         IPlexTokenStore tokenStore,
+        Func<ServerData> lookupServerData,
         ILogger<PlexServer> logger
     )
     {
         this.MachineIdentifier = machineIdentifier;
-        this._serverDiscovery = serverDiscovery;
+        this._serverDataLookup = lookupServerData;
         this._tokenStore = tokenStore;
         this._fileName = $"plex_{Convert.ToBase64String(Encoding.UTF8.GetBytes(machineIdentifier)).TrimEnd('=')}.json";
         this._httpClient = httpClient;
         this._settingsManager = settingsManager;
         this._logger = logger;
+        this._library = new(this);
         this._disposable = new(
             this._activeMedia,
             this._isConnected,
@@ -117,14 +126,17 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             .CombineLatest(this._players, (id, players) => PlexServer.GetPlayerById(players, id))
             .DistinctUntilChanged()
             .TakeUntil(this._cancellationTokenSource.Token);
-        IObservable<Unit> interval = Observable.Interval(TimeSpan.FromSeconds(30d))
-            .StartWith(0L)
-            .Select(_ => Observable.FromAsync(this.DiscoverPlayersAsync))
-            .Switch()
-            .Do(_ => this._playerDiscoveryTaskSource.TrySetResult())
-            .TakeUntil(this._cancellationTokenSource.Token);
-        this._playerDiscoverySubscription = new(interval.Subscribe, LazyThreadSafetyMode.ExecutionAndPublication);
-        this._connectionTask = new(this.ConnectSocketAsync, LazyThreadSafetyMode.ExecutionAndPublication);
+        this._playerDiscoverySubscription = new(
+            () => Observable.Interval(TimeSpan.FromSeconds(30d))
+                .StartWith(0L)
+                .Select(_ => Observable.FromAsync(this.DiscoverPlayersAsync))
+                .Switch()
+                .Do(_ => this._playerDiscoveryTaskSource.TrySetResult())
+                .TakeUntil(this._cancellationTokenSource.Token)
+                .Subscribe(),
+            LazyThreadSafetyMode.ExecutionAndPublication
+        );
+        this._socketTask = new(this.ConnectSocketAsync, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public MediaItem? ActiveMedia => this._activeMedia.Value;
@@ -132,16 +144,60 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     public IObservable<Unit> Disposed => this._isDisposed;
     public bool IsConnected => this._isConnected.Value;
     public IObservable<bool> IsConnectedChanged => this._isConnected;
+    public IMediaLibrary Library => this._library;
     public string MachineIdentifier { get; }
     public PlayState PlayState => this._playState.Value;
     public IObservable<PlayState> PlayStateChanged => this._playState;
     public PlayerData? SelectedPlayer => PlexServer.GetPlayerById(this._players.Value, this._selectedPlayerId.Value);
     public IObservable<PlayerData?> SelectedPlayerChanged { get; }
     public string? SelectedPlayerName => this.SelectedPlayer?.Name;
-    public ServerData ServerData => this._serverDiscovery.Data[this.MachineIdentifier];
+    public ServerData ServerData => this._serverDataLookup();
     public string IPAddress => this.ServerData.IPAddress;
     public string Name => this.ServerData.Name;
     public int Port => this.ServerData.Port;
+
+    public async Task DiscoverPlayersAsync(CancellationToken cancellationToken)
+    {
+        if (await this._httpClient.GetAsync<Response<ClientsMediaContainer>>(this.GetUri("clients"), this.AddTokenHeaders, cancellationToken).ConfigureAwait(false) is not { MediaContainer.Clients: { } clients })
+        {
+            return;
+        }
+        ClientServer[] onlineClients = [.. clients.Where(client => client.ProtocolVersion == 1 && (client.ProtocolCapabilities & PlayerCapabilities.Playback) == PlayerCapabilities.Playback)];
+        ImmutableDictionary<string, PlayerData> previous = this._players.Value;
+        if (previous.Count == 0 && onlineClients.Length == 0)
+        {
+            return;
+        }
+        Dictionary<string, PlayerData> onlinePlayers = onlineClients.ToDictionary(
+            client => client.MachineIdentifier,
+            client => new PlayerData(
+                client.Name,
+                client.MachineIdentifier,
+                client.ProtocolCapabilities,
+                client.Address,
+                client.Port,
+                client.Product
+            )
+        );
+        if (onlinePlayers.Keys.All(previous.ContainsKey) &&
+            previous.Values.All(player => !onlinePlayers.TryGetValue(player.MachineIdentifier, out PlayerData onlinePlayer) ? !player.IsOnline : onlinePlayer.Equals(player)))
+        {
+            return;
+        }
+        Dictionary<string, PlayerData> next = [];
+        foreach ((string id, PlayerData previousPlayer) in previous)
+        {
+            if (!onlinePlayers.ContainsKey(id))
+            {
+                next.Add(id, previousPlayer with { IsOnline = false });
+            }
+        }
+        foreach ((string id, PlayerData player) in onlinePlayers)
+        {
+            next.Add(id, player);
+        }
+        this._players.OnNext(next.ToImmutableDictionary());
+    }
 
     public void Dispose()
     {
@@ -150,31 +206,11 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         {
             this._playerDiscoverySubscription.Value.Dispose();
         }
-        if (this._connectionTask.IsValueCreated)
-        {
-            this._connectionTask.Value.Wait();
-        }
         this._isDisposed.OnNext(default);
         this._disposable.Dispose();
     }
 
-    public async Task<LibrarySectionInfo[]> GetLibrarySectionsAsync(CancellationToken cancellationToken)
-    {
-        Response<LibrarySectionsMediaContainer> container = await this._httpClient.GetAsync<Response<LibrarySectionsMediaContainer>>(
-            this.GetUri("library/sections"),
-            cancellationToken: cancellationToken
-        ).ConfigureAwait(false);
-        return container.MediaContainer.Sections;
-    }
-
-    public Task InitializeAsync(CancellationToken cancellationToken)
-    {
-        _ = this._connectionTask.Value;
-        _ = this._playerDiscoverySubscription.Value;
-        return this._initializationTaskSource.Task.WaitAsync(cancellationToken);
-    }
-
-    public async Task<PlayerData[]> ListPlayersAsync(bool refresh, CancellationToken cancellationToken)
+    public async Task<PlayerData[]> GetPlayersAsync(bool refresh, CancellationToken cancellationToken)
     {
         if (refresh)
         {
@@ -183,11 +219,23 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         return [.. this._players.Value.Values];
     }
 
+    public Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        _ = this._socketTask.Value;
+        _ = this._playerDiscoverySubscription.Value;
+        return this._initializationTaskSource.Task.WaitAsync(cancellationToken);
+    }
+
     public async Task PlayMediaAsync(MediaItem media, CancellationToken cancellationToken)
     {
-        await this.SendPlaybackCommandAsync(PlaybackCommand.Stop, cancellationToken).ConfigureAwait(false);
-        int playQueueId = await this.CreatePlayQueueAsync(media, cancellationToken).ConfigureAwait(false);
-        // The remaining commands switch to this instance's cancellation token.
+        await this.SendPlayerCommandAsync("timeline/poll", [("wait", "0")], cancellationToken).ConfigureAwait(false);
+        await this.SendPlaybackCommandAsync(PlaybackCommand.Stop, this._activeMedia.Value?.Type ?? media.Type, cancellationToken).ConfigureAwait(false);
+        await this.SendPlayerCommandAsync("timeline/poll", [("wait", "0")], cancellationToken).ConfigureAwait(false);
+
+        // The remaining commands switch to this instance's cancellation token. int playQueueId =
+        // await this.CreatePlayQueueAsync(media, this._cancellationTokenSource.Token).ConfigureAwait(false);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500d), this._cancellationTokenSource.Token).ConfigureAwait(false);
         await this.SendPlayerCommandAsync(
             "playback/playMedia",
             [
@@ -199,11 +247,13 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 ("offset", "0"),
                 ("key", $"/library/metadata/{media.RatingKey}"),
                 ("type", TextAttribute.GetText(media.Type)),
-                ("containerKey", $"/playQueues/{playQueueId}?window=100&own=1")
             ],
             this._cancellationTokenSource.Token
         ).ConfigureAwait(false);
-        await this.SendPlayerCommandAsync("timeline/poll", [("wait", "1")], this._cancellationTokenSource.Token).ConfigureAwait(false);
+        await Task.Delay(TimeSpan.FromMilliseconds(500d), this._cancellationTokenSource.Token).ConfigureAwait(false);
+
+        await this.SendPlayerCommandAsync("timeline/poll", [("wait", "1")], cancellationToken).ConfigureAwait(false);
+        await this.SendPlaybackCommandAsync(PlaybackCommand.Play, media.Type, this._cancellationTokenSource.Token).ConfigureAwait(false);
     }
 
     public async Task PlayMediaAsync(int ratingKey, CancellationToken cancellationToken)
@@ -219,55 +269,59 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         return this.SendPlayerCommandAsync($"navigation/{TextAttribute.GetText(command)}", cancellationToken: cancellationToken);
     }
 
-    public Task SendPlaybackCommandAsync(PlaybackCommand command, CancellationToken cancellationToken)
+    public async Task SendPlaybackCommandAsync(PlaybackCommand command, CancellationToken cancellationToken)
     {
-        if (this._activeMedia.Value is not { Type: { } type })
+        if (this._activeMedia.Value is { Type: { } type })
         {
-            return Task.CompletedTask;
+            await this.SendPlaybackCommandAsync(command, type, cancellationToken).ConfigureAwait(false);
         }
-        return this.SendPlayerCommandAsync(
-            $"playback/{TextAttribute.GetText(command)}",
-            queryParameters: [("type", TextAttribute.GetText(type))],
-            cancellationToken: cancellationToken
-        );
     }
+
+    private MediaItem CreateMediaItem(MediaItemMetadata metadata) => new(
+        metadata.RatingKey,
+        metadata.Type,
+        metadata.Title,
+        metadata.Summary,
+        metadata.Thumbnail is { } url ? this.GetImageUri(url) : null
+    );
 
     Task IPlexServer.SelectPlayerAsync(string playerIdentifier, CancellationToken cancellationToken) => this.SelectPlayerAsync(playerIdentifier, cancellationToken);
 
-    private async Task<PlayerData?> SelectPlayerAsync(string playerIdentifier, CancellationToken cancellationToken)
-    {
-        this._logger.LogInformation("Selecting player {Identifier}", playerIdentifier);
-        if (await ResolvePlayerAsync().ConfigureAwait(false) is not { } player)
-        {
-            return default;
-        }
-        if (this._selectedPlayerId.Value != playerIdentifier)
-        {
-            this.SaveSelectedPlayer(player);
-            this._selectedPlayerId.OnNext(playerIdentifier);
-        }
-        return player;
+    private Task SendPlaybackCommandAsync(PlaybackCommand command, MediaType type, CancellationToken cancellationToken) => this.SendPlayerCommandAsync(
+        $"playback/{TextAttribute.GetText(command)}",
+        queryParameters: [("type", TextAttribute.GetText(type))],
+        cancellationToken: cancellationToken
+    );
 
-        async ValueTask<PlayerData?> ResolvePlayerAsync()
-        {
-            if (this._players.Value.TryGetValue(playerIdentifier, out PlayerData player))
-            {
-                return player;
-            }
-            await this.DiscoverPlayersAsync(cancellationToken).ConfigureAwait(false);
-            return this._players.Value.TryGetValue(playerIdentifier, out player) ? player : default(PlayerData?);
-        }
+    private static PlayerData? GetPlayerById(ImmutableDictionary<string, PlayerData> players, string? playerId)
+    {
+        return playerId != null && players.TryGetValue(playerId, out PlayerData player) ? player : null;
     }
 
-    private static PlayerData? GetPlayerById(ImmutableDictionary<string, PlayerData> players, string? id) => id switch
+    private void AddTokenHeaders(HttpRequestMessage request)
     {
-        { } playerId when players.TryGetValue(playerId, out PlayerData player) => player,
-        _ => null
-    };
+        request.Headers.Add("X-Plex-Token", this._tokenStore.AuthToken);
+        request.Headers.Add("X-Plex-Client-Identifier", this._tokenStore.ClientIdentifier);
+    }
+
+    private async Task<LibraryMediaContainer> BrowseLibraryAsync(string? suffix, PaginationParameters? pagination = null, CancellationToken cancellationToken = default)
+    {
+        Response<LibraryMediaContainer> response = await this._httpClient.GetAsync<Response<LibraryMediaContainer>>(
+            this.GetUri(
+                $"library/sections{(suffix == null ? string.Empty : $"/{suffix}")}",
+                pagination is { } parameters
+                    ? [("X-Plex-Container-Start", $"{parameters.Offset}"), ("X-Plex-Container-Size", $"{parameters.PageSize}")]
+                    : []
+            ),
+            this.AddTokenHeaders,
+            cancellationToken
+        ).ConfigureAwait(false);
+        return response.MediaContainer;
+    }
 
     private async Task ConnectSocketAsync()
     {
-        Uri uri = this.GetUri(":/websockets/notifications", "ws");
+        Uri uri = this.GetUri(Uri.UriSchemeWs, ":/websockets/notifications");
         while (!this._cancellationTokenSource.IsCancellationRequested)
         {
             // Disable keep-alive pings, Plex server does not support them.
@@ -293,10 +347,13 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 }
                 await JsonWebSocket.MessageLoop<ServerMessage>(
                     webSocket,
-                    (message, _) => message.Container switch
+                    (message, _) =>
                     {
-                        { Type: ServerNotificationType.Playing, Notifications: { Length: > 0 } notifications } => this.ProcessNotificationsAsync(notifications),
-                        _ => Task.CompletedTask
+                        if (message.Container is { Type: ServerNotificationType.Playing, Notifications: { Length: > 0 } notifications })
+                        {
+                            this.ProcessNotifications(notifications);
+                        }
+                        return Task.CompletedTask;
                     },
                     cancellationToken: this._cancellationTokenSource.Token
                 ).ConfigureAwait(false);
@@ -330,132 +387,73 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 ("uri", $"server://{this.MachineIdentifier}/com.plexapp.plugins.library/library/metadata/{media.RatingKey}")
             ]
         );
-        return await this._httpClient.PostAsync<Response<JsonElement>>(uri, null, cancellationToken).ConfigureAwait(false) switch
-        {
-            { MediaContainer: { } element } => element.GetProperty("playQueueID").GetInt32()
-        };
+        JsonElement element = (await this._httpClient.PostAsync<Response<JsonElement>>(uri, this.AddTokenHeaders, cancellationToken).ConfigureAwait(false)).MediaContainer;
+        return element.GetProperty("playQueueID").GetInt32();
     }
 
-    private async Task DiscoverPlayersAsync(CancellationToken cancellationToken)
+    private Uri GetImageUri(string url) => this.GetUri($"photo/:/transcode", queryParameters: ("url", url));
+
+    private Uri GetUri(string scheme, string path, params (string Key, string Value)[] queryParameters)
     {
-        ClientServer[] onlineClients = await QueryClientsAsync(cancellationToken).ConfigureAwait(false);
-        ImmutableDictionary<string, PlayerData> previous = this._players.Value;
-        if (previous.Count == 0 && onlineClients.Length == 0)
+        UriBuilder builder = new(scheme, this.IPAddress, this.Port, path);
+        if (queryParameters.Length != 0)
         {
-            return;
+            builder.Query = string.Join('&', queryParameters.Select(entry => $"{entry.Key}={Uri.EscapeDataString(entry.Value)}"));
         }
-        Dictionary<string, PlayerData> onlinePlayers = onlineClients.ToDictionary(client => client.MachineIdentifier, CreatePlayer);
-        if (previous.Count == 0)
-        {
-            this._players.OnNext(onlinePlayers.ToImmutableDictionary());
-            return;
-        }
-        if (!IsChanged(previous, onlinePlayers))
-        {
-            return;
-        }
-        Dictionary<string, PlayerData> next = [];
-        foreach ((string id, PlayerData previousPlayer) in previous)
-        {
-            if (!onlinePlayers.ContainsKey(id))
-            {
-                next.Add(id, previousPlayer with { IsOnline = false });
-            }
-        }
-        foreach ((string id, PlayerData player) in onlinePlayers)
-        {
-            next.Add(id, player);
-        }
-        this._players.OnNext(next.ToImmutableDictionary());
-
-        async Task<ClientServer[]> QueryClientsAsync(CancellationToken cancellationToken)
-        {
-            return await this._httpClient.GetAsync<Response<ClientsMediaContainer>>(this.GetUri("clients"), null, cancellationToken).ConfigureAwait(false) is { MediaContainer.Clients: { } clients }
-                ? [.. clients.Where(client => client.ProtocolVersion == 1 && (client.ProtocolCapabilities & PlayerCapabilities.Playback) == PlayerCapabilities.Playback)]
-                : [];
-        }
-
-        static bool IsChanged(IReadOnlyDictionary<string, PlayerData> current, IReadOnlyDictionary<string, PlayerData> onlinePlayers) => (
-            onlinePlayers.Keys.Any(key => !current.ContainsKey(key)) ||
-            current.Values.Any(current => onlinePlayers.TryGetValue(current.MachineIdentifier, out PlayerData next) ? !current.Equals(next) : current.IsOnline)
-        );
-
-        static PlayerData CreatePlayer(ClientServer client) => new(
-            client.Name,
-            client.MachineIdentifier,
-            client.ProtocolCapabilities,
-            client.Address,
-            client.Port,
-            client.Product
-        );
+        return builder.Uri;
     }
 
-    private Uri GetUri(string pathSuffix, string protocol = "http", params (string, string)[] queryParameters)
-    {
-        StringBuilder builder = new StringBuilder(protocol)
-            .Append("://")
-            .Append(this.IPAddress)
-            .Append(':')
-            .Append(this.Port)
-            .Append('/')
-            .Append(pathSuffix);
-        for (int index = 0; index < queryParameters.Length; index++)
-        {
-            (string key, string value) = queryParameters[index];
-            builder
-                .Append(index == 0 ? '?' : '&')
-                .Append($"{key}={WebUtility.UrlEncode(value)}");
-        }
-        return new(builder.ToString());
-    }
+    private Uri GetUri(string path, params (string Key, string Value)[] queryParameters) => this.GetUri(Uri.UriSchemeHttp, path, queryParameters);
 
-    private async Task ProcessNotificationsAsync(PlayStateNotification[] notifications)
+    private void ProcessNotifications(PlayStateNotification[] notifications)
     {
         if (this._selectedPlayerId.Value is not { } playerId)
         {
-            string id = notifications[0].ClientIdentifier;
-            if (await this.SelectPlayerAsync(id, this._cancellationTokenSource.Token).ConfigureAwait(false) is null)
-            {
-                // Notification is for a player we don't know about.
-                return;
-            }
-            playerId = id;
+            return;
         }
-        if (Array.FindIndex(notifications, notification => notification.ClientIdentifier == playerId) is int index and not -1)
+        int index = Array.FindIndex(notifications, notification => notification.ClientIdentifier == playerId);
+        if (index == -1)
         {
-            PlayStateNotification notification = notifications[index];
-            this._playState.OnNext(notification.State);
-            this._ratingKey.OnNext(notification.RatingKey);
+            return;
         }
+        PlayStateNotification notification = notifications[index];
+        this._playState.OnNext(notification.State);
+        this._ratingKey.OnNext(notification.RatingKey);
     }
 
     private async Task<MediaItem?> QueryMediaItemAsync(int ratingKey, CancellationToken cancellationToken)
     {
-        string json = (await this._httpClient.GetAsync<JsonElement>(
-            this.GetUri($"library/metadata/{ratingKey}"),
-            cancellationToken: cancellationToken
-        ).ConfigureAwait(false)).ToString();
-
         Response<MediaItemDetailContainer> response = await this._httpClient.GetAsync<Response<MediaItemDetailContainer>>(
             this.GetUri($"library/metadata/{ratingKey}"),
-            cancellationToken: cancellationToken
+            this.AddTokenHeaders,
+            cancellationToken
         ).ConfigureAwait(false);
-        if (response.MediaContainer.Metadata is not [{ } metadata, ..])
-        {
-            return null;
-        }
-        return new(
-            metadata.RatingKey,
-            metadata.Type,
-            metadata.Title,
-            metadata.Summary,
-            metadata.Thumbnail is { Length: not 0 } url ? this.GetUri($"photo/:/transcode", queryParameters: ("url", url)) : null
-        );
+        return response.MediaContainer.Metadata is [{ } metadata, ..] ? this.CreateMediaItem(metadata) : null;
     }
 
     private void SaveSelectedPlayer(PlayerData player)
     {
         this._settingsManager.WriteAllBytes(this._fileName, JsonSerializer.SerializeToUtf8Bytes(player, JsonSerializerOptions.Web));
+    }
+
+    private async Task<PlayerData?> SelectPlayerAsync(string playerIdentifier, CancellationToken cancellationToken)
+    {
+        this._logger.LogInformation("Selecting player {Identifier}", playerIdentifier);
+        if (!this._players.Value.TryGetValue(playerIdentifier, out PlayerData player))
+        {
+            await this.DiscoverPlayersAsync(cancellationToken).ConfigureAwait(false);
+            if (!this._players.Value.TryGetValue(playerIdentifier, out player))
+            {
+                this._logger.LogWarning("Can not select player {Id} - not found.", playerIdentifier);
+                return null;
+            }
+        }
+        if (this._selectedPlayerId.Value != playerIdentifier)
+        {
+            this.SaveSelectedPlayer(player);
+            this._selectedPlayerId.OnNext(playerIdentifier);
+        }
+        return player;
     }
 
     private async Task SendPlayerCommandAsync(string command, (string, string)[]? queryParameters = null, CancellationToken cancellationToken = default)
@@ -469,16 +467,15 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             this._logger.LogWarning("Player does not support {Capability}, errors may occur.", Enum.GetName(capability));
         }
         long commandId = Interlocked.Increment(ref this._commandId);
-        Uri uri = this.GetUri($"player/{command}", queryParameters: [.. queryParameters ?? [], ("commandID", commandId.ToString())]);
         try
         {
-            using HttpRequestMessage request = new(HttpMethod.Get, uri)
+            UriBuilder builder = new(this.GetUri($"player/{command}", queryParameters: [.. queryParameters ?? [], ("commandID", $"{commandId}")]))
             {
-                Headers =
-                {
-                    { "X-Plex-Target-Client-Identifier", player.MachineIdentifier }
-                }
+                Host = player.IPAddress,
+                Port = player.Port
             };
+            using HttpRequestMessage request = new(HttpMethod.Get, builder.Uri) { Headers = { { "X-Plex-Target-Client-Identifier", player.MachineIdentifier } } };
+            this.AddTokenHeaders(request);
             using HttpResponseMessage response = await this._httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {

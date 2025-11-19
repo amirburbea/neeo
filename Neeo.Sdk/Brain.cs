@@ -110,69 +110,64 @@ public sealed partial class Brain(
     /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
     public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
     {
-        TaskCompletionSource<Brain?> tcs = new();
-        cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+        TaskCompletionSource<Brain?> taskSource = new();
+        cancellationToken.Register(() => taskSource.TrySetCanceled(cancellationToken));
         if (!Brain.IsNetworkConnected())
         {
-            tcs.TrySetException(new ApplicationException("Brain discovery requires network connectivity"));
+            taskSource.TrySetException(new ApplicationException("Brain discovery requires network connectivity"));
         }
         else
         {
-            _ = Task.Run(ResolveAsync, cancellationToken);
+            _ = Task.Run(ResolveAsync, cancellationToken).ContinueWith(
+                _ => taskSource.TrySetResult(default),
+                TaskContinuationOptions.ExecuteSynchronously
+            );
         }
-        return tcs.Task;
+        return taskSource.Task;
 
         async Task ResolveAsync()
         {
-            try
+            // Running for up to 1 + 2 + 4 + 8 = 15 seconds.
+            for (int seconds = 1; !taskSource.Task.IsCompleted && seconds <= 8; seconds *= 2)
             {
-                // Running for up to 1 + 2 + 4 + 8 = 15 seconds.
-                for (int seconds = 1; !tcs.Task.IsCompleted && seconds <= 8; seconds *= 2)
+                TimeSpan timeSpan = TimeSpan.FromSeconds(seconds);
+                using CancellationTokenSource cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cancellationSource.CancelAfter(timeSpan);
+                try
                 {
-                    TimeSpan timeSpan = TimeSpan.FromSeconds(seconds);
-                    using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    cts.CancelAfter(timeSpan);
-                    try
-                    {
-                        await ZeroconfResolver.ResolveAsync(
-                            Constants.ServiceName,
-                            scanTime: timeSpan,
-                            retries: 1,
-                            callback: host => OnHostDiscovered(host, cts),
-                            cancellationToken: cts.Token
-                        ).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                    {
-                        tcs.TrySetCanceled(cancellationToken);
-                        break;
-                    }
-                    catch (Exception)
-                    {
-                        // Retry on other errors.
-                    }
+                    await ZeroconfResolver.ResolveAsync(
+                        Constants.ServiceName,
+                        scanTime: timeSpan,
+                        retries: 1,
+                        callback: host =>
+                        {
+                            if (Brain.TryCreateBrain(host) is not { } brain)
+                            {
+                                return;
+                            }
+                            if ((predicate == null || predicate(brain)) && taskSource.TrySetResult(brain))
+                            {
+                                // Cancel to break out of the discovery process.
+                                cancellationSource.Cancel(true);
+                            }
+                        },
+                        cancellationToken: cancellationSource.Token
+                    ).ConfigureAwait(false);
                 }
-            }
-            finally
-            {
-                if (!tcs.Task.IsCompleted)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    tcs.TrySetResult(null);
+                    taskSource.TrySetCanceled(cancellationToken);
+                    break;
                 }
-            }
-
-            void OnHostDiscovered(IZeroconfHost host, CancellationTokenSource cancellationTokenSource)
-            {
-                if (Brain.TryCreateBrain(host) is { } brain && (predicate == null || predicate(brain)) && tcs.TrySetResult(brain))
+                catch (Exception)
                 {
-                    // Cancel to break out of the discovery process.
-                    cancellationTokenSource.Cancel(true);
+                    // Retry on other errors.
                 }
             }
         }
     }
 
-    [GeneratedRegex(@"^(?<ip>(\d+[.]){3}\d+)[:]", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]
+    [GeneratedRegex(@"^(?<ip>(\d+[.]){3}\d+)[:]", RegexOptions.ExplicitCapture)]
     private static partial Regex IPAddresRegex();
 
     private static bool IsNetworkConnected() => Enumerable.Any(

@@ -185,7 +185,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
         EmbeddedImages images = new(this._uriPrefix);
         string identifier = builder.Parameters.BrowseIdentifier ?? string.Empty;
-        int offset = builder.Parameters.Offset ?? 0;
+        int offset = builder.Parameters.Offset;
         int limit = builder.Parameters.Limit;
         switch (identifier)
         {

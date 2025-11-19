@@ -1,17 +1,27 @@
 ﻿using System.Linq;
 using System.Net.Http;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 
 namespace Neeo.Drivers.Plex;
 
 public sealed class PlexRemoteDeviceProvider(
     IHttpClientFactory httpClientFactory,
-    IPlexServerDiscovery serverDiscovery,
     IPlexServerManager serverManager,
     IPlexTokenStore tokenStore,
+    Task<ISdkEnvironment> startupTask,
     ILogger<PlexRemoteDeviceProvider> logger
-) : PlexDeviceProviderBase(httpClientFactory, serverDiscovery, serverManager, tokenStore, logger, DeviceType.TV, "Remote")
+) : PlexDeviceProviderBase(
+    httpClientFactory,
+    serverManager, 
+    tokenStore, 
+    startupTask, 
+    logger, 
+    DeviceType.TV, 
+    "Remote"
+)
 {
     protected override IDeviceBuilder CreateDevice() => base.CreateDevice()
         .AddSensor(Components.Playing.SensorName, null, this.IsPlaying)

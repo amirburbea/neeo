@@ -25,7 +25,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 
     private static Task Browse(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
-        int offset = builder.Parameters.Offset ?? 0;
+        int offset = builder.Parameters.Offset;
         int limit = builder.Parameters.Limit;
         if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
         {

@@ -9,5 +9,5 @@
 public readonly record struct BrowseParameters(
     string BrowseIdentifier = "",
     int Limit = Constants.MaxItems,
-    int? Offset = null
+    int Offset = 0
 );
