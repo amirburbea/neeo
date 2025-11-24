@@ -27,7 +27,7 @@ public static class JsonWebSocket
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     public static async Task MessageLoop<TMessage>(
         WebSocket webSocket,
-        Func<TMessage, CancellationToken, Task> processMessage,
+        Func<TMessage, CancellationToken, ValueTask> processMessage,
         Action? onDisconnected = null,
         CancellationToken cancellationToken = default
     ) where TMessage : notnull
@@ -91,8 +91,8 @@ public static class JsonWebSocket
             }
         }
 
-        Task ProcessAsync(ReadOnlySpan<byte> span) => JsonSerializer.Deserialize<TMessage>(span, JsonSerializerOptions.Web) is { } message
+        ValueTask ProcessAsync(ReadOnlySpan<byte> span) => JsonSerializer.Deserialize<TMessage>(span, JsonSerializerOptions.Web) is { } message
             ? processMessage(message, cancellationToken)
-            : Task.CompletedTask;
+            : ValueTask.CompletedTask;
     }
 }

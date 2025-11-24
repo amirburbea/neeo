@@ -30,7 +30,6 @@ public interface IPlexServerManager
 
 internal sealed class PlexServerManager : IPlexServerManager, IDisposable
 {
-    private static readonly Func<IPlexServer, IPlexServer> _createProxy = PlexServerManager.CreateProxyFactory();
     private static readonly byte[] _gdmRequest = Encoding.ASCII.GetBytes("M-SEARCH * HTTP/1.0\r\n\r\n");
 
     private readonly ConcurrentDictionary<string, ServerData> _discoveryData = [];
@@ -54,7 +53,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         this._settingsManager = settingsManager;
         this._tokenStore = tokenStore;
         this._loggerFactory = loggerFactory;
-        this._httpClient = httpClientFactory.CreateClient("plex");
+        this._httpClient = httpClientFactory.CreateClient(nameof(Plex));
         this._logger = loggerFactory.CreateLogger<PlexServerManager>();
         this._discoverySubscription = new(
             () => Observable.Interval(TimeSpan.FromMinutes(5d))
@@ -104,13 +103,13 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         {
             if (this._servers.GetValueOrDefault(machineIdentifier) is ({ } server, { } proxies))
             {
-                proxies.Add(proxy = PlexServerManager._createProxy(server));
+                proxies.Add(proxy = PlexServerProxy.Create(server));
             }
             else
             {
                 this._servers.Add(
                     machineIdentifier,
-                    (server = this.CreateServer(machineIdentifier), [proxy = PlexServerManager._createProxy(server)])
+                    (server = this.CreateServer(machineIdentifier), [proxy = PlexServerProxy.Create(server)])
                 );
             }
         }
@@ -124,137 +123,6 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
     {
         _ = this._discoverySubscription.Value; // Ensure initialized.
         return this._initializationSource.Task;
-    }
-
-    private static Func<IPlexServer, IPlexServer> CreateProxyFactory()
-    {
-        AssemblyName assemblyName = new($"{nameof(PlexServer)}Assembly");
-        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-        ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule($"{nameof(PlexServer)}Module");
-        TypeBuilder typeBuilder = moduleBuilder.DefineType($"{nameof(PlexServer)}Proxy", TypeAttributes.Public, typeof(object), [typeof(IPlexServer)]);
-        FieldBuilder subject = typeBuilder.DefineField("_disposed", typeof(Subject<Unit>), FieldAttributes.Private | FieldAttributes.InitOnly);
-        FieldBuilder server = typeBuilder.DefineField("_server", typeof(IPlexServer), FieldAttributes.Private | FieldAttributes.InitOnly);
-        PlexServerManager.GenerateConstructor(typeBuilder, server: server, subject: subject);
-        foreach (PropertyInfo property in typeof(IPlexServer).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
-        {
-            if (property is { Name: nameof(IPlexServer.Disposed) })
-            {
-                PlexServerManager.GenerateDisposedProperty(typeBuilder, subject, property);
-            }
-            else
-            {
-                PlexServerManager.GenerateProxiedProperty(typeBuilder, server, property);
-            }
-        }
-        PlexServerManager.GenerateDisposeMethod(typeBuilder, subject: subject);
-        foreach (MethodInfo method in typeof(IPlexServer).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
-        {
-            // Getters were already generated, so ignore.
-            if (!method.IsSpecialName)
-            {
-                PlexServerManager.GenerateProxiedMethod(typeBuilder, server, method);
-            }
-        }
-        ParameterExpression serverParameter = Expression.Parameter(typeof(IPlexServer));
-        return Expression.Lambda<Func<IPlexServer, IPlexServer>>(
-            Expression.New(
-                typeBuilder.CreateType().GetConstructor([typeof(IPlexServer)])!,
-                serverParameter
-            ),
-            serverParameter
-        ).Compile();
-    }
-
-    private static void GenerateConstructor(TypeBuilder typeBuilder, FieldBuilder server, FieldBuilder subject)
-    {
-        ConstructorBuilder constructorBuilder = typeBuilder.DefineConstructor(
-            MethodAttributes.Public | MethodAttributes.SpecialName,
-            CallingConventions.Standard,
-            [typeof(IPlexServer)]
-        );
-        ILGenerator generator = constructorBuilder.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes)!);
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldarg_1);
-        generator.Emit(OpCodes.Stfld, server);
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Newobj, typeof(Subject<Unit>).GetConstructor(Type.EmptyTypes)!);
-        generator.Emit(OpCodes.Stfld, subject);
-        generator.Emit(OpCodes.Ret);
-    }
-
-    private static void GenerateDisposedProperty(TypeBuilder typeBuilder, FieldBuilder subject, PropertyInfo declaredProperty)
-    {
-        PropertyBuilder propertyBuilder = typeBuilder.DefineProperty(
-            declaredProperty.Name,
-            PropertyAttributes.None,
-            declaredProperty.PropertyType,
-            Type.EmptyTypes
-        );
-        MethodBuilder methodBuilder = typeBuilder.DefineMethod(
-            declaredProperty.GetMethod!.Name,
-            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
-            declaredProperty.PropertyType,
-            Type.EmptyTypes
-        );
-        ILGenerator generator = methodBuilder.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldfld, subject);
-        generator.Emit(OpCodes.Ret);
-        propertyBuilder.SetGetMethod(methodBuilder);
-    }
-
-    private static void GenerateDisposeMethod(TypeBuilder typeBuilder, FieldBuilder subject)
-    {
-        MethodInfo disposeMethod = typeof(IDisposable).GetMethod(nameof(IDisposable.Dispose), Type.EmptyTypes)!;
-        MethodBuilder methodBuilder = typeBuilder.DefineMethod(
-            disposeMethod.Name,
-            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
-            typeof(void),
-            Type.EmptyTypes
-        );
-        ILGenerator generator = methodBuilder.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldfld, subject);
-        generator.Emit(OpCodes.Call, typeof(Unit).GetProperty(nameof(Unit.Default), BindingFlags.Static | BindingFlags.Public)!.GetMethod!);
-        generator.Emit(OpCodes.Callvirt, typeof(Subject<Unit>).GetMethod(nameof(Subject<>.OnNext), [typeof(Unit)])!);
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldfld, subject);
-        generator.Emit(OpCodes.Callvirt, disposeMethod);
-        generator.Emit(OpCodes.Ret);
-    }
-
-    private static MethodBuilder GenerateProxiedMethod(TypeBuilder typeBuilder, FieldBuilder server, MethodInfo declaredMethod)
-    {
-        ParameterInfo[] parameters = declaredMethod.GetParameters();
-        MethodBuilder methodBuilder = typeBuilder.DefineMethod(
-            declaredMethod.Name,
-            MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
-            declaredMethod.ReturnType,
-            parameters.Length != 0 ? Array.ConvertAll(parameters, parameter => parameter.ParameterType) : Type.EmptyTypes
-        );
-        ILGenerator generator = methodBuilder.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldfld, server);
-        for (int index = 0; index < parameters.Length; index++)
-        {
-            generator.Emit(OpCodes.Ldarg_S, (short)(index + 1));
-        }
-        generator.Emit(OpCodes.Callvirt, declaredMethod);
-        generator.Emit(OpCodes.Ret);
-        return methodBuilder;
-    }
-
-    private static void GenerateProxiedProperty(TypeBuilder typeBuilder, FieldBuilder server, PropertyInfo declaredProperty)
-    {
-        PropertyBuilder propertyBuilder = typeBuilder.DefineProperty(
-            declaredProperty.Name,
-            PropertyAttributes.None,
-            declaredProperty.PropertyType,
-            Type.EmptyTypes
-        );
-        propertyBuilder.SetGetMethod(PlexServerManager.GenerateProxiedMethod(typeBuilder, server, declaredProperty.GetMethod!));
     }
 
     private PlexServer CreateServer(string machineIdentifier) => new(
@@ -306,10 +174,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
                             name = value;
                             break;
                         case Constants.PortPrefix:
-                            if (!int.TryParse(value, out port))
-                            {
-                                continue;
-                            }
+                            port = int.Parse(value);
                             break;
                         case Constants.ResourceIdentifierPrefix:
                             machineIdentifier = value;
@@ -378,5 +243,141 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         public const string NamePrefix = "Name";
         public const string PortPrefix = "Port";
         public const string ResourceIdentifierPrefix = "Resource-Identifier";
+    }
+
+    private static class PlexServerProxy
+    {
+        public static Func<IPlexServer, IPlexServer> Create = PlexServerProxy.CreateProxyFactory();
+
+        private static Func<IPlexServer, IPlexServer> CreateProxyFactory()
+        {
+            AssemblyName assemblyName = new($"{nameof(PlexServer)}Assembly");
+            AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+            ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule($"{nameof(PlexServer)}Module");
+            TypeBuilder typeBuilder = moduleBuilder.DefineType($"{nameof(PlexServer)}Proxy", TypeAttributes.Public, typeof(object), [typeof(IPlexServer)]);
+            FieldBuilder subject = typeBuilder.DefineField("_disposed", typeof(Subject<Unit>), FieldAttributes.Private | FieldAttributes.InitOnly);
+            FieldBuilder server = typeBuilder.DefineField("_server", typeof(IPlexServer), FieldAttributes.Private | FieldAttributes.InitOnly);
+            PlexServerProxy.GenerateConstructor(typeBuilder, server: server, subject: subject);
+            foreach (PropertyInfo property in typeof(IPlexServer).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            {
+                if (property is { Name: nameof(IPlexServer.Disposed) })
+                {
+                    PlexServerProxy.GenerateDisposedProperty(typeBuilder, subject, property);
+                }
+                else
+                {
+                    PlexServerProxy.GenerateProxiedProperty(typeBuilder, server, property);
+                }
+            }
+            PlexServerProxy.GenerateDisposeMethod(typeBuilder, subject: subject);
+            foreach (MethodInfo method in typeof(IPlexServer).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            {
+                // Getters were already generated, so ignore.
+                if (!method.IsSpecialName)
+                {
+                    PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, method);
+                }
+            }
+            ParameterExpression serverParameter = Expression.Parameter(typeof(IPlexServer));
+            return Expression.Lambda<Func<IPlexServer, IPlexServer>>(
+                Expression.New(
+                    typeBuilder.CreateType().GetConstructor([typeof(IPlexServer)])!,
+                    serverParameter
+                ),
+                serverParameter
+            ).Compile();
+        }
+
+        private static void GenerateConstructor(TypeBuilder typeBuilder, FieldBuilder server, FieldBuilder subject)
+        {
+            ConstructorBuilder constructorBuilder = typeBuilder.DefineConstructor(
+                MethodAttributes.Public | MethodAttributes.SpecialName,
+                CallingConventions.Standard,
+                [typeof(IPlexServer)]
+            );
+            ILGenerator generator = constructorBuilder.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes)!);
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldarg_1);
+            generator.Emit(OpCodes.Stfld, server);
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Newobj, typeof(Subject<Unit>).GetConstructor(Type.EmptyTypes)!);
+            generator.Emit(OpCodes.Stfld, subject);
+            generator.Emit(OpCodes.Ret);
+        }
+
+        private static void GenerateDisposedProperty(TypeBuilder typeBuilder, FieldBuilder subject, PropertyInfo declaredProperty)
+        {
+            PropertyBuilder propertyBuilder = typeBuilder.DefineProperty(
+                declaredProperty.Name,
+                PropertyAttributes.None,
+                declaredProperty.PropertyType,
+                Type.EmptyTypes
+            );
+            MethodBuilder methodBuilder = typeBuilder.DefineMethod(
+                declaredProperty.GetMethod!.Name,
+                MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+                declaredProperty.PropertyType,
+                Type.EmptyTypes
+            );
+            ILGenerator generator = methodBuilder.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldfld, subject);
+            generator.Emit(OpCodes.Ret);
+            propertyBuilder.SetGetMethod(methodBuilder);
+        }
+
+        private static void GenerateDisposeMethod(TypeBuilder typeBuilder, FieldBuilder subject)
+        {
+            MethodInfo disposeMethod = typeof(IDisposable).GetMethod(nameof(IDisposable.Dispose), Type.EmptyTypes)!;
+            MethodBuilder methodBuilder = typeBuilder.DefineMethod(
+                disposeMethod.Name,
+                MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
+                typeof(void),
+                Type.EmptyTypes
+            );
+            ILGenerator generator = methodBuilder.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldfld, subject);
+            generator.Emit(OpCodes.Call, typeof(Unit).GetProperty(nameof(Unit.Default), BindingFlags.Static | BindingFlags.Public)!.GetMethod!);
+            generator.Emit(OpCodes.Callvirt, typeof(Subject<Unit>).GetMethod(nameof(Subject<>.OnNext), [typeof(Unit)])!);
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldfld, subject);
+            generator.Emit(OpCodes.Callvirt, disposeMethod);
+            generator.Emit(OpCodes.Ret);
+        }
+
+        private static MethodBuilder GenerateProxiedMethod(TypeBuilder typeBuilder, FieldBuilder server, MethodInfo declaredMethod)
+        {
+            ParameterInfo[] parameters = declaredMethod.GetParameters();
+            MethodBuilder methodBuilder = typeBuilder.DefineMethod(
+                declaredMethod.Name,
+                MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
+                declaredMethod.ReturnType,
+                parameters.Length != 0 ? Array.ConvertAll(parameters, parameter => parameter.ParameterType) : Type.EmptyTypes
+            );
+            ILGenerator generator = methodBuilder.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldfld, server);
+            for (int index = 0; index < parameters.Length; index++)
+            {
+                generator.Emit(OpCodes.Ldarg_S, (short)(index + 1));
+            }
+            generator.Emit(OpCodes.Callvirt, declaredMethod);
+            generator.Emit(OpCodes.Ret);
+            return methodBuilder;
+        }
+
+        private static void GenerateProxiedProperty(TypeBuilder typeBuilder, FieldBuilder server, PropertyInfo declaredProperty)
+        {
+            PropertyBuilder propertyBuilder = typeBuilder.DefineProperty(
+                declaredProperty.Name,
+                PropertyAttributes.None,
+                declaredProperty.PropertyType,
+                Type.EmptyTypes
+            );
+            propertyBuilder.SetGetMethod(PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, declaredProperty.GetMethod!));
+        }
     }
 }

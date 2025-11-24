@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -95,14 +96,12 @@ public static class HttpClientMethods
         CancellationToken cancellationToken = default
     ) where TBody : notnull where TValue : notnull
     {
-        using MemoryStream stream = new();
-        if (body is not null)
-        {
-            await JsonSerializer.SerializeAsync(stream, body, JsonSerializerOptions.Web, cancellationToken).ConfigureAwait(false);
-            stream.Position = 0L;
-        }
-        using StreamContent content = new(stream) { Headers = { ContentType = HttpClientMethods._applicationJson } };
-        using HttpRequestMessage request = HttpClientMethods.CreateRequest(uri, HttpMethod.Post, content, configureRequest);
+        using HttpRequestMessage request = HttpClientMethods.CreateRequest(
+            uri,
+            HttpMethod.Post,
+            body == null ? null : JsonContent.Create(body, options: JsonSerializerOptions.Web),
+            configureRequest
+        );
         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
         return await response.DeserializeAsync<TValue>(cancellationToken).ConfigureAwait(false);
     }
@@ -133,7 +132,6 @@ public static class HttpClientMethods
             string contents = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}");
         }
-        using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return (await JsonSerializer.DeserializeAsync<TValue>(stream, JsonSerializerOptions.Web, cancellationToken).ConfigureAwait(false))!;
+        return (await response.Content.ReadFromJsonAsync<TValue>(JsonSerializerOptions.Web, cancellationToken).ConfigureAwait(false))!;
     }
 }

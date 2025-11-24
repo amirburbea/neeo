@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
-using Org.BouncyCastle.Asn1.Cms;
 
 namespace Neeo.Drivers.Plex;
 
@@ -25,7 +25,7 @@ partial class PlexServer
         [Text("album")]
         Album,
 
-        [Text("Season")]
+        [Text("season")]
         Season,
     }
 
@@ -114,14 +114,29 @@ partial class PlexServer
         [property: JsonPropertyName("Metadata")] MediaItemMetadata[]? Metadata
     );
 
+    private enum MediaCategory
+    {
+        [Text("photo")]
+        Photo = 0,
+        [Text("video")]
+        Video = 1,
+        [Text("music")]
+        Music = 2
+    }
+
     private record struct MediaItemMetadata
     (
         int RatingKey,
         MediaType Type,
         string Title,
         string? Summary = null,
-        [property: JsonPropertyName("thumb")] string? Thumbnail = null
+        [property: JsonPropertyName("thumb")] string? Thumbnail = null,
+        int? ViewOffset = null,
+        [property: JsonPropertyName("Player")] MediaPlayer? Player = null,
+        int? Duration = null
     );
+
+    private record struct MediaPlayer(string MachineIdentifier, PlayState State);
 
     private record struct LibraryDirectory(
         string Key,

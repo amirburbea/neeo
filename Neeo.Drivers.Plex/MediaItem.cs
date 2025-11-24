@@ -8,4 +8,7 @@ public readonly record struct MediaItem(
     string Title,
     string? Summary = null,
     Uri? ThumbnailUri = null
-);
+) : IMediaDirectoryItem
+{
+    MediaDirectoryItemType IMediaDirectoryItem.Type => MediaDirectoryItemType.Item;
+}

@@ -20,4 +20,7 @@ public enum MediaType
 
     [Text("video")]
     Video,
+
+    [Text("show")]
+    Show,
 }

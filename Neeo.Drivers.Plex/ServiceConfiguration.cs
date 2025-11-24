@@ -3,11 +3,12 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Plex;
 
-public sealed class ServiceConfiguration : IServiceConfiguration
+public sealed partial class ServiceConfiguration : IServiceConfiguration
 {
     public void ConfigureServices(IServiceCollection services) => services
         .AddSingleton<IPlexServerManager, PlexServerManager>()
         .AddSingleton<IPlexSettingsManager, PlexSettingsManager>()
         .AddSingleton<IPlexTokenStore, PlexTokenStore>()
-        .AddHttpClient("plex", client => client.DefaultRequestHeaders.Accept.Add(new("application/json")));
+        .AddHttpClient(nameof(Plex), client => client.DefaultRequestHeaders.Accept.Add(new("application/json")))
+        .ConfigurePrimaryHttpMessageHandler(PlexDirectConnect.CreateHttpHandler);
 }

@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Reactive.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -46,18 +47,18 @@ public abstract partial class PlexDeviceProviderBase(
         { Buttons.PreviousTrack, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.SkipPrevious, token) },
         { Buttons.SkipBackward, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.SkipPrevious, token) },
         { Buttons.Stop, (server, token) => server.SendPlaybackCommandAsync(PlaybackCommand.Stop, token) },
-        { Buttons.CursorUp, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.MoveUp, token) },
-        { Buttons.CursorDown, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.MoveDown, token) },
-        { Buttons.CursorLeft, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.MoveLeft, token) },
-        { Buttons.CursorRight, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.MoveRight, token) },
-        { Buttons.CursorEnter, (server, token) => server.SendNavigationCommandAsync(NavigationCommand.Select, token) },
+        { Buttons.CursorUp, (server, token) => Task.CompletedTask },
+        { Buttons.CursorDown, (server, token) => Task.CompletedTask },
+        { Buttons.CursorLeft, (server, token) => server.SeekBackAsync(token) },
+        { Buttons.CursorRight, (server, token) => server.SeekForwardAsync(token) },
+        { Buttons.CursorEnter, PlexDeviceProviderBase.TogglePlayAsync },
     };
 
     private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
     private static readonly Uri _signInUri = new("https://plex.tv/users/sign_in.json");
     private static readonly Uri _userUri = new($"https://plex.tv/api/v2/user");
 
-    private readonly HttpClient _httpClient = httpClientFactory.CreateClient("Plex");
+    private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
     private readonly ConcurrentDictionary<string, IPlexServer> _servers = [];
     private IDeviceNotifier? _notifier;
     private string _uriPrefix = string.Empty;
@@ -68,75 +69,6 @@ public abstract partial class PlexDeviceProviderBase(
     {
         this._httpClient.Dispose();
         GC.SuppressFinalize(this);
-    }
-
-    private async Task OnServerAddedAsync(string machineIdentifier, CancellationToken cancellationToken)
-    {
-        if (serverManager.GetServer(machineIdentifier) is not { } server)
-        {
-            logger.LogWarning("Plex device added but server not found: {Id}", machineIdentifier);
-            return;
-        }
-        logger.LogInformation("Plex device added: {Name} ({IPAddress})", server.Name, server.ServerData.IPAddress);
-        if (!this._servers.TryAdd(machineIdentifier, server) || this._notifier is not { } notifier)
-        {
-            return;
-        }
-        // Notify on changes to connection.
-        server.IsConnectedChanged
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Select(isConnected => Observable.FromAsync((token) => notifier.SendPowerNotificationAsync(isConnected, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        // Notify on changes to player.
-        server.SelectedPlayerChanged
-            .Select(data => data is { Name: { } name } ? name : string.Empty)
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(playerName => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Player.SensorName, playerName, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        // Notify on changes to play state.
-        server.PlayStateChanged
-            .Select(state => state is PlayState.Playing or PlayState.Buffering)
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(isPlaying => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        // Notify on changes to active media.
-        server.IsConnectedChanged
-            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
-            .Select(_ => this.GetTitle(machineIdentifier))
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Title.SensorName, value, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        server.IsConnectedChanged
-            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
-            .Select(_ => this.GetDescription(machineIdentifier))
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Description.SensorName, value, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        server.IsConnectedChanged
-            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
-            .Select(_ => this.GetCoverArt(machineIdentifier))
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.CoverArt.SensorName, value, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        await server.InitializeAsync(cancellationToken).ConfigureAwait(false);
     }
 
     protected Task BrowseDirectoryAsync(string machineIdentifier, IDirectoryBuilder builder, CancellationToken cancellationToken)
@@ -258,34 +190,35 @@ public abstract partial class PlexDeviceProviderBase(
             ["all"] => BrowseAllAsync(),
             ["firstCharacter"] => BrowseFirstCharactersAsync(),
             ["firstCharacter", { Length: 1 } character] => BrowseFirstCharacterAsync(character[0]),
+            ["recentlyAdded"] => BrowseRecentlyAddedAsync(),
             _ => Task.CompletedTask,
         };
 
-        async Task BrowseAllAsync()
+        Task BrowseAllAsync() => sectionType switch
         {
-            if (sectionType == LibrarySectionType.Movie)
+            LibrarySectionType.Movie => BrowseDirectoryAsync(server.Library.ListMoviesAsync(sectionKey, parameters, cancellationToken)),
+            LibrarySectionType.Show => BrowseDirectoryAsync(server.Library.ListTVShowsAsync(sectionKey, parameters, cancellationToken)),
+            LibrarySectionType.Artist => BrowseDirectoryAsync(server.Library.ListMusicAsync(sectionKey, parameters, cancellationToken)),
+            _ => Task.CompletedTask,
+        };
+
+        async Task BrowseDirectoryAsync(Task<MediaDirectory> fetchMovies)
+        {
+            MediaDirectory directory = await fetchMovies.ConfigureAwait(false);
+            builder.SetTotalMatchingItems(directory.TotalSize);
+            foreach (MediaItem media in directory.Items.OfType<MediaItem>())
             {
-                MediaDirectory directory = await server.Library.ListMoviesAsync(sectionKey, parameters, cancellationToken).ConfigureAwait(false);
-                builder.SetTotalMatchingItems(directory.TotalSize);
-                foreach (MediaItem media in directory.Items)
-                {
-                    builder.AddEntry(this.CreateEntry(media));
-                }
+                builder.AddEntry(this.CreateEntry(media));
             }
         }
 
-        async Task BrowseFirstCharacterAsync(char character)
+        Task BrowseFirstCharacterAsync(char character) => sectionType switch
         {
-            if (sectionType == LibrarySectionType.Movie)
-            {
-                MediaDirectory directory = await server.Library.ListMoviesByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken).ConfigureAwait(false);
-                builder.SetTotalMatchingItems(directory.TotalSize);
-                foreach (MediaItem media in directory.Items)
-                {
-                    builder.AddEntry(this.CreateEntry(media));
-                }
-            }
-        }
+            LibrarySectionType.Movie => BrowseDirectoryAsync(server.Library.ListMoviesByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken)),
+            LibrarySectionType.Show => BrowseDirectoryAsync(server.Library.ListTVShowsByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken)),
+            LibrarySectionType.Artist => BrowseDirectoryAsync(server.Library.ListMusicByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken)),
+            _ => Task.CompletedTask,
+        };
 
         async Task BrowseFirstCharactersAsync() => Array.ForEach(
             await server.Library.ListFirstCharactersAsync(sectionKey, cancellationToken).ConfigureAwait(false),
@@ -296,24 +229,31 @@ public abstract partial class PlexDeviceProviderBase(
             ))
         );
 
+        Task BrowseRecentlyAddedAsync() => sectionType switch
+        {
+            LibrarySectionType.Movie => BrowseDirectoryAsync(server.Library.ListMoviesRecentlyAddedAsync(sectionKey, parameters, cancellationToken)),
+            LibrarySectionType.Show => BrowseDirectoryAsync(server.Library.ListTVShowsRecentlyAddedAsync(sectionKey, parameters, cancellationToken)),
+            LibrarySectionType.Artist => BrowseDirectoryAsync(server.Library.ListMusicRecentlyAddedAsync(sectionKey, parameters, cancellationToken)),
+            _ => Task.CompletedTask
+        };
+
         async Task BrowseSectionRootAsync()
         {
             LibrarySectionDetail detail = await server.Library.GetSectionDetailAsync(sectionKey, cancellationToken).ConfigureAwait(false);
             builder
                 .SetTitle(detail.Title)
-                .AddTileRow([new(this.GetThumbnailUrl(detail.Thumbnail, ImageSize.Small))])
                 .AddEntry(new(
                     $"All {Enum.GetName(sectionType)}s",
                     ThumbnailUri: this.GetEmbeddedResourceUrl(EmbeddedImage.Menu),
                     BrowseIdentifier: $"library.{sectionKey}:{(int)sectionType}.all"
                 ))
                 .AddEntry(new(
-                    $"By first character",
+                    $"By First Character",
                     ThumbnailUri: this.GetEmbeddedResourceUrl(EmbeddedImage.Menu),
                     BrowseIdentifier: $"library.{sectionKey}:{(int)sectionType}.firstCharacter"
                 ))
                 .AddEntry(new(
-                    "Recently added",
+                    "Recently Added",
                     ThumbnailUri: this.GetEmbeddedResourceUrl(EmbeddedImage.Menu),
                     BrowseIdentifier: $"library.{sectionKey}:{(int)sectionType}.recentlyAdded"
                 ));
@@ -456,9 +396,10 @@ public abstract partial class PlexDeviceProviderBase(
 
         async Task<ActionResult> HandleThumbnailRouteAsync(string suffix)
         {
+            string imageUrl = PlexDeviceProviderBase.DecodeBase64(suffix);
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, new Uri(PlexDeviceProviderBase.DecodeBase64(suffix))) { Headers = { { "X-Plex-Token", tokenStore.AuthToken } } };
+                using HttpRequestMessage request = new(HttpMethod.Get, new Uri(imageUrl)) { Headers = { { "X-Plex-Token", tokenStore.AuthToken } } };
                 HttpResponseMessage response = await this._httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
@@ -471,8 +412,9 @@ public abstract partial class PlexDeviceProviderBase(
             {
                 return new BadRequestResult();
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException e)
             {
+                Console.WriteLine(e);
                 return new StatusCodeResult(503);
             }
         }
@@ -497,6 +439,75 @@ public abstract partial class PlexDeviceProviderBase(
                 await this.OnServerAddedAsync(machineIdentifier, cancellationToken: default).ConfigureAwait(false);
             }
         }
+    }
+
+    private async Task OnServerAddedAsync(string machineIdentifier, CancellationToken cancellationToken)
+    {
+        if (serverManager.GetServer(machineIdentifier) is not { } server)
+        {
+            logger.LogWarning("Plex device added but server not found: {Id}", machineIdentifier);
+            return;
+        }
+        logger.LogInformation("Plex device added: {Name} ({IPAddress})", server.Name, server.ServerData.IPAddress);
+        if (!this._servers.TryAdd(machineIdentifier, server) || this._notifier is not { } notifier)
+        {
+            return;
+        }
+        // Notify on changes to connection.
+        server.IsConnectedChanged
+            .Skip(1)
+            .DistinctUntilChanged()
+            .Select(isConnected => Observable.FromAsync((token) => notifier.SendPowerNotificationAsync(isConnected, machineIdentifier, token)))
+            .Switch()
+            .TakeUntil(server.Disposed)
+            .Subscribe();
+        // Notify on changes to player.
+        server.SelectedPlayerChanged
+            .Select(data => data is { Name: { } name } ? name : string.Empty)
+            .DistinctUntilChanged()
+            .Skip(1)
+            .Select(playerName => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Player.SensorName, playerName, machineIdentifier, token)))
+            .Switch()
+            .TakeUntil(server.Disposed)
+            .Subscribe();
+        // Notify on changes to play state.
+        server.PlayStateChanged
+            .Select(state => state is PlayState.Playing or PlayState.Buffering)
+            .DistinctUntilChanged()
+            .Skip(1)
+            .Select(isPlaying => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token)))
+            .Switch()
+            .TakeUntil(server.Disposed)
+            .Subscribe();
+        // Notify on changes to active media.
+        server.IsConnectedChanged
+            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
+            .Select(_ => this.GetTitle(machineIdentifier))
+            .DistinctUntilChanged()
+            .Skip(1)
+            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Title.SensorName, value, machineIdentifier, token)))
+            .Switch()
+            .TakeUntil(server.Disposed)
+            .Subscribe();
+        server.IsConnectedChanged
+            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
+            .Select(_ => this.GetDescription(machineIdentifier))
+            .DistinctUntilChanged()
+            .Skip(1)
+            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Description.SensorName, value, machineIdentifier, token)))
+            .Switch()
+            .TakeUntil(server.Disposed)
+            .Subscribe();
+        server.IsConnectedChanged
+            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
+            .Select(_ => this.GetCoverArt(machineIdentifier))
+            .DistinctUntilChanged()
+            .Skip(1)
+            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.CoverArt.SensorName, value, machineIdentifier, token)))
+            .Switch()
+            .TakeUntil(server.Disposed)
+            .Subscribe();
+        await server.InitializeAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private Task OnServerRemovedAsync(string machineIdentifier, CancellationToken cancellationToken)

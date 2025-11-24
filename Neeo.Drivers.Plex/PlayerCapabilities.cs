@@ -5,7 +5,7 @@ using Neeo.Sdk.Utilities;
 namespace Neeo.Drivers.Plex;
 
 [Flags, JsonConverter(typeof(TextJsonConverter<PlayerCapabilities>))]
-public enum PlayerCapabilities
+public enum PlayerCapabilities : ulong
 {
     None = 0,
 
