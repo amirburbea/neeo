@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Exceptions;
 using Neeo.Sdk.Utilities;
 
@@ -303,7 +303,7 @@ public sealed class HisenseTV : IDisposable
 
     private sealed class Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix) : IDisposable
     {
-        private static readonly MqttFactory _clientFactory = new();
+        private static readonly MqttClientFactory _clientFactory = new();
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
         private readonly IMqttClient _client = Connection._clientFactory.CreateMqttClient();
 
@@ -485,7 +485,7 @@ public sealed class HisenseTV : IDisposable
         private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             string topic = e.ApplicationMessage.Topic;
-            string payload = e.ApplicationMessage.PayloadSegment is { } bytes ? Encoding.UTF8.GetString(bytes) : string.Empty;
+            string payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
             logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
             this.MessageReceived?.Invoke(this, new((topic, payload)));
             switch (topic)
