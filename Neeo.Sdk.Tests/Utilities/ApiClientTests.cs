@@ -96,11 +96,6 @@ public sealed class ApiClientTests : IDisposable
         Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri!.ToString());
     }
 
-    [Fact]
-    public Task Requests_should_throw_on_path_without_preceding_slash() => Assert.ThrowsAsync<ArgumentException>(
-        () => this._client.GetAsync<object>("path_without_preceding_slash")
-    );
-
     private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)
     {
         List<HttpRequestMessage> captured = [];

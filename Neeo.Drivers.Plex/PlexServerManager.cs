@@ -56,11 +56,11 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         this._logger = loggerFactory.CreateLogger<PlexServerManager>();
         this._discoverySubscription = new(
             () => Observable.Interval(TimeSpan.FromMinutes(5d))
-                .StartWith(0L) // start immediately.
-                .Select((_, index) => index)
-                .Do((index) =>
+                .Select(index => index + 1) // make interval index one-based.
+                .StartWith(0L) // start immediately with 0.
+                .Do(index =>
                 {
-                    if (index == 0)
+                    if (index is 0)
                     {
                         this._logger.LogInformation("Starting Plex Discovery...");
                     }
@@ -247,20 +247,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
     private static class PlexServerProxy
     {
         public static Func<IPlexServer, IPlexServer> Create = PlexServerProxy.CreateProxyFactory();
-
-        /// <summary>
-        /// Compile a delegate equivalent to: <code>IPlexServer server => new PlexServerProxy(server);</code>
-        /// </summary>
-        private static Func<IPlexServer, IPlexServer> CreateProxyDelegate(Type proxyType)
-        {
-            DynamicMethod dynamicMethod = new("CreateProxy", typeof(IPlexServer), [typeof(IPlexServer)]);
-            ILGenerator generator = dynamicMethod.GetILGenerator();
-            generator.Emit(OpCodes.Ldarg_0);
-            generator.Emit(OpCodes.Newobj, proxyType.GetConstructor([typeof(IPlexServer)])!);
-            generator.Emit(OpCodes.Ret);
-            return dynamicMethod.CreateDelegate<Func<IPlexServer, IPlexServer>>();
-        }
-
+        
         private static Func<IPlexServer, IPlexServer> CreateProxyFactory()
         {
             AssemblyName assemblyName = new($"{nameof(PlexServer)}Assembly");
@@ -272,7 +259,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             PlexServerProxy.GenerateConstructor(typeBuilder, server: server, subject: subject);
             foreach (PropertyInfo property in typeof(IPlexServer).GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
-                if (property is { Name: nameof(IPlexServer.Disposed) })
+                if (property.Name is nameof(IPlexServer.Disposed))
                 {
                     PlexServerProxy.GenerateDisposedProperty(typeBuilder, subject, property);
                 }
@@ -291,7 +278,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
                 }
                 PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, method);
             }
-            return PlexServerProxy.CreateProxyDelegate(typeBuilder.CreateType());
+            return PlexServerProxy.GenerateFactory(typeBuilder.CreateType());
         }
 
         private static void GenerateConstructor(TypeBuilder typeBuilder, FieldBuilder server, FieldBuilder subject)
@@ -355,6 +342,19 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             generator.Emit(OpCodes.Ldfld, subject);
             generator.Emit(OpCodes.Callvirt, disposeMethod);
             generator.Emit(OpCodes.Ret);
+        }
+
+        /// <summary>
+        /// Compile a delegate equivalent to: <code>IPlexServer server => new PlexServerProxy(server);</code>
+        /// </summary>
+        private static Func<IPlexServer, IPlexServer> GenerateFactory(Type proxyType)
+        {
+            DynamicMethod dynamicMethod = new("CreateProxy", typeof(IPlexServer), [typeof(IPlexServer)]);
+            ILGenerator generator = dynamicMethod.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Newobj, proxyType.GetConstructor([typeof(IPlexServer)])!);
+            generator.Emit(OpCodes.Ret);
+            return dynamicMethod.CreateDelegate<Func<IPlexServer, IPlexServer>>();
         }
 
         private static MethodBuilder GenerateProxiedMethod(TypeBuilder typeBuilder, FieldBuilder server, MethodInfo declaredMethod)

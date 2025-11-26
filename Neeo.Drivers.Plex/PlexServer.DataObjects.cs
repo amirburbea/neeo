@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
@@ -107,7 +106,7 @@ partial class PlexServer
     private record struct ServerNotificationContainer(
         int Size,
         [property: JsonPropertyName("Type")] ServerNotificationType Type,
-        [property: JsonPropertyName("PlaySessionStateNotification")] PlayStateNotification[]? Notifications
+        [property: JsonPropertyName("PlaySessionStateNotification")] JsonElement? Notifications
     );
 
     private record struct MediaItemDetailContainer(

@@ -76,7 +76,7 @@ public static class Program
         }
         services
             .AddSingleton<TaskCompletionSource<ISdkEnvironment>>()
-            .AddKeyedSingleton<Task>("Startup", (provider, key) => provider.GetRequiredService<TaskCompletionSource<ISdkEnvironment>>().Task)
+            .AddKeyedSingleton<Task>(Startup.Task, (provider, key) => provider.GetRequiredService<TaskCompletionSource<ISdkEnvironment>>().Task)
             .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
             .AddHostedService<SdkService>();
     }

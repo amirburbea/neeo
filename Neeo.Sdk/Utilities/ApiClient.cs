@@ -43,34 +43,25 @@ internal sealed class ApiClient(
     ILogger<ApiClient> logger
 ) : IApiClient
 {
+    private readonly Uri _baseUri = new($"http://{brain.ServiceEndPoint}");
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(ApiClient));
-    private readonly string _uriPrefix = $"http://{brain.ServiceEndPoint}";
 
     public Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken = default)
         where TData : notnull
     {
-        Uri uri = this.GetUri(path);
-        logger.LogInformation("Making GET request to {uri}...", uri);
-        return this._httpClient.GetAsync<TData>(uri, cancellationToken: cancellationToken);
+        UriBuilder builder = new(this._baseUri) {Path = path};
+        logger.LogInformation("Making GET request to {uri}...", builder.Uri);
+        return this._httpClient.GetAsync<TData>(builder.Uri, cancellationToken: cancellationToken);
     }
 
     public async Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
         where TBody : notnull
     {
-        Uri uri = this.GetUri(path);
-        logger.LogInformation("Making POST request to {uri}...", uri);
-        SuccessResponse response = await this._httpClient.PostAsync<TBody, SuccessResponse>(uri, body, cancellationToken: cancellationToken).ConfigureAwait(false);
+        UriBuilder builder = new(this._baseUri) { Path = path };
+        logger.LogInformation("Making POST request to {uri}...", builder.Uri);
+        SuccessResponse response = await this._httpClient
+            .PostAsync<TBody, SuccessResponse>(builder.Uri, body, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
         return response.Success;
-    }
-
-    private Uri GetUri(string path)
-    {
-        if (path.StartsWith("http"))
-        {
-            return new(path);
-        }
-        return path.StartsWith('/')
-            ? new(this._uriPrefix + path)
-            : throw new ArgumentException("Path must start with a forward slash (\"/\").", nameof(path));
     }
 }

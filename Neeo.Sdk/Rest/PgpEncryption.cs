@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -105,15 +104,13 @@ internal sealed class PgpEncryption : IPgpEncryption
 
     private static string GetPublicKeyText(PgpPublicKey publicKey)
     {
-        using Stream outputStream = new MemoryStream();
-        using (ArmoredOutputStream armoredStream = new(outputStream))
+        using StringWriter stringWriter = new();
+        using (ArmoredOutputStream armoredStream = new (new StringWriterOutputStream(stringWriter)))
         {
             armoredStream.SetHeader(ArmoredOutputStream.HeaderVersion, default);
             publicKey.Encode(armoredStream);
         }
-        outputStream.Seek(0L, SeekOrigin.Begin);
-        using StreamReader reader = new(outputStream);
-        return reader.ReadToEnd();
+        return stringWriter.ToString();
     }
 
     private PgpKeyPair GetKeyPair()
@@ -125,6 +122,31 @@ internal sealed class PgpEncryption : IPgpEncryption
         using (this._lock.EnterScope())
         {
             return this._keyPair ??= PgpEncryption.CreatePgpKeys();
+        }
+    }
+
+    private sealed class StringWriterOutputStream(StringWriter writer) : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override void Flush() => writer.Flush();
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            ReadOnlySpan<byte> bytes = buffer.AsSpan(offset, count);
+            Span<char> characters = stackalloc char[count];
+            int length = Encoding.ASCII.GetChars(bytes, characters);
+            writer.Write(characters[..length]);
         }
     }
 }

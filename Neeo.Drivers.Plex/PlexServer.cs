@@ -374,16 +374,21 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
         async ValueTask ProcessMessageAsync(ServerMessage message, CancellationToken cancellationToken)
         {
-            if (message.Container is not { Type: ServerNotificationType.Playing, Notifications: { } notifications })
+            if (message.Container is not { Type: ServerNotificationType.Playing, Notifications: { } element })
             {
                 return;
             }
-            int index = Array.FindIndex(notifications, notification => notification.ClientIdentifier == this._selectedPlayerId.Value);
+            if (element.Deserialize<PlayStateNotification[]>(JsonSerializerOptions.Web) is not { Length: > 0 } array)
+            {
+                this._logger.LogDebug("Received empty playing notification from Plex server '{Name}'", this.Name);
+                return;
+            }
+            int index = Array.FindIndex(array, notification => notification.ClientIdentifier == this._selectedPlayerId.Value);
             if (index is -1)
             {
                 return;
             }
-            PlayStateNotification notification = notifications[index];
+            PlayStateNotification notification = array[index];
             this._ratingKey.OnNext(notification.RatingKey);
             this._playState.OnNext(notification.State);
         }

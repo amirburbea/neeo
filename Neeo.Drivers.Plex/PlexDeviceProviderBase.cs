@@ -120,19 +120,21 @@ public abstract partial class PlexDeviceProviderBase(
 
     protected string GetTitle(string machineIdentifier) => this.GetActiveMediaText(machineIdentifier, static media => media.Title);
 
-    protected Task HandleDirectoryActionAsync(string machineIdentifier, string actionIdentifier, CancellationToken cancellationToken)
+    protected async Task HandleDirectoryActionAsync(string machineIdentifier, string actionIdentifier, CancellationToken cancellationToken)
     {
-        if (this.GetServer(machineIdentifier) is not { } server || actionIdentifier.IndexOf('.') is not (int index and not -1))
+        int index = actionIdentifier.IndexOf('.');
+        if (index == -1 || this.GetServer(machineIdentifier) is not { } server)
         {
-            return Task.CompletedTask;
+            return;
         }
         string suffix = actionIdentifier[(index + 1)..];
-        return (actionIdentifier[..index] switch
+        Task actionTask = actionIdentifier[..index] switch
         {
+            "media" when int.TryParse(suffix, out int ratingKey) => server.PlayMediaAsync(ratingKey, cancellationToken),
             "player" => server.SelectPlayerAsync(suffix, cancellationToken),
-            "media" => server.PlayMediaAsync(int.Parse(suffix), cancellationToken),
             _ => Task.CompletedTask,
-        });
+        };
+        await actionTask.ConfigureAwait(false);
     }
 
     protected async Task InitializeAsync(CancellationToken cancellationToken)
@@ -564,9 +566,9 @@ public abstract partial class PlexDeviceProviderBase(
             tokenStore.AuthToken = element.GetProperty("user").GetProperty("authToken").GetString()!;
             return RegistrationResult.Success;
         }
-        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        catch (HttpRequestException ex) when (ex.StatusCode is { } code && Enum.GetName(code) is { } message)
         {
-            return RegistrationResult.Failed("Unauthorized");
+            return RegistrationResult.Failed(message);
         }
 
         void ConfigureRequest(HttpRequestMessage request)

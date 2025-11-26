@@ -133,6 +133,10 @@ internal sealed class NotificationService : INotificationService, IDisposable
                 this._cache.AddOrUpdate(key, data);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Ignore cancellation during shutdown
+        }
         catch (Exception e)
         {
             this._logger.LogError(e, "Failed to send notification.");

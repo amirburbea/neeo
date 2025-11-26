@@ -119,8 +119,10 @@ public sealed partial class Brain(
         else
         {
             _ = Task.Run(ResolveAsync, cancellationToken).ContinueWith(
-                _ => taskSource.TrySetResult(default),
-                TaskContinuationOptions.ExecuteSynchronously
+                _ => taskSource.TrySetResult(null),
+                CancellationToken.None, // Ensure continuation runs.
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default
             );
         }
         return taskSource.Task;
@@ -168,7 +170,7 @@ public sealed partial class Brain(
     }
 
     [GeneratedRegex(@"^(?<ip>(\d+[.]){3}\d+)[:]", RegexOptions.ExplicitCapture)]
-    private static partial Regex IPAddresRegex();
+    private static partial Regex IPAddressRegex();
 
     private static bool IsNetworkConnected() => Enumerable.Any(
         from netInterface in NetworkInterface.GetAllNetworkInterfaces()
@@ -183,16 +185,19 @@ public sealed partial class Brain(
         {
             return null;
         }
-        string hostName = $"{properties["hon"]}.local";
-        string version = properties["rel"];
         return (host.IPAddress, host.Id) switch
         {
             ({ Length: > 0 } ip, _) => CreateBrain(ip),
-            (_, { } id) when Brain.IPAddresRegex().Match(id) is { Success: true, Groups: { } groups } => CreateBrain(groups["ip"].Value),
+            (_, { } id) when Brain.IPAddressRegex().Match(id) is { Success: true, Groups: { } groups } => CreateBrain(groups["ip"].Value),
             _ => null
         };
 
-        Brain CreateBrain(string ip) => new(IPAddress.Parse(ip), port, hostName, version);
+        Brain CreateBrain(string ip)
+        {
+            string hostName = $"{properties["hon"]}.local";
+            string version = properties["rel"];
+            return new(IPAddress.Parse(ip), port, hostName, version);
+        }
     }
 
     [GeneratedRegex(@"^(?<v>\d+\.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]

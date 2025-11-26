@@ -82,10 +82,14 @@ public sealed class SdkService(
 
     private static void OnAppDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
     {
-        Exception exception = (Exception)e.ExceptionObject;
+        SdkService.PrintException((Exception)e.ExceptionObject, e.IsTerminating);
+    }
+
+    private static void PrintException(Exception exception, bool isTerminating)
+    {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"\n🚨 Unhandled Exception caught by AppDomain:");
-        Console.WriteLine($"IsTerminating: {e.IsTerminating}");
+        Console.WriteLine($"🚨 Unhandled Exception:");
+        Console.WriteLine($"IsTerminating: {isTerminating}");
         Console.WriteLine($"Type: {exception.GetType().FullName}");
         Console.WriteLine($"Message: {exception.Message}");
         Console.WriteLine($"StackTrace:\n{exception.StackTrace}");

@@ -45,7 +45,7 @@ internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDyna
         return await this.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is [{ } device] ? device : default;
     }
 
-    Task<DiscoveredDevice[]> IDiscoveryFeature.DiscoverAsync(CancellationToken cancellationToken) => this.DiscoverAsync(default, cancellationToken);
+    Task<DiscoveredDevice[]> IDiscoveryFeature.DiscoverAsync(CancellationToken cancellationToken) => this.DiscoverAsync(cancellationToken: cancellationToken);
 
     public async Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId = default, CancellationToken cancellationToken = default)
     {

@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Notifications;
-using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;
 
@@ -117,8 +116,6 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     /// </summary>
     internal sealed class DeviceIndex(DeviceModel[] devices)
     {
-        private static readonly Comparer<SearchEntry> _entryComparer = Comparer<SearchEntry>.Create(DeviceIndex.CompareEntries);
-
         public IEnumerable<DeviceSearchResult> Search(string query)
         {
             string[] searchTokens = [..
@@ -152,7 +149,8 @@ internal sealed class DeviceDatabase : IDeviceDatabase
                 entries.Add(new(device) { Score = score });
             }
             return DeviceIndex.Normalize(entries, maxScore)
-                .OrderBy(IdentityFunction.For<SearchEntry>(), DeviceIndex._entryComparer)
+                .OrderBy(entry => entry.Score, Comparer<double>.Default)
+                .ThenBy(entry => entry.Device.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(entry => new DeviceSearchResult(entry.Device, entry.Score, maxScore));
         }
 
@@ -163,28 +161,11 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             {
                 return 0;
             }
-            if (searchToken.Length < 2)
+            if (searchToken.Length == 1 || index is not 0)
             {
                 return 1;
             }
-            if (text == searchToken)
-            {
-                return 6;
-            }
-            if (index == 0)
-            {
-                return 2;
-            }
-            return 1;
-        }
-
-        private static int CompareEntries(SearchEntry left, SearchEntry right)
-        {
-            if (left.Score.CompareTo(right.Score) is int scoreComparison and not 0)
-            {
-                return scoreComparison;
-            }
-            return Comparer<DeviceModel>.Default.Compare(left.Device, right.Device);
+            return text.Length == searchToken.Length ? 6 : 2;
         }
 
         private static IEnumerable<SearchEntry> Normalize(IEnumerable<SearchEntry> entries, int maxScore)
@@ -194,7 +175,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             foreach (SearchEntry entry in entries)
             {
                 entry.Score = 1d - entry.Score * normalizedScore;
-                string key = $"{entry.Device.Manufacturer} {entry.Device.Name} {entry.Device.Tokens} {Enum.GetName(entry.Device.Type)}";
+                string key = $"{entry.Device.Manufacturer}|{entry.Device.Name}|{entry.Device.Tokens}|{Enum.GetName(entry.Device.Type)}";
                 if (entry.Score <= 0.5 && hashSet.Add(key))
                 {
                     yield return entry;
@@ -245,9 +226,10 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         }
     }
 
-    private class SearchEntry(DeviceModel device)
+    private sealed class SearchEntry(DeviceModel device)
     {
         public DeviceModel Device => device;
-        public double Score { get; internal set; }
+
+        public double Score { get; set; }
     }
 }

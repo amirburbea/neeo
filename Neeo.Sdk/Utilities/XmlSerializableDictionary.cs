@@ -11,7 +11,7 @@ namespace Neeo.Sdk.Utilities;
 /// </summary>
 /// <typeparam name="TKey">The type of the keys in the dictionary.</typeparam>
 /// <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
-[XmlRoot(nameof(Dictionary<TKey, TValue>))]
+[XmlRoot(nameof(Dictionary<,>))]
 public class XmlSerializableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IXmlSerializable
     where TKey : notnull
 {
