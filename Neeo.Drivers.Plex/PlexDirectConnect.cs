@@ -53,7 +53,8 @@ internal static partial class PlexDirectConnect
 
         async ValueTask<Stream> ConnectAsync(IPAddress address)
         {
-            Socket socket = new(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            Socket socket = new(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             try
             {
                 await socket.ConnectAsync(address, context.DnsEndPoint.Port, cancellationToken).ConfigureAwait(false);
@@ -67,7 +68,7 @@ internal static partial class PlexDirectConnect
         }
     }
 
-    [GeneratedRegex(@"^(?<ip>(\d+[-]){3}\d)\..+\.plex\.direct$", RegexOptions.ExplicitCapture | RegexOptions.Compiled, "en-US")]
+    [GeneratedRegex(@"^(?<ip>(\d+[-]){3}\d+)\..+\.plex\.direct$", RegexOptions.ExplicitCapture | RegexOptions.Compiled, "en-US")]
     private static partial Regex PlexDirectRegex();
 
     private static bool ValidateRemoteCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors) => errors switch

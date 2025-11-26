@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Notifications;
-using Neeo.Sdk.Utilities.TokenSearch;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices;
 
@@ -52,13 +51,13 @@ public interface IDeviceDatabase
     /// </summary>
     /// <param name="query">The search query.</param>
     /// <returns>An array of sort entries ranked as per a similar algorithm to "tokenseach.js".</returns>
-    SearchEntry<DeviceModel>[] Search(string? query);
+    DeviceSearchResult[] Search(string? query);
 }
 
 internal sealed class DeviceDatabase : IDeviceDatabase
 {
     private readonly Dictionary<string, DeviceAdapterContainer> _containers;
-    private readonly TokenSearch<DeviceModel> _deviceIndex;
+    private readonly DeviceIndex _deviceIndex;
     private readonly DeviceModel[] _devices;
     private readonly INotificationService _notificationService;
 
@@ -81,13 +80,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
                 callback(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor));
             }
         }
-        this._deviceIndex = new(
-            this._devices,
-            nameof(DeviceModel.Manufacturer),
-            nameof(DeviceModel.Name),
-            nameof(DeviceModel.Tokens),
-            nameof(DeviceModel.Type)
-        );
+        this._deviceIndex = new(this._devices);
     }
 
     public IEnumerable<IDeviceAdapter> Adapters => from container in this._containers.Values select container.Adapter;
@@ -115,9 +108,100 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         return id is > -1 && id < this._devices.Length ? this._devices[id] : null;
     }
 
-    public SearchEntry<DeviceModel>[] Search(string? query) => string.IsNullOrEmpty(query)
+    public DeviceSearchResult[] Search(string? query) => string.IsNullOrEmpty(query)
         ? []
         : [.. this._deviceIndex.Search(query).Take(OptionConstants.MaxSearchResults)];
+
+    /// <summary>
+    /// A class to search a collection of items by tokens and return ranked results. Based on <a href="https://github.com/neophob/tokensearch.js">tokensearch.js</a>.
+    /// </summary>
+    internal sealed class DeviceIndex(DeviceModel[] devices)
+    {
+        private static readonly Comparer<SearchEntry> _entryComparer = Comparer<SearchEntry>.Create(DeviceIndex.CompareEntries);
+
+        public IEnumerable<DeviceSearchResult> Search(string query)
+        {
+            string[] searchTokens = [..
+                (query ?? throw new ArgumentNullException(nameof(query)))
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Distinct()
+                    .Take(5)
+            ];
+            List<SearchEntry> entries = [];
+            int maxScore = 0;
+            foreach (DeviceModel device in devices)
+            {
+                string[] dataTokens =
+                [
+                    device.Manufacturer,
+                    device.Name,
+                    device.Tokens,
+                    Enum.GetName(device.Type)!
+                ];
+                int score = dataTokens.Sum(dataToken =>
+                {
+                    return searchTokens.Sum(ScoreSearchToken);
+
+                    int ScoreSearchToken(string searchToken) => DeviceIndex.Score(dataToken, searchToken);
+                });
+                if (score <= 0)
+                {
+                    continue;
+                }
+                maxScore = Math.Max(score, maxScore);
+                entries.Add(new(device) { Score = score });
+            }
+            return DeviceIndex.Normalize(entries, maxScore)
+                .OrderBy(IdentityFunction.For<SearchEntry>(), DeviceIndex._entryComparer)
+                .Select(entry => new DeviceSearchResult(entry.Device, entry.Score, maxScore));
+        }
+
+        private static int Score(string text, string searchToken)
+        {
+            int index = text.IndexOf(searchToken, StringComparison.OrdinalIgnoreCase);
+            if (index == -1)
+            {
+                return 0;
+            }
+            if (searchToken.Length < 2)
+            {
+                return 1;
+            }
+            if (text == searchToken)
+            {
+                return 6;
+            }
+            if (index == 0)
+            {
+                return 2;
+            }
+            return 1;
+        }
+
+        private static int CompareEntries(SearchEntry left, SearchEntry right)
+        {
+            if (left.Score.CompareTo(right.Score) is int scoreComparison and not 0)
+            {
+                return scoreComparison;
+            }
+            return Comparer<DeviceModel>.Default.Compare(left.Device, right.Device);
+        }
+
+        private static IEnumerable<SearchEntry> Normalize(IEnumerable<SearchEntry> entries, int maxScore)
+        {
+            double normalizedScore = 1d / maxScore;
+            HashSet<string> hashSet = new(StringComparer.OrdinalIgnoreCase);
+            foreach (SearchEntry entry in entries)
+            {
+                entry.Score = 1d - entry.Score * normalizedScore;
+                string key = $"{entry.Device.Manufacturer} {entry.Device.Name} {entry.Device.Tokens} {Enum.GetName(entry.Device.Type)}";
+                if (entry.Score <= 0.5 && hashSet.Add(key))
+                {
+                    yield return entry;
+                }
+            }
+        }
+    }
 
     private static class OptionConstants
     {
@@ -159,5 +243,11 @@ internal sealed class DeviceDatabase : IDeviceDatabase
                 }
             }
         }
+    }
+
+    private class SearchEntry(DeviceModel device)
+    {
+        public DeviceModel Device => device;
+        public double Score { get; internal set; }
     }
 }

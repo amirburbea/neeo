@@ -33,12 +33,6 @@ internal sealed class NotificationMapping(
     ILogger<NotificationMapping> logger
 ) : INotificationMapping
 {
-    private static readonly Func<Entry[], Dictionary<string, string[]>> _groupEntriesByName = entries => new(
-        from entry in entries
-        group entry by entry.Name into grouping
-        select KeyValuePair.Create(grouping.Key, grouping.Select(static item => item.EventKey).ToArray())
-    );
-
     private readonly ConcurrentDictionary<string, Dictionary<string, string[]>> _cache = new();
 
     public async ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken)
@@ -57,10 +51,15 @@ internal sealed class NotificationMapping(
         return [];
     }
 
-    private Task<Dictionary<string, string[]>> FetchNotificationKeysAsync(string adapterName, string deviceId, CancellationToken cancellationToken)
+    private async Task<Dictionary<string, string[]>> FetchNotificationKeysAsync(string adapterName, string deviceId, CancellationToken cancellationToken)
     {
         string url = string.Format(BrainUrlPaths.NotificationKeyFormat, environment.SdkAdapterName, adapterName, deviceId);
-        return client.GetAsync(url, NotificationMapping._groupEntriesByName, cancellationToken);
+        Entry[] entries = await client.GetAsync<Entry[]>(url, cancellationToken).ConfigureAwait(false);
+        return new(
+            from entry in entries
+            group entry by entry.Name into grouping
+            select KeyValuePair.Create(grouping.Key, grouping.Select(static item => item.EventKey).ToArray())
+        );
     }
 
     public readonly record struct Entry(string EventKey, string Name);

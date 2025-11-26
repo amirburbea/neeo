@@ -23,19 +23,6 @@ public interface IApiClient
         where TData : notnull;
 
     /// <summary>
-    /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
-    /// <paramref name="path"/> and return the output of the specified <paramref name="transform"/>.
-    /// </summary>
-    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
-    /// <typeparam name="TOutput">The output type of the transform.</typeparam>
-    /// <param name="path">The API path on the NEEO Brain.</param>
-    /// <param name="transform">The transformation to run on the data.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
-        where TData : notnull;
-
-    /// <summary>
     /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
     /// <paramref name="path"/> and return the a value indicating success.
     ///
@@ -59,15 +46,12 @@ internal sealed class ApiClient(
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(ApiClient));
     private readonly string _uriPrefix = $"http://{brain.ServiceEndPoint}";
 
-    Task<TData> IApiClient.GetAsync<TData>(string path, CancellationToken cancellationToken) => this.GetAsync(path, static (TData data) => data, cancellationToken);
-
-    public async Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+    public Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken = default)
         where TData : notnull
     {
         Uri uri = this.GetUri(path);
         logger.LogInformation("Making GET request to {uri}...", uri);
-        TData data = await this._httpClient.GetAsync<TData>(uri, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return transform(data);
+        return this._httpClient.GetAsync<TData>(uri, cancellationToken: cancellationToken);
     }
 
     public async Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)

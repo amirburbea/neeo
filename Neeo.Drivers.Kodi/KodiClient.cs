@@ -305,7 +305,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     private Task<VolumeInfo> GetVolumeAsync() => this.SendMessageAsync(
         "Application.GetProperties",
-        new { Properties = new[] { "muted", "volume" } },
+        new { Properties = VolumeInfo.Properties },
         (VolumeInfo info) => info
     );
 
@@ -331,7 +331,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                         {
                             this.ProcessIncomingMessage(method, responseData);
                         }
-                        return Task.CompletedTask;
+                        return ValueTask.CompletedTask;
                     },
                     this.OnDisconnected,
                     token
@@ -560,5 +560,8 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     private readonly record struct VolumeInfo(
         int Volume,
         bool Muted = false
-    );
+    )
+    {
+        public static readonly string[] Properties = ["muted", "volume"];
+}
 }

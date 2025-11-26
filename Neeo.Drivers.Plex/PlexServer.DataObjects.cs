@@ -146,11 +146,7 @@ partial class PlexServer
         [property: JsonPropertyName("thumb")] string? Thumbnail = null,
         LibraryDirectoryType? Type = null,
         int? Size = null
-    )
-    {
-        [JsonExtensionData]
-        public Dictionary<string, object> ExtensionData { get; set; } = [];
-    }
+    );
 
     private record struct LibraryMediaContainer(
         [property: JsonPropertyName("title1")] string Title,
@@ -163,5 +159,4 @@ partial class PlexServer
         string? ViewGroup = null,
         string? Art = null
     );
-
 }

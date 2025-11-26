@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,7 +53,7 @@ public sealed class ApiClientTests : IDisposable
     {
         this.SetupJsonResponse(data);
 
-        Assert.Equal(data.Length, await this._client.GetAsync("/", static (string text) => text.Length));
+        Assert.Equal(data.Length, (await this._client.GetAsync<string>("/")).Length);
     }
 
     [Fact]
@@ -60,7 +61,7 @@ public sealed class ApiClientTests : IDisposable
     {
         var lazy = this.SetupJsonResponse(new object());
 
-        await this._client.GetAsync("/", IdentityFunction.For<object>());
+        await this._client.GetAsync<object>("/");
 
         var (request, requestBody) = lazy.Value;
         Assert.Equal("GET", request.Method.Method);
@@ -89,7 +90,7 @@ public sealed class ApiClientTests : IDisposable
     {
         var lazy = this.SetupJsonResponse(new object());
 
-        _ = this._client.GetAsync(path, IdentityFunction.For<object>());
+        _ = this._client.GetAsync<object>(path);
 
         var (request, _) = lazy.Value;
         Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri!.ToString());
@@ -97,7 +98,7 @@ public sealed class ApiClientTests : IDisposable
 
     [Fact]
     public Task Requests_should_throw_on_path_without_preceding_slash() => Assert.ThrowsAsync<ArgumentException>(
-        () => this._client.GetAsync("path_without_preceding_slash", IdentityFunction.For<object>())
+        () => this._client.GetAsync<object>("path_without_preceding_slash")
     );
 
     private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)
@@ -114,24 +115,8 @@ public sealed class ApiClientTests : IDisposable
                 {
                     requestBody = await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 }
-                return new()
-                {
-                    Content = new StringContent(JsonSerializer.Serialize(data, JsonSerializerOptions.Web))
-                };
+                return new() { Content = JsonContent.Create(data) };
             });
         return new(() => (captured.Single(), requestBody));
-    }
-
-    internal static class IdentityFunction
-    {
-        /// <summary>
-        /// Gets an identity function for items of type <typeparamref name="TItem"/>.
-        /// </summary>
-        public static Func<TItem, TItem> For<TItem>() => Identity<TItem>.Function;
-
-        private static class Identity<TItem>
-        {
-            public static readonly Func<TItem, TItem> Function = item => item;
-        }
-    }
+    }    
 }

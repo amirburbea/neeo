@@ -2,8 +2,8 @@
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 
@@ -13,7 +13,7 @@ public sealed class PlexMediaPlayerDeviceProvider(
     IHttpClientFactory httpClientFactory,
     IPlexServerManager serverManager,
     IPlexTokenStore tokenStore,
-    Task<ISdkEnvironment> startupTask,
+    [FromKeyedServices("Startup")] Task startupTask,
     ILogger<PlexMediaPlayerDeviceProvider> logger
 ) : PlexDeviceProviderBase(
     httpClientFactory,

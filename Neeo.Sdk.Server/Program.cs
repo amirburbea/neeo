@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -50,14 +51,14 @@ public static class Program
         {
             throw new ApplicationException("Invalid configuration, configuration should have an array \"Drivers\" with at least one driver assembly.");
         }
-        foreach (string driverPath in driverPaths)
+        foreach (string assemblyPath in driverPaths.Select(Path.GetFullPath))
         {
-            string assemblyPath = Path.GetFullPath(driverPath);
             if (!File.Exists(assemblyPath))
             {
                 throw new FileNotFoundException(assemblyPath);
             }
-            foreach (Type type in Program.LoadAssembly(assemblyPath).GetExportedTypes())
+            DriverAssemblyLoadContext context = new(assemblyPath);
+            foreach (Type type in context.LoadFromAssemblyName(AssemblyName.GetAssemblyName(assemblyPath)).GetExportedTypes())
             {
                 if (!type.IsClass || type.IsAbstract || type.IsGenericTypeDefinition)
                 {
@@ -75,15 +76,9 @@ public static class Program
         }
         services
             .AddSingleton<TaskCompletionSource<ISdkEnvironment>>()
-            .AddSingleton(provider => provider.GetRequiredService<TaskCompletionSource<ISdkEnvironment>>().Task)
+            .AddKeyedSingleton<Task>("Startup", (provider, key) => provider.GetRequiredService<TaskCompletionSource<ISdkEnvironment>>().Task)
             .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
             .AddHostedService<SdkService>();
-    }
-
-    private static Assembly LoadAssembly(string assemblyPath)
-    {
-        DriverAssemblyLoadContext loadContext = new(assemblyPath);
-        return loadContext.LoadFromAssemblyName(AssemblyName.GetAssemblyName(assemblyPath));
     }
 
     private sealed class DriverAssemblyLoadContext(string assemblyPath) : AssemblyLoadContext

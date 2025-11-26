@@ -23,4 +23,10 @@ public enum MediaType
 
     [Text("show")]
     Show,
+
+    [Text("album")]
+    Album,
+
+    [Text("track")]
+    Track,
 }

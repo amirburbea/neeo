@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -249,6 +248,19 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
     {
         public static Func<IPlexServer, IPlexServer> Create = PlexServerProxy.CreateProxyFactory();
 
+        /// <summary>
+        /// Compile a delegate equivalent to: <code>IPlexServer server => new PlexServerProxy(server);</code>
+        /// </summary>
+        private static Func<IPlexServer, IPlexServer> CreateProxyDelegate(Type proxyType)
+        {
+            DynamicMethod dynamicMethod = new("CreateProxy", typeof(IPlexServer), [typeof(IPlexServer)]);
+            ILGenerator generator = dynamicMethod.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Newobj, proxyType.GetConstructor([typeof(IPlexServer)])!);
+            generator.Emit(OpCodes.Ret);
+            return dynamicMethod.CreateDelegate<Func<IPlexServer, IPlexServer>>();
+        }
+
         private static Func<IPlexServer, IPlexServer> CreateProxyFactory()
         {
             AssemblyName assemblyName = new($"{nameof(PlexServer)}Assembly");
@@ -258,7 +270,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             FieldBuilder subject = typeBuilder.DefineField("_disposed", typeof(Subject<Unit>), FieldAttributes.Private | FieldAttributes.InitOnly);
             FieldBuilder server = typeBuilder.DefineField("_server", typeof(IPlexServer), FieldAttributes.Private | FieldAttributes.InitOnly);
             PlexServerProxy.GenerateConstructor(typeBuilder, server: server, subject: subject);
-            foreach (PropertyInfo property in typeof(IPlexServer).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            foreach (PropertyInfo property in typeof(IPlexServer).GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
                 if (property is { Name: nameof(IPlexServer.Disposed) })
                 {
@@ -272,20 +284,14 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             PlexServerProxy.GenerateDisposeMethod(typeBuilder, subject: subject);
             foreach (MethodInfo method in typeof(IPlexServer).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
             {
-                // Getters were already generated, so ignore.
-                if (!method.IsSpecialName)
+                if (method.IsSpecialName)
                 {
-                    PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, method);
+                    // Getters/setters were already generated, so ignore.
+                    continue;
                 }
+                PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, method);
             }
-            ParameterExpression serverParameter = Expression.Parameter(typeof(IPlexServer));
-            return Expression.Lambda<Func<IPlexServer, IPlexServer>>(
-                Expression.New(
-                    typeBuilder.CreateType().GetConstructor([typeof(IPlexServer)])!,
-                    serverParameter
-                ),
-                serverParameter
-            ).Compile();
+            return PlexServerProxy.CreateProxyDelegate(typeBuilder.CreateType());
         }
 
         private static void GenerateConstructor(TypeBuilder typeBuilder, FieldBuilder server, FieldBuilder subject)
@@ -344,6 +350,9 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             generator.Emit(OpCodes.Callvirt, typeof(Subject<Unit>).GetMethod(nameof(Subject<>.OnNext), [typeof(Unit)])!);
             generator.Emit(OpCodes.Ldarg_0);
             generator.Emit(OpCodes.Ldfld, subject);
+            generator.Emit(OpCodes.Callvirt, typeof(Subject<Unit>).GetMethod(nameof(Subject<>.OnCompleted), Type.EmptyTypes)!);
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Ldfld, subject);
             generator.Emit(OpCodes.Callvirt, disposeMethod);
             generator.Emit(OpCodes.Ret);
         }
@@ -377,7 +386,14 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
                 declaredProperty.PropertyType,
                 Type.EmptyTypes
             );
-            propertyBuilder.SetGetMethod(PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, declaredProperty.GetMethod!));
+            if (declaredProperty.GetMethod is { } getMethod)
+            {
+                propertyBuilder.SetGetMethod(PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, getMethod));
+            }
+            if (declaredProperty.SetMethod is { } setMethod)
+            {
+                propertyBuilder.SetSetMethod(PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, setMethod));
+            }
         }
     }
 }

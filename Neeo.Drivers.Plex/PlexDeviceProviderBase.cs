@@ -7,7 +7,6 @@ using System.Net;
 using System.Net.Http;
 using System.Reactive.Linq;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -17,7 +16,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Devices.Setup;
@@ -29,7 +27,7 @@ public abstract partial class PlexDeviceProviderBase(
     IHttpClientFactory httpClientFactory,
     IPlexServerManager serverManager,
     IPlexTokenStore tokenStore,
-    Task<ISdkEnvironment> startupTask,
+    Task startupTask,
     ILogger logger,
     DeviceType deviceType,
     string deviceName
@@ -313,7 +311,8 @@ public abstract partial class PlexDeviceProviderBase(
     private DirectoryEntry CreateEntry(MediaItem media) => new(
         media.Title,
         media.Summary,
-        ActionIdentifier: $"media.{media.RatingKey}",
+        ActionIdentifier: media.Type is MediaType.Episode or MediaType.Movie or MediaType.Video ? $"media.{media.RatingKey}" : null,
+
         ThumbnailUri: media.ThumbnailUri is { } uri ? this.GetThumbnailUrl(uri, ImageSize.Small) : null
     );
 

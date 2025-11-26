@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.WebSockets;
@@ -9,12 +8,10 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Utilities;
 
@@ -294,7 +291,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     private static MediaCategory GetMediaCategory(MediaType type) => type switch
     {
         MediaType.Episode or MediaType.Movie or MediaType.Video or MediaType.Show => MediaCategory.Video,
-        MediaType.Music => MediaCategory.Music,
+        MediaType.Music or MediaType.Album or MediaType.Track => MediaCategory.Music,
         MediaType.Photo => MediaCategory.Photo,
         _ => throw new NotSupportedException(),
     };

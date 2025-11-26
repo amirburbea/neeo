@@ -102,10 +102,6 @@ internal static class Server
                 .UseRouting()
                 .UseCors(nameof(CorsPolicy))
                 .UseEndpoints(endpoints => endpoints.MapControllers());
-            if (context.HostingEnvironment.IsDevelopment())
-            {
-                builder.UseDeveloperExceptionPage();
-            }
         });
 
     private static class Constants

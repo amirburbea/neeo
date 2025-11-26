@@ -33,8 +33,8 @@ public sealed class NotificationMappingTests
         List<string> paths = [];
         Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         mockClient
-            .Setup(client => client.GetAsync(Capture.In(paths), It.IsAny<Func<Entry[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
-            .ReturnsTransformOf(NotificationMappingTests._entries);
+            .Setup(client => client.GetAsync<Entry[]>(Capture.In(paths), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(NotificationMappingTests._entries);
         this._path = new(() => paths.Single());
         this._notificationMapping = new(mockClient.Object, mockEnvironment.Object, NullLogger<NotificationMapping>.Instance);
     }

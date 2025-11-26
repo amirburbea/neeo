@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -26,7 +27,7 @@ public interface IPgpEncryption
 
     /// <summary>
     /// Uses the current private key to decrypt the encrypted bytes.
-    /// 
+    ///
     /// In the event the encryption of the current bytes is not as expected, returns <c>null</c>.
     /// </summary>
     /// <param name="encryptedBytes">The encrypted bytes to decrypt.</param>
@@ -42,9 +43,9 @@ public interface IPgpEncryption
 
 internal sealed class PgpEncryption : IPgpEncryption
 {
-    private PgpKeyPair _keys = PgpEncryption.CreatePgpKeys();
-
-    public string PublicKeyText => PgpEncryption.GetPublicKeyText(this._keys.PublicKey);
+    private readonly Lock _lock = new();
+    private PgpKeyPair? _keyPair;
+    public string PublicKeyText => PgpEncryption.GetPublicKeyText(this.GetKeyPair().PublicKey);
 
     public async Task<byte[]?> DecryptViaPrivateKeyAsync(string encryptedBytes, CancellationToken cancellationToken)
     {
@@ -54,7 +55,7 @@ internal sealed class PgpEncryption : IPgpEncryption
         PgpObject list = inputFactory.NextPgpObject() as PgpEncryptedDataList ?? inputFactory.NextPgpObject(); // There could be a wrapper.
         if (list is PgpEncryptedDataList and [PgpPublicKeyEncryptedData data, ..])
         {
-            using Stream privateStream = data.GetDataStream(this._keys.PrivateKey);
+            using Stream privateStream = data.GetDataStream(this.GetKeyPair().PrivateKey);
             PgpObjectFactory privateFactory = new(privateStream);
             if (privateFactory.NextPgpObject() is PgpLiteralData literal)
             {
@@ -67,16 +68,24 @@ internal sealed class PgpEncryption : IPgpEncryption
         return null;
     }
 
-    public void RotateKeys() => this._keys = PgpEncryption.CreatePgpKeys();
+    public void RotateKeys()
+    {
+        using (this._lock.EnterScope())
+        {
+            this._keyPair = PgpEncryption.CreatePgpKeys();
+        }
+    }
 
     private static PgpKeyPair CreatePgpKeys()
     {
-        byte[] randomBytes = RandomNumberGenerator.GetBytes(64);
+        byte[] randomBytes = RandomNumberGenerator.GetBytes(32);
         char[] passphrase = Encoding.ASCII.GetChars(randomBytes);
         SecureRandom random = new();
         random.SetSeed(randomBytes);
         RsaKeyPairGenerator generator = new();
-        generator.Init(new RsaKeyGenerationParameters(BigInteger.ValueOf(0x10001), random, 768, 8));
+        // NEEO Brain requires PGP for device registration. Since we rotate keys after each use,
+        // 512-bit RSA is sufficient for this temporary, local-network-only use case.
+        generator.Init(new RsaKeyGenerationParameters(BigInteger.ValueOf(0x10001), random, 512, 4));
         AsymmetricCipherKeyPair pair = generator.GenerateKeyPair();
         PgpSecretKey secretKey = new(
             PgpSignature.DefaultCertification,
@@ -84,7 +93,7 @@ internal sealed class PgpEncryption : IPgpEncryption
             pair.Public,
             pair.Private,
             DateTime.UtcNow,
-            Guid.NewGuid().ToString("N"),
+            "neeo",
             SymmetricKeyAlgorithmTag.Aes256,
             passphrase,
             null,
@@ -105,5 +114,17 @@ internal sealed class PgpEncryption : IPgpEncryption
         outputStream.Seek(0L, SeekOrigin.Begin);
         using StreamReader reader = new(outputStream);
         return reader.ReadToEnd();
+    }
+
+    private PgpKeyPair GetKeyPair()
+    {
+        if (this._keyPair is { } keys)
+        {
+            return keys;
+        }
+        using (this._lock.EnterScope())
+        {
+            return this._keyPair ??= PgpEncryption.CreatePgpKeys();
+        }
     }
 }

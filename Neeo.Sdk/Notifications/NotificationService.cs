@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Text.Json.Serialization;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using BitFaster.Caching.Lru;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
@@ -38,41 +38,62 @@ public interface INotificationService
 
 internal sealed class NotificationService : INotificationService, IDisposable
 {
-    private readonly ActionBlock<Message> _actionBlock;
     private readonly ConcurrentLru<string, object> _cache = new(Constants.MaxCachedEntries);
     private readonly CancellationTokenSource _cancellationSource = new();
+    private readonly Channel<Message> _channel;
     private readonly IApiClient _client;
     private readonly ILogger<NotificationService> _logger;
     private readonly INotificationMapping _notificationMapping;
+    private readonly Task[] _processingTasks;
 
     public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<NotificationService> logger)
     {
         (this._client, this._notificationMapping, this._logger) = (client, notificationMapping, logger);
-        this._actionBlock = new(this.SendAsync, new()
+        this._channel = Channel.CreateBounded<Message>(new BoundedChannelOptions(Constants.MaxQueuedNotifications)
         {
-            MaxDegreeOfParallelism = Constants.MaxConcurrency,
-            BoundedCapacity = Constants.MaxConcurrency,
-            CancellationToken = this._cancellationSource.Token,
+            FullMode = BoundedChannelFullMode.Wait
         });
+        this._processingTasks = new Task[Constants.MaxConcurrentWorkers];
+        for (int i = 0; i < Constants.MaxConcurrentWorkers; i++)
+        {
+            this._processingTasks[i] = Task.Run(ProcessMessagesAsync, this._cancellationSource.Token);
+        }
+
+        async Task ProcessMessagesAsync()
+        {
+            await foreach (Message message in this._channel.Reader.ReadAllAsync(this._cancellationSource.Token).ConfigureAwait(false))
+            {
+                await this.SendAsync(message).ConfigureAwait(false);
+            }
+        }
     }
 
     public void Dispose()
     {
+        this._channel.Writer.Complete();
         this._cancellationSource.Cancel();
-        this._actionBlock.Complete();
+        try
+        {
+            Task.WaitAll(this._processingTasks, TimeSpan.FromSeconds(5));
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown
+        }
+        this._cancellationSource.Dispose();
     }
 
     public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.QueueNotificationAsync(
         adapter,
         notification,
-        false,
+        isSensorNotification: false,
         cancellationToken
     );
 
     public Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.QueueNotificationAsync(
         adapter,
         notification,
-        true,
+        isSensorNotification: true,
         cancellationToken
     );
 
@@ -87,21 +108,13 @@ internal sealed class NotificationService : INotificationService, IDisposable
         {
             this._logger.LogInformation("Send notification: {Notification}", notification);
         }
-        if (await this._notificationMapping.GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken).ConfigureAwait(false) is { Length: > 0 } keys)
+        string[] keys = await this._notificationMapping
+            .GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken)
+            .ConfigureAwait(false);
+        foreach (string key in keys)
         {
-            await Parallel.ForEachAsync(
-                keys,
-                cancellationToken,
-                async (notificationKey, cancellationToken) =>
-                {
-                    Message message = Message.Create(notificationKey, value, isSensorNotification);
-                    // We try to post synchronously, but if not we wait to send asynchronously.
-                    if (!this._actionBlock.Post(message) && !await this._actionBlock.SendAsync(message, cancellationToken).ConfigureAwait(false))
-                    {
-                        this._logger.LogWarning("Postpone failed {Message}", message);
-                    }
-                }
-            ).ConfigureAwait(false);
+            Message message = Message.Create(key, value, isSensorNotification);
+            await this._channel.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -130,7 +143,8 @@ internal sealed class NotificationService : INotificationService, IDisposable
     {
         public const string DeviceSensorUpdateKey = "DEVICE_SENSOR_UPDATE";
         public const int MaxCachedEntries = 50;
-        public const int MaxConcurrency = 25;
+        public const int MaxConcurrentWorkers = 5;
+        public const int MaxQueuedNotifications = 100;
     }
 
     public readonly record struct Message(string Type, object Data)
