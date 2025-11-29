@@ -5,11 +5,7 @@ namespace Neeo.Sdk.Devices.Components;
 /// <summary>
 /// Describes a switch component.
 /// </summary>
-public interface ISwitchComponent : IComponent, IComponentWithAssociatedSensor
-{
-}
-
-internal sealed record class SwitchComponent(
+public sealed record class SwitchComponent(
     string Name,
     string? Label,
     string Path,

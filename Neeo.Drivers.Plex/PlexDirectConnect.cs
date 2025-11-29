@@ -68,7 +68,7 @@ internal static partial class PlexDirectConnect
         }
     }
 
-    [GeneratedRegex(@"^(?<ip>(\d+[-]){3}\d+)\..+\.plex\.direct$", RegexOptions.ExplicitCapture | RegexOptions.Compiled, "en-US")]
+    [GeneratedRegex(@"^(?<ip>(\d+[-]){3}\d+)\..+\.plex\.direct$", RegexOptions.ExplicitCapture | RegexOptions.Compiled)]
     private static partial Regex PlexDirectRegex();
 
     private static bool ValidateRemoteCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors) => errors switch

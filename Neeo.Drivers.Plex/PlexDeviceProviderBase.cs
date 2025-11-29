@@ -99,8 +99,7 @@ public abstract partial class PlexDeviceProviderBase(
         .RegisterDeviceSubscriptionCallbacks(this.OnServerAddedAsync, this.OnServerRemovedAsync, this.NotifyInitialServersAsync)
         .RegisterInitializer(this.InitializeAsync)
         .AddButtonGroup(ButtonGroups.Power)
-        .SetManufacturer("Plex")
-        .SetDriverVersion(2);
+        .SetManufacturer("Plex");
 
     protected string GetCoverArt(string machineIdentifier) => this.GetCoverArt(this.GetServer(machineIdentifier)?.ActiveMedia);
 

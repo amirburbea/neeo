@@ -7,27 +7,22 @@ namespace Neeo.Sdk.Devices;
 /// </summary>
 public readonly struct DeviceTiming
 {
-    internal DeviceTiming(int? powerOnDelay = default, int? shutdownDelay = default, int? sourceSwitchDelay = default)
-    {
-        (this.PowerOnDelay, this.ShutdownDelay, this.SourceSwitchDelay) = (powerOnDelay, shutdownDelay, sourceSwitchDelay);
-    }
-
     /// <summary>
     /// Specifies the number of milliseconds NEEO should wait after powering on the device
     /// before sending it another command.
     /// </summary>
     [JsonPropertyName("standbyCommandDelay")]
-    public int? PowerOnDelay { get; }
+    public int? PowerOnDelay { get; init; }
 
     /// <summary>
     /// Specifies the number of milliseconds NEEO should wait after shutting down the device
     /// before sending it another command.
     /// </summary>
-    public int? ShutdownDelay { get; }
+    public int? ShutdownDelay { get; init; }
 
     /// <summary>
     /// Specifies the number of milliseconds NEEO should wait after switching input on the device
     /// before sending it another command.
     /// </summary>
-    public int? SourceSwitchDelay { get; }
+    public int? SourceSwitchDelay { get; init; }
 }

@@ -181,8 +181,8 @@ public sealed class DeviceDatabaseTests
         for (int i = 0; i < builders.Length; i++)
         {
             IDeviceBuilder builder = builders[i];
-            Assert.Equal(builder.AdapterName, database.GetDeviceByAdapterName(builder.AdapterName)!.AdapterName);
-            Assert.Equal($"token{i}", database.GetDeviceByAdapterName(builder.AdapterName)!.Tokens);
+            Assert.Equal(builder.AdapterName, database.GetDeviceByAdapterName(builder.AdapterName)?.AdapterName);
+            Assert.Equal($"token{i}", database.GetDeviceByAdapterName(builder.AdapterName)?.Tokens);
         }
     }
 
@@ -217,7 +217,7 @@ public sealed class DeviceDatabaseTests
         for (int i = 0; i < builders.Length; i++)
         {
             IDeviceBuilder builder = builders[i];
-            Assert.Equal(builder.AdapterName, database.GetDeviceById(i)!.AdapterName);
+            Assert.Equal(builder.AdapterName, database.GetDeviceById(i)?.AdapterName);
         }
     }
 

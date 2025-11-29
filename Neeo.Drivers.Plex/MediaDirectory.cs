@@ -2,7 +2,7 @@
 
 namespace Neeo.Drivers.Plex;
 
-public record struct MediaDirectory(
+public readonly record struct MediaDirectory(
     string Title,
     int TotalSize,
     IMediaDirectoryItem[] Items,

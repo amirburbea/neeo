@@ -82,7 +82,7 @@ internal sealed class BrainRecipes(
             _ => throw new NotSupportedException("Recipe can not be powered off."),
         };
 
-        public Task PowerOnAsync(CancellationToken cancellationToken) => client.GetAsync<EmptyObject>(recipe.Urls.SetPowerOn, cancellationToken);
+        public Task PowerOnAsync(CancellationToken cancellationToken) => client.GetAsync<JsonElement>(recipe.Urls.SetPowerOn, cancellationToken);
 
         private readonly struct EmptyObject { }
     }

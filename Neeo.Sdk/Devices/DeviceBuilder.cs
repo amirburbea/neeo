@@ -1272,7 +1272,7 @@ internal sealed partial class DeviceBuilder(
             return new(name, Uri.EscapeDataString(label ?? string.Empty), pathPrefix + name, GetSensorName(name));
         }
 
-        static string GetSensorName(string name) => name.EndsWith(SensorComponent.ComponentSuffix) ? name : string.Concat(name.ToUpperInvariant(), SensorComponent.ComponentSuffix);
+        static string GetSensorName(string name) => name.EndsWith(Constants.SensorSuffix) ? name : string.Concat(name.ToUpperInvariant(), Constants.SensorSuffix);
 
         static bool RequiresDiscovery(DeviceCapability capability) => capability is DeviceCapability.BridgeDevice or DeviceCapability.AddAnotherDevice or DeviceCapability.RegisterUserAccount;
     }
@@ -1287,7 +1287,12 @@ internal sealed partial class DeviceBuilder(
         {
             throw new InvalidOperationException("Timing is already defined.");
         }
-        this.Timing = new(Validator.ValidateDelay(powerOnDelay), Validator.ValidateDelay(shutdownDelay), Validator.ValidateDelay(sourceSwitchDelay));
+        this.Timing = new()
+        {
+            PowerOnDelay = Validator.ValidateDelay(powerOnDelay),
+            ShutdownDelay = Validator.ValidateDelay(shutdownDelay),
+            SourceSwitchDelay = Validator.ValidateDelay(sourceSwitchDelay),
+        };
         return this;
     }
 

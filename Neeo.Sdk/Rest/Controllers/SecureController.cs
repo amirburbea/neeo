@@ -9,7 +9,6 @@ internal sealed class SecureController(IPgpEncryption pgpEncryption) : Controlle
     [HttpGet("pubkey")]
     public ActionResult<PgpPublicKeyResponse> GetPublicKey()
     {
-        pgpEncryption.RotateKeys();
         return new PgpPublicKeyResponse(pgpEncryption.PublicKeyText);
     }
 

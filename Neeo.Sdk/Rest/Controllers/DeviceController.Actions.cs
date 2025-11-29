@@ -29,7 +29,7 @@ internal partial class DeviceController
         {
             IFavoritesFeature favoritesFeature => this.Ok(await favoritesFeature.ExecuteAsync(
                 deviceId,
-                parameters.GetProperty("favoriteId").GetString()!,
+                parameters.Deserialize<FavoritePayload>(JsonSerializerOptions.Web).FavoriteId,
                 cancellationToken
             )),
             IDirectoryFeature directoryFeature => this.Ok(await directoryFeature.BrowseAsync(
@@ -73,7 +73,7 @@ internal partial class DeviceController
         string adapterName,
         string componentName,
         string deviceId,
-        [FromBody] DirectoryAction action,
+        [FromBody] DirectoryActionPayload action,
         CancellationToken cancellationToken
     )
     {
@@ -126,7 +126,7 @@ internal partial class DeviceController
         return default;
     }
 
-    public readonly record struct DirectoryAction(string ActionIdentifier);
+    public readonly record struct DirectoryActionPayload(string ActionIdentifier);
 
-    private readonly record struct Favorite(string FavoriteId);
+    public readonly record struct FavoritePayload(string FavoriteId);
 }

@@ -54,7 +54,7 @@ internal partial class DeviceController
         public string ApiVersion { get; } = "1.0";
 
         [JsonPropertyName("capabilities")]
-        public IReadOnlyCollection<IComponent> Components { get; } = adapter.Components;
+        public IReadOnlyCollection<Component> Components { get; } = adapter.Components;
 
         public IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; } = adapter.DeviceCapabilities;
 

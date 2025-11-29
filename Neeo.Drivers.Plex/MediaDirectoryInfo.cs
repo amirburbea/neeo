@@ -2,7 +2,7 @@
 
 namespace Neeo.Drivers.Plex;
 
-public record struct MediaDirectoryInfo(
+public readonly record struct MediaDirectoryInfo(
     string Title,
     int RatingKey,
     string? Key = null,

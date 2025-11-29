@@ -14,7 +14,8 @@ public interface IRegistrationFeature : IFeature
     FeatureType IFeature.Type => FeatureType.Registration;
 
     /// <summary>
-    /// Asynchronously determine if the device is already registered. If the device was previously registered, then NEEO will not prompt for credentials.
+    /// Asynchronously determine if the device is already registered. If the device was previously
+    /// registered, then NEEO will not prompt for credentials.
     /// </summary>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
@@ -31,18 +32,21 @@ public interface IRegistrationFeature : IFeature
 
 internal sealed class RegistrationFeature(QueryIsRegistered queryIsRegistered, Func<byte[], CancellationToken, Task<RegistrationResult>> register) : IRegistrationFeature
 {
-    private readonly QueryIsRegistered _queryIsRegistered = queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered));
-
     public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, Func<TPayload, CancellationToken, Task<RegistrationResult>> register)
         where TPayload : struct
     {
-        return new(queryIsRegistered ?? throw new ArgumentNullException(nameof(queryIsRegistered)), (utf8Bytes, cancellationToken) =>
-        {
-            return register(JsonSerializer.Deserialize<TPayload>(utf8Bytes, JsonSerializerOptions.Web), cancellationToken);
-        });
+        ArgumentNullException.ThrowIfNull(queryIsRegistered, nameof(queryIsRegistered));
+        ArgumentNullException.ThrowIfNull(register, nameof(register));
+        return new(
+            queryIsRegistered,
+            (utf8Bytes, cancellationToken) => register(
+                JsonSerializer.Deserialize<TPayload>(utf8Bytes, JsonSerializerOptions.Web),
+                cancellationToken
+            )
+        );
     }
 
-    public async Task<IsRegisteredResponse> QueryIsRegisteredAsync(CancellationToken cancellationToken) => new(await this._queryIsRegistered(cancellationToken).ConfigureAwait(false));
+    public async Task<IsRegisteredResponse> QueryIsRegisteredAsync(CancellationToken cancellationToken) => new(await queryIsRegistered(cancellationToken).ConfigureAwait(false));
 
     public Task<RegistrationResult> RegisterAsync(byte[] jsonBytes, CancellationToken cancellationToken) => register(jsonBytes, cancellationToken);
 }

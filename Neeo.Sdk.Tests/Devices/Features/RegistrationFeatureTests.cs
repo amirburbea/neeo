@@ -24,7 +24,7 @@ public sealed class RegistrationFeatureTests
             register: (_, _) => Task.FromResult(RegistrationResult.Success)
         );
 
-        IsRegisteredResponse result = await feature.QueryIsRegisteredAsync(cts.Token);
+        IsRegisteredResponse result = await ((IRegistrationFeature)feature).QueryIsRegisteredAsync(cts.Token);
 
         Assert.True(result.Registered);
         mockQuery.Verify(query => query(cts.Token), Times.Once);
@@ -51,7 +51,7 @@ public sealed class RegistrationFeatureTests
 
         TestCredentials credentials = new(userName, password);
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(credentials, JsonSerializerOptions.Web);
-        RegistrationResult result = await feature.RegisterAsync(bytes, cts.Token);
+        RegistrationResult result = await ((IRegistrationFeature)feature).RegisterAsync(bytes, cts.Token);
 
         Assert.Equal(success, result.IsSuccess);
         mockRegister.Verify(register => register(credentials, cts.Token), Times.Once);

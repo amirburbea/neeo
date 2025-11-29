@@ -174,7 +174,7 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
             throw new InvalidOperationException("Can not add more entries");
         }
         this._items.Add(item);
-        if (item.Type is DirectoryItemType.Entry)
+        if (item is { Type: DirectoryItemType.Entry })
         {
             this.EntryCount++;
         }

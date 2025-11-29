@@ -29,7 +29,7 @@ internal partial class DeviceController
             return this.NotFound();
         }
         // Extract the credentials as JSON bytes.
-        if (await pgpEncryption.DecryptViaPrivateKeyAsync(payload.Data, cancellationToken) is not { } decryptedJsonBytes)
+        if (await pgpEncryption.DecryptAsync(payload.Data, cancellationToken) is not { } decryptedJsonBytes)
         {
             return this.BadRequest();
         }

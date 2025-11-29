@@ -7,7 +7,7 @@ namespace Neeo.Sdk.Devices;
 /// <summary>
 /// A model for a built device.
 /// </summary>
-public sealed class DeviceModel(int id, IDeviceAdapter adapter)
+public readonly struct DeviceModel(int id, IDeviceAdapter adapter)
 {
     /// <summary>
     /// Gets the name of the device adapter.
@@ -18,7 +18,7 @@ public sealed class DeviceModel(int id, IDeviceAdapter adapter)
     /// Gets the collection of device components.
     /// </summary>
     [JsonPropertyName("capabilities")]
-    public IReadOnlyCollection<IComponent> Components => adapter.Components;
+    public IReadOnlyCollection<Component> Components => adapter.Components;
 
     /// <summary>
     /// Gets the collection of unique capabilities of the device.

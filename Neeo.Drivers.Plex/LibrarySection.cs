@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Drivers.Plex;
 
-public record struct LibrarySection(
+public readonly record struct LibrarySection(
     int Key,
     string Title,
     LibrarySectionType Type

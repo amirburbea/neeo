@@ -21,7 +21,8 @@ internal sealed class SdkRegistration(
     {
         try
         {
-            await client.PostAsync(BrainUrlPaths.RegisterServer, new { Name = environment.SdkAdapterName, BaseUrl = environment.HostAddress }, cancellationToken).ConfigureAwait(false);
+            RegisterServerRequest request = new(environment.SdkAdapterName, environment.HostAddress);
+            await client.PostAsync(BrainUrlPaths.RegisterServer, request, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Server {Name} registered on {Brain} ({Address}).", environment.SdkAdapterName, brain.HostName, brain.ServiceEndPoint.Address);
         }
         catch (Exception e)
@@ -35,7 +36,8 @@ internal sealed class SdkRegistration(
     {
         try
         {
-            await client.PostAsync(BrainUrlPaths.UnregisterServer, new { Name = environment.SdkAdapterName }, cancellationToken).ConfigureAwait(false);
+            UnregisterServerRequest request = new(environment.SdkAdapterName);
+            await client.PostAsync(BrainUrlPaths.UnregisterServer, request, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Server unregistered from {brain}.", brain.HostName);
         }
         catch (Exception e)
@@ -43,4 +45,7 @@ internal sealed class SdkRegistration(
             logger.LogWarning("Failed to unregister with brain - {content}.", e.Message);
         }
     }
+
+    public readonly record struct RegisterServerRequest(string Name, string BaseUrl);
+    public readonly record struct UnregisterServerRequest(string Name);
 }

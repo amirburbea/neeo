@@ -3,4 +3,6 @@
 internal static class Constants
 {
     public const string PowerSensorName = "powerstate";
+
+    public const string SensorSuffix = "_SENSOR";
 }

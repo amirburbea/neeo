@@ -93,14 +93,14 @@ internal static class Server
             services
                .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
                .AddJsonOptions(options => Server.ConfigureJsonOptions(options.JsonSerializerOptions))
-               .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+               .AddCors(options => options.AddDefaultPolicy(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AssemblyControllerFeatureProvider.Instance));
         })
         .Configure((context, builder) =>
         {
             builder
                 .UseRouting()
-                .UseCors(nameof(CorsPolicy))
+                .UseCors()
                 .UseEndpoints(endpoints => endpoints.MapControllers());
         });
 

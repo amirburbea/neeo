@@ -36,7 +36,7 @@ public interface INotificationService
     Task SendSensorNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default);
 }
 
-internal sealed class NotificationService : INotificationService, IDisposable
+internal sealed class NotificationService : INotificationService
 {
     private readonly ConcurrentLru<string, object> _cache = new(Constants.MaxCachedEntries);
     private readonly CancellationTokenSource _cancellationSource = new();
@@ -49,10 +49,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
     public NotificationService(IApiClient client, INotificationMapping notificationMapping, ILogger<NotificationService> logger)
     {
         (this._client, this._notificationMapping, this._logger) = (client, notificationMapping, logger);
-        this._channel = Channel.CreateBounded<Message>(new BoundedChannelOptions(Constants.MaxQueuedNotifications)
-        {
-            FullMode = BoundedChannelFullMode.Wait
-        });
+        this._channel = Channel.CreateBounded<Message>(options: new(Constants.MaxQueuedNotifications) { FullMode = BoundedChannelFullMode.Wait });
         this._processingTasks = new Task[Constants.MaxConcurrentWorkers];
         for (int i = 0; i < Constants.MaxConcurrentWorkers; i++)
         {
@@ -80,7 +77,10 @@ internal sealed class NotificationService : INotificationService, IDisposable
         {
             // Expected during shutdown
         }
-        this._cancellationSource.Dispose();
+        finally
+        {
+            this._cancellationSource.Dispose();
+        }
     }
 
     public Task SendNotificationAsync(IDeviceAdapter adapter, Notification notification, CancellationToken cancellationToken = default) => this.QueueNotificationAsync(
@@ -113,8 +113,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
             .ConfigureAwait(false);
         foreach (string key in keys)
         {
-            Message message = Message.Create(key, value, isSensorNotification);
-            await this._channel.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+            await this._channel.Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -151,19 +150,15 @@ internal sealed class NotificationService : INotificationService, IDisposable
         public const int MaxQueuedNotifications = 100;
     }
 
-    public readonly record struct Message(string Type, object Data)
+    public readonly struct Message(string type, object data, bool isSensorNotification)
     {
-        public static Message Create(string type, object data, bool isSensorNotification) => isSensorNotification
-            ? new(Constants.DeviceSensorUpdateKey, new SensorData(type, data))
-            : new(type, data);
-
         [JsonIgnore]
-        public (string, object) CacheData => this.Data switch
-        {
-            SensorData({ } key, { } value) => (key, value),
-            _ => (this.Type, this.Data)
-        };
+        public (string, object) CacheData { get; } = (type, data);
 
-        private record struct SensorData(string SensorEventKey, object SensorValue);
+        public string Type { get; } = isSensorNotification ? Constants.DeviceSensorUpdateKey : type;
+
+        public object Data { get; } = isSensorNotification ? new SensorData(type, data) : data;
+
+        public readonly record struct SensorData(string SensorEventKey, object SensorValue);
     }
 }

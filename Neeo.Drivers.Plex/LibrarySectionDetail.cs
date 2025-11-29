@@ -2,7 +2,7 @@
 
 namespace Neeo.Drivers.Plex;
 
-public record struct LibrarySectionDetail(
+public readonly record struct LibrarySectionDetail(
     string Title,
     Uri Thumbnail
 );
