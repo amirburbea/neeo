@@ -58,9 +58,16 @@ internal sealed class NotificationService : INotificationService
 
         async Task ProcessMessagesAsync()
         {
-            await foreach (Message message in this._channel.Reader.ReadAllAsync(this._cancellationSource.Token).ConfigureAwait(false))
+            try
             {
-                await this.SendAsync(message).ConfigureAwait(false);
+                await foreach (Message message in this._channel.Reader.ReadAllAsync(this._cancellationSource.Token).ConfigureAwait(false))
+                {
+                    await this.SendAsync(message).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException ex) when (ex.CancellationToken == this._cancellationSource.Token)
+            {
+                // Expected during shutdown
             }
         }
     }

@@ -41,16 +41,19 @@ public interface IBrain
 /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
 /// </remarks>
 /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
-/// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
 /// <param name="hostName">The host name of the NEEO Brain.</param>
 /// <param name="version">The firmware version of the NEEO Brain.</param>
 public sealed partial class Brain(
     IPAddress ipAddress,
-    int servicePort = 3000,
     string? hostName = default,
     string version = "0.50.0"
 ) : IBrain
 {
+    /// <summary>
+    /// The port of the Brain's API service.
+    /// </summary>
+    public const int ServicePort = 3000;
+
     /// <summary>
     /// The host name of the NEEO Brain.
     /// </summary>
@@ -68,7 +71,7 @@ public sealed partial class Brain(
         ipAddress.AddressFamily == AddressFamily.InterNetwork
             ? ipAddress
             : throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress)),
-        servicePort
+        Brain.ServicePort
     );
 
     /// <summary>
@@ -181,7 +184,7 @@ public sealed partial class Brain(
 
     private static Brain? TryCreateBrain(IZeroconfHost host)
     {
-        if (host.Services.Values.FirstOrDefault() is not { Port: int port, Properties: [{ } properties, ..] })
+        if (host.Services.Values.FirstOrDefault() is not { Properties: [{ } properties, ..] })
         {
             return null;
         }
@@ -196,7 +199,7 @@ public sealed partial class Brain(
         {
             string hostName = $"{properties["hon"]}.local";
             string version = properties["rel"];
-            return new(IPAddress.Parse(ip), port, hostName, version);
+            return new(IPAddress.Parse(ip), hostName, version);
         }
     }
 
@@ -315,8 +318,8 @@ public static class BrainMethods
         {
             // Get IPv4 addresses for the current device.
             IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-            // If the Brain IP is not contained, the Brain is a separate device. Return the first
-            // non-loopback IP address on this host.
+            // If the Brain IP is not in the list, the Brain is a separate device.
+            // Return the first non-loopback IP address on this host.
             if (Array.IndexOf(addresses, brain.IPAddress) == -1 && Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) is { } ipAddress)
             {
                 return ipAddress;
