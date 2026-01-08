@@ -1,6 +1,6 @@
 ﻿namespace Neeo.Sdk.Devices;
 
-public static class PlayerWidgetConstants
+internal static class PlayerWidgetConstants
 {
     public const string CoverArtSensorName = "COVER_ART_SENSOR";
 
