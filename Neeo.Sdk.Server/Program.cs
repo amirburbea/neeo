@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -24,7 +25,6 @@ public static class Program
         .RunConsoleAsync();
 
     private static void ConfigureAppConfiguration(IHostEnvironment environment, IConfigurationBuilder builder) => builder
-        .AddEnvironmentVariables(prefix: "NEEO_")
         .AddCommandLine(Environment.GetCommandLineArgs()[1..])
         .AddJsonFile("appsettings.json", optional: true)
         .AddJsonFile($"appsettings.{environment.EnvironmentName}.json", optional: true);
@@ -51,6 +51,8 @@ public static class Program
         {
             throw new ApplicationException("Invalid configuration, configuration should have an array \"Drivers\" with at least one driver assembly.");
         }
+        List<Type> providerTypes = [];
+        List<IServiceConfiguration> serviceConfigurations = [];
         foreach (string assemblyPath in driverPaths.Select(Path.GetFullPath))
         {
             if (!File.Exists(assemblyPath))
@@ -66,11 +68,11 @@ public static class Program
                 }
                 if (typeof(IDeviceProvider).IsAssignableFrom(type))
                 {
-                    services.Add(new(typeof(IDeviceProvider), type, ServiceLifetime.Singleton));
+                    providerTypes.Add(type);
                 }
                 else if (typeof(IServiceConfiguration).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) is { } constructor)
                 {
-                    ((IServiceConfiguration)constructor.Invoke(null)).ConfigureServices(services);
+                    serviceConfigurations.Add((IServiceConfiguration)constructor.Invoke(null));
                 }
             }
         }

@@ -8,7 +8,6 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -24,20 +23,21 @@ namespace Neeo.Sdk.Rest;
 internal static class Server
 {
     public static async Task<IHost> StartSdkAsync(
-        IBrain brain,
-        IReadOnlyCollection<IDeviceBuilder> devices,
+        Brain brain,
+        Func<IServiceProvider, IReadOnlyCollection<IDeviceBuilder>> devices,
         string adapterName,
         IPAddress hostAddress,
         int port,
-        Action<HostBuilderContext, ILoggingBuilder>? configureLogging,
-        CancellationToken cancellationToken
+        IServiceConfiguration[]? serviceConfigurations = default,
+        Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
+        CancellationToken cancellationToken = default
     )
     {
         IHost host = new HostBuilder()
             .ConfigureWebHostDefaults(builder => Server.ConfigureWebHostDefaults(builder, hostAddress, port))
             .ConfigureLogging(configureLogging ?? Server.ConfigureLoggingDefaults)
             .ConfigureServices(Server.ConfigureHttpClient)
-            .ConfigureServices(services => Server.ConfigureServices(services, brain, devices, adapterName))
+            .ConfigureServices(services => Server.ConfigureServices(services, brain, devices, adapterName, serviceConfigurations))
             .Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
         return host;
@@ -65,21 +65,25 @@ internal static class Server
         }
     }
 
-    private static void ConfigureServices(IServiceCollection services, IBrain brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
-        .AddSingleton(brain)
-        .AddSingleton(devices)
-        .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
-        .AddSingleton<IPgpEncryption, PgpEncryption>()
-        .AddSingleton<IApiClient, ApiClient>()
-        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-        .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
-        .AddSingleton<INotificationMapping, NotificationMapping>()
-        .AddSingleton<INotificationService, NotificationService>()
-        .AddSingleton<ISdkEnvironment, SdkEnvironment>()
-        .AddSingleton<IBrainRecipes, BrainRecipes>()
-        .AddHostedService<SdkRegistration>()
-        .AddHostedService<UriPrefixNotifier>()
-        .AddHostedService<SubscriptionsNotifier>();
+    private static void ConfigureServices(IServiceCollection services, Brain brain, Func<IServiceProvider, IReadOnlyCollection<IDeviceBuilder>> devices, string adapterName, IServiceConfiguration[]? serviceConfigurations)
+    {
+        services
+            .AddSingleton<IApiClient, ApiClient>()
+            .AddSingleton<IBrainRecipes, BrainRecipes>()
+            .AddSingleton<IDeviceDatabase, DeviceDatabase>()
+            .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
+            .AddSingleton<INotificationMapping, NotificationMapping>()
+            .AddSingleton<INotificationService, NotificationService>()
+            .AddSingleton<IPgpEncryption, PgpEncryption>()
+            .AddSingleton<ISdkEnvironment, SdkEnvironment>()
+            .AddSingleton<IBrain>(brain)
+            .AddSingleton(devices)
+            .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
+            .AddHostedService<SdkRegistration>()
+            .AddHostedService<SubscriptionsNotifier>()
+            .AddHostedService<UriPrefixNotifier>();
+        Array.ForEach(serviceConfigurations ?? [], configuration => configuration.ConfigureServices(services));
+    }
 
     private static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPAddress hostAddress, int port) => builder
         .ConfigureKestrel(options =>
