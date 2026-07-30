@@ -50,7 +50,10 @@ internal sealed class ApiClient(
         where TData : notnull
     {
         UriBuilder builder = new(this._baseUri) {Path = path};
-        logger.LogInformation("Making GET request to {uri}...", builder.Uri);
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Making GET request to {uri}...", builder.Uri);
+        }
         return this._httpClient.GetAsync<TData>(builder.Uri, cancellationToken: cancellationToken);
     }
 
@@ -58,7 +61,10 @@ internal sealed class ApiClient(
         where TBody : notnull
     {
         UriBuilder builder = new(this._baseUri) { Path = path };
-        logger.LogInformation("Making POST request to {uri}...", builder.Uri);
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Making POST request to {uri}...", builder.Uri);
+        }
         SuccessResponse response = await this._httpClient
             .PostAsync<TBody, SuccessResponse>(builder.Uri, body, cancellationToken: cancellationToken)
             .ConfigureAwait(false);

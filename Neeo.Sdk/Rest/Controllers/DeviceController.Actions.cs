@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 using Neeo.Sdk.Devices.Features;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -29,12 +30,12 @@ internal partial class DeviceController
         {
             IFavoritesFeature favoritesFeature => this.Ok(await favoritesFeature.ExecuteAsync(
                 deviceId,
-                parameters.Deserialize<FavoritePayload>(JsonSerializerOptions.Web).FavoriteId,
+                parameters.Deserialize<FavoritePayload>(AppJsonSerializerOptions.Default).FavoriteId,
                 cancellationToken
             )),
             IDirectoryFeature directoryFeature => this.Ok(await directoryFeature.BrowseAsync(
                 deviceId,
-                parameters.Deserialize<BrowseParameters>(JsonSerializerOptions.Web),
+                parameters.Deserialize<BrowseParameters>(AppJsonSerializerOptions.Default),
                 cancellationToken
             )),
             _ => this.NotFound(),

@@ -20,7 +20,7 @@ public sealed class ValueFeatureTests
         mockGetter.Setup(getter => getter(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(value);
 
         ValueFeature feature = ValueFeature.Create(mockGetter.Object);
-        ValueResponse response = await feature.GetValueAsync(string.Empty, default);
+        ValueResponse response = await feature.GetValueAsync(string.Empty, TestContext.Current.CancellationToken);
 
         Assert.Same(BooleanBoxes.GetBox(value), response.Value);
     }
@@ -35,9 +35,9 @@ public sealed class ValueFeatureTests
 
         ValueFeature feature = ValueFeature.Create(Mock.Of<AsyncDeviceValueGetter<bool>>(MockBehavior.Strict), mockSetter.Object);
         string deviceId = Guid.NewGuid().ToString("N");
-        await feature.SetValueAsync(deviceId, text, default);
+        await feature.SetValueAsync(deviceId, text, TestContext.Current.CancellationToken);
 
-        mockSetter.Verify(setter => setter(deviceId, value, default), Times.Once());
+        mockSetter.Verify(setter => setter(deviceId, value, It.IsAny<CancellationToken>()), Times.Once());
     }
 
     [Theory]
@@ -51,9 +51,9 @@ public sealed class ValueFeatureTests
 
         ValueFeature feature = ValueFeature.Create(Mock.Of<AsyncDeviceValueGetter<double>>(MockBehavior.Strict), mockSetter.Object);
         string deviceId = Guid.NewGuid().ToString("N");
-        await feature.SetValueAsync(deviceId, text, default);
+        await feature.SetValueAsync(deviceId, text, TestContext.Current.CancellationToken);
 
-        mockSetter.Verify(setter => setter(deviceId, value, default), Times.Once());
+        mockSetter.Verify(setter => setter(deviceId, value, It.IsAny<CancellationToken>()), Times.Once());
     }
 
     [Fact]
@@ -61,6 +61,6 @@ public sealed class ValueFeatureTests
     {
         ValueFeature feature = ValueFeature.Create(Mock.Of<AsyncDeviceValueGetter<bool>>(MockBehavior.Strict));
 
-        return Assert.ThrowsAsync<NotSupportedException>(() => feature.SetValueAsync(string.Empty, string.Empty, default));
+        return Assert.ThrowsAsync<NotSupportedException>(() => feature.SetValueAsync(string.Empty, string.Empty, TestContext.Current.CancellationToken));
     }
 }

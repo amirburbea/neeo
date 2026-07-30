@@ -20,8 +20,8 @@ public sealed class FavoritesFeatureTests
 
         FavoritesFeature feature = new(mockFavoriteHandler.Object);
         string deviceId = Guid.NewGuid().ToString("N");
-        await feature.ExecuteAsync(deviceId, favorite, default);
+        await feature.ExecuteAsync(deviceId, favorite, TestContext.Current.CancellationToken);
 
-        mockFavoriteHandler.Verify(handler => handler(deviceId, favorite, default), Times.Once());
+        mockFavoriteHandler.Verify(handler => handler(deviceId, favorite, It.IsAny<CancellationToken>()), Times.Once());
     }
 }

@@ -44,7 +44,7 @@ public sealed class SdkRegistrationTests
     [Fact]
     public async Task StartAsync_should_register_using_correct_parameters()
     {
-        await this._sdkRegistration.StartAsync(default);
+        await this._sdkRegistration.StartAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(BrainUrlPaths.RegisterServer, this._path.Value);
         Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\",\"baseUrl\":\"{Constants.HostAddress}\"}}", this._body.Value);
@@ -53,7 +53,7 @@ public sealed class SdkRegistrationTests
     [Fact]
     public async Task StopAsync_should_unregister_using_correct_parameters()
     {
-        await this._sdkRegistration.StopAsync(default);
+        await this._sdkRegistration.StopAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(BrainUrlPaths.UnregisterServer, this._path.Value);
         Assert.Equal($"{{\"name\":\"{Constants.SdkAdapterName}\"}}", this._body.Value);

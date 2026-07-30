@@ -35,34 +35,25 @@ public interface IDynamicDeviceRegistry
 internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) : IDynamicDeviceRegistry
 {
     private readonly ConcurrentDictionary<string, IDeviceAdapter> _discoveredDevices = new();
-    private readonly ReaderWriterLockSlim _lock = new();
+    private readonly ConcurrentDictionary<string, Task<IDeviceAdapter?>> _pendingDiscoveries = new();
 
-    public async ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken = default)
+    public ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken = default)
     {
         if (rootAdapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature { EnableDynamicDeviceBuilder: true } feature)
         {
             return default;
         }
         string key = DynamicDeviceRegistry.ComputeKey(rootAdapter.AdapterName, deviceId);
-        try
+        if (this._discoveredDevices.GetValueOrDefault(key) is { } discoveredDevice)
         {
-            this._lock.EnterReadLock();
-            if (this._discoveredDevices.GetValueOrDefault(key) is { } discoveredDevice)
-            {
-                return discoveredDevice;
-            }
+            return new(discoveredDevice);
         }
-        finally
-        {
-            this._lock.ExitReadLock();
-        }
-        if (await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not { DeviceBuilder: { } builder })
-        {
-            return default;
-        }
-        IDeviceAdapter adapter = builder.BuildAdapter();
-        this.RegisterDiscoveredDevice(key, adapter);
-        return adapter;
+        // Coalesce concurrent misses for the same key onto a single in-flight discovery call.
+        Task<IDeviceAdapter?> discoveryTask = this._pendingDiscoveries.GetOrAdd(
+            key,
+            _ => this.DiscoverAndRegisterAsync(feature, key, deviceId, cancellationToken)
+        );
+        return new(discoveryTask);
     }
 
     public IDeviceAdapter RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder)
@@ -78,23 +69,31 @@ internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logge
 
     private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
 
+    private async Task<IDeviceAdapter?> DiscoverAndRegisterAsync(IDiscoveryFeature feature, string key, string deviceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not { DeviceBuilder: { } builder })
+            {
+                return null;
+            }
+            IDeviceAdapter adapter = builder.BuildAdapter();
+            this.RegisterDiscoveredDevice(key, adapter);
+            return adapter;
+        }
+        finally
+        {
+            this._pendingDiscoveries.TryRemove(key, out _);
+        }
+    }
+
     private void RegisterDiscoveredDevice(string key, IDeviceAdapter device)
     {
         if (!device.DeviceCapabilities.Contains(DeviceCapability.DynamicDevice))
         {
             throw new ArgumentException("Dynamically defined devices must have DeviceCharacteristic.DynamicDevice", nameof(device));
         }
-        int count;
-        try
-        {
-            this._lock.EnterWriteLock();
-            this._discoveredDevices.TryAdd(key, device);
-            count = this._discoveredDevices.Count;
-        }
-        finally
-        {
-            this._lock.ExitWriteLock();
-        }
-        logger.LogInformation("Added device, currently registered {count} dynamic device(s).", count);
+        this._discoveredDevices.TryAdd(key, device);
+        logger.LogInformation("Added device, currently registered {count} dynamic device(s).", this._discoveredDevices.Count);
     }
 }

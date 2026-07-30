@@ -30,7 +30,7 @@ public sealed class UriPrefixNotifierTest
         mockAdapter.Setup(adapter => adapter.UriPrefixCallback).Returns(prefix => uriPrefix = prefix);
         this._mockDatabase.Setup(database => database.Adapters).Returns([mockAdapter.Object]);
 
-        await this._uriPrefixNotifier.StartAsync(default);
+        await this._uriPrefixNotifier.StartAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal($"{Constants.HostAddress}/device/{nameof(mockAdapter)}/custom/", uriPrefix);
     }

@@ -20,6 +20,8 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
     private CancellationTokenSource? _cancellationTokenSource;
     private Task<bool>? _connectTask;
+    private Func<KodiClient, CancellationToken, Task>? _pendingButtonAction;
+    private ReconnectLoop? _reconnectLoop;
     private ClientWebSocket? _webSocket;
 
     public event EventHandler? Connected;
@@ -80,9 +82,21 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:9090/jsonrpc"), cancellationToken).ConfigureAwait(false);
                 this._cancellationTokenSource = cts;
                 this._webSocket = webSocket;
-                _ = Task.Factory.StartNew(this.MessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                // Task.Factory.StartNew with an async delegate returns Task<Task> - without Unwrap(), the
+                // outer task completes at the first await, so a fault in the real loop would become an
+                // unobserved task exception rather than something we can see.
+                _ = Task.Factory.StartNew(this.MessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default)
+                    .Unwrap()
+                    .ContinueWith(
+                        task => logger.LogError(task.Exception, "Kodi message loop terminated unexpectedly."),
+                        TaskContinuationOptions.OnlyOnFaulted
+                    );
                 await this.OnConnected().ConfigureAwait(false);
                 logger.LogInformation("Connected to {ipAddress}:9090/jsonrpc...", this.IPAddress);
+                if (Interlocked.Exchange(ref this._pendingButtonAction, null) is { } pendingAction)
+                {
+                    _ = this.ReplayPendingActionAsync(pendingAction);
+                }
                 return true;
             }
             catch (WebSocketException)
@@ -108,6 +122,25 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         }
         this.IsDisposed = true;
         this.Disposed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Queues an action to be replayed once the client (re)connects, replacing any previously queued
+    /// action - only the most recently queued action survives, so a burst of button presses while
+    /// disconnected doesn't replay all of them once the connection comes back.
+    /// </summary>
+    public void QueuePendingButtonAction(Func<KodiClient, CancellationToken, Task> action) => Interlocked.Exchange(ref this._pendingButtonAction, action);
+
+    private async Task ReplayPendingActionAsync(Func<KodiClient, CancellationToken, Task> action)
+    {
+        try
+        {
+            await action(this, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to replay queued button action.");
+        }
     }
 
     public Task<QueryData<AlbumInfo>> GetAlbumsAsync(int start = 0, int end = -1, int? artistId = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
@@ -163,6 +196,13 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     public Task<bool> OpenFileAsync(string key, int id, CancellationToken cancellationToken) => this.SendMessageAsync(
         "Player.Open",
         new { Item = new Dictionary<string, int>(1) { { key, id } } },
+        static (string result) => result == "OK",
+        cancellationToken
+    );
+
+    public Task<bool> GoHomeAsync(CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "GUI.ActivateWindow",
+        new { window = "home" },
         static (string result) => result == "OK",
         cancellationToken
     );
@@ -282,6 +322,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         using WebSocket? webSocket = Interlocked.Exchange(ref this._webSocket, default);
         using CancellationTokenSource? source = Interlocked.Exchange(ref this._cancellationTokenSource, default);
         source?.Cancel();
+        Interlocked.Exchange(ref this._reconnectLoop, default)?.Dispose();
     }
 
     private Task<int> GetCurrentWindowIdAsync(CancellationToken cancellationToken) => this.SendMessageAsync(
@@ -334,7 +375,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                         return ValueTask.CompletedTask;
                     },
                     this.OnDisconnected,
-                    token
+                    cancellationToken: token
                 ).ConfigureAwait(false);
             }
         }
@@ -356,19 +397,23 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         this.PlayerState = PlayerState.Defaults;
     }
 
-    private async void OnDisconnected()
+    private void OnDisconnected()
     {
         this.CleanUp();
         this.PlayerState = PlayerState.Disconnected;
         this.Disconnected?.Invoke(this, EventArgs.Empty);
-        using PeriodicTimer timer = new(TimeSpan.FromMinutes(1d));
-        while (!this.IsDisposed && !this.IsConnected && await timer.WaitForNextTickAsync().ConfigureAwait(false))
+        if (this.IsDisposed)
         {
-            if (await this.ConnectAsync().ConfigureAwait(false))
-            {
-                return;
-            }
+            return;
         }
+        ReconnectLoop loop = new(TimeSpan.FromSeconds(15d), TimeSpan.FromMinutes(2d), _ => this.ConnectAsync(), logger);
+        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is not null)
+        {
+            // A reconnect loop is already running - don't start a second one.
+            loop.Dispose();
+            return;
+        }
+        loop.Start();
     }
 
     private async void OnPlay(PlayParameters parameters)

@@ -1,7 +1,7 @@
 ﻿namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
-/// Represents an entry - a file or directory - within a directory.
+/// Parameters describing an entry - a file or directory - to add to a directory.
 /// </summary>
 /// <param name="Title">The title of the entry.</param>
 /// <param name="Label">Optional - the label to use for the entry.</param>
@@ -18,7 +18,4 @@ public sealed record class DirectoryEntry(
     bool? IsQueueable = null,
     string? ActionIdentifier = null,
     DirectoryUIAction? UIAction = null
-) : ClickableDirectoryItem(ActionIdentifier, UIAction), IDirectoryItem
-{
-    DirectoryItemType IDirectoryItem.Type => DirectoryItemType.Entry;
-}
+);

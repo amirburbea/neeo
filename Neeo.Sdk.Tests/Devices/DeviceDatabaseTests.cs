@@ -87,7 +87,7 @@ public sealed class DeviceDatabaseTests
             NullLogger<DeviceDatabase>.Instance
         );
 
-        _ = database.GetAdapterAsync("name").AsTask();
+        _ = database.GetAdapterAsync("name", TestContext.Current.CancellationToken).AsTask();
 
         mockInitializer.Verify(initializer => initializer(It.IsAny<CancellationToken>()), Times.Once());
     }
@@ -108,7 +108,7 @@ public sealed class DeviceDatabaseTests
 
         for (int i = 0; i < 5; i++)
         {
-            _ = database.GetAdapterAsync("name").AsTask();
+            _ = database.GetAdapterAsync("name", TestContext.Current.CancellationToken).AsTask();
         }
         source.SetResult();
 
@@ -119,7 +119,7 @@ public sealed class DeviceDatabaseTests
     public void GetAdapterAsync_does_not_call_initializer_if_initialized()
     {
         var (mockBuilder, mockAdapter, _) = CreateDevice("name");
-        Mock<DeviceInitializer> mockInitializer = new Mock<DeviceInitializer>(MockBehavior.Strict);
+        Mock<DeviceInitializer> mockInitializer = new(MockBehavior.Strict);
         mockInitializer.Setup(initializer => initializer(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         mockAdapter.Setup(adapter => adapter.Initializer).Returns(mockInitializer.Object);
         DeviceDatabase database = new(
@@ -130,7 +130,7 @@ public sealed class DeviceDatabaseTests
 
         for (int i = 0; i < 2; i++)
         {
-            _ = database.GetAdapterAsync("name").AsTask();
+            _ = database.GetAdapterAsync("name", TestContext.Current.CancellationToken).AsTask();
         }
 
         mockInitializer.Verify(initializer => initializer(It.IsAny<CancellationToken>()), Times.Once());
@@ -147,7 +147,7 @@ public sealed class DeviceDatabaseTests
             NullLogger<DeviceDatabase>.Instance
         );
 
-        Assert.Equal(mockAdapter.Object, await database.GetAdapterAsync("name"));
+        Assert.Equal(mockAdapter.Object, await database.GetAdapterAsync("name", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public sealed class DeviceDatabaseTests
             NullLogger<DeviceDatabase>.Instance
         );
 
-        Assert.Null(await database.GetAdapterAsync("name"));
+        Assert.Null(await database.GetAdapterAsync("name", TestContext.Current.CancellationToken));
     }
 
     [Fact]

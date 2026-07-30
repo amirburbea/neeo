@@ -18,7 +18,7 @@ public sealed class DynamicDeviceRegistryTests
     {
         var (mockRootAdapter, mockFeature) = CreateRootAdapter(discovery: true, enableDynamicDeviceBuilder: true);
 
-        await this._dynamicDeviceRegistry.GetDiscoveredDeviceAsync(mockRootAdapter.Object, "id");
+        await this._dynamicDeviceRegistry.GetDiscoveredDeviceAsync(mockRootAdapter.Object, "id", TestContext.Current.CancellationToken);
 
         mockFeature!.Verify(feature => feature.DiscoverAsync("id", It.IsAny<CancellationToken>()), Times.Once());
     }
@@ -34,7 +34,7 @@ public sealed class DynamicDeviceRegistryTests
         mockDeviceBuilder.Setup(device => device.BuildAdapter()).Returns(mockDynamicAdapter.Object);
 
         this._dynamicDeviceRegistry.RegisterDiscoveredDevice(mockRootAdapter.Object, "id", mockDeviceBuilder.Object);
-        var discoveredDevice = await this._dynamicDeviceRegistry.GetDiscoveredDeviceAsync(mockRootAdapter.Object, "id");
+        var discoveredDevice = await this._dynamicDeviceRegistry.GetDiscoveredDeviceAsync(mockRootAdapter.Object, "id", TestContext.Current.CancellationToken);
 
         Assert.Equal(mockDynamicAdapter.Object, discoveredDevice);
     }

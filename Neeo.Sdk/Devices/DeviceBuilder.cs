@@ -1402,7 +1402,7 @@ internal sealed partial class DeviceBuilder(
 
     private sealed record ButtonParameters(string Name, string? Label) : ParametersBase(Name, Label);
 
-    private readonly record struct Credentials([property: JsonPropertyName("username")] string UserName, string Password);
+    internal readonly record struct Credentials([property: JsonPropertyName("username")] string UserName, string Password);
 
     private static class DeviceBuilderConstants
     {
@@ -1418,7 +1418,7 @@ internal sealed partial class DeviceBuilder(
 
     private sealed record RangeSensorParameters(string Name, string? Label, ValueFeature Feature, IReadOnlyCollection<double> Range, string Unit) : SensorParameters(SensorType.Range, Name, Label, Feature);
 
-    private readonly record struct SecurityCodeContainer(string SecurityCode);
+    internal readonly record struct SecurityCodeContainer(string SecurityCode);
 
     private record SensorParameters(SensorType Type, string Name, string? Label, ValueFeature ValueFeature) : ParametersBase(Name, Label);
 

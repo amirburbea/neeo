@@ -39,55 +39,58 @@ internal sealed class PgpEncryption : IPgpEncryption
 {
     private PgpKeyPair Keys => field ??= CreatePgpKeys();
 
-    public string PublicKeyText => field ??= PgpEncryption.GetPublicKeyText(this.Keys.PublicKey);
+    public string PublicKeyText => field ??= GetPublicKeyText(this.Keys.PublicKey);
 
     public async Task<byte[]?> DecryptAsync(string encryptedText, CancellationToken cancellationToken)
     {
-        using MemoryStream inputStream = new();
-        int length = Encoding.UTF8.GetByteCount(encryptedText);
-        byte[] bytes = ArrayPool<byte>.Shared.Rent(length);
-        try
+        ArgumentNullException.ThrowIfNull(encryptedText);
+        if (encryptedText.Length == 0)
         {
-            Encoding.UTF8.GetBytes(encryptedText, bytes.AsSpan(0, length));
-            await inputStream.WriteAsync(bytes.AsMemory(0, length), cancellationToken).ConfigureAwait(false);
+            return null;
         }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(bytes);
-        }
-        inputStream.Position = 0L;
+        byte[] utf8 = Encoding.UTF8.GetBytes(encryptedText);
+        using MemoryStream inputStream = new(utf8, writable: false);
         using ArmoredInputStream armoredInputStream = new(inputStream);
         PgpObjectFactory inputFactory = new(armoredInputStream);
         while (inputFactory.NextPgpObject() is { } pgpObject)
         {
             if (pgpObject is PgpEncryptedDataList and [PgpPublicKeyEncryptedData data, ..])
             {
-                return await DecryptAsync(this.Keys.PrivateKey, data, cancellationToken).ConfigureAwait(false);
+                return await DecryptPayloadAsync(this.Keys.PrivateKey, data, cancellationToken).ConfigureAwait(false);
             }
         }
         return null;
+    }
 
-        static async Task<byte[]?> DecryptAsync(PgpPrivateKey privateKey, PgpPublicKeyEncryptedData data, CancellationToken cancellationToken)
+    private static async Task<byte[]?> DecryptPayloadAsync(
+        PgpPrivateKey privateKey,
+        PgpPublicKeyEncryptedData data,
+        CancellationToken cancellationToken
+    )
+    {
+        using Stream privateStream = data.GetDataStream(privateKey);
+        PgpObjectFactory privateFactory = new(privateStream);
+        if (privateFactory.NextPgpObject() is not PgpLiteralData literal)
         {
-            using Stream privateStream = data.GetDataStream(privateKey);
-            PgpObjectFactory privateFactory = new(privateStream);
-            if (privateFactory.NextPgpObject() is not PgpLiteralData literal)
-            {
-                return null;
-            }
-            using Stream credentialsStream = literal.GetInputStream();
-            using MemoryStream outputStream = new();
-            await credentialsStream.CopyToAsync(outputStream, cancellationToken).ConfigureAwait(false);
-            return outputStream.ToArray();
+            return null;
         }
+        await using Stream credentialsStream = literal.GetInputStream();
+        await using MemoryStream outputStream = new();
+        await credentialsStream.CopyToAsync(outputStream, cancellationToken).ConfigureAwait(false);
+        return outputStream.ToArray();
     }
 
     private static PgpKeyPair CreatePgpKeys()
     {
         SecureRandom random = new();
-        byte[] randomBytes = new byte[32];
-        random.NextBytes(randomBytes);
-        char[] passphrase = Convert.ToBase64String(randomBytes).ToCharArray();
+        Span<byte> entropy = stackalloc byte[32];
+        random.NextBytes(entropy);
+        Span<char> characters = stackalloc char[entropy.Length * 2];
+        if (!Convert.TryToHexString(entropy, characters, out int charsWritten))
+        {
+            throw new InvalidOperationException("Hex buffer for passphrase was too small.");
+        }
+        char[] passphrase = characters[..charsWritten].ToArray();
         AsymmetricCipherKeyPair cipherKeyPair = CreateCipherKeyPair(random);
         PgpSecretKey secretKey = new(
             PgpSignature.DefaultCertification,
@@ -124,6 +127,9 @@ internal sealed class PgpEncryption : IPgpEncryption
         return stringWriter.ToString();
     }
 
+    /// <summary>
+    /// Adapts <see cref="StringWriter"/> as a <see cref="Stream"/> for ASCII armored output (BouncyCastle writes bytes).
+    /// </summary>
     private sealed class StringWriterOutputStream(StringWriter writer) : Stream
     {
         public override bool CanRead => false;
@@ -140,12 +146,31 @@ internal sealed class PgpEncryption : IPgpEncryption
 
         public override void SetLength(long value) => throw new NotSupportedException();
 
-        public override void Write(byte[] buffer, int offset, int count)
+        public override void Write(byte[] buffer, int offset, int count) => this.Write(buffer.AsSpan(offset, count));
+
+        public override void Write(ReadOnlySpan<byte> buffer)
         {
-            ReadOnlySpan<byte> bytes = buffer.AsSpan(offset, count);
-            Span<char> characters = stackalloc char[count];
-            int length = Encoding.ASCII.GetChars(bytes, characters);
-            writer.Write(characters[..length]);
+            if (buffer.IsEmpty)
+            {
+                return;
+            }
+            if (buffer.Length <= 512)
+            {
+                Span<char> stackChars = stackalloc char[buffer.Length];
+                int length = Encoding.ASCII.GetChars(buffer, stackChars);
+                writer.Write(stackChars[..length]);
+                return;
+            }
+            char[] rented = ArrayPool<char>.Shared.Rent(buffer.Length);
+            try
+            {
+                int length = Encoding.ASCII.GetChars(buffer, rented.AsSpan(0, buffer.Length));
+                writer.Write(rented.AsSpan(0, length));
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(rented);
+            }
         }
     }
 }

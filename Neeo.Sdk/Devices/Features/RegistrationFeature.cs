@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Setup;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Features;
 
@@ -40,7 +41,7 @@ internal sealed class RegistrationFeature(QueryIsRegistered queryIsRegistered, F
         return new(
             queryIsRegistered,
             (utf8Bytes, cancellationToken) => register(
-                JsonSerializer.Deserialize<TPayload>(utf8Bytes, JsonSerializerOptions.Web),
+                JsonSerializer.Deserialize<TPayload>(utf8Bytes, AppJsonSerializerOptions.Default),
                 cancellationToken
             )
         );

@@ -43,14 +43,23 @@ internal static class Server
         return host;
     }
 
-    private static void ConfigureHttpClient(IServiceCollection services) => services
-        .AddHttpClient(nameof(ApiClient))
-        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
+    private static void ConfigureHttpClient(IServiceCollection services)
+    {
+        void AddBrainClient(string name) => services
+            .AddHttpClient(name)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
+
+        AddBrainClient(nameof(ApiClient));
+        AddBrainClient(NotificationService.NotificationsHttpClientName);
+    }
 
     private static void ConfigureJsonOptions(JsonSerializerOptions options)
     {
-        options.DictionaryKeyPolicy = options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        // Share the exact same naming policy/null-handling/resolver as the rest of the SDK (see
+        // AppJsonSerializerOptions), rather than configuring MVC's options independently.
+        options.DictionaryKeyPolicy = options.PropertyNamingPolicy = AppJsonSerializerOptions.Default.PropertyNamingPolicy;
+        options.DefaultIgnoreCondition = AppJsonSerializerOptions.Default.DefaultIgnoreCondition;
+        options.TypeInfoResolver = AppJsonSerializerOptions.Default.TypeInfoResolver;
     }
 
     private static void ConfigureLoggingDefaults(HostBuilderContext context, ILoggingBuilder builder)

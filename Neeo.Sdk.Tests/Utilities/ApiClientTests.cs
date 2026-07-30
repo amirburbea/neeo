@@ -53,7 +53,7 @@ public sealed class ApiClientTests : IDisposable
     {
         this.SetupJsonResponse(data);
 
-        Assert.Equal(data.Length, (await this._client.GetAsync<string>("/")).Length);
+        Assert.Equal(data.Length, (await this._client.GetAsync<string>("/", TestContext.Current.CancellationToken)).Length);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class ApiClientTests : IDisposable
     {
         var lazy = this.SetupJsonResponse(new object());
 
-        await this._client.GetAsync<object>("/");
+        await this._client.GetAsync<object>("/", TestContext.Current.CancellationToken);
 
         var (request, requestBody) = lazy.Value;
         Assert.Equal("GET", request.Method.Method);
@@ -74,7 +74,7 @@ public sealed class ApiClientTests : IDisposable
         var body = new { A = "123" };
         var lazy = this.SetupJsonResponse(new SuccessResponse(true));
 
-        _ = this._client.PostAsync("/", body);
+        _ = this._client.PostAsync("/", body, TestContext.Current.CancellationToken);
 
         var (request, requestBody) = lazy.Value;
         Assert.Equal("POST", request.Method.Method);
@@ -90,7 +90,7 @@ public sealed class ApiClientTests : IDisposable
     {
         var lazy = this.SetupJsonResponse(new object());
 
-        _ = this._client.GetAsync<object>(path);
+        _ = this._client.GetAsync<object>(path, TestContext.Current.CancellationToken);
 
         var (request, _) = lazy.Value;
         Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri!.ToString());

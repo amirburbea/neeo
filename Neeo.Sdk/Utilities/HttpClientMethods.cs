@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -98,7 +97,7 @@ public static class HttpClientMethods
         using HttpRequestMessage request = HttpClientMethods.CreateRequest(
             uri,
             HttpMethod.Post,
-            body == null ? null : JsonContent.Create(body, options: JsonSerializerOptions.Web),
+            body == null ? null : JsonContent.Create(body, options: AppJsonSerializerOptions.Default),
             configureRequest
         );
         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -131,6 +130,6 @@ public static class HttpClientMethods
             string contents = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}");
         }
-        return (await response.Content.ReadFromJsonAsync<TValue>(JsonSerializerOptions.Web, cancellationToken).ConfigureAwait(false))!;
+        return (await response.Content.ReadFromJsonAsync<TValue>(AppJsonSerializerOptions.Default, cancellationToken).ConfigureAwait(false))!;
     }
 }

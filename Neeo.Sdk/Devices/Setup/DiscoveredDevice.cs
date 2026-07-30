@@ -1,4 +1,6 @@
-﻿namespace Neeo.Sdk.Devices.Setup;
+﻿using System.Text.Json.Serialization;
+
+namespace Neeo.Sdk.Devices.Setup;
 
 /// <summary>
 /// Represents a device found during the discovery phase.
@@ -24,6 +26,7 @@ public readonly struct DiscoveredDevice(
     /// cref="IDeviceBuilder.EnableDiscovery"/>, represents the individual dynamic device (which
     /// needn't be similar to the discovering adapter).
     /// </summary>
+    [JsonIgnore]
     public IDeviceBuilder? DeviceBuilder => deviceBuilder;
 
     /// <summary>

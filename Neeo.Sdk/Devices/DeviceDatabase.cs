@@ -99,7 +99,8 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     public DeviceModel? GetDeviceByAdapterName(string name)
     {
-        return Array.Find(this._devices, device => device.AdapterName == name);
+        int index = Array.FindIndex(this._devices, device => device.AdapterName == name);
+        return index < 0 ? null : this._devices[index];
     }
 
     public DeviceModel? GetDeviceById(int id)

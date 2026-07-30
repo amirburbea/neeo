@@ -1,9 +1,7 @@
 ﻿using System.Linq;
 using System.Net.Http;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 
 namespace Neeo.Drivers.Plex;
@@ -12,15 +10,15 @@ public sealed class PlexRemoteDeviceProvider(
     IHttpClientFactory httpClientFactory,
     IPlexServerManager serverManager,
     IPlexTokenStore tokenStore,
-    [FromKeyedServices(Startup.Task)] Task startupTask,
+    IHostApplicationLifetime applicationLifetime,
     ILogger<PlexRemoteDeviceProvider> logger
 ) : PlexDeviceProviderBase(
     httpClientFactory,
-    serverManager, 
-    tokenStore, 
-    startupTask, 
-    logger, 
-    DeviceType.TV, 
+    serverManager,
+    tokenStore,
+    applicationLifetime,
+    logger,
+    DeviceType.TV,
     "Remote"
 )
 {

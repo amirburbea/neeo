@@ -45,7 +45,7 @@ internal sealed class BrainRecipes(
         return Array.ConvertAll(definitions, definition => new Recipe(definition, client));
     }
 
-    private sealed class Recipe(
+    internal sealed class Recipe(
         RecipeDefinition recipe,
         IApiClient client
     ) : IRecipe
@@ -84,10 +84,10 @@ internal sealed class BrainRecipes(
 
         public Task PowerOnAsync(CancellationToken cancellationToken) => client.GetAsync<JsonElement>(recipe.Urls.SetPowerOn, cancellationToken);
 
-        private readonly struct EmptyObject { }
+        internal readonly struct EmptyObject { }
     }
 
-    private readonly record struct RecipeDefinition(
+    internal readonly record struct RecipeDefinition(
         bool IsCustom,
         bool IsPoweredOn,
         string Uid,
@@ -97,7 +97,7 @@ internal sealed class BrainRecipes(
         [property: JsonPropertyName("url")] RecipeUrls Urls
      );
 
-    private readonly record struct RecipeDetail(
+    internal readonly record struct RecipeDetail(
         [property: JsonPropertyName("devicename")] string DeviceName,
         [property: JsonPropertyName("roomname")] string RoomName,
         [property: JsonPropertyName("devicetype")] DeviceType DeviceType,
@@ -105,7 +105,7 @@ internal sealed class BrainRecipes(
         string? Manufacturer = null
     );
 
-    private readonly record struct RecipeUrls(
+    internal readonly record struct RecipeUrls(
         string GetPowerState,
         string SetPowerOn,
         string? SetPowerOff = null

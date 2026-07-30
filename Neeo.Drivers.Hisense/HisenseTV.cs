@@ -27,7 +27,7 @@ public sealed class HisenseTV : IDisposable
 
     private Connection? _connection;
     private bool _isDisposed;
-    private PeriodicTimer? _reconnectTimer;
+    private ReconnectLoop? _reconnectLoop;
 
     private HisenseTV(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
     {
@@ -153,9 +153,9 @@ public sealed class HisenseTV : IDisposable
     public void Dispose()
     {
         this._isDisposed = true;
-        if (Interlocked.Exchange(ref this._reconnectTimer, default) is { } timer)
+        if (Interlocked.Exchange(ref this._reconnectLoop, default) is { } loop)
         {
-            timer.Dispose();
+            loop.Dispose();
         }
         using Connection? connection = Interlocked.Exchange(ref this._connection, null);
         if (connection != null)
@@ -263,20 +263,14 @@ public sealed class HisenseTV : IDisposable
 
     private void StartReconnectTimer()
     {
-        this._reconnectTimer = new(TimeSpan.FromSeconds(14d));
-        _ = Task.Factory.StartNew(
-            async () =>
-            {
-                while (await this._reconnectTimer.WaitForNextTickAsync().ConfigureAwait(false))
-                {
-                    if (await this.TryConnectAsync().ConfigureAwait(false))
-                    {
-                        break;
-                    }
-                }
-            },
-            TaskCreationOptions.LongRunning
-        ).ContinueWith(_ => Interlocked.Exchange(ref this._reconnectTimer, default)?.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        ReconnectLoop loop = new(TimeSpan.FromSeconds(14d), TimeSpan.FromMinutes(2d), this.TryConnectAsync, this._logger);
+        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is not null)
+        {
+            // A reconnect loop is already running - don't start a second one.
+            loop.Dispose();
+            return;
+        }
+        loop.Start();
     }
 
     private async Task<bool> TryConnectAsync(CancellationToken cancellationToken = default)
@@ -293,9 +287,11 @@ public sealed class HisenseTV : IDisposable
         connection.Disconnected += this.Connection_Disconnected;
         connection.VolumeChanged += this.Connection_VolumeChanged;
         connection.StateChanged += this.Connection_StateChanged;
-        if (Interlocked.Exchange(ref this._reconnectTimer, default) is { } timer)
+        if (Interlocked.Exchange(ref this._reconnectLoop, default) is { } loop)
         {
-            timer.Dispose();
+            // A direct call to TryConnectAsync succeeded while a background reconnect loop was still
+            // running (e.g. triggered by a getter method rather than the loop's own next tick) - stop it.
+            loop.Dispose();
         }
         this.Connected?.Invoke(this, EventArgs.Empty);
         return true;

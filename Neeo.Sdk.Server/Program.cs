@@ -76,9 +76,16 @@ public static class Program
                 }
             }
         }
+        // Provider types and driver service configurations are handed to SdkService as data, rather than
+        // being registered/applied against this (outer) container - SdkService threads them through to
+        // Brain.StartServerAsync's Type[] overload, which applies them inside the same (inner) container
+        // that hosts IApiClient/IDeviceDatabase/etc., so drivers and the SDK's own services can see each
+        // other via normal constructor injection instead of being split across two disconnected hosts.
         services
-            .AddSingleton<TaskCompletionSource<ISdkEnvironment>>()
-            .AddKeyedSingleton<Task>(Startup.Task, (provider, key) => provider.GetRequiredService<TaskCompletionSource<ISdkEnvironment>>().Task)
+            .AddSingleton(providerTypes.ToArray())
+            .AddSingleton(serviceConfigurations.ToArray())
+            .AddSingleton<IBrainDiscovery, BrainDiscovery>()
+            .AddSingleton<ISdkServerStarter, SdkServerStarter>()
             .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
             .AddHostedService<SdkService>();
     }

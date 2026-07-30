@@ -7,9 +7,9 @@ namespace Neeo.Sdk.Devices.Directories;
 /// </summary>
 [JsonPolymorphic]
 [JsonDerivedType(typeof(DirectoryButtonRow))]
-[JsonDerivedType(typeof(DirectoryEntry))]
+[JsonDerivedType(typeof(DirectoryEntryData))]
 [JsonDerivedType(typeof(DirectoryHeader))]
-[JsonDerivedType(typeof(DirectoryInfoItem))]
+[JsonDerivedType(typeof(DirectoryInfoItemData))]
 [JsonDerivedType(typeof(DirectoryTileRow))]
 public interface IDirectoryItem
 {

@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
@@ -27,12 +28,15 @@ public abstract partial class PlexDeviceProviderBase(
     IHttpClientFactory httpClientFactory,
     IPlexServerManager serverManager,
     IPlexTokenStore tokenStore,
-    Task startupTask,
+    IHostApplicationLifetime applicationLifetime,
     ILogger logger,
     DeviceType deviceType,
     string deviceName
 ) : IDeviceProvider, IDisposable
 {
+    private readonly Task _startupTask = PlexDeviceProviderBase.CreateStartupTask(applicationLifetime);
+
+
     protected static readonly Dictionary<Buttons, Func<IPlexServer, CancellationToken, Task>> ButtonHandlers = new()
     {
         { Buttons.PlayToggle, PlexDeviceProviderBase.TogglePlayAsync },
@@ -193,13 +197,7 @@ public abstract partial class PlexDeviceProviderBase(
             _ => Task.CompletedTask,
         };
 
-        Task BrowseAllAsync() => sectionType switch
-        {
-            LibrarySectionType.Movie => BrowseDirectoryAsync(server.Library.ListMoviesAsync(sectionKey, parameters, cancellationToken)),
-            LibrarySectionType.Show => BrowseDirectoryAsync(server.Library.ListTVShowsAsync(sectionKey, parameters, cancellationToken)),
-            LibrarySectionType.Artist => BrowseDirectoryAsync(server.Library.ListMusicAsync(sectionKey, parameters, cancellationToken)),
-            _ => Task.CompletedTask,
-        };
+        Task BrowseAllAsync() => BrowseDirectoryAsync(server.Library.ListMediaAsync(sectionKey, parameters, cancellationToken));
 
         async Task BrowseDirectoryAsync(Task<MediaDirectory> fetchMovies)
         {
@@ -211,13 +209,7 @@ public abstract partial class PlexDeviceProviderBase(
             }
         }
 
-        Task BrowseFirstCharacterAsync(char character) => sectionType switch
-        {
-            LibrarySectionType.Movie => BrowseDirectoryAsync(server.Library.ListMoviesByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken)),
-            LibrarySectionType.Show => BrowseDirectoryAsync(server.Library.ListTVShowsByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken)),
-            LibrarySectionType.Artist => BrowseDirectoryAsync(server.Library.ListMusicByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken)),
-            _ => Task.CompletedTask,
-        };
+        Task BrowseFirstCharacterAsync(char character) => BrowseDirectoryAsync(server.Library.ListMediaByFirstCharacterAsync(sectionKey, character, parameters, cancellationToken));
 
         async Task BrowseFirstCharactersAsync() => Array.ForEach(
             await server.Library.ListFirstCharactersAsync(sectionKey, cancellationToken).ConfigureAwait(false),
@@ -228,13 +220,7 @@ public abstract partial class PlexDeviceProviderBase(
             ))
         );
 
-        Task BrowseRecentlyAddedAsync() => sectionType switch
-        {
-            LibrarySectionType.Movie => BrowseDirectoryAsync(server.Library.ListMoviesRecentlyAddedAsync(sectionKey, parameters, cancellationToken)),
-            LibrarySectionType.Show => BrowseDirectoryAsync(server.Library.ListTVShowsRecentlyAddedAsync(sectionKey, parameters, cancellationToken)),
-            LibrarySectionType.Artist => BrowseDirectoryAsync(server.Library.ListMusicRecentlyAddedAsync(sectionKey, parameters, cancellationToken)),
-            _ => Task.CompletedTask
-        };
+        Task BrowseRecentlyAddedAsync() => BrowseDirectoryAsync(server.Library.ListMediaRecentlyAddedAsync(sectionKey, parameters, cancellationToken));
 
         async Task BrowseSectionRootAsync()
         {
@@ -432,13 +418,24 @@ public abstract partial class PlexDeviceProviderBase(
 
         async Task InitializeUponStartup()
         {
-            await startupTask.ConfigureAwait(false); // Wait for NEEO SDK to initialize
+            await this._startupTask.ConfigureAwait(false); // Wait for NEEO SDK to initialize
             await this.InitializeAsync(cancellationToken: default).ConfigureAwait(false);
             foreach (string machineIdentifier in machineIdentifiers)
             {
                 await this.OnServerAddedAsync(machineIdentifier, cancellationToken: default).ConfigureAwait(false);
             }
         }
+    }
+
+    private static Task CreateStartupTask(IHostApplicationLifetime applicationLifetime)
+    {
+        if (applicationLifetime.ApplicationStarted.IsCancellationRequested)
+        {
+            return Task.CompletedTask;
+        }
+        TaskCompletionSource taskCompletionSource = new();
+        applicationLifetime.ApplicationStarted.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), taskCompletionSource);
+        return taskCompletionSource.Task;
     }
 
     private async Task OnServerAddedAsync(string machineIdentifier, CancellationToken cancellationToken)

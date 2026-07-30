@@ -37,6 +37,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         [Buttons.Digit7] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number7, cancellationToken),
         [Buttons.Digit8] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number8, cancellationToken),
         [Buttons.Digit9] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number9, cancellationToken),
+        [Buttons.Home] = (client, cancellationToken) => client.GoHomeAsync(cancellationToken),
         [Buttons.Language] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Language, cancellationToken),
         [Buttons.Menu] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Menu, cancellationToken),
         [Buttons.MuteToggle] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.MuteToggle, cancellationToken),
@@ -502,16 +503,26 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             await WakeOnLan.WakeAsync(macAddress, cancellationToken).ConfigureAwait(false);
         }
-        if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
+        if (this.GetClientOrDefault(deviceId) is not { } client)
         {
             this._logger.LogInformation("Can not process {button} as device is not ready.", buttonName);
             return;
         }
-        if (Button.TryResolve(buttonName) is { } button && KodiDeviceProviderBase._buttonFunctions.GetValueOrDefault(button) is { } function)
+        if (Button.TryResolve(buttonName) is not { } button || KodiDeviceProviderBase._buttonFunctions.GetValueOrDefault(button) is not { } function)
+        {
+            return;
+        }
+        if (KodiDeviceProviderBase.IsClientReady(client))
         {
             await function(client, cancellationToken).ConfigureAwait(false);
             return;
         }
+        // Not connected - a reconnect was already kicked off by IsClientReady. Queue this press to replay
+        // once the connection comes back, rather than dropping it or blocking this call on the reconnect.
+        // Only the most recently queued press survives, so a burst of presses while disconnected doesn't
+        // replay all of them.
+        this._logger.LogInformation("Device not connected, queuing {button} to replay once reconnected.", buttonName);
+        client.QueuePendingButtonAction(function);
     }
 
     private bool HasDeviceId(string deviceId)

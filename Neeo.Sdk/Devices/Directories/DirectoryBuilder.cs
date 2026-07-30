@@ -112,12 +112,17 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
         {
             throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxButtonsPerRow}.", nameof(buttons));
         }
-        return this.AddItem(new DirectoryButtonRow(buttons));
+        DirectoryButtonData[] data = new DirectoryButtonData[buttons.Length];
+        for (int index = 0; index < buttons.Length; index++)
+        {
+            data[index] = DirectoryBuilder.ToData(buttons[index] ?? throw new ArgumentException("Button must not be null.", nameof(buttons)));
+        }
+        return this.AddItem(new DirectoryButtonRow(data));
     }
 
     public DirectoryBuilder AddEntry(DirectoryEntry entry)
     {
-        return this.AddItem(entry ?? throw new ArgumentNullException(nameof(entry)));
+        return this.AddItem(DirectoryBuilder.ToData(entry ?? throw new ArgumentNullException(nameof(entry))));
     }
 
     public DirectoryBuilder AddHeader(string title)
@@ -127,7 +132,7 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
 
     public DirectoryBuilder AddInfoItem(DirectoryInfoItem infoItem)
     {
-        return this.AddItem(infoItem ?? throw new ArgumentNullException(nameof(infoItem)));
+        return this.AddItem(DirectoryBuilder.ToData(infoItem ?? throw new ArgumentNullException(nameof(infoItem))));
     }
 
     public DirectoryBuilder AddTileRow(params DirectoryTile[] tiles)
@@ -136,7 +141,12 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
         {
             throw new ArgumentException($"Array must not be null or empty and have length <= {Constants.MaxTilesPerRow}.", nameof(tiles));
         }
-        return this.AddItem(new DirectoryTileRow(tiles));
+        DirectoryTileData[] data = new DirectoryTileData[tiles.Length];
+        for (int index = 0; index < tiles.Length; index++)
+        {
+            data[index] = DirectoryBuilder.ToData(tiles[index] ?? throw new ArgumentException("Tile must not be null.", nameof(tiles)));
+        }
+        return this.AddItem(new DirectoryTileRow(data));
     }
 
     public DirectoryData Build() => new(
@@ -180,4 +190,36 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
         }
         return this;
     }
+
+    private static DirectoryButtonData ToData(DirectoryButton button) => new(
+        button.Text is { Length: > 0 } text ? text : throw new ArgumentException("Button text must not be null or empty.", nameof(button)),
+        button.Icon,
+        button.Inverse,
+        button.ActionIdentifier,
+        button.UIAction
+    );
+
+    private static DirectoryEntryData ToData(DirectoryEntry entry) => new(
+        entry.Title,
+        entry.Label,
+        entry.BrowseIdentifier,
+        Validator.ValidateThumbnailUri(entry.ThumbnailUri),
+        entry.IsQueueable,
+        entry.ActionIdentifier,
+        entry.UIAction
+    );
+
+    private static DirectoryInfoItemData ToData(DirectoryInfoItem infoItem) => new(
+        infoItem.Title is { Length: > 0 } title ? title : throw new ArgumentException("Info item title must not be null or empty.", nameof(infoItem)),
+        infoItem.Text is { Length: > 0 } text ? text : throw new ArgumentException("Info item text must not be null or empty.", nameof(infoItem)),
+        infoItem.ActionIdentifier,
+        infoItem.AffirmativeButtonText,
+        infoItem.NegativeButtonText
+    );
+
+    private static DirectoryTileData ToData(DirectoryTile tile) => new(
+        Validator.ValidateThumbnailUri(tile.ThumbnailUri, required: true)!,
+        tile.ActionIdentifier,
+        tile.UIAction
+    );
 }

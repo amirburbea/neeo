@@ -27,6 +27,22 @@ internal static class Validator
         ? throw new ArgumentException("Range low must be less than range high and neither value can be infinity or NaN.")
         : [low, high];
 
+    [return: NotNullIfNotNull(nameof(thumbnailUri))]
+    public static string? ValidateThumbnailUri(
+        string? thumbnailUri,
+        bool required = false,
+        [CallerArgumentExpression(nameof(thumbnailUri))] string name = ""
+    )
+    {
+        if (string.IsNullOrEmpty(thumbnailUri))
+        {
+            return required ? throw new ArgumentException("Thumbnail URI must not be null or empty.", name) : null;
+        }
+        return Uri.TryCreate(thumbnailUri, UriKind.Absolute, out Uri? uri) && !string.IsNullOrEmpty(uri.Host)
+            ? thumbnailUri
+            : throw new ArgumentException($"Thumbnail URI '{thumbnailUri}' must be an absolute URI with a host.", name);
+    }
+
     [return: NotNullIfNotNull(nameof(text))]
     public static string? ValidateText(
         string? text,

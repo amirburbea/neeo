@@ -7,7 +7,7 @@ namespace Neeo.Sdk.Devices.Directories;
 /// </summary>
 /// <param name="Buttons">The collection of buttons to display.</param>
 internal sealed record class DirectoryButtonRow(
-    IReadOnlyCollection<DirectoryButton> Buttons
+    IReadOnlyCollection<DirectoryButtonData> Buttons
 ) : IDirectoryItem
 {
     DirectoryItemType IDirectoryItem.Type => DirectoryItemType.ButtonRow;

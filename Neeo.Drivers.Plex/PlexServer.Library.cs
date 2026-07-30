@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,34 +21,19 @@ partial class PlexServer
             return container.Directories is { } directories ? Array.ConvertAll(directories, directory => directory.Title[0]) : [];
         }
 
-        public Task<MediaDirectory> ListMoviesAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
+        public Task<MediaDirectory> ListMediaAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
         {
-            return this.ListMediaAsync($"{sectionKey}/all", pagination, cancellationToken);
+            return this.ListMediaByPathAsync($"{sectionKey}/all", pagination, cancellationToken);
         }
 
-        public Task<MediaDirectory> ListMoviesByFirstCharacterAsync(int sectionKey, char character, PaginationParameters pagination, CancellationToken cancellationToken)
+        public Task<MediaDirectory> ListMediaByFirstCharacterAsync(int sectionKey, char character, PaginationParameters pagination, CancellationToken cancellationToken)
         {
-            return this.ListMediaAsync($"{sectionKey}/firstCharacter/{Uri.EscapeDataString(char.ToString(character))}", pagination, cancellationToken);
+            return this.ListMediaByPathAsync($"{sectionKey}/firstCharacter/{Uri.EscapeDataString(char.ToString(character))}", pagination, cancellationToken);
         }
 
-        public Task<MediaDirectory> ListMoviesRecentlyAddedAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
+        public Task<MediaDirectory> ListMediaRecentlyAddedAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
         {
-            return this.ListMediaAsync($"{sectionKey}/recentlyAdded", pagination, cancellationToken);
-        }
-
-        public Task<MediaDirectory> ListMusicAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
-        {
-            return this.ListMediaAsync($"{sectionKey}/all", pagination, cancellationToken);
-        }
-
-        public Task<MediaDirectory> ListMusicByFirstCharacterAsync(int sectionKey, char character, PaginationParameters pagination, CancellationToken cancellationToken)
-        {
-            return this.ListMediaAsync($"{sectionKey}/firstCharacter/{Uri.EscapeDataString(char.ToString(character))}", pagination, cancellationToken);
-        }
-
-        public Task<MediaDirectory> ListMusicRecentlyAddedAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
-        {
-            return this.ListMediaAsync($"{sectionKey}/recentlyAdded", pagination, cancellationToken);
+            return this.ListMediaByPathAsync($"{sectionKey}/recentlyAdded", pagination, cancellationToken);
         }
 
         public async Task<LibrarySection[]> ListSectionsAsync(CancellationToken cancellationToken) => [..
@@ -61,22 +46,7 @@ partial class PlexServer
             )
         ];
 
-        public Task<MediaDirectory> ListTVShowsAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
-        {
-            return this.ListMediaAsync($"{sectionKey}/all", pagination, cancellationToken);
-        }
-
-        public Task<MediaDirectory> ListTVShowsByFirstCharacterAsync(int sectionKey, char character, PaginationParameters pagination, CancellationToken cancellationToken)
-        {
-            return this.ListMediaAsync($"{sectionKey}/firstCharacter/{Uri.EscapeDataString(char.ToString(character))}", pagination, cancellationToken);
-        }
-
-        public Task<MediaDirectory> ListTVShowsRecentlyAddedAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)
-        {
-            return this.ListMediaAsync($"{sectionKey}/recentlyAdded", pagination, cancellationToken);
-        }
-
-        private async Task<MediaDirectory> ListMediaAsync(string path, PaginationParameters pagination, CancellationToken cancellationToken)
+        private async Task<MediaDirectory> ListMediaByPathAsync(string path, PaginationParameters pagination, CancellationToken cancellationToken)
         {
             LibraryMediaContainer container = await server.BrowseLibraryAsync(path, pagination, cancellationToken).ConfigureAwait(false);
             return new MediaDirectory(

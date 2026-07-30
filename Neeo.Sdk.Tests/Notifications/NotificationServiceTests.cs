@@ -1,103 +1,149 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Moq.Protected;
+using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
-using Neeo.Sdk.Utilities;
 using Xunit;
 
 namespace Neeo.Sdk.Tests.Notifications;
 
-using Message = NotificationService.Message;
-
 public sealed class NotificationServiceTests : IDisposable
 {
-    private readonly List<Message> _messages = [];
+    private readonly List<byte[]> _capturedBodies = [];
+
+    private readonly HttpClient _httpClient;
+
     private readonly Mock<INotificationMapping> _mockNotificationMapping = new(MockBehavior.Strict);
+
     private readonly NotificationService _notificationService;
 
-    /// <summary>
-    /// A task that completes when <see cref="ApiClient.PostAsync"/> is called, since <see
-    /// cref="ActionBlock{T}"/> runs in its own task scheduler.
-    /// </summary>
-    private readonly Task _postAsyncCompleted;
+    private readonly Task _postCompleted;
 
     public NotificationServiceTests()
     {
         this._mockNotificationMapping
             .Setup(mapping => mapping.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([Constants.NotificationKey]);
-        Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         TaskCompletionSource tcs = new();
-        mockClient
-            .Setup(client => client.PostAsync(BrainUrlPaths.Notifications, Capture.In(this._messages), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true)
-            .Callback(tcs.SetResult);
-        this._postAsyncCompleted = tcs.Task;
-        this._notificationService = new(mockClient.Object, this._mockNotificationMapping.Object, NullLogger<NotificationService>.Instance);
+        Mock<HttpMessageHandler> handlerMock = new(MockBehavior.Strict);
+        handlerMock
+            .Protected()
+            .As<IMessageHandlerMockedMethods>()
+            .Setup(handler => handler.Dispose(true));
+        handlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns(async (HttpRequestMessage request, CancellationToken cancellationToken) =>
+            {
+                byte[] bytes = await request.Content!.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+                lock (this._capturedBodies)
+                {
+                    this._capturedBodies.Add(bytes);
+                }
+
+                tcs.TrySetResult();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new SuccessResponse(true), options: JsonSerializerOptions.Web),
+                };
+            });
+        this._httpClient = new HttpClient(handlerMock.Object);
+        Mock<IHttpClientFactory> mockFactory = new(MockBehavior.Strict);
+        mockFactory.Setup(f => f.CreateClient(NotificationService.NotificationsHttpClientName)).Returns(this._httpClient);
+        Mock<IBrain> mockBrain = new(MockBehavior.Strict);
+        mockBrain.Setup(brain => brain.ServiceEndPoint).Returns(new IPEndPoint(IPAddress.Loopback, 3000));
+        this._postCompleted = tcs.Task;
+        this._notificationService = new(
+            mockFactory.Object,
+            mockBrain.Object,
+            this._mockNotificationMapping.Object,
+            NullLogger<NotificationService>.Instance
+        );
     }
 
-    public void Dispose() => this._notificationService.Dispose();
+    private interface IMessageHandlerMockedMethods
+    {
+        void Dispose(bool disposing);
+
+        Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        this._notificationService.Dispose();
+        this._httpClient.Dispose();
+    }
 
     [Fact]
     public async Task SendNotificationAsync_should_send_correct_message()
     {
-        await this._notificationService.SendNotificationAsync(
-            this.CreateDeviceAdapter(),
-            new(Constants.DeviceId, Constants.ComponentName, Constants.Value)
-        );
+        await this._notificationService.SendNotificationAsync(this.CreateDeviceAdapter(), 
+            new(Constants.DeviceId, Constants.ComponentName, Constants.Value), TestContext.Current.CancellationToken);
 
-        Message message = await this.GetMessageAsync();
-        Assert.Equal((Constants.NotificationKey, Constants.Value), message.CacheData);
-        Assert.Equal(Constants.NotificationKey, message.Type);
+        await this._postCompleted;
+        using JsonDocument doc = JsonDocument.Parse(this.GetCapturedBody());
+        JsonElement root = doc.RootElement;
+        Assert.Equal(Constants.NotificationKey, root.GetProperty("type").GetString());
+        Assert.Equal(Constants.Value, root.GetProperty("data").GetString());
     }
 
     [Fact]
     public Task SendNotificationAsync_should_throw_if_property_is_null()
     {
-        return Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(
-            this.CreateDeviceAdapter(),
-            default
-        ));
+        return Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(this.CreateDeviceAdapter(), default, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task SendSensorNotificationAsync_should_send_correct_message()
     {
-        await this._notificationService.SendSensorNotificationAsync(
-            this.CreateDeviceAdapter(),
-            new(Constants.DeviceId, Constants.ComponentName, Constants.Value)
-        );
+        await this._notificationService.SendSensorNotificationAsync(this.CreateDeviceAdapter(),
+            new(Constants.DeviceId, Constants.ComponentName, Constants.Value), TestContext.Current.CancellationToken);
 
-        Message message = await this.GetMessageAsync();
-        Assert.Equal("DEVICE_SENSOR_UPDATE", message.Type);
-        Assert.Equal((Constants.NotificationKey, Constants.Value), message.CacheData);
+        await this._postCompleted;
+        using JsonDocument doc = JsonDocument.Parse(this.GetCapturedBody());
+        JsonElement root = doc.RootElement;
+        Assert.Equal("DEVICE_SENSOR_UPDATE", root.GetProperty("type").GetString());
+        JsonElement data = root.GetProperty("data");
+        Assert.Equal(Constants.NotificationKey, data.GetProperty("sensorEventKey").GetString());
+        Assert.Equal(Constants.Value, data.GetProperty("sensorValue").GetString());
     }
 
     [Fact]
     public Task SendSensorNotificationAsync_should_throw_if_property_is_null()
     {
-        return Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendSensorNotificationAsync(
-            this.CreateDeviceAdapter(),
-            notification: new()
-        ));
+        return Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendSensorNotificationAsync(this.CreateDeviceAdapter(), notification: new(), cancellationToken: TestContext.Current.CancellationToken));
     }
 
     private IDeviceAdapter CreateDeviceAdapter()
     {
-        string adapterName = $"adapter{this._messages.Count}";
+        string adapterName = $"adapter{this._capturedBodies.Count}";
         Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
         return mockAdapter.Object;
     }
 
-    private Task<Message> GetMessageAsync() => this._postAsyncCompleted.ContinueWith(_ => this._messages.Single(), TaskContinuationOptions.ExecuteSynchronously);
+    private byte[] GetCapturedBody()
+    {
+        lock (this._capturedBodies)
+        {
+            return this._capturedBodies.Count == 1
+                ? this._capturedBodies[0]
+                : throw new InvalidOperationException($"Expected 1 captured body, got {this._capturedBodies.Count}.");
+        }
+    }
 
     private static class Constants
     {

@@ -16,7 +16,7 @@ public sealed class DiscoveryFeatureTests
         DiscoveredDevice deviceWithBuilder = new("id", "", deviceBuilder: Device.Create("abc", DeviceType.Accessory));
         DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithBuilder }), enableDynamicDeviceBuilder: false);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public sealed class DiscoveryFeatureTests
         DiscoveredDevice deviceWithoutBuilder = new("id", "");
         DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithoutBuilder }), enableDynamicDeviceBuilder: true);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -34,16 +34,16 @@ public sealed class DiscoveryFeatureTests
         DiscoveredDevice deviceWithNullId = new(null!, "name");
         DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithNullId }));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task DiscoverAsync_should_validate_ids_are_unique()
     {
-        DiscoveredDevice[] devices = Enumerable.Repeat(new DiscoveredDevice("id", ""), 5).ToArray();
+        DiscoveredDevice[] devices = [.. Enumerable.Repeat(new DiscoveredDevice("id", ""), 5)];
         DiscoveryFeature feature = new((_, _) => Task.FromResult(devices));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class DiscoveryFeatureTests
         DiscoveredDevice deviceWithEmptyName = new("id", "");
         DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { deviceWithEmptyName }));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -61,6 +61,6 @@ public sealed class DiscoveryFeatureTests
         DiscoveredDevice device = new("id", "");
         DiscoveryFeature feature = new((_, _) => Task.FromResult(new[] { device }), enableDynamicDeviceBuilder: true);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync("abc"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => feature.DiscoverAsync("abc", TestContext.Current.CancellationToken));
     }
 }

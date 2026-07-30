@@ -74,6 +74,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     private readonly Func<ServerData> _serverDataLookup;
     private readonly IPlexSettingsManager _settingsManager;
     private readonly Lazy<Task> _socketTask;
+    private readonly Lazy<Task> _timelineHeartbeatTask;
     private readonly IPlexTokenStore _tokenStore;
     private int _commandId;
     private Guid _sessionId;
@@ -128,6 +129,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             LazyThreadSafetyMode.ExecutionAndPublication
         );
         this._socketTask = new(this.ConnectSocketAsync, LazyThreadSafetyMode.ExecutionAndPublication);
+        this._timelineHeartbeatTask = new(() => this.PollTimelineHeartbeatAsync(this._cancellationTokenSource.Token), LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public MediaItem? ActiveMedia => this._activeMedia.Value;
@@ -202,6 +204,10 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         {
             this._socketTask.Value.Wait();
         }
+        if (this._timelineHeartbeatTask.IsValueCreated)
+        {
+            this._timelineHeartbeatTask.Value.Wait();
+        }
         this._isDisposed.OnNext(default);
         this._disposable.Dispose();
     }
@@ -219,6 +225,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     {
         _ = this._socketTask.Value;
         _ = this._playerDiscoverySubscription.Value;
+        _ = this._timelineHeartbeatTask.Value;
         return this._initializationTaskSource.Task.WaitAsync(cancellationToken);
     }
 
@@ -298,6 +305,13 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     private Uri GetUri(string path, params (string Key, string Value)[] queryParameters) => this.GetUri(Uri.UriSchemeHttps, path, queryParameters);
 
+    /// <summary>
+    /// Builds a URI targeting the player's own local address, rather than the Plex server. Direct
+    /// client control is what the official Plex apps use by default (server-relayed control depends on
+    /// the client keeping an active Companion session with the server, which is unreliable in practice).
+    /// </summary>
+    private static Uri GetPlayerUri(PlayerData player, string path, (string Key, string Value)[] queryParameters) => PlexServer.BuildUri(Uri.UriSchemeHttp, player.IPAddress, player.Port, path, queryParameters);
+
     Task IPlexServer.SelectPlayerAsync(string playerIdentifier, CancellationToken cancellationToken) => this.SelectPlayerAsync(playerIdentifier, cancellationToken);
 
     private static PlayerData? GetPlayerById(ImmutableDictionary<string, PlayerData> players, string? playerId)
@@ -324,6 +338,31 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             cancellationToken
         ).ConfigureAwait(false);
         return response.MediaContainer;
+    }
+
+    /// <summary>
+    /// Periodically pokes the selected player with a harmless <c>timeline/poll</c> request while it's
+    /// selected. Some Plex clients silently let their Companion session go stale if nothing is sent to
+    /// them for a while (a known Plex-side quirk, not something we can fix), which then makes them stop
+    /// responding to real commands until something happens to revive the session. This keeps it warm.
+    /// </summary>
+    private async Task PollTimelineHeartbeatAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using PeriodicTimer timer = new(TimeSpan.FromSeconds(75d));
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (this.SelectedPlayer is { })
+                {
+                    await this.SendPlayerCommandAsync("timeline/poll", [("wait", "0")], cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown.
+        }
     }
 
     private async Task ConnectSocketAsync()
@@ -404,9 +443,11 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     private Uri GetImageUri(string url) => this.GetUri($"photo/:/transcode", ("url", url));
 
-    private Uri GetUri(string scheme, string path, params (string Key, string Value)[] queryParameters)
+    private Uri GetUri(string scheme, string path, params (string Key, string Value)[] queryParameters) => PlexServer.BuildUri(scheme, this.HostName, this.Port, path, queryParameters);
+
+    private static Uri BuildUri(string scheme, string host, int port, string path, (string Key, string Value)[] queryParameters)
     {
-        UriBuilder builder = new(scheme, this.HostName, this.Port, path);
+        UriBuilder builder = new(scheme, host, port, path);
         if (queryParameters.Length != 0)
         {
             builder.Query = string.Join('&', queryParameters.Select(entry => $"{entry.Key}={Uri.EscapeDataString(entry.Value)}"));
@@ -489,7 +530,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     private async Task SendPlayerCommandAsync(string command, (string, string)[]? queryParameters, CancellationToken cancellationToken)
     {
-        if (this.SelectedPlayer is not { Capabilities: { } capabilities, MachineIdentifier: { } targetId })
+        if (this.SelectedPlayer is not { Capabilities: { } capabilities, MachineIdentifier: { } targetId } player)
         {
             return;
         }
@@ -497,26 +538,40 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         {
             this._logger.LogWarning("Player does not support {Capability}, errors may occur.", Enum.GetName(capability));
         }
-        int commandId = Interlocked.Increment(ref this._commandId);
+        (string, string)[] allParameters = [
+            .. queryParameters ?? [],
+            ("commandID", $"{Interlocked.Increment(ref this._commandId)}"),
+            ("X-Plex-Target-Client-Identifier", targetId)
+        ];
+        // Prefer talking to the player directly - this is what the official Plex apps do by default, and
+        // it doesn't depend on the client keeping an active (and unreliable in practice) Companion
+        // session with the server alive. Fall back to relaying through the server if that fails (e.g.
+        // the client isn't reachable directly on this network).
+        if (await this.TrySendCommandAsync(PlexServer.GetPlayerUri(player, $"player/{command}", allParameters), command, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+        await this.TrySendCommandAsync(this.GetUri($"player/{command}", allParameters), command, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> TrySendCommandAsync(Uri uri, string command, CancellationToken cancellationToken)
+    {
         try
         {
-            using HttpRequestMessage request = new(HttpMethod.Get, this.GetUri($"player/{command}", [
-                .. queryParameters ?? [],
-                ("commandID", $"{commandId}"),
-                ("X-Plex-Target-Client-Identifier", targetId)
-            ]));
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
             this.AddTokenHeaders(request);
             using HttpResponseMessage response = await this._httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
-                return;
+                return true;
             }
             string text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            this._logger.LogWarning("Plex command ({Command}) failed: {Code}.\n{Text}", command, response.StatusCode, text);
+            this._logger.LogWarning("Plex command ({Command}) failed via {Host}: {Code}.\n{Text}", command, uri.Host, response.StatusCode, text);
         }
         catch (Exception e)
         {
-            this._logger.LogWarning("Plex command ({Command}) failed: {Error}", command, e);
+            this._logger.LogWarning("Plex command ({Command}) failed via {Host}: {Error}", command, uri.Host, e);
         }
+        return false;
     }
 }

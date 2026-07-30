@@ -20,8 +20,8 @@ public sealed class ButtonFeatureTests
 
         ButtonFeature feature = new(mockButtonHandler.Object, buttonName);
         string deviceId = Guid.NewGuid().ToString("N");
-        await feature.ExecuteAsync(deviceId, default);
+        await feature.ExecuteAsync(deviceId, TestContext.Current.CancellationToken);
 
-        mockButtonHandler.Verify(handler => handler(deviceId, buttonName, default), Times.Once());
+        mockButtonHandler.Verify(handler => handler(deviceId, buttonName, It.IsAny<CancellationToken>()), Times.Once());
     }
 }
