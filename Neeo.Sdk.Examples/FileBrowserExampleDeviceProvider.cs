@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 
@@ -13,17 +15,30 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
     public FileBrowserExampleDeviceProvider()
     {
         const string deviceName = "SDK File Browser Example";
-        this.DeviceBuilder = Device.Create(deviceName, DeviceType.MediaPlayer)
+        this.DeviceBuilder = Device.Create(deviceName, DeviceType.Accessory)
             .SetSpecificName(deviceName)
             .SetIcon(DeviceIconOverride.NeeoBrain)
             .AddAdditionalSearchTokens("explorer")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-            .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, browser: Browse, actionHandler: this.OnDirectoryAction);
+            .EnableDeviceRoute(prefix => this._uriPrefix = prefix, HandleImageRequest)
+            .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, browser: this.Browse, actionHandler: this.OnDirectoryAction);
     }
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static Task Browse(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
+    private string _uriPrefix = string.Empty;
+
+    // Serves the images embedded in this assembly, e.g. "{prefix}puppy.jpg".
+    private static Task<ActionResult> HandleImageRequest(HttpRequest request, string path, CancellationToken cancellationToken)
+    {
+        ActionResult result = path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+            && typeof(FileBrowserExampleDeviceProvider).Assembly.GetManifestResourceStream(path) is { } stream
+            ? new FileStreamResult(stream, "image/jpeg")
+            : new NotFoundResult();
+        return Task.FromResult(result);
+    }
+
+    private Task Browse(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         int offset = builder.Parameters.Offset;
         int limit = builder.Parameters.Limit;
@@ -42,14 +57,14 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             try
             {
                 string root = builder.Parameters.BrowseIdentifier;
-                DirectoryEntry[] array = [.. GetEntries(root)];
+                DirectoryEntry[] array = [.. this.GetEntries(root)];
                 string title = $"{root.Replace('\\', '/')} ({array.Length})";
                 builder.SetTitle(title);
                 if (offset == 0)
                 {
                     builder
                         .AddHeader(title)
-                        .AddTileRow([new("https://neeo-sdk.neeo.io/puppy.jpg", "puppy")])
+                        .AddTileRow([new($"{this._uriPrefix}puppy.jpg", "puppy")])
                         .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
                         .AddButtonRow(
                             new("Reload", ActionIdentifier: "RELOAD", Inverse: false, UIAction: DirectoryUIAction.Reload),
@@ -71,7 +86,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
         return Task.CompletedTask;
     }
 
-    private static IEnumerable<DirectoryEntry> GetEntries(string directory)
+    private IEnumerable<DirectoryEntry> GetEntries(string directory)
     {
         foreach (string fullPath in Directory.EnumerateFileSystemEntries(directory))
         {
@@ -83,7 +98,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                 BrowseIdentifier: isDirectory ? fullPath : null,
                 ActionIdentifier: isDirectory ? null : fullPath,
                 IsQueueable: isDirectory ? null : true,
-                ThumbnailUri: isDirectory ? "https://neeo-sdk.neeo.io/folder.jpg" : "https://neeo-sdk.neeo.io/file.jpg"
+                ThumbnailUri: $"{this._uriPrefix}{(isDirectory ? "folder" : "file")}.jpg"
             );
         }
     }

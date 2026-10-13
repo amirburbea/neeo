@@ -167,8 +167,7 @@ public sealed partial class KodiClientManager(
 
     public async Task<bool> TryAddHostAsync(string hostNameOrAddress, int port = 8080, CancellationToken cancellationToken = default)
     {
-        IPAddress? ip = null;
-        if (!IPAddress.TryParse(hostNameOrAddress, out ip))
+        if (!IPAddress.TryParse(hostNameOrAddress, out IPAddress? ip))
         {
             try
             {
@@ -200,7 +199,7 @@ public sealed partial class KodiClientManager(
             return Task.FromResult<KodiClient?>(existing);
         }
 
-        return this._connectingClients.GetOrAdd(ipAddress, ip => ConnectInternalAsync(ip));
+        return this._connectingClients.GetOrAdd(ipAddress, ConnectInternalAsync);
 
         async Task<KodiClient?> ConnectInternalAsync(IPAddress targetIp)
         {

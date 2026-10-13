@@ -22,7 +22,7 @@ internal sealed record class DirectoryEntryData(
 /// Wire representation of a <see cref="DirectoryButton"/>, produced by <see cref="DirectoryBuilder"/> after validation.
 /// </summary>
 internal sealed record class DirectoryButtonData(
-    string Text,
+    [property: JsonPropertyName("title")] string Text,
     [property: JsonPropertyName("iconName")] DirectoryButtonIcon? Icon,
     bool? Inverse,
     string? ActionIdentifier,

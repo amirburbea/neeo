@@ -35,7 +35,6 @@ public abstract partial class PlexDeviceProviderBase(
 {
     private readonly Task _startupTask = PlexDeviceProviderBase.CreateStartupTask(applicationLifetime);
 
-
     protected static readonly Dictionary<Buttons, Func<IPlexServer, CancellationToken, Task>> ButtonHandlers = new()
     {
         { Buttons.PlayToggle, PlexDeviceProviderBase.TogglePlayAsync },

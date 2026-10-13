@@ -84,6 +84,9 @@ public sealed class DirectoryFeatureTests
 
         JsonElement button = document.RootElement.GetProperty("buttons")[0];
         Assert.True(button.GetProperty("isButton").GetBoolean());
+        // The Brain reads the label from "title" (as the TypeScript SDK emits), not "text".
+        Assert.Equal("Shuffle", button.GetProperty("title").GetString());
+        Assert.False(button.TryGetProperty("text", out _));
         Assert.Equal("shuffle", button.GetProperty("iconName").GetString());
     }
 
