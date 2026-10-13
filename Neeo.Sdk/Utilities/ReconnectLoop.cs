@@ -27,7 +27,11 @@ public sealed class ReconnectLoop : IDisposable
     /// </summary>
     /// <param name="initialDelay">The delay before the first retry attempt, and the starting point for backoff after each new call to <see cref="Start"/>.</param>
     /// <param name="maxDelay">The maximum delay between retry attempts once backoff has grown to this point.</param>
-    /// <param name="tryConnectAsync">Attempts a single connection, returning <see langword="true"/> on success. The loop stops once this returns <see langword="true"/>.</param>
+    /// <param name="tryConnectAsync">
+    /// Attempts a single connection, returning <see langword="true"/> on success. The loop stops once this returns <see langword="true"/>.
+    /// The token it is given is scoped to the reconnect cycle and is cancelled once the cycle ends (including on success), so work
+    /// that should outlive the attempt (such as a session started on success) must not be bound to it.
+    /// </param>
     /// <param name="logger">Logger used to report unexpected exceptions from <paramref name="tryConnectAsync"/> (the loop itself never dies silently - it logs and keeps retrying).</param>
     public ReconnectLoop(TimeSpan initialDelay, TimeSpan maxDelay, Func<CancellationToken, Task<bool>> tryConnectAsync, ILogger logger)
     {

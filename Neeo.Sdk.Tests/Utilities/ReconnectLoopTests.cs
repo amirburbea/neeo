@@ -55,6 +55,29 @@ public sealed class ReconnectLoopTests
     }
 
     [Fact]
+    public async Task Attempt_token_is_cancelled_once_an_attempt_succeeds()
+    {
+        CancellationToken attemptToken = default;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(40),
+            token =>
+            {
+                attemptToken = token;
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken);
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+
+        // Work that outlives the attempt (e.g. a session started on success) must not be bound to this token.
+        Assert.True(attemptToken.IsCancellationRequested);
+    }
+
+    [Fact]
     public async Task Start_is_a_no_op_when_already_running()
     {
         TaskCompletionSource neverCompletes = new();
