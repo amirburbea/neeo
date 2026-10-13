@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -21,7 +23,8 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     private readonly WebOSClientManager _clientManager;
     private readonly ILogger<WebOSDeviceProvider> _logger;
-    private readonly HashSet<string> _subscribedDevices = new(StringComparer.Ordinal);
+    // Device IDs the Brain has added for this adapter (written from the Brain's subscription callbacks, read from client events).
+    private readonly ConcurrentDictionary<string, byte> _subscribedDevices = new(StringComparer.Ordinal);
     private IDeviceNotifier? _notifier;
     private bool _isDisposed;
 
@@ -30,6 +33,10 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         this._clientManager = clientManager;
         this._logger = logger;
         this._clientManager.Registry.Changed += this.Registry_Changed;
+        foreach (WebOSClient client in this._clientManager.Clients)
+        {
+            this.AttachClientEvents(client);
+        }
     }
 
     public IDeviceBuilder DeviceBuilder => field ??= Device.Create(DeviceName, DeviceType.TV)
@@ -73,23 +80,29 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
         .AddSlider("VOLUME", null, this.GetVolumeAsync, this.SetVolumeAsync)
-        .AddTextLabel("VOLUME-LABEL", "Volume", async (deviceId, ct) => (await this.GetVolumeAsync(deviceId, ct).ConfigureAwait(false)).ToString())
+        .AddTextLabel("VOLUME-LABEL", "Volume", async (deviceId, ct) => (await this.GetVolumeAsync(deviceId, ct).ConfigureAwait(false)).ToString(CultureInfo.InvariantCulture))
         .AddTextLabel("APP", "Current App", this.GetForegroundAppAsync)
         .EnableDiscovery(
             "Discovering LG webOS TV...",
-            "Ensure your TV is turned on, connected to the local network, and 'LG Connect Apps' is enabled.",
+            "Ensure your TV is turned on, connected to the local network, and 'LG Connect Apps' is enabled. To turn the TV on from NEEO, also enable 'Turn on via Wi-Fi' (or 'Turn on via LAN').",
             this.PerformDiscoveryAsync
         )
         .EnableRegistration(
             "Pairing with LG webOS TV...",
-            "A prompt will appear on your TV screen asking to allow NEEO Remote. Click 'Allow' with your LG remote, then submit to finish pairing.",
+            "Turn your TV on, enter any code and submit. A prompt will then appear on your TV screen asking to allow NEEO Remote - click 'Allow' with your LG remote within 60 seconds.",
             this.QueryIsRegisteredAsync,
             this.RegisterAsync
         );
 
     private Task<bool> GetPowerStateAsync(string deviceId)
     {
-        return Task.FromResult(this._clientManager.TryGetConnected(deviceId, out _));
+        if (this._clientManager.TryGetConnected(deviceId, out _))
+        {
+            return Task.FromResult(true);
+        }
+        // The Brain asking is a good moment to retry (coalesced, and restarts the backoff) - e.g. the TV was just turned on.
+        this._clientManager.GetClient(deviceId)?.RequestReconnect();
+        return Task.FromResult(false);
     }
 
     private Task<double> GetVolumeAsync(string deviceId, CancellationToken cancellationToken)
@@ -118,14 +131,24 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             return;
         }
 
-        if (Button.TryResolve(buttonName) is { } button)
+        Buttons? resolved = Button.TryResolve(buttonName);
+        if (resolved is Buttons.PowerOn || (resolved is Buttons.PowerToggle && !client.IsConnected))
+        {
+            await client.PowerOnAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+        if (!client.IsConnected)
+        {
+            this._logger.LogInformation("Can not process {button} as the TV is not connected.", buttonName);
+            client.RequestReconnect();
+            return;
+        }
+
+        if (resolved is { } button)
         {
             switch (button)
             {
-                case Buttons.PowerOn:
-                    await client.PowerOnAsync(cancellationToken).ConfigureAwait(false);
-                    return;
-                case Buttons.PowerOff:
+                case Buttons.PowerOff or Buttons.PowerToggle:
                     await client.PowerOffAsync(cancellationToken).ConfigureAwait(false);
                     return;
                 case Buttons.InputHdmi1:
@@ -201,73 +224,59 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         }
 
         WebOSClient[] clients = await this._clientManager.DiscoverAsync(cancellationToken).ConfigureAwait(false);
-        return [.. clients.Select(c => new DiscoveredDevice(c.DeviceId, $"{DeviceName} ({c.IPAddress})", true))];
+        return [.. clients.Select(static c => new DiscoveredDevice(c.DeviceId, $"{DeviceName} ({c.IPAddress}){(c.IsPaired ? string.Empty : " - not paired")}", true))];
     }
 
     private Task<bool> QueryIsRegisteredAsync(CancellationToken cancellationToken)
     {
-        return Task.FromResult(this._clientManager.Clients.Any(static c => c.IsConnected && !string.IsNullOrEmpty(c.ClientKey)));
+        return Task.FromResult(this._clientManager.HasPairedDevices);
     }
 
+    // The NEEO app registers before it discovers, so this is where TVs get paired. The security code itself is not used.
     private async Task<RegistrationResult> RegisterAsync(string securityCode, CancellationToken cancellationToken)
     {
-        foreach (WebOSClient client in this._clientManager.Clients)
-        {
-            if (client.IsConnected)
-            {
-                return RegistrationResult.Success;
-            }
-            if (await client.ConnectAsync(cancellationToken).ConfigureAwait(false))
-            {
-                return RegistrationResult.Success;
-            }
-        }
-        return RegistrationResult.Failed("Pairing timed out or was rejected by the TV.");
+        return await this._clientManager.PairAsync(cancellationToken).ConfigureAwait(false)
+            ? RegistrationResult.Success
+            : RegistrationResult.Failed("No TV was paired - make sure it is on, then accept the prompt on the TV within 60 seconds.");
     }
 
     private Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
     {
-        this._subscribedDevices.Add(deviceId);
-        if (this._clientManager.GetClient(deviceId) is { } client)
-        {
-            this.AttachClientEvents(client);
-        }
+        this._subscribedDevices.TryAdd(deviceId, default);
+        this._clientManager.GetOrCreateKnownClient(deviceId);
         return Task.CompletedTask;
     }
 
     private Task OnDeviceRemovedAsync(string deviceId, CancellationToken cancellationToken)
     {
-        this._subscribedDevices.Remove(deviceId);
+        this._subscribedDevices.TryRemove(deviceId, out _);
         if (this._clientManager.Registry.TryRemove(deviceId, out WebOSClient? client))
         {
-            this.DetachClientEvents(client);
             client.Dispose();
         }
         return Task.CompletedTask;
     }
 
-    private async Task InitializeDeviceListAsync(string[] deviceIds, CancellationToken cancellationToken)
+    private Task InitializeDeviceListAsync(string[] deviceIds, CancellationToken cancellationToken)
     {
         foreach (string deviceId in deviceIds)
         {
-            this._subscribedDevices.Add(deviceId);
-            if (PhysicalAddress.TryParse(deviceId, out PhysicalAddress? mac))
-            {
-                if (NetworkMethods.GetNetworkDevices().FirstOrDefault(d => d.Value.Equals(mac)) is { Key: { } ipAddress })
-                {
-                    await this._clientManager.GetOrCreateClientAsync(ipAddress, mac, 3000, cancellationToken).ConfigureAwait(false);
-                }
-            }
+            this._subscribedDevices.TryAdd(deviceId, default);
+            // Starts connecting in the background (a TV that is off is retried, and picked up when it comes on).
+            this._clientManager.GetOrCreateKnownClient(deviceId);
         }
+        return Task.CompletedTask;
     }
 
+    // Every client's events are observed for as long as it is registered; the handlers only notify for devices the Brain has
+    // added, so the order in which clients and subscriptions arrive does not matter.
     private void Registry_Changed(object? sender, DeviceRegistryChangedEventArgs<WebOSClient> e)
     {
         if (e.Kind == DeviceRegistryChangeKind.Removed)
         {
             this.DetachClientEvents(e.Client);
         }
-        else if (e.Kind == DeviceRegistryChangeKind.Added && this._subscribedDevices.Contains(e.DeviceId))
+        else if (e.Kind == DeviceRegistryChangeKind.Added)
         {
             this.AttachClientEvents(e.Client);
         }
@@ -275,6 +284,8 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     private void AttachClientEvents(WebOSClient client)
     {
+        // Detach first so attaching twice (constructor and Added racing) never subscribes twice.
+        this.DetachClientEvents(client);
         client.VolumeChanged += this.Client_VolumeChanged;
         client.ForegroundAppChanged += this.Client_ForegroundAppChanged;
     }
@@ -287,16 +298,16 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     private void Client_VolumeChanged(object? sender, DataEventArgs<int> e)
     {
-        if (sender is WebOSClient client && this._notifier is { } notifier)
+        if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
         {
             _ = notifier.SendNotificationAsync("VOLUME", (double)e.Data, client.DeviceId);
-            _ = notifier.SendNotificationAsync("VOLUME-LABEL", e.Data.ToString(), client.DeviceId);
+            _ = notifier.SendNotificationAsync("VOLUME-LABEL", e.Data.ToString(CultureInfo.InvariantCulture), client.DeviceId);
         }
     }
 
     private void Client_ForegroundAppChanged(object? sender, DataEventArgs<string> e)
     {
-        if (sender is WebOSClient client && this._notifier is { } notifier)
+        if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
         {
             _ = notifier.SendNotificationAsync("APP", e.Data, client.DeviceId);
         }

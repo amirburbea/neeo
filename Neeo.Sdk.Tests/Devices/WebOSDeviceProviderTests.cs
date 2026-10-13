@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Threading.Tasks;
 using System.Net.NetworkInformation;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -108,5 +111,86 @@ public sealed class WebOSDeviceProviderTests
         Assert.IsAssignableFrom<IDeviceClient>(client);
         Assert.Equal(mac.ToString(), client.DeviceId);
         Assert.False(client.IsConnected);
+    }
+
+    [Fact]
+    public async Task Unpaired_client_does_not_connect_or_reconnect()
+    {
+        using WebOSClient client = new(IPAddress.Loopback, PhysicalAddress.Parse("001122334455"), NullLogger.Instance);
+
+        Assert.False(client.IsPaired);
+        Assert.False(await client.ConnectAsync(TestContext.Current.CancellationToken));
+        client.RequestReconnect(); // No-op while unpaired.
+        Assert.False(client.IsConnected);
+    }
+
+    [Fact]
+    public void Client_with_a_stored_key_is_paired()
+    {
+        using WebOSClient client = new(IPAddress.Loopback, PhysicalAddress.Parse("001122334455"), NullLogger.Instance, clientKey: "key");
+
+        Assert.True(client.IsPaired);
+        Assert.Equal("key", client.ClientKey);
+    }
+
+    [Fact]
+    public void GetOrCreateClient_creates_one_client_per_device_and_remembers_its_address()
+    {
+        InMemorySettings settings = new();
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+        PhysicalAddress mac = PhysicalAddress.Parse("001122334455");
+
+        WebOSClient first = manager.GetOrCreateClient(IPAddress.Parse("192.0.2.10"), mac);
+        WebOSClient second = manager.GetOrCreateClient(IPAddress.Parse("192.0.2.10"), mac);
+
+        Assert.Same(first, second);
+        Assert.Same(first, manager.GetClient(mac.ToString()));
+        Assert.Equal("192.0.2.10", settings[$"{mac}|ip"]);
+        Assert.False(manager.HasPairedDevices);
+    }
+
+    [Fact]
+    public void Clients_are_created_with_their_stored_pairing_key()
+    {
+        PhysicalAddress mac = PhysicalAddress.Parse("001122334455");
+        InMemorySettings settings = new() { [mac.ToString()] = "stored-key" };
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+
+        WebOSClient client = manager.GetOrCreateClient(IPAddress.Parse("192.0.2.10"), mac);
+
+        Assert.True(manager.HasPairedDevices);
+        Assert.Equal("stored-key", client.ClientKey);
+    }
+
+    [Fact]
+    public void GetOrCreateKnownClient_falls_back_to_the_last_known_address()
+    {
+        // A MAC address that won't be in this machine's ARP table.
+        PhysicalAddress mac = PhysicalAddress.Parse("02DEADBEEF01");
+        InMemorySettings settings = new() { [mac.ToString()] = "stored-key", [$"{mac}|ip"] = "192.0.2.20" };
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+
+        WebOSClient? client = manager.GetOrCreateKnownClient(mac.ToString());
+
+        Assert.NotNull(client);
+        Assert.Equal(IPAddress.Parse("192.0.2.20"), client.IPAddress);
+        Assert.Null(manager.GetOrCreateKnownClient("02DEADBEEF02"));
+    }
+
+    private static WebOSClientManager CreateManager(InMemorySettings settings) => new(
+        NullLogger<WebOSClient>.Instance,
+        NullLogger<WebOSClientManager>.Instance,
+        settings
+    );
+
+    private sealed class InMemorySettings : Dictionary<string, string>, ISettingsStore<WebOSClientManager>
+    {
+        public InMemorySettings() : base(StringComparer.Ordinal)
+        {
+        }
+
+        public string? Get(string key, string? defaultValue = default) => this.TryGetValue(key, out string? value) ? value : defaultValue;
+
+        public void Update(Action<IDictionary<string, string>> action) => action(this);
     }
 }

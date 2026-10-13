@@ -20,6 +20,11 @@ public sealed class WebOSPointerSocket(Uri uri, ILogger? logger = null) : IDispo
         ObjectDisposedException.ThrowIf(this._isDisposed, this);
         this._webSocket?.Dispose();
         ClientWebSocket socket = new();
+        if (uri.Scheme == Uri.UriSchemeWss)
+        {
+            // The TV presents a self-signed certificate; this only applies to this socket.
+            socket.Options.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
+        }
         try
         {
             await socket.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);

@@ -21,13 +21,22 @@ public sealed class WebOSClientManager(
     ISettingsStore<WebOSClientManager> settings
 ) : IDisposable
 {
+    // Settings keys: "<deviceId>" holds the pairing (client) key, "<deviceId>|ip" the last known IP address (so a TV that is
+    // off - and therefore missing from the ARP table - at startup can still be found).
+    private const string IPAddressSuffix = "|ip";
+    private static readonly int[] _ports = [3001, 3000];
+
     private readonly DeviceRegistry<WebOSClient> _clients = new(logger);
-    private readonly ConcurrentDictionary<string, Task<WebOSClient?>> _connectingClients = new(StringComparer.Ordinal);
     private bool _isDisposed;
 
     public IReadOnlyCollection<WebOSClient> Clients => this._clients.Clients;
 
     public IDeviceRegistry<WebOSClient> Registry => this._clients;
+
+    /// <summary>
+    /// Gets a value indicating whether any TV has been paired (even if it is not currently known or connected).
+    /// </summary>
+    public bool HasPairedDevices => settings.Keys.Any(static key => !key.EndsWith(IPAddressSuffix, StringComparison.Ordinal));
 
     public WebOSClient? GetClient(string deviceId) => this._clients.GetClient(deviceId);
 
@@ -36,38 +45,47 @@ public sealed class WebOSClientManager(
         return this._clients.TryGetConnected(deviceId, out client);
     }
 
-    public async Task<WebOSClient?> GetOrCreateClientAsync(
-        IPAddress ipAddress,
-        PhysicalAddress macAddress,
-        int port = 3000,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>
+    /// Gets the client for the TV, creating it (and, if it is paired, starting to connect it in the background) if needed.
+    /// </summary>
+    public WebOSClient GetOrCreateClient(IPAddress ipAddress, PhysicalAddress macAddress, int port = 3000)
     {
+        ObjectDisposedException.ThrowIf(this._isDisposed, this);
         string deviceId = macAddress.Equals(PhysicalAddress.None) ? ipAddress.ToString() : macAddress.ToString();
+        WebOSClient client = this._clients.GetOrAdd(deviceId, id => this.CreateClient(id, ipAddress, macAddress, port), out bool added);
+        if (added)
+        {
+            settings[deviceId + IPAddressSuffix] = ipAddress.ToString();
+            client.RequestReconnect();
+        }
+        return client;
+    }
+
+    /// <summary>
+    /// Gets the client for a device the Brain already knows, looking up its IP address in the ARP table and falling back to the
+    /// last known address.
+    /// </summary>
+    public WebOSClient? GetOrCreateKnownClient(string deviceId)
+    {
         if (this._clients.GetClient(deviceId) is { } existing)
         {
             return existing;
         }
-        return await this._connectingClients.GetOrAdd(
-            deviceId,
-            async deviceId =>
-            {
-                string? clientKey = settings.TryGetValue(deviceId, out string? key) ? key : null;
-                WebOSClient client = new(ipAddress, macAddress, clientLogger, clientKey, port);
-
-                client.Registered += (_, e) =>
-                {
-                    logger.LogInformation("Saving webOS client key for device {deviceId}.", client.DeviceId);
-                    settings[client.DeviceId] = e.Data;
-                };
-
-                this._clients.TryAdd(client);
-                await client.ConnectAsync(cancellationToken).ConfigureAwait(false);
-                return client;
-            }
-        ).ConfigureAwait(false);
+        if (!PhysicalAddress.TryParse(deviceId, out PhysicalAddress? macAddress))
+        {
+            return IPAddress.TryParse(deviceId, out IPAddress? address) ? this.GetOrCreateClient(address, PhysicalAddress.None) : null;
+        }
+        IPAddress? ipAddress = NetworkMethods.GetNetworkDevices().FirstOrDefault(device => device.Value.Equals(macAddress)).Key;
+        if (ipAddress is null && settings.Get(deviceId + IPAddressSuffix) is { } text && IPAddress.TryParse(text, out IPAddress? stored))
+        {
+            ipAddress = stored;
+        }
+        return ipAddress is null ? null : this.GetOrCreateClient(ipAddress, macAddress);
     }
 
+    /// <summary>
+    /// Finds webOS TVs on the network (anything answering on the webOS ports), creating clients for them. Does not pair.
+    /// </summary>
     public async Task<WebOSClient[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         ConcurrentBag<WebOSClient> discovered = [];
@@ -79,11 +97,12 @@ public sealed class WebOSClientManager(
                 try
                 {
                     (IPAddress ip, PhysicalAddress mac) = device;
-                    if (await WebOSClientManager.ProbePortAsync(ip, 3000, 400, cancellationToken).ConfigureAwait(false))
+                    foreach (int port in _ports)
                     {
-                        if (await this.GetOrCreateClientAsync(ip, mac, 3000, cancellationToken).ConfigureAwait(false) is { } client)
+                        if (await WebOSClientManager.ProbePortAsync(ip, port, 400, cancellationToken).ConfigureAwait(false))
                         {
-                            discovered.Add(client);
+                            discovered.Add(this.GetOrCreateClient(ip, mac));
+                            return;
                         }
                     }
                 }
@@ -99,6 +118,34 @@ public sealed class WebOSClientManager(
         ).ConfigureAwait(false);
 
         return [.. discovered];
+    }
+
+    /// <summary>
+    /// Discovers TVs and pairs each one that is not paired yet, one at a time (each shows a prompt on the TV and waits up to 60
+    /// seconds for it to be accepted).
+    /// </summary>
+    /// <returns><see langword="true"/> if at least one TV is paired once done.</returns>
+    public async Task<bool> PairAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (WebOSClient client in await this.DiscoverAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (!client.IsPaired)
+            {
+                await client.PairAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        return this.HasPairedDevices;
+    }
+
+    private WebOSClient CreateClient(string deviceId, IPAddress ipAddress, PhysicalAddress macAddress, int port)
+    {
+        WebOSClient client = new(ipAddress, macAddress, clientLogger, settings.Get(deviceId), port);
+        client.Registered += (_, e) =>
+        {
+            logger.LogInformation("Saving webOS client key for device {deviceId}.", client.DeviceId);
+            settings[client.DeviceId] = e.Data;
+        };
+        return client;
     }
 
     private static async Task<bool> ProbePortAsync(IPAddress ip, int port, int timeoutMs, CancellationToken cancellationToken)

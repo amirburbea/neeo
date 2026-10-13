@@ -30,6 +30,7 @@ public sealed class WebOSClient(
     private CancellationTokenSource? _cancellationTokenSource;
     private WebOSPointerSocket? _pointerSocket;
     private ReconnectLoop? _reconnectLoop;
+    private Uri? _workingEndpoint;
     private ClientWebSocket? _webSocket;
     private int _messageIdCounter;
     private bool _isRegistered;
@@ -57,9 +58,11 @@ public sealed class WebOSClient(
 
     public PhysicalAddress MacAddress { get; } = macAddress;
 
-    public int Port => port;
+    public int Port => this._workingEndpoint?.Port ?? port;
 
     public string? ClientKey => this._clientKey;
+
+    public bool IsPaired => !string.IsNullOrEmpty(this._clientKey);
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open } && this._isRegistered;
 
@@ -69,7 +72,29 @@ public sealed class WebOSClient(
 
     public string ForegroundApp { get; private set; } = string.Empty;
 
-    public async Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Connects using the stored client key. Never prompts on the TV - an unpaired client fails (see <see cref="PairAsync"/>).
+    /// </summary>
+    public Task<bool> ConnectAsync(CancellationToken cancellationToken = default) => this.ConnectAsync(allowPairing: false, cancellationToken);
+
+    /// <summary>
+    /// Connects, showing the pairing prompt on the TV if no client key is stored yet (waiting up to 60 seconds for it to be accepted).
+    /// </summary>
+    public Task<bool> PairAsync(CancellationToken cancellationToken = default) => this.ConnectAsync(allowPairing: true, cancellationToken);
+
+    /// <summary>
+    /// Requests a (re)connection attempt as soon as possible, coalesced with any attempt in flight. A no-op once disposed or
+    /// while unpaired.
+    /// </summary>
+    public void RequestReconnect()
+    {
+        if (!this._isDisposed && this.IsPaired && !this.IsConnected)
+        {
+            this.GetReconnectLoop().TriggerNow();
+        }
+    }
+
+    private async Task<bool> ConnectAsync(bool allowPairing, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(this._isDisposed, this);
         if (this.IsConnected)
@@ -83,6 +108,11 @@ public sealed class WebOSClient(
             if (this.IsConnected)
             {
                 return true;
+            }
+            if (!allowPairing && !this.IsPaired)
+            {
+                logger.LogDebug("Not connecting to webOS TV at {ipAddress}: it has not been paired.", this.IPAddress);
+                return false;
             }
             return await this.PerformConnectAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -110,11 +140,21 @@ public sealed class WebOSClient(
         return this.SendRequestAsync("ssap://system/turnOff", null, cancellationToken);
     }
 
-    public Task PowerOnAsync(CancellationToken cancellationToken = default)
+    public async Task PowerOnAsync(CancellationToken cancellationToken = default)
     {
-        return !this.MacAddress.Equals(PhysicalAddress.None)
-            ? this.MacAddress.WakeAsync(cancellationToken)
-            : Task.CompletedTask;
+        if (this.IsConnected || this.MacAddress.Equals(PhysicalAddress.None))
+        {
+            return;
+        }
+        // Requires "Turn on via Wi-Fi/LAN" (or equivalent) on the TV.
+        await this.MacAddress.WakeAsync(cancellationToken).ConfigureAwait(false);
+        // Give the TV's network a moment to come up, then reconnect rather than waiting for the next backoff tick.
+        _ = Task.Delay(TimeSpan.FromSeconds(3d), CancellationToken.None).ContinueWith(
+            _ => this.RequestReconnect(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default
+        );
     }
 
     public async Task SendKeyAsync(Buttons button, CancellationToken cancellationToken = default)
@@ -216,39 +256,95 @@ public sealed class WebOSClient(
 
     private async Task<bool> PerformConnectAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Connecting to webOS TV at {ipAddress}:{port}...", this.IPAddress, this.Port);
-        ClientWebSocket socket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
-        CancellationTokenSource cts = new();
+        foreach (Uri endpoint in this.GetEndpoints())
+        {
+            // Only fall back to the other endpoint when this one couldn't be reached - a failure after the socket opened (e.g. a
+            // pairing prompt that wasn't accepted) would just fail again there (and show a second prompt).
+            if (await this.TryConnectToAsync(endpoint, cancellationToken).ConfigureAwait(false) is { } connected)
+            {
+                return connected;
+            }
+        }
+        return false;
+    }
 
+    /// <summary>
+    /// Newer webOS firmware only accepts the secure socket on 3001 (with a self-signed certificate), older firmware only the
+    /// plain one on <see cref="Port"/> - try the one that last worked first.
+    /// </summary>
+    private IEnumerable<Uri> GetEndpoints()
+    {
+        Uri secure = new($"wss://{this.IPAddress}:3001");
+        Uri plain = new($"ws://{this.IPAddress}:{port}");
+        return this._workingEndpoint == plain ? [plain, secure] : [secure, plain];
+    }
+
+    /// <returns><see langword="true"/> if connected and registered, <see langword="false"/> if the socket opened but registration
+    /// failed, or <see langword="null"/> if the socket could not be opened.</returns>
+    private async Task<bool?> TryConnectToAsync(Uri endpoint, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Connecting to webOS TV at {endpoint}...", endpoint);
+        ClientWebSocket socket = WebOSClient.CreateSocket(endpoint);
+        CancellationTokenSource cts = new();
+        bool opened = false;
+        bool connected = false;
         try
         {
-            await socket.ConnectAsync(new Uri($"ws://{this.IPAddress}:{this.Port}"), cancellationToken).ConfigureAwait(false);
+            await socket.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+            opened = true;
             this._webSocket = socket;
             this._cancellationTokenSource = cts;
+            this._workingEndpoint = endpoint;
 
-            Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
             _ = Task.Run(this.MessageLoopAsync, cts.Token);
 
+            // Also ends with a timeout (an OperationCanceledException) if the pairing prompt isn't accepted.
             string key = await this.RegisterAsync(socket, cts.Token).ConfigureAwait(false);
             this._clientKey = key;
             this._isRegistered = true;
 
             await this.SubscribeToEventsAsync(cts.Token).ConfigureAwait(false);
             _ = this.EnsurePointerSocketAsync(cts.Token);
-
+            connected = true;
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("Failed to connect/register with webOS TV at {endpoint}: {message}", endpoint, ex.Message);
+        }
+        finally
+        {
+            if (!connected)
+            {
+                if (ReferenceEquals(this._webSocket, socket))
+                {
+                    this.CleanUp();
+                }
+                else
+                {
+                    cts.Dispose();
+                    socket.Dispose();
+                }
+            }
+        }
+        if (connected)
+        {
             this.ConnectionChanged?.Invoke(this, EventArgs.Empty);
             this.Connected?.Invoke(this, EventArgs.Empty);
-            logger.LogInformation("Successfully connected and paired with webOS TV at {ipAddress}.", this.IPAddress);
+            logger.LogInformation("Successfully connected and paired with webOS TV at {endpoint}.", endpoint);
             return true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        return opened ? false : null;
+    }
+
+    private static ClientWebSocket CreateSocket(Uri endpoint)
+    {
+        ClientWebSocket socket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
+        if (endpoint.Scheme == Uri.UriSchemeWss)
         {
-            logger.LogWarning("Failed to connect/register with webOS TV at {ipAddress}: {message}", this.IPAddress, ex.Message);
-            cts.Dispose();
-            socket.Dispose();
-            this.CleanUp();
-            return false;
+            // The TV presents a self-signed certificate; this only applies to this socket.
+            socket.Options.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
         }
+        return socket;
     }
 
     private async Task<string> RegisterAsync(ClientWebSocket socket, CancellationToken cancellationToken)
@@ -384,7 +480,7 @@ public sealed class WebOSClient(
                 return false;
             }
 
-            Uri baseUri = new($"ws://{this.IPAddress}:{this.Port}");
+            Uri baseUri = this._workingEndpoint ?? new($"ws://{this.IPAddress}:{port}");
             Uri fullUri = Uri.IsWellFormedUriString(socketPath, UriKind.Absolute)
                 ? new(socketPath)
                 : new(baseUri, socketPath);
@@ -483,13 +579,33 @@ public sealed class WebOSClient(
             return;
         }
 
-        ReconnectLoop loop = new(TimeSpan.FromSeconds(15d), TimeSpan.FromMinutes(2d), _ => this.ConnectAsync(), logger);
-        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is not null)
+        this.GetReconnectLoop().Start();
+    }
+
+    // One loop for the client's lifetime, created on first use (a field initializer can't capture this). A short initial delay
+    // so a TV turned on with its own remote is picked up quickly; an unpaired client stops retrying (pairing connects it).
+    private ReconnectLoop GetReconnectLoop()
+    {
+        if (Volatile.Read(ref this._reconnectLoop) is { } existing)
+        {
+            return existing;
+        }
+        ReconnectLoop loop = new(
+            TimeSpan.FromSeconds(5d),
+            TimeSpan.FromMinutes(2d),
+            async cancellationToken => await this.ConnectAsync(cancellationToken).ConfigureAwait(false) || !this.IsPaired,
+            logger
+        );
+        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is { } winner)
         {
             loop.Dispose();
-            return;
+            return winner;
         }
-        loop.Start();
+        if (this._isDisposed)
+        {
+            loop.Dispose();
+        }
+        return loop;
     }
 
     private void CleanUp()
