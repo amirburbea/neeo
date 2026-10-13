@@ -22,8 +22,19 @@ namespace Neeo.Sdk.Utilities;
 /// <param name="loggerFactory">Logger factory.</param>
 public sealed class SettingsStoreProvider(IConfiguration configuration, ILoggerFactory loggerFactory) : ISettingsStoreProvider
 {
-    private readonly ConcurrentDictionary<string, ISettingsStore> _stores = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// The name of the file (within <see cref="SettingsDirectory"/>) holding the randomly generated master key
+    /// from which each store's encryption key is derived.
+    /// </summary>
+    public const string KeyFileName = "settings.key";
+
+    private const int MasterKeyLength = 32;
+
     private readonly ILogger<SettingsStore> _logger = loggerFactory.CreateLogger<SettingsStore>();
+    private readonly Lock _masterKeyLock = new();
+    // Lazy so that concurrent first requests for a store construct (and load/migrate its file) exactly once.
+    private readonly ConcurrentDictionary<string, Lazy<ISettingsStore>> _stores = new(StringComparer.OrdinalIgnoreCase);
+    private byte[]? _masterKey;
 
     /// <summary>
     /// Gets the base directory on disk where encrypted settings files are stored.
@@ -35,11 +46,21 @@ public sealed class SettingsStoreProvider(IConfiguration configuration, ILoggerF
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         string fileName = SettingsStoreProvider.NormalizeFileName(name);
-        return this._stores.GetOrAdd(fileName, file =>
+        Lazy<ISettingsStore> store = this._stores.GetOrAdd(fileName, file => new(() =>
         {
             string filePath = Path.Combine(this.SettingsDirectory, file);
-            return new SettingsStore(file, filePath, this._logger);
-        });
+            return new SettingsStore(file, filePath, SettingsStore.DeriveKey(this.GetMasterKey(), file), this._logger);
+        }));
+        try
+        {
+            return store.Value;
+        }
+        catch
+        {
+            // Don't cache the failure (Lazy would) - let a later call retry.
+            this._stores.TryRemove(new(fileName, store));
+            throw;
+        }
     }
 
     /// <inheritdoc/>
@@ -47,6 +68,8 @@ public sealed class SettingsStoreProvider(IConfiguration configuration, ILoggerF
 
     /// <summary>
     /// Resolves the store file name for the specified type, honoring <see cref="SettingsStoreAttribute"/> if present.
+    /// Otherwise the name is derived from the type's full name (so that identically named types in different
+    /// drivers do not share a store).
     /// </summary>
     /// <param name="type">The type to resolve the store name for.</param>
     /// <returns>The resolved file name.</returns>
@@ -57,7 +80,54 @@ public sealed class SettingsStoreProvider(IConfiguration configuration, ILoggerF
         {
             return customName;
         }
-        return $"{type.Name.ToLowerInvariant()}.settings.bin";
+        string fullName = (type.FullName ?? type.Name).Replace('+', '.');
+        StringBuilder builder = new(fullName.Length);
+        foreach (char c in fullName)
+        {
+            builder.Append(char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' ? char.ToLowerInvariant(c) : '_');
+        }
+        return builder.Append(".settings.bin").ToString();
+    }
+
+    private byte[] GetMasterKey()
+    {
+        using (this._masterKeyLock.EnterScope())
+        {
+            return this._masterKey ??= SettingsStoreProvider.LoadOrCreateMasterKey(Path.Combine(this.SettingsDirectory, KeyFileName));
+        }
+    }
+
+    private static byte[] LoadOrCreateMasterKey(string keyFilePath)
+    {
+        if (!File.Exists(keyFilePath))
+        {
+            // Write to a temp file first and then move it into place (without overwriting), so a concurrent process
+            // either wins the race or reads the winner's complete key file - never a partially written one.
+            string tempFile = $"{keyFilePath}.{Guid.NewGuid():N}.tmp";
+            FileStreamOptions options = new() { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
+            if (!OperatingSystem.IsWindows())
+            {
+                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            }
+            using (FileStream stream = new(tempFile, options))
+            {
+                stream.Write(RandomNumberGenerator.GetBytes(MasterKeyLength));
+            }
+            try
+            {
+                File.Move(tempFile, keyFilePath, overwrite: false);
+            }
+            catch (IOException) when (File.Exists(keyFilePath))
+            {
+                File.Delete(tempFile);
+            }
+        }
+        byte[] key = File.ReadAllBytes(keyFilePath);
+        if (key.Length != MasterKeyLength)
+        {
+            throw new InvalidDataException($"The settings key file '{keyFilePath}' is corrupt (expected {MasterKeyLength} bytes, found {key.Length}).");
+        }
+        return key;
     }
 
     private static string NormalizeFileName(string name)
@@ -107,7 +177,9 @@ public sealed class SettingsStoreProvider(IConfiguration configuration, ILoggerF
 }
 
 /// <summary>
-/// A persistent, encrypted key-value store using AES-GCM with a machine-derived key.
+/// A persistent, encrypted key-value store using AES-GCM, keyed from the provider's master key file.
+/// The encryption keeps settings unreadable to someone who only has the store file; anyone who can also
+/// read <see cref="SettingsStoreProvider.KeyFileName"/> can decrypt it.
 /// </summary>
 internal sealed class SettingsStore : ISettingsStore
 {
@@ -121,12 +193,12 @@ internal sealed class SettingsStore : ISettingsStore
     private Dictionary<string, string> _entries = new(StringComparer.Ordinal);
     private int _batchDepth;
 
-    public SettingsStore(string storeName, string filePath, ILogger<SettingsStore> logger)
+    public SettingsStore(string storeName, string filePath, byte[] key, ILogger<SettingsStore> logger)
     {
         this._filePath = filePath;
-        this._key = SettingsStore.DeriveKey(storeName);
+        this._key = key;
         this._logger = logger;
-        this.Load();
+        this.Load(storeName);
     }
 
     public string this[string key]
@@ -304,45 +376,93 @@ internal sealed class SettingsStore : ISettingsStore
 
     IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
 
-    private void Load()
+    private void Load(string storeName)
     {
         if (!File.Exists(this._filePath))
         {
             return;
         }
+        byte[] encryptedData;
         try
         {
-            byte[] encryptedData = File.ReadAllBytes(this._filePath);
-            if (encryptedData.Length < IvLength + TagLength)
-            {
-                return;
-            }
-            ReadOnlySpan<byte> cipherText = encryptedData.AsSpan(IvLength + TagLength);
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(cipherText.Length);
-            try
-            {
-                Span<byte> decryptedBytes = buffer.AsSpan(0, cipherText.Length);
-                using AesGcm decryptor = new(this._key, TagLength);
-                decryptor.Decrypt(
-                    nonce: encryptedData.AsSpan(0, IvLength),
-                    ciphertext: cipherText,
-                    tag: encryptedData.AsSpan(IvLength, TagLength),
-                    plaintext: decryptedBytes
-                );
-                if (JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedBytes, AppJsonSerializerOptions.Default) is { } dict)
-                {
-                    this._entries = new(dict, StringComparer.Ordinal);
-                }
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            encryptedData = File.ReadAllBytes(this._filePath);
         }
         catch (Exception ex)
         {
-            this._logger.LogWarning(ex, "Failed to decrypt settings from {path}; starting with fresh settings.", this._filePath);
+            // Don't fall through to "fresh settings" - the next save would overwrite a file we merely failed to read.
+            throw new IOException($"Failed to read settings from '{this._filePath}'.", ex);
         }
+        if (SettingsStore.TryDecrypt(this._key, encryptedData) is { } entries)
+        {
+            this._entries = entries;
+            return;
+        }
+        if (SettingsStore.TryDecrypt(SettingsStore.DeriveLegacyKey(storeName), encryptedData) is { } legacyEntries)
+        {
+            // Written by an older version with a key derived from the machine name - re-encrypt with the current key.
+            this._entries = legacyEntries;
+            this._logger.LogInformation("Migrating settings at {path} to the settings key file.", this._filePath);
+            this.Save();
+            return;
+        }
+        // Keep the unreadable file rather than silently overwriting it on the next save.
+        string backupPath = $"{this._filePath}.{DateTime.UtcNow:yyyyMMddHHmmss}.unreadable";
+        try
+        {
+            File.Move(this._filePath, backupPath);
+            this._logger.LogWarning("Failed to decrypt settings from {path}; moved it to {backupPath} and starting with fresh settings.", this._filePath, backupPath);
+        }
+        catch (Exception ex)
+        {
+            throw new IOException($"Failed to decrypt settings from '{this._filePath}', and failed to move it aside to '{backupPath}'.", ex);
+        }
+    }
+
+    internal static Dictionary<string, string>? TryDecrypt(byte[] key, byte[] encryptedData)
+    {
+        if (encryptedData.Length < IvLength + TagLength)
+        {
+            return null;
+        }
+        ReadOnlySpan<byte> cipherText = encryptedData.AsSpan(IvLength + TagLength);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(cipherText.Length);
+        try
+        {
+            Span<byte> decryptedBytes = buffer.AsSpan(0, cipherText.Length);
+            using AesGcm decryptor = new(key, TagLength);
+            decryptor.Decrypt(
+                nonce: encryptedData.AsSpan(0, IvLength),
+                ciphertext: cipherText,
+                tag: encryptedData.AsSpan(IvLength, TagLength),
+                plaintext: decryptedBytes
+            );
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedBytes, AppJsonSerializerOptions.Default) is { } dict
+                ? new(dict, StringComparer.Ordinal)
+                : null;
+        }
+        catch (Exception ex) when (ex is CryptographicException or JsonException)
+        {
+            return null;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+        }
+    }
+
+    internal static byte[] Encrypt(byte[] key, ReadOnlySpan<byte> plainText)
+    {
+        byte[] result = new byte[IvLength + TagLength + plainText.Length];
+        Span<byte> iv = result.AsSpan(0, IvLength);
+        RandomNumberGenerator.Fill(iv);
+        using AesGcm encryptor = new(key, TagLength);
+        encryptor.Encrypt(
+            nonce: iv,
+            plaintext: plainText,
+            ciphertext: result.AsSpan(IvLength + TagLength),
+            tag: result.AsSpan(IvLength, TagLength)
+        );
+        return result;
     }
 
     private void Save()
@@ -358,29 +478,10 @@ internal sealed class SettingsStore : ISettingsStore
             {
                 Directory.CreateDirectory(directory);
             }
-            byte[] jsonBytes = JsonSerializer.SerializeToUtf8Bytes(this._entries, AppJsonSerializerOptions.Default);
-            int totalSize = IvLength + TagLength + jsonBytes.Length;
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(totalSize);
-            try
-            {
-                Span<byte> result = buffer.AsSpan(0, totalSize);
-                Span<byte> iv = result[..IvLength];
-                RandomNumberGenerator.Fill(iv);
-                using AesGcm encryptor = new(this._key, TagLength);
-                encryptor.Encrypt(
-                    nonce: iv,
-                    plaintext: jsonBytes,
-                    ciphertext: result[(IvLength + TagLength)..],
-                    tag: result.Slice(IvLength, TagLength)
-                );
-                string tempFile = $"{this._filePath}.{Guid.NewGuid():N}.tmp";
-                File.WriteAllBytes(tempFile, buffer[..totalSize]);
-                File.Move(tempFile, this._filePath, overwrite: true);
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            byte[] encrypted = SettingsStore.Encrypt(this._key, JsonSerializer.SerializeToUtf8Bytes(this._entries, AppJsonSerializerOptions.Default));
+            string tempFile = $"{this._filePath}.{Guid.NewGuid():N}.tmp";
+            File.WriteAllBytes(tempFile, encrypted);
+            File.Move(tempFile, this._filePath, overwrite: true);
         }
         catch (Exception ex)
         {
@@ -388,7 +489,21 @@ internal sealed class SettingsStore : ISettingsStore
         }
     }
 
-    private static byte[] DeriveKey(string storeName)
+    /// <summary>
+    /// Derives the encryption key for a single store from the provider's master key.
+    /// </summary>
+    internal static byte[] DeriveKey(byte[] masterKey, string storeName) => HKDF.DeriveKey(
+        HashAlgorithmName.SHA256,
+        masterKey,
+        outputLength: 32,
+        salt: [],
+        info: Encoding.UTF8.GetBytes(string.Concat(typeof(SettingsStore).FullName, ".", storeName))
+    );
+
+    /// <summary>
+    /// The key used by earlier versions, derived only from the machine name. Kept solely to migrate existing files.
+    /// </summary>
+    internal static byte[] DeriveLegacyKey(string storeName)
     {
         byte[] output = new byte[32]; // 256 bits AES key
         ReadOnlySpan<char> password = Environment.MachineName;
