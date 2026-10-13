@@ -52,7 +52,7 @@ public static partial class NetworkMethods
     public static async Task<long?> TryPingAsync(IPAddress address, CancellationToken cancellationToken)
     {
         using Ping ping = new();
-        TaskCompletionSource<long> taskSource = new();
+        TaskCompletionSource<long?> taskSource = new();
         await using (cancellationToken.Register(OnCancellationRequested).ConfigureAwait(false))
         {
             ping.PingCompleted += OnPingCompleted;

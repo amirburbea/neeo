@@ -1,21 +1,43 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Devices;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Server;
 
-public sealed class SdkService(
-    IEnumerable<IDeviceProvider> providers,
+internal sealed class SdkService(
+    Type[] providerTypes,
+    IServiceConfiguration[] serviceConfigurations,
     IConfiguration configuration,
+    IBrainDiscovery discovery,
+    ISdkServerStarter starter,
+    IHostApplicationLifetime applicationLifetime,
     ILogger<SdkService> logger
 ) : BackgroundService
 {
+    private ISdkEnvironment? _environment;
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (this._environment is { } environment)
+            {
+                logger.LogInformation("Stopping server...");
+                await environment.StopAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.UnhandledException -= SdkService.OnAppDomainUnhandledException;
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Brain brain;
@@ -25,18 +47,29 @@ public sealed class SdkService(
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("Brain discovery was cancelled.");
+            logger.LogInformation("Brain discovery was cancelled!");
+            applicationLifetime.StopApplication();
             return;
         }
-        logger.LogInformation("Using Brain {name} at {endpoint}...", brain.HostName, brain.ServiceEndPoint);
-        ISdkEnvironment environment = await brain.StartServerAsync(
-            [.. providers],
-            name: configuration.GetValue<string>("ServerName"),
-            cancellationToken: stoppingToken
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to discover Brain. Shutting down...\n");
+            applicationLifetime.StopApplication();
+            return;
+        }
+        AppDomain.CurrentDomain.UnhandledException += SdkService.OnAppDomainUnhandledException;
+        logger.LogInformation("Using Brain {Name} at {Endpoint}...", brain.HostName, brain.ServiceEndPoint);
+        ISdkEnvironment environment = await starter.StartServerAsync(
+            brain,
+            providerTypes,
+            configuration.GetValue<string>("ServerName"),
+            serviceConfigurations,
+            stoppingToken
         ).ConfigureAwait(false);
-        logger.LogInformation("Started server at address {address}...", environment.HostAddress);
-        stoppingToken.Register(StopServerAsync);
-        logger.LogInformation("Brain WebUI is running at http://{ipAddress}:3200/eui", brain.IPAddress);
+        this._environment = environment;
+        logger.LogInformation("Started server at address {Address}...", environment.HostAddress);
+        logger.LogInformation("Brain WebUI is running at http://{IPAddress}:3200/eui", brain.IPAddress);
+        await Task.Delay(Timeout.Infinite, stoppingToken).ConfigureAwait(false);
 
         async ValueTask<Brain> GetBrainAsync()
         {
@@ -45,17 +78,27 @@ public sealed class SdkService(
                 return new(address);
             }
             logger.LogInformation("Discovering Brain...");
-            if (await Brain.DiscoverOneAsync(cancellationToken: stoppingToken).ConfigureAwait(false) is not { } brain)
+            if (await discovery.DiscoverOneAsync(cancellationToken: stoppingToken).ConfigureAwait(false) is not { } brain)
             {
-                throw new ApplicationException("Failed to discover Brain. (If on Windows, ensure Bonjour 3x is installed).");
+                throw new ApplicationException("Discovery failed, host stopping.");
             }
             return brain;
         }
+    }
 
-        async void StopServerAsync()
-        {
-            logger.LogInformation("Stopping server at address {address}...", environment.HostAddress);
-            await environment.StopAsync(default).ConfigureAwait(false);
-        }
+    private static void OnAppDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
+    {
+        SdkService.PrintException((Exception)e.ExceptionObject, e.IsTerminating);
+    }
+
+    private static void PrintException(Exception exception, bool isTerminating)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"🚨 Unhandled Exception:");
+        Console.WriteLine($"IsTerminating: {isTerminating}");
+        Console.WriteLine($"Type: {exception.GetType().FullName}");
+        Console.WriteLine($"Message: {exception.Message}");
+        Console.WriteLine($"StackTrace:\n{exception.StackTrace}");
+        Console.ResetColor();
     }
 }

@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Utilities.TokenSearch;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -24,7 +23,7 @@ internal sealed class DatabaseController(IDeviceDatabase database) : ControllerB
     }
 
     [HttpGet("search")]
-    public ActionResult<SearchEntry<DeviceModel>[]> Search([FromQuery(Name = "q")] string? query)
+    public ActionResult<DeviceSearchResult[]> Search([FromQuery(Name = "q")] string? query)
     {
         return database.Search(query);
     }

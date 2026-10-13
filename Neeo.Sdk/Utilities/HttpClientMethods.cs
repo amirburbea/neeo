@@ -1,8 +1,8 @@
-﻿using System;
-using System.IO;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,17 +24,19 @@ public static class HttpClientMethods
     /// <param name="uri">The request URI.</param>
     /// <param name="configureRequest">Optional callback that can be used to further configure the request, such as adding request headers.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="options">Optional <see cref="JsonSerializerOptions"/> to use for deserialization.</param>
     /// <returns>A <typeparamref name="TValue"/> representation of the JSON response.</returns>
     public static async Task<TValue> GetAsync<TValue>(
         this HttpClient client,
         Uri uri,
         Action<HttpRequestMessage>? configureRequest = null,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        JsonSerializerOptions? options = null
     ) where TValue : notnull
     {
         using HttpRequestMessage request = HttpClientMethods.CreateRequest(uri, HttpMethod.Get, default, configureRequest);
         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        return await response.DeserializeAsync<TValue>(cancellationToken).ConfigureAwait(false);
+        return await response.DeserializeAsync<TValue>(cancellationToken, options).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -65,15 +67,17 @@ public static class HttpClientMethods
     /// <param name="uri">The request URI.</param>
     /// <param name="configureRequest">Optional callback that can be used to further configure the request, such as adding request headers.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="options">Optional <see cref="JsonSerializerOptions"/> to use for serialization and deserialization.</param>
     /// <returns>A <typeparamref name="TValue"/> representation of the JSON response.</returns>
     public static Task<TValue> PostAsync<TValue>(
         this HttpClient client,
         Uri uri,
         Action<HttpRequestMessage>? configureRequest = null,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        JsonSerializerOptions? options = null
     ) where TValue : notnull
     {
-        return client.PostAsync<object, TValue>(uri, default, configureRequest, cancellationToken);
+        return client.PostAsync<object, TValue>(uri, default, configureRequest, cancellationToken, options);
     }
 
     /// <summary>
@@ -86,25 +90,25 @@ public static class HttpClientMethods
     /// <param name="body">Optional object to be serialized into the request body as JSON, omitted if <c>null</c>.</param>
     /// <param name="configureRequest">Optional callback that can be used to further configure the request, such as adding request headers.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="options">Optional <see cref="JsonSerializerOptions"/> to use for serialization and deserialization.</param>
     /// <returns>A <typeparamref name="TValue"/> representation of the JSON response.</returns>
     public static async Task<TValue> PostAsync<TBody, TValue>(
         this HttpClient client,
         Uri uri,
         TBody? body,
         Action<HttpRequestMessage>? configureRequest = null,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        JsonSerializerOptions? options = null
     ) where TBody : notnull where TValue : notnull
     {
-        using MemoryStream stream = new();
-        if (body is not null)
-        {
-            await JsonSerializer.SerializeAsync(stream, body, JsonSerialization.Options, cancellationToken).ConfigureAwait(false);
-            stream.Position = 0L;
-        }
-        using StreamContent content = new(stream) { Headers = { ContentType = HttpClientMethods._applicationJson } };
-        using HttpRequestMessage request = HttpClientMethods.CreateRequest(uri, HttpMethod.Post, content, configureRequest);
+        using HttpRequestMessage request = HttpClientMethods.CreateRequest(
+            uri,
+            HttpMethod.Post,
+            body == null ? null : JsonContent.Create(body, options: options ?? AppJsonSerializerOptions.Default),
+            configureRequest
+        );
         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        return await response.DeserializeAsync<TValue>(cancellationToken).ConfigureAwait(false);
+        return await response.DeserializeAsync<TValue>(cancellationToken, options).ConfigureAwait(false);
     }
 
     private static HttpRequestMessage CreateRequest(
@@ -125,15 +129,17 @@ public static class HttpClientMethods
         return request;
     }
 
-    private static async Task<TValue> DeserializeAsync<TValue>(this HttpResponseMessage response, CancellationToken cancellationToken = default)
-        where TValue : notnull
+    private static async Task<TValue> DeserializeAsync<TValue>(
+        this HttpResponseMessage response,
+        CancellationToken cancellationToken = default,
+        JsonSerializerOptions? options = null
+    ) where TValue : notnull
     {
         if (!response.IsSuccessStatusCode)
         {
             string contents = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}");
         }
-        using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return (await JsonSerializer.DeserializeAsync<TValue>(stream, JsonSerialization.Options, cancellationToken).ConfigureAwait(false))!;
+        return (await response.Content.ReadFromJsonAsync<TValue>(options ?? AppJsonSerializerOptions.Default, cancellationToken).ConfigureAwait(false))!;
     }
 }

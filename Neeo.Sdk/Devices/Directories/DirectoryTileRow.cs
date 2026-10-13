@@ -7,7 +7,7 @@ namespace Neeo.Sdk.Devices.Directories;
 /// </summary>
 /// <param name="Tiles">The collection of tiles to display.</param>
 internal sealed record DirectoryTileRow(
-    IReadOnlyCollection<DirectoryTile> Tiles
+    IReadOnlyCollection<DirectoryTileData> Tiles
 ) : IDirectoryItem
 {
     DirectoryItemType IDirectoryItem.Type => DirectoryItemType.TileRow;

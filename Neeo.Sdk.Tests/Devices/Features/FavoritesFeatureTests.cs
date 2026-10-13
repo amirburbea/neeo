@@ -19,10 +19,9 @@ public sealed class FavoritesFeatureTests
         mockFavoriteHandler.Setup(handler => handler(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         FavoritesFeature feature = new(mockFavoriteHandler.Object);
-        string deviceId = Guid.NewGuid().ToString();
-        CancellationToken cancellationToken = new();
-        await feature.ExecuteAsync(deviceId, favorite, cancellationToken);
+        string deviceId = Guid.NewGuid().ToString("N");
+        await feature.ExecuteAsync(deviceId, favorite, TestContext.Current.CancellationToken);
 
-        mockFavoriteHandler.Verify(handler => handler(deviceId, favorite, cancellationToken), Times.Once());
+        mockFavoriteHandler.Verify(handler => handler(deviceId, favorite, It.IsAny<CancellationToken>()), Times.Once());
     }
 }

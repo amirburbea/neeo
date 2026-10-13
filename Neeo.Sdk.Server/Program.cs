@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Threading.Tasks;
@@ -22,7 +25,6 @@ public static class Program
         .RunConsoleAsync();
 
     private static void ConfigureAppConfiguration(IHostEnvironment environment, IConfigurationBuilder builder) => builder
-        .AddEnvironmentVariables(prefix: "NEEO_")
         .AddCommandLine(Environment.GetCommandLineArgs()[1..])
         .AddJsonFile("appsettings.json", optional: true)
         .AddJsonFile($"appsettings.{environment.EnvironmentName}.json", optional: true);
@@ -35,7 +37,8 @@ public static class Program
     {
         builder
             .ClearProviders()
-            .AddSimpleConsole(options => options.SingleLine = true);
+            .AddSimpleConsole(options => options.SingleLine = true)
+            .AddFilter((_, name, level) => level >= LogLevel.Information && (name is null || !name.StartsWith(typeof(HttpClient).FullName!)));
         if (!environment.IsProduction())
         {
             builder.AddDebug();
@@ -48,14 +51,16 @@ public static class Program
         {
             throw new ApplicationException("Invalid configuration, configuration should have an array \"Drivers\" with at least one driver assembly.");
         }
-        foreach (string driverPath in driverPaths)
+        List<Type> providerTypes = [];
+        List<IServiceConfiguration> serviceConfigurations = [];
+        foreach (string assemblyPath in driverPaths.Select(Path.GetFullPath))
         {
-            string assemblyPath = Path.GetFullPath(driverPath);
             if (!File.Exists(assemblyPath))
             {
                 throw new FileNotFoundException(assemblyPath);
             }
-            foreach (Type type in Program.LoadAssembly(assemblyPath).GetExportedTypes())
+            DriverAssemblyLoadContext context = new(assemblyPath);
+            foreach (Type type in context.LoadFromAssemblyName(AssemblyName.GetAssemblyName(assemblyPath)).GetExportedTypes())
             {
                 if (!type.IsClass || type.IsAbstract || type.IsGenericTypeDefinition)
                 {
@@ -63,23 +68,27 @@ public static class Program
                 }
                 if (typeof(IDeviceProvider).IsAssignableFrom(type))
                 {
-                    services.Add(new(typeof(IDeviceProvider), type, ServiceLifetime.Singleton));
+                    providerTypes.Add(type);
                 }
                 else if (typeof(IServiceConfiguration).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) is { } constructor)
                 {
-                    ((IServiceConfiguration)constructor.Invoke(null)).ConfigureServices(services);
+                    serviceConfigurations.Add((IServiceConfiguration)constructor.Invoke(null));
                 }
             }
-            services
-                .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
-                .AddHostedService<SdkService>();
         }
-    }
-
-    private static Assembly LoadAssembly(string assemblyPath)
-    {
-        DriverAssemblyLoadContext loadContext = new(assemblyPath);
-        return loadContext.LoadFromAssemblyName(AssemblyName.GetAssemblyName(assemblyPath));
+        serviceConfigurations.Add(new ConfigurationServiceConfiguration(configuration));
+        // Provider types and driver service configurations are handed to SdkService as data, rather than
+        // being registered/applied against this (outer) container - SdkService threads them through to
+        // Brain.StartServerAsync's Type[] overload, which applies them inside the same (inner) container
+        // that hosts IApiClient/IDeviceDatabase/etc., so drivers and the SDK's own services can see each
+        // other via normal constructor injection instead of being split across two disconnected hosts.
+        services
+            .AddSingleton(providerTypes.ToArray())
+            .AddSingleton(serviceConfigurations.ToArray())
+            .AddSingleton<IBrainDiscovery, BrainDiscovery>()
+            .AddSingleton<ISdkServerStarter, SdkServerStarter>()
+            .Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost)
+            .AddHostedService<SdkService>();
     }
 
     private sealed class DriverAssemblyLoadContext(string assemblyPath) : AssemblyLoadContext
@@ -93,5 +102,10 @@ public static class Program
         protected override nint LoadUnmanagedDll(string unmanagedDllName) => this._resolver.ResolveUnmanagedDllToPath(unmanagedDllName) is { } path
             ? this.LoadUnmanagedDllFromPath(path)
             : default;
+    }
+
+    private sealed class ConfigurationServiceConfiguration(IConfiguration configuration) : IServiceConfiguration
+    {
+        public void ConfigureServices(IServiceCollection services) => services.AddSingleton(configuration);
     }
 }

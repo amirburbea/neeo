@@ -3,8 +3,8 @@
 namespace Neeo.Sdk.Utilities;
 
 /// <summary>
-/// When implemented in libraries loaded in the integration server <c>Neeo.Sdk.Server</c>,
-/// will be invoked before startup to allow for registering dependencies.
+/// When implemented in libraries loaded in the integration server <c>Neeo.Sdk.Server</c>, will
+/// be invoked before startup to allow for registering dependencies.
 /// </summary>
 public interface IServiceConfiguration
 {

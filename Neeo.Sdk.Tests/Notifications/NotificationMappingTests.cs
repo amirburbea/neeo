@@ -16,12 +16,11 @@ using Entry = NotificationMapping.Entry;
 
 public sealed class NotificationMappingTests
 {
-    private static readonly Entry[] _entries =
-    [
-        new("key0", Name: "name0", Label: "name1"),
-        new("key1", Name: "name1", Label: "name1"),
-        new("key2", Name: "name2", Label: "label2"),
-        new("key3", Name: "name3", Label: "label2"),
+    private static readonly Entry[] _entries = [
+        new("key0", Name: "name0"),
+        new("key1", Name: "name1"),
+        new("key2", Name: "name2"),
+        new("key3", Name: "name3"),
     ];
 
     private readonly NotificationMapping _notificationMapping;
@@ -34,8 +33,8 @@ public sealed class NotificationMappingTests
         List<string> paths = [];
         Mock<IApiClient> mockClient = new(MockBehavior.Strict);
         mockClient
-            .Setup(client => client.GetAsync(Capture.In(paths), It.IsAny<Func<Entry[], It.IsAnyType>>(), It.IsAny<CancellationToken>()))
-            .ReturnsTransformOf(NotificationMappingTests._entries);
+            .Setup(client => client.GetAsync<Entry[]>(Capture.In(paths), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(NotificationMappingTests._entries);
         this._path = new(() => paths.Single());
         this._notificationMapping = new(mockClient.Object, mockEnvironment.Object, NullLogger<NotificationMapping>.Instance);
     }
@@ -46,14 +45,6 @@ public sealed class NotificationMappingTests
         var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "name1");
 
         Assert.Equal("key1", keys.Single());
-    }
-
-    [Fact]
-    public async Task Should_get_keys_via_fallback_to_label_when_not_matching_by_name()
-    {
-        var keys = await this.GetNotificationKeysAsync(string.Empty, string.Empty, "label2");
-
-        Assert.Equal<string>(["key2", "key3"], keys);
     }
 
     [Fact]
@@ -69,7 +60,7 @@ public sealed class NotificationMappingTests
         Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
-        return this._notificationMapping.GetNotificationKeysAsync(mockAdapter.Object, deviceId, componentName, default);
+        return this._notificationMapping.GetNotificationKeysAsync(mockAdapter.Object, deviceId, componentName, CancellationToken.None);
     }
 
     private static class Constants

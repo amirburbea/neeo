@@ -5,3 +5,4 @@
 /// </summary>
 /// <param name="Registered">A value indicating if registration was previously performed.</param>
 public readonly record struct IsRegisteredResponse(bool Registered);
+

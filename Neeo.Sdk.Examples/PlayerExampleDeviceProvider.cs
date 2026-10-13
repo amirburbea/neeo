@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
@@ -104,10 +104,6 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
         public IDeviceNotifier? Notifier { get; set; }
 
-        string? IPlayerWidgetController.QueueDirectoryLabel { get; }
-
-        string? IPlayerWidgetController.RootDirectoryLabel { get; }
-
         public Task<string> GetCoverArtAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<string>(PlayerKey.CoverArt);
 
         public Task<string> GetDescriptionAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<string>(PlayerKey.Description);
@@ -137,23 +133,12 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             _ => Task.CompletedTask,
         };
 
-        Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
-        {
-            // Queue is not supported for this demo.
-            return Task.CompletedTask;
-        }
-
         public Task HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
         {
             return Enum.TryParse(actionIdentifier, out Pet pet) ? this.ChangeTrackAsync(deviceId, pet) : Task.CompletedTask;
         }
 
-        Task IPlayerWidgetController.BrowseQueueDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task BrowseRootDirectoryAsync(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+        public Task BrowseRootDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
             {

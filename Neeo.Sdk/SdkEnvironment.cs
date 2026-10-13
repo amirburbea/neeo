@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.Hosting;
 
 namespace Neeo.Sdk;
 
@@ -12,12 +13,19 @@ namespace Neeo.Sdk;
 public interface ISdkEnvironment
 {
     /// <summary>
+    /// The NEEO Brain for the integration server.
+    /// </summary>
+    IBrain Brain { get; }
+
+    /// <summary>
     /// The host server address.
     /// </summary>
     string HostAddress { get; }
 
     /// <summary>
     /// The encoded SDK adapter name as registered on the NEEO Brain.
+    /// 
+    /// 
     /// </summary>
     string SdkAdapterName { get; }
 
@@ -31,12 +39,20 @@ public interface ISdkEnvironment
 
 internal sealed class SdkEnvironment(
     SdkAdapterName sdkAdapterName,
-    IServer server
+    IBrain brain,
+    IServer server,
+    IHost host
 ) : ISdkEnvironment
 {
-    public string HostAddress => server.Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+    public IBrain Brain => brain;
+
+    public string HostAddress => server.Features.Get<IServerAddressesFeature>()?.Addresses?.FirstOrDefault() ?? string.Empty;
 
     public string SdkAdapterName { get; } = (string)sdkAdapterName;
 
-    public Task StopAsync(CancellationToken cancellationToken) => server.StopAsync(cancellationToken);
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await server.StopAsync(cancellationToken).ConfigureAwait(false);
+        await host.StopAsync(cancellationToken).ConfigureAwait(false);
+    }
 }

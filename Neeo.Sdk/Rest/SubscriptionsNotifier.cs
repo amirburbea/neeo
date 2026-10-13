@@ -29,7 +29,7 @@ internal sealed class SubscriptionsNotifier(
                 return;
             }
             logger.LogInformation("Notifying subscriptions for {Manufacturer} {DeviceName}...", adapter.Manufacturer, adapter.DeviceName);
-            string path = string.Format(UrlPaths.SubscriptionsFormat, environment.SdkAdapterName, adapter.AdapterName);
+            string path = string.Format(BrainUrlPaths.SubscriptionsFormat, environment.SdkAdapterName, adapter.AdapterName);
             string[] deviceIds = await client.GetAsync<string[]>(path, cancellationToken).ConfigureAwait(false);
             await feature.NotifyDeviceListAsync(deviceIds, cancellationToken).ConfigureAwait(false);
         }

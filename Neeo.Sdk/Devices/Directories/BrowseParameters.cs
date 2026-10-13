@@ -7,7 +7,7 @@
 /// <param name="Limit">The expected limit of the number of items to provide.</param>
 /// <param name="Offset">The pagination offset to use.</param>
 public readonly record struct BrowseParameters(
-    string? BrowseIdentifier = default,
+    string BrowseIdentifier = "",
     int Limit = Constants.MaxItems,
-    int? Offset = default
+    int Offset = 0
 );

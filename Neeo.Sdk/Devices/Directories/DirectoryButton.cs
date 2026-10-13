@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Directories;
@@ -24,7 +23,7 @@ public enum DirectoryButtonIcon
 }
 
 /// <summary>
-/// Defines a button in a directory.
+/// Parameters describing a button to add to a directory.
 /// </summary>
 /// <param name="Text">The text for the button.</param>
 /// <param name="Icon">Optional, standard button icon (only for Repeat and Shuffle).</param>
@@ -33,15 +32,8 @@ public enum DirectoryButtonIcon
 /// <param name="UIAction">The (optional) standardized directory UI action.</param>
 public sealed record class DirectoryButton(
     string Text,
-    [property: JsonPropertyName("iconName")] DirectoryButtonIcon? Icon = default,
+    DirectoryButtonIcon? Icon = default,
     bool? Inverse = null,
     string? ActionIdentifier = null,
     DirectoryUIAction? UIAction = null
-) : ClickableDirectoryItem(ActionIdentifier, UIAction)
-{
-    /// <summary>
-    /// Tells the NEEO Brain that this is a Button.
-    /// </summary>
-    [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
-    public bool IsButton { get; } = true;
-}
+);

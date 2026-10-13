@@ -18,7 +18,7 @@ public interface IDeviceAdapter
     /// <summary>
     /// Gets the collection of device components.
     /// </summary>
-    IReadOnlyCollection<IComponent> Components { get; }
+    IReadOnlyCollection<Component> Components { get; }
 
     /// <summary>
     /// Gets the collection of unique capabilities of the device.
@@ -103,7 +103,7 @@ public interface IDeviceAdapter
 
 internal readonly record struct DeviceAdapter(
     string AdapterName,
-    IReadOnlyCollection<IComponent> Components,
+    IReadOnlyCollection<Component> Components,
     IReadOnlyDictionary<string, IFeature> Features,
     IReadOnlyCollection<DeviceCapability> DeviceCapabilities,
     string DeviceName,

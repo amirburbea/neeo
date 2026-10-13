@@ -34,22 +34,18 @@ internal sealed class BrainRecipes(
 {
     public Task<string[]> GetActiveRecipeKeysAsync(CancellationToken cancellationToken)
     {
-        return client.GetAsync<string[]>(UrlPaths.ActiveRecipes, cancellationToken);
+        return client.GetAsync<string[]>(BrainUrlPaths.ActiveRecipes, cancellationToken);
     }
 
     public async Task<IRecipe[]> GetAllRecipesAsync(CancellationToken cancellationToken)
     {
-        return await client.GetAsync(
-            UrlPaths.RecipeDefinitions,
-            (RecipeDefinition[] definitions) => Array.ConvertAll(
-                definitions,
-                definition => new Recipe(definition, client)
-            ),
-            cancellationToken
-        );
+        RecipeDefinition[] definitions = await client
+            .GetAsync<RecipeDefinition[]>(BrainUrlPaths.RecipeDefinitions, cancellationToken)
+            .ConfigureAwait(false);
+        return Array.ConvertAll(definitions, definition => new Recipe(definition, client));
     }
 
-    private sealed class Recipe(
+    internal sealed class Recipe(
         RecipeDefinition recipe,
         IApiClient client
     ) : IRecipe
@@ -72,31 +68,26 @@ internal sealed class BrainRecipes(
 
         public string Type => recipe.Type;
 
-        public Task<bool> GetPowerStateAsync(CancellationToken cancellationToken) => client.GetAsync(
-            recipe.Urls.GetPowerState,
-            (JsonElement element) => element.GetProperty("active").GetBoolean(),
-            cancellationToken
-        );
+        public async Task<bool> GetPowerStateAsync(CancellationToken cancellationToken)
+        {
+            JsonElement element = await client
+                .GetAsync<JsonElement>(recipe.Urls.GetPowerState, cancellationToken)
+                .ConfigureAwait(false);
+            return element.GetProperty("active").GetBoolean();
+        }
 
         public Task PowerOffAsync(CancellationToken cancellationToken) => recipe.Urls.SetPowerOff switch
         {
-            { } url => client.GetAsync(url, EmptyObject.Transform, cancellationToken),
+            { } url => client.GetAsync<EmptyObject>(url, cancellationToken),
             _ => throw new NotSupportedException("Recipe can not be powered off."),
         };
 
-        public Task PowerOnAsync(CancellationToken cancellationToken) => client.GetAsync(
-            recipe.Urls.SetPowerOn,
-            EmptyObject.Transform,
-            cancellationToken
-        );
+        public Task PowerOnAsync(CancellationToken cancellationToken) => client.GetAsync<JsonElement>(recipe.Urls.SetPowerOn, cancellationToken);
 
-        private readonly struct EmptyObject
-        {
-            public static readonly Func<EmptyObject, object?> Transform = _ => null;
-        }
+        internal readonly struct EmptyObject { }
     }
 
-    private readonly record struct RecipeDefinition(
+    internal readonly record struct RecipeDefinition(
         bool IsCustom,
         bool IsPoweredOn,
         string Uid,
@@ -106,7 +97,7 @@ internal sealed class BrainRecipes(
         [property: JsonPropertyName("url")] RecipeUrls Urls
      );
 
-    private readonly record struct RecipeDetail(
+    internal readonly record struct RecipeDetail(
         [property: JsonPropertyName("devicename")] string DeviceName,
         [property: JsonPropertyName("roomname")] string RoomName,
         [property: JsonPropertyName("devicetype")] DeviceType DeviceType,
@@ -114,7 +105,7 @@ internal sealed class BrainRecipes(
         string? Manufacturer = null
     );
 
-    private readonly record struct RecipeUrls(
+    internal readonly record struct RecipeUrls(
         string GetPowerState,
         string SetPowerOn,
         string? SetPowerOff = null

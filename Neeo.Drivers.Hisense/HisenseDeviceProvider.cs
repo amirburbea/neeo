@@ -49,11 +49,10 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
     private readonly HashSet<string> _deviceIds = [];
     private HisenseTV[] _candidates = [];
     private bool _connected;
-    private IDeviceBuilder? _deviceBuilder;
     private IDeviceNotifier? _notifier;
     private HisenseTV? _tv;
 
-    public IDeviceBuilder DeviceBuilder => this._deviceBuilder ??= Device.Create(Constants.DeviceName, DeviceType.TV)
+    public IDeviceBuilder DeviceBuilder => field ??= Device.Create(Constants.DeviceName, DeviceType.TV)
         .SetManufacturer(Constants.Manufacturer)
         .SetSpecificName($"{Constants.Manufacturer} {Constants.DeviceName}")
         .AddButtonHandler(this.OnButtonPressed)
@@ -88,19 +87,19 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
 
     private static Task NotifyStateAsync(IDeviceNotifier notifier, HisenseTV tv, IState state) => notifier.SendNotificationAsync("STATE", state.ToString(), tv.DeviceId);
 
-    private async Task BrowseApps(string deviceId, DirectoryBuilder list, CancellationToken cancellationToken)
+    private async Task BrowseApps(string deviceId, IDirectoryBuilder list, CancellationToken cancellationToken)
     {
         if (this._tv is not { } tv)
         {
             return;
         }
-        list.AddTileRow(new DirectoryTile("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png"));
+        list.AddTileRow([new("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png")]);
         AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync(cancellationToken).ConfigureAwait(false), static app => !app.IsUninstalled);
         Array.Sort(apps, (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
-        (_, int limit, int? offset) = list.Parameters;
+        (_, int limit, int offset) = list.Parameters;
         if (offset is > 0 && limit < apps.Length)
         {
-            int start = offset ?? 0;
+            int start = offset;
             apps = apps[start..(start + limit)];
         }
         foreach ((string name, string url, _) in apps)

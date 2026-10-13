@@ -1,38 +1,28 @@
-﻿using Neeo.Sdk.Utilities;
+﻿using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Neeo.Sdk.Devices.Components;
 
 /// <summary>
 /// Describes a device sensor.
 /// </summary>
-public interface ISensorComponent : IComponent
-{
-    /// <summary>
-    /// Gets the sensor details.
-    /// </summary>
-    ISensorDetails Sensor { get; }
-}
-
-internal sealed record class SensorComponent(
+public sealed record class SensorComponent(
     string Name,
     string Label,
     string Path,
-    ISensorDetails Sensor
-) : Component(ComponentType.Sensor, Name, Label, Path), ISensorComponent
-{
-    public const string ComponentSuffix = "_SENSOR";
-}
+    SensorDetails Sensor
+) : Component(ComponentType.Sensor, Name, Label, Path);
 
 /// <summary>
 /// Describes the details of a sensor.
 /// </summary>
-[JsonDirectSerialization<ISensorDetails>]
-public interface ISensorDetails
-{
-    /// <summary>
-    /// Gets the type of the sensor.
-    /// </summary>
-    SensorType Type { get; }
-}
+[JsonDerivedType(typeof(RangeSensorDetails))]
+public record class SensorDetails(SensorType Type);
 
-internal record class SensorDetails(SensorType Type) : ISensorDetails;
+/// <summary>
+/// Describes the details of a range sensor.
+/// </summary>
+public sealed record class RangeSensorDetails(
+    IReadOnlyCollection<double> Range,
+    string Unit
+) : SensorDetails(SensorType.Range);

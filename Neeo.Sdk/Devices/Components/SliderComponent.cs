@@ -1,22 +1,29 @@
-﻿namespace Neeo.Sdk.Devices.Components;
+﻿using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace Neeo.Sdk.Devices.Components;
 
 /// <summary>
 /// Describes a slider component.
 /// </summary>
-public interface ISliderComponent : IComponent
-{
-    /// <summary>
-    /// Gets the details of the slider.
-    /// </summary>
-    ISliderDetails Slider { get; }
-}
-
-internal sealed record class SliderComponent(
+public sealed record class SliderComponent(
     string Name,
     string? Label,
     string Path,
     SliderDetails Slider
-) : Component(ComponentType.Slider, Name, Label, Path), ISliderComponent
+) : Component(ComponentType.Slider, Name, Label, Path);
+
+/// <summary>
+/// Describes the details of a slider.
+/// </summary>
+public readonly record struct SliderDetails(
+    IReadOnlyCollection<double> Range,
+    string Unit,
+    [property: JsonPropertyName("sensor")] string SensorName
+)
 {
-    ISliderDetails ISliderComponent.Slider => this.Slider;
+    /// <summary>
+    /// Gets the type (a constant - "range").
+    /// </summary>
+    public string Type { get; } = "range";
 }

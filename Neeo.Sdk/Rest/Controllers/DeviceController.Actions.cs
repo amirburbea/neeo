@@ -1,11 +1,11 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Devices.Directories;
+using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest.Controllers;
@@ -25,17 +25,17 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        logger.LogInformation("Execute {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
+        logger.LogInformation("Execute {Type}:{Component} on {Name}:{Id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
             IFavoritesFeature favoritesFeature => this.Ok(await favoritesFeature.ExecuteAsync(
                 deviceId,
-                parameters.GetProperty("favoriteId").GetString()!,
+                parameters.Deserialize<FavoritePayload>(AppJsonSerializerOptions.Default).FavoriteId,
                 cancellationToken
             )),
             IDirectoryFeature directoryFeature => this.Ok(await directoryFeature.BrowseAsync(
                 deviceId,
-                parameters.Deserialize<BrowseParameters>(JsonSerialization.Options),
+                parameters.Deserialize<BrowseParameters>(AppJsonSerializerOptions.Default),
                 cancellationToken
             )),
             _ => this.NotFound(),
@@ -54,11 +54,17 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        logger.LogInformation("Get {type}:{component} on {name}:{id}", feature.Type, componentName, adapter.DeviceName, deviceId);
+        logger.LogInformation("Get {Type}:{Component} on {Name}:{Id}", feature.Type, componentName, adapter.DeviceName, deviceId);
         return feature switch
         {
-            IButtonFeature buttonFeature => this.Ok(await buttonFeature.ExecuteAsync(deviceId, cancellationToken)),
-            IValueFeature valueFeature => this.Ok(await valueFeature.GetValueAsync(deviceId, cancellationToken)),
+            IButtonFeature buttonFeature => this.Ok(await buttonFeature.ExecuteAsync(
+                deviceId,
+                cancellationToken
+            )),
+            IValueFeature valueFeature => this.Ok(await valueFeature.GetValueAsync(
+                deviceId,
+                cancellationToken
+            )),
             _ => this.NotFound(),
         };
     }
@@ -68,7 +74,7 @@ internal partial class DeviceController
         string adapterName,
         string componentName,
         string deviceId,
-        [FromBody] DirectoryAction action,
+        [FromBody] DirectoryActionPayload action,
         CancellationToken cancellationToken
     )
     {
@@ -76,7 +82,7 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        logger.LogInformation("Perform directory action {action} on {name}:{id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
+        logger.LogInformation("Perform directory action {Action} on {Name}:{Id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
         return await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier, cancellationToken);
     }
 
@@ -93,7 +99,7 @@ internal partial class DeviceController
         {
             return this.NotFound();
         }
-        logger.LogInformation("Set {component} value to {value} on {name}:{id}", componentName, value, adapter.DeviceName, deviceId);
+        logger.LogInformation("Set {Component} value to {Value} on {Name}:{Id}", componentName, value, adapter.DeviceName, deviceId);
         return await valueFeature.SetValueAsync(deviceId, value, cancellationToken);
     }
 
@@ -121,7 +127,7 @@ internal partial class DeviceController
         return default;
     }
 
-    public readonly record struct DirectoryAction(string ActionIdentifier);
+    public readonly record struct DirectoryActionPayload(string ActionIdentifier);
 
-    private readonly record struct Favorite(string FavoriteId);
+    public readonly record struct FavoritePayload(string FavoriteId);
 }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
@@ -24,9 +23,9 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private static Task Browse(string deviceId, DirectoryBuilder builder, CancellationToken cancellationToken)
+    private static Task Browse(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
-        int offset = builder.Parameters.Offset ?? 0;
+        int offset = builder.Parameters.Offset;
         int limit = builder.Parameters.Limit;
         if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
         {

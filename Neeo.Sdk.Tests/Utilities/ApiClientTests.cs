@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,7 +53,7 @@ public sealed class ApiClientTests : IDisposable
     {
         this.SetupJsonResponse(data);
 
-        Assert.Equal(data.Length, await this._client.GetAsync("/", static (string text) => text.Length));
+        Assert.Equal(data.Length, (await this._client.GetAsync<string>("/", TestContext.Current.CancellationToken)).Length);
     }
 
     [Fact]
@@ -60,7 +61,7 @@ public sealed class ApiClientTests : IDisposable
     {
         var lazy = this.SetupJsonResponse(new object());
 
-        await this._client.GetAsync("/", IdentityFunction.For<object>());
+        await this._client.GetAsync<object>("/", TestContext.Current.CancellationToken);
 
         var (request, requestBody) = lazy.Value;
         Assert.Equal("GET", request.Method.Method);
@@ -73,12 +74,12 @@ public sealed class ApiClientTests : IDisposable
         var body = new { A = "123" };
         var lazy = this.SetupJsonResponse(new SuccessResponse(true));
 
-        _ = this._client.PostAsync("/", body);
+        _ = this._client.PostAsync("/", body, TestContext.Current.CancellationToken);
 
         var (request, requestBody) = lazy.Value;
         Assert.Equal("POST", request.Method.Method);
         Assert.NotNull(requestBody);
-        Assert.Equal(JsonSerializer.Serialize(body, JsonSerialization.Options), requestBody);
+        Assert.Equal(JsonSerializer.Serialize(body, JsonSerializerOptions.Web), requestBody);
     }
 
     [Theory]
@@ -89,16 +90,35 @@ public sealed class ApiClientTests : IDisposable
     {
         var lazy = this.SetupJsonResponse(new object());
 
-        _ = this._client.GetAsync(path, IdentityFunction.For<object>());
+        _ = this._client.GetAsync<object>(path, TestContext.Current.CancellationToken);
 
         var (request, _) = lazy.Value;
         Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri!.ToString());
     }
 
     [Fact]
-    public Task Requests_should_throw_on_path_without_preceding_slash() => Assert.ThrowsAsync<ArgumentException>(
-        () => this._client.GetAsync("path_without_preceding_slash", IdentityFunction.For<object>())
-    );
+    public async Task IsAliveAsync_should_return_true_when_response_is_success()
+    {
+        this.SetupJsonResponse(new { firmwareVersion = "0.53.0" });
+
+        bool isAlive = await this._client.IsAliveAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(isAlive);
+    }
+
+    [Fact]
+    public async Task IsAliveAsync_should_return_false_when_request_throws()
+    {
+        this._mockMessageHandler
+            .Protected()
+            .As<IMessageHandlerMockedMethods>()
+            .Setup(handler => handler.SendAsync(It.IsAny<HttpRequestMessage>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        bool isAlive = await this._client.IsAliveAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(isAlive);
+    }
 
     private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)
     {
@@ -114,24 +134,8 @@ public sealed class ApiClientTests : IDisposable
                 {
                     requestBody = await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 }
-                return new()
-                {
-                    Content = new StringContent(JsonSerializer.Serialize(data, JsonSerialization.Options))
-                };
+                return new() { Content = JsonContent.Create(data) };
             });
         return new(() => (captured.Single(), requestBody));
-    }
-
-    internal static class IdentityFunction
-    {
-        /// <summary>
-        /// Gets an identity function for items of type <typeparamref name="TItem"/>.
-        /// </summary>
-        public static Func<TItem, TItem> For<TItem>() => Identity<TItem>.Function;
-
-        private static class Identity<TItem>
-        {
-            public static readonly Func<TItem, TItem> Function = item => item;
-        }
-    }
+    }    
 }

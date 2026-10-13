@@ -13,13 +13,13 @@ internal sealed class UriPrefixNotifier(IDeviceDatabase database, ISdkEnvironmen
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        Parallel.ForEach(database.Adapters, new() { CancellationToken = cancellationToken }, adapter =>
+        foreach (IDeviceAdapter adapter in database.Adapters)
         {
             if (adapter.UriPrefixCallback is { } callback)
             {
                 callback($"{environment.HostAddress}/device/{adapter.AdapterName}/custom/");
             }
-        });
+        }
         return Task.CompletedTask;
     }
 

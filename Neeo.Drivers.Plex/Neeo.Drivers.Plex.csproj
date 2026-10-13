@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <OutputType>Library</OutputType>
+    <Platforms>AnyCPU;ARM32</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Images\movie.jpg" />
+    <None Remove="Images\music.jpg" />
+    <None Remove="Images\plex_logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Images\menu.jpg" />
+    <EmbeddedResource Include="Images\movie.jpg" />
+    <EmbeddedResource Include="Images\music.jpg" />
+    <EmbeddedResource Include="Images\plex_logo.png" />
+    <EmbeddedResource Include="Images\player.jpg" />
+    <EmbeddedResource Include="Images\tv_show.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="PlexServer.*.cs">
+	  <DependentUpon>PlexServer.cs</DependentUpon>
+	</Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Reactive" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj">
+		<Private>false</Private>
+		<ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

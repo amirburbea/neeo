@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Exceptions;
 using Neeo.Sdk.Utilities;
 
@@ -27,7 +27,7 @@ public sealed class HisenseTV : IDisposable
 
     private Connection? _connection;
     private bool _isDisposed;
-    private PeriodicTimer? _reconnectTimer;
+    private ReconnectLoop? _reconnectLoop;
 
     private HisenseTV(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
     {
@@ -153,9 +153,9 @@ public sealed class HisenseTV : IDisposable
     public void Dispose()
     {
         this._isDisposed = true;
-        if (Interlocked.Exchange(ref this._reconnectTimer, default) is { } timer)
+        if (Interlocked.Exchange(ref this._reconnectLoop, default) is { } loop)
         {
-            timer.Dispose();
+            loop.Dispose();
         }
         using Connection? connection = Interlocked.Exchange(ref this._connection, null);
         if (connection != null)
@@ -263,20 +263,14 @@ public sealed class HisenseTV : IDisposable
 
     private void StartReconnectTimer()
     {
-        this._reconnectTimer = new(TimeSpan.FromSeconds(14d));
-        _ = Task.Factory.StartNew(
-            async () =>
-            {
-                while (await this._reconnectTimer.WaitForNextTickAsync().ConfigureAwait(false))
-                {
-                    if (await this.TryConnectAsync().ConfigureAwait(false))
-                    {
-                        break;
-                    }
-                }
-            },
-            TaskCreationOptions.LongRunning
-        ).ContinueWith(_ => Interlocked.Exchange(ref this._reconnectTimer, default)?.Dispose(), TaskContinuationOptions.ExecuteSynchronously);
+        ReconnectLoop loop = new(TimeSpan.FromSeconds(14d), TimeSpan.FromMinutes(2d), this.TryConnectAsync, this._logger);
+        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is not null)
+        {
+            // A reconnect loop is already running - don't start a second one.
+            loop.Dispose();
+            return;
+        }
+        loop.Start();
     }
 
     private async Task<bool> TryConnectAsync(CancellationToken cancellationToken = default)
@@ -293,9 +287,11 @@ public sealed class HisenseTV : IDisposable
         connection.Disconnected += this.Connection_Disconnected;
         connection.VolumeChanged += this.Connection_VolumeChanged;
         connection.StateChanged += this.Connection_StateChanged;
-        if (Interlocked.Exchange(ref this._reconnectTimer, default) is { } timer)
+        if (Interlocked.Exchange(ref this._reconnectLoop, default) is { } loop)
         {
-            timer.Dispose();
+            // A direct call to TryConnectAsync succeeded while a background reconnect loop was still
+            // running (e.g. triggered by a getter method rather than the loop's own next tick) - stop it.
+            loop.Dispose();
         }
         this.Connected?.Invoke(this, EventArgs.Empty);
         return true;
@@ -303,7 +299,7 @@ public sealed class HisenseTV : IDisposable
 
     private sealed class Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix) : IDisposable
     {
-        private static readonly MqttFactory _clientFactory = new();
+        private static readonly MqttClientFactory _clientFactory = new();
         private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
         private readonly IMqttClient _client = Connection._clientFactory.CreateMqttClient();
 
@@ -485,7 +481,7 @@ public sealed class HisenseTV : IDisposable
         private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             string topic = e.ApplicationMessage.Topic;
-            string payload = e.ApplicationMessage.PayloadSegment is { } bytes ? Encoding.UTF8.GetString(bytes) : string.Empty;
+            string payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
             logger.LogInformation("Received message '{payload}' to topic '{topic}'.", payload, topic);
             this.MessageReceived?.Invoke(this, new((topic, payload)));
             switch (topic)

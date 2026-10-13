@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,19 +23,6 @@ public interface IApiClient
         where TData : notnull;
 
     /// <summary>
-    /// Asynchronously fetch data via a GET request to an endpoint on the Brain at the specified API
-    /// <paramref name="path"/> and return the output of the specified <paramref name="transform"/>.
-    /// </summary>
-    /// <typeparam name="TData">The type of data to deserialize from the response.</typeparam>
-    /// <typeparam name="TOutput">The output type of the transform.</typeparam>
-    /// <param name="path">The API path on the NEEO Brain.</param>
-    /// <param name="transform">The transformation to run on the data.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
-        where TData : notnull;
-
-    /// <summary>
     /// Asynchronously fetch data via a POST request to an endpoint on the Brain at the specified API
     /// <paramref name="path"/> and return the a value indicating success.
     ///
@@ -48,6 +35,13 @@ public interface IApiClient
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
         where TBody : notnull;
+
+    /// <summary>
+    /// Asynchronously probes the NEEO Brain to verify it is reachable and responsive.
+    /// </summary>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see langword="true"/> if the Brain responded successfully; otherwise <see langword="false"/>.</returns>
+    Task<bool> IsAliveAsync(CancellationToken cancellationToken = default);
 }
 
 internal sealed class ApiClient(
@@ -56,37 +50,53 @@ internal sealed class ApiClient(
     ILogger<ApiClient> logger
 ) : IApiClient
 {
+    private readonly Uri _baseUri = new($"http://{brain.ServiceEndPoint}");
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(ApiClient));
-    private readonly string _uriPrefix = $"http://{brain.ServiceEndPoint}";
 
-    Task<TData> IApiClient.GetAsync<TData>(string path, CancellationToken cancellationToken) => this.GetAsync(path, static (TData data) => data, cancellationToken);
-
-    public async Task<TOutput> GetAsync<TData, TOutput>(string path, Func<TData, TOutput> transform, CancellationToken cancellationToken = default)
+    public Task<TData> GetAsync<TData>(string path, CancellationToken cancellationToken = default)
         where TData : notnull
     {
-        Uri uri = this.GetUri(path);
-        logger.LogInformation("Making GET request to {uri}...", uri);
-        TData data = await this._httpClient.GetAsync<TData>(uri, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return transform(data);
+        UriBuilder builder = new(this._baseUri) {Path = path};
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Making GET request to {uri}...", builder.Uri);
+        }
+        return this._httpClient.GetAsync<TData>(builder.Uri, cancellationToken: cancellationToken);
     }
 
     public async Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
         where TBody : notnull
     {
-        Uri uri = this.GetUri(path);
-        logger.LogInformation("Making POST request to {uri}...", uri);
-        SuccessResponse response = await this._httpClient.PostAsync<TBody, SuccessResponse>(uri, body, cancellationToken: cancellationToken).ConfigureAwait(false);
+        UriBuilder builder = new(this._baseUri) { Path = path };
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Making POST request to {uri}...", builder.Uri);
+        }
+        SuccessResponse response = await this._httpClient
+            .PostAsync<TBody, SuccessResponse>(builder.Uri, body, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
         return response.Success;
     }
 
-    private Uri GetUri(string path)
+    public async Task<bool> IsAliveAsync(CancellationToken cancellationToken = default)
     {
-        if (path.StartsWith("http"))
+        try
         {
-            return new(path);
+            UriBuilder builder = new(this._baseUri) { Path = BrainUrlPaths.SystemInfo };
+            using HttpResponseMessage response = await this._httpClient.GetAsync(
+                builder.Uri,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken
+            ).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
         }
-        return path.StartsWith('/')
-            ? new(this._uriPrefix + path)
-            : throw new ArgumentException("Path must start with a forward slash (\"/\").", nameof(path));
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

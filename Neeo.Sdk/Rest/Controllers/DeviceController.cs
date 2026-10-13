@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
-using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Neeo.Sdk.Rest.Controllers;
 
@@ -11,7 +10,7 @@ namespace Neeo.Sdk.Rest.Controllers;
 internal sealed partial class DeviceController(
     IDeviceDatabase database,
     IDynamicDeviceRegistry dynamicDeviceRegistry,
-    PgpKeyPair pgpKeys,
+    IPgpEncryption pgpEncryption,
     ILogger<DeviceController> logger
 ) : ControllerBase
 {

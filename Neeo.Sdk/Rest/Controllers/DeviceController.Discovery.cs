@@ -38,7 +38,7 @@ internal partial class DeviceController
         return dynamicDevices;
     }
 
-    public readonly record struct DynamicDiscoveredDevice(
+    internal readonly record struct DynamicDiscoveredDevice(
         string Id,
         string Name,
         bool? Reachable,
@@ -46,7 +46,7 @@ internal partial class DeviceController
         DynamicDevice Device
     );
 
-    public readonly struct DynamicDevice(IDeviceAdapter adapter)
+    internal readonly struct DynamicDevice(IDeviceAdapter adapter)
     {
         public string AdapterName { get; } = adapter.AdapterName;
 
@@ -54,7 +54,7 @@ internal partial class DeviceController
         public string ApiVersion { get; } = "1.0";
 
         [JsonPropertyName("capabilities")]
-        public IReadOnlyCollection<IComponent> Components { get; } = adapter.Components;
+        public IReadOnlyCollection<Component> Components { get; } = adapter.Components;
 
         public IReadOnlyCollection<DeviceCapability> DeviceCapabilities { get; } = adapter.DeviceCapabilities;
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
@@ -8,7 +8,6 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -24,40 +23,52 @@ namespace Neeo.Sdk.Rest;
 internal static class Server
 {
     public static async Task<IHost> StartSdkAsync(
-        IBrain brain,
-        IReadOnlyCollection<IDeviceBuilder> devices,
+        Brain brain,
+        Func<IServiceProvider, IReadOnlyCollection<IDeviceBuilder>> devices,
         string adapterName,
         IPAddress hostAddress,
         int port,
-        Action<HostBuilderContext, ILoggingBuilder>? configureLogging,
-        CancellationToken cancellationToken
+        IServiceConfiguration[]? serviceConfigurations = default,
+        Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
+        CancellationToken cancellationToken = default
     )
     {
         IHost host = new HostBuilder()
             .ConfigureWebHostDefaults(builder => Server.ConfigureWebHostDefaults(builder, hostAddress, port))
             .ConfigureLogging(configureLogging ?? Server.ConfigureLoggingDefaults)
             .ConfigureServices(Server.ConfigureHttpClient)
-            .ConfigureServices(services => Server.ConfigureServices(services, brain, devices, adapterName))
+            .ConfigureServices(services => Server.ConfigureServices(services, brain, devices, adapterName, serviceConfigurations))
             .Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
         return host;
     }
 
-    private static void ConfigureHttpClient(IServiceCollection services) => services
-        .AddHttpClient(nameof(ApiClient))
-        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
+    private static void ConfigureHttpClient(IServiceCollection services)
+    {
+        void AddBrainClient(string name) => services
+            .AddHttpClient(name)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
+
+        AddBrainClient(nameof(ApiClient));
+        AddBrainClient(NotificationService.NotificationsHttpClientName);
+    }
 
     private static void ConfigureJsonOptions(JsonSerializerOptions options)
     {
-        options.DictionaryKeyPolicy = options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        // Share the exact same naming policy/null-handling/resolver as the rest of the SDK (see
+        // AppJsonSerializerOptions), rather than configuring MVC's options independently.
+        options.DictionaryKeyPolicy = options.PropertyNamingPolicy = AppJsonSerializerOptions.Default.PropertyNamingPolicy;
+        options.DefaultIgnoreCondition = AppJsonSerializerOptions.Default.DefaultIgnoreCondition;
+        options.TypeInfoResolver = AppJsonSerializerOptions.Default.TypeInfoResolver;
     }
 
     private static void ConfigureLoggingDefaults(HostBuilderContext context, ILoggingBuilder builder)
     {
         builder
             .ClearProviders()
-            .SetMinimumLevel(LogLevel.Warning)
+            .SetMinimumLevel(LogLevel.Information)
+            .AddFilter("Microsoft.AspNetCore", LogLevel.Warning)
+            .AddFilter("System.Net.Http", LogLevel.Warning)
             .AddSimpleConsole(options => options.SingleLine = true);
         if (context.HostingEnvironment.IsDevelopment())
         {
@@ -65,22 +76,27 @@ internal static class Server
         }
     }
 
-    private static void ConfigureServices(IServiceCollection services, IBrain brain, IReadOnlyCollection<IDeviceBuilder> devices, string adapterName) => services
-        .AddSingleton(brain)
-        .AddSingleton(devices)
-        .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
-        .AddSingleton(PgpKeyPairGenerator.CreatePgpKeys()) // Keys are created at random at the start of the server.
-        .AddSingleton<PgpPublicKeyResponse>()
-        .AddSingleton<IApiClient, ApiClient>()
-        .AddSingleton<IDeviceDatabase, DeviceDatabase>()
-        .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
-        .AddSingleton<INotificationMapping, NotificationMapping>()
-        .AddSingleton<INotificationService, NotificationService>()
-        .AddSingleton<ISdkEnvironment, SdkEnvironment>()
-        .AddSingleton<IBrainRecipes, BrainRecipes>()
-        .AddHostedService<SdkRegistration>()
-        .AddHostedService<UriPrefixNotifier>()
-        .AddHostedService<SubscriptionsNotifier>();
+    private static void ConfigureServices(IServiceCollection services, Brain brain, Func<IServiceProvider, IReadOnlyCollection<IDeviceBuilder>> devices, string adapterName, IServiceConfiguration[]? serviceConfigurations)
+    {
+        services
+            .AddSingleton<IApiClient, ApiClient>()
+            .AddSingleton<IBrainRecipes, BrainRecipes>()
+            .AddSingleton<IDeviceDatabase, DeviceDatabase>()
+            .AddSingleton<IDynamicDeviceRegistry, DynamicDeviceRegistry>()
+            .AddSingleton<INotificationMapping, NotificationMapping>()
+            .AddSingleton<INotificationService, NotificationService>()
+            .AddSingleton<IPgpEncryption, PgpEncryption>()
+            .AddSingleton<ISdkEnvironment, SdkEnvironment>()
+            .AddSingleton<ISettingsStoreProvider, SettingsStoreProvider>()
+            .AddSingleton(typeof(ISettingsStore<>), typeof(SettingsStore<>))
+            .AddSingleton<IBrain>(brain)
+            .AddSingleton(devices)
+            .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
+            .AddHostedService<SdkRegistration>()
+            .AddHostedService<SubscriptionsNotifier>()
+            .AddHostedService<UriPrefixNotifier>();
+        Array.ForEach(serviceConfigurations ?? [], configuration => configuration.ConfigureServices(services));
+    }
 
     private static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPAddress hostAddress, int port) => builder
         .ConfigureKestrel(options =>
@@ -94,19 +110,15 @@ internal static class Server
             services
                .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
                .AddJsonOptions(options => Server.ConfigureJsonOptions(options.JsonSerializerOptions))
-               .AddCors(options => options.AddPolicy(nameof(CorsPolicy), builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+               .AddCors(options => options.AddDefaultPolicy(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
                .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AssemblyControllerFeatureProvider.Instance));
         })
         .Configure((context, builder) =>
         {
             builder
                 .UseRouting()
-                .UseCors(nameof(CorsPolicy))
+                .UseCors()
                 .UseEndpoints(endpoints => endpoints.MapControllers());
-            if (context.HostingEnvironment.IsDevelopment())
-            {
-                builder.UseDeveloperExceptionPage();
-            }
         });
 
     private static class Constants

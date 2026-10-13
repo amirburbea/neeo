@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Rest;
+using Neeo.Sdk.Utilities;
 using Zeroconf;
 
 namespace Neeo.Sdk;
@@ -20,7 +22,7 @@ namespace Neeo.Sdk;
 /// <summary>
 /// Minimal information about a NEEO Brain.
 /// </summary>
-internal interface IBrain
+public interface IBrain
 {
     /// <summary>
     /// The host name of the NEEO Brain.
@@ -40,17 +42,18 @@ internal interface IBrain
 /// Initializes an instance of the <see cref="Brain"/> class with details about the NEEO Brain.
 /// </remarks>
 /// <param name="ipAddress">The IP Address of the NEEO Brain on the network.</param>
-/// <param name="servicePort">The port on which the NEEO Brain service is running.</param>
 /// <param name="hostName">The host name of the NEEO Brain.</param>
 /// <param name="version">The firmware version of the NEEO Brain.</param>
 public sealed partial class Brain(
     IPAddress ipAddress,
-    int servicePort = 3000,
     string? hostName = default,
     string version = "0.50.0"
 ) : IBrain
 {
-    private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(15d);
+    /// <summary>
+    /// The port of the Brain's API service.
+    /// </summary>
+    public const int ServicePort = 3000;
 
     /// <summary>
     /// The host name of the NEEO Brain.
@@ -69,7 +72,7 @@ public sealed partial class Brain(
         ipAddress.AddressFamily == AddressFamily.InterNetwork
             ? ipAddress
             : throw new ArgumentException("The supplied IP address must be an IPv4 address.", nameof(ipAddress)),
-        servicePort
+        Brain.ServicePort
     );
 
     /// <summary>
@@ -79,115 +82,11 @@ public sealed partial class Brain(
         ? version
         : throw new InvalidOperationException("The NEEO Brain is not running a compatible firmware version (>= 0.50). It must be upgraded first.");
 
-    /// <summary>
-    /// Discovers all <see cref="Brain"/>s on the network.
-    /// </summary>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>s.</returns>
-    public static async Task<Brain[]> DiscoverAsync(CancellationToken cancellationToken = default)
-    {
-        IReadOnlyList<IZeroconfHost> hosts = await ZeroconfResolver.ResolveAsync(Constants.ServiceName, Brain._scanTime, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return [.. hosts.Select(Brain.TryCreateBrain).OfType<Brain>()];
-    }
-
-    /// <summary>
-    /// Discovers the first <see cref="Brain"/> on the network matching the specified
-    /// <paramref name="predicate"/> if provided. If no <paramref name="predicate"/> is provided, returns the first
-    /// <see cref="Brain"/> discovered.
-    /// </summary>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <param name="predicate">Optional predicate that must be matched by the Brain (if not <see langword="null"/>).</param>
-    /// <returns><see cref="Task"/> of the discovered <see cref="Brain"/>.</returns>
-    public static Task<Brain?> DiscoverOneAsync(Func<Brain, bool>? predicate = default, CancellationToken cancellationToken = default)
-    {
-        TaskCompletionSource<Brain?> tcs = new();
-        cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
-        _ = Task.Factory.StartNew(ResolveAsync, cancellationToken, TaskCreationOptions.None, TaskScheduler.Default);
-        return tcs.Task;
-
-        async Task ResolveAsync()
-        {
-            using CancellationTokenSource raceTokenSource = new();
-            try
-            {
-                using CancellationTokenSource junctionTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
-                    raceTokenSource.Token,
-                    cancellationToken
-                );
-                // Bonjour sometimes fails to discover, race multiple scans at once, offset by 500ms.
-                await Parallel.ForEachAsync(
-                    [0, 500],
-                    junctionTokenSource.Token,
-                    async (delay, cancellationToken) =>
-                    {
-                        try
-                        {
-                            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                            await ZeroconfResolver.ResolveAsync(
-                                Constants.ServiceName,
-                                Brain._scanTime,
-                                 callback: OnHostDiscovered,
-                                cancellationToken: cancellationToken
-                            ).ConfigureAwait(false);
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // Expected in race.
-                        }
-                    }
-                ).ConfigureAwait(false);
-                tcs.TrySetResult(null);
-            }
-            catch (OperationCanceledException)
-            {
-                // Ignore.
-            }
-
-            void OnHostDiscovered(IZeroconfHost host)
-            {
-                if (tcs.Task.IsCompleted || tcs.Task.IsCanceled || Brain.TryCreateBrain(host) is not { } brain)
-                {
-                    return;
-                }
-                if ((predicate == null || predicate(brain)) && tcs.TrySetResult(brain))
-                {
-                    raceTokenSource.Cancel(true);
-                }
-            }
-        }
-    }
-
-    [GeneratedRegex(@"^(?<ip>(\d+[.]){3}\d+)[:]", RegexOptions.ExplicitCapture)]
-    private static partial Regex IPAddresRegex();
-
-    private static Brain? TryCreateBrain(IZeroconfHost host)
-    {
-        return host.IPAddress switch
-        {
-            { Length: > 0 } address => TryCreateBrain(address),
-            null when Brain.IPAddresRegex().Match(host.Id) is { Success: true, Groups: { } groups } => TryCreateBrain(groups["ip"].Value),
-            _ => null,
-        };
-
-        Brain? TryCreateBrain(string ipAddress)
-        {
-            return host.Services.Values.FirstOrDefault() is { Port: int port, Properties: [{ } properties, ..] }
-                ? new(IPAddress.Parse(ipAddress), port, $"{properties["hon"]}.local", properties["rel"])
-                : null;
-        }
-    }
-
     [GeneratedRegex(@"^(?<v>\d+\.\d+)\.", RegexOptions.Compiled | RegexOptions.ExplicitCapture)]
     private static partial Regex VersionPrefixRegex();
-
-    private static class Constants
-    {
-        public const string ServiceName = "_neeo._tcp.local.";
-    }
 }
 
 /// <summary>
-///
 /// </summary>
 public static class BrainMethods
 {
@@ -203,94 +102,153 @@ public static class BrainMethods
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
     /// <param name="brain">The NEEO Brain.</param>
-    /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
     /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
+    /// <param name="name">
+    /// A name for your integration server. This name should be consistent upon restarting the
+    /// driver host server.
+    /// </param>
     /// <param name="hostIPAddress">
-    /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
+    /// The IP Address on which to bind the integration server. If not specified, falls back to the
+    /// first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
     /// </param>
     /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
-    /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
+    /// <param name="serviceConfigurations">Optional additional service configuration(s).</param>
+    /// <param name="configureLogging">
+    /// By default, the integration server logs via debug in development. This allows overriding the
+    /// behavior with a custom log configuration.
+    /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public static async Task<ISdkEnvironment> StartServerAsync(
+    public static Task<ISdkEnvironment> StartServerAsync(
         this Brain brain,
         IDeviceBuilder[] devices,
         string? name = default,
         IPAddress? hostIPAddress = null,
         ushort port = 0,
+        IServiceConfiguration[]? serviceConfigurations = default,
         Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
         CancellationToken cancellationToken = default
     )
     {
+        ArgumentNullException.ThrowIfNull(brain);
         if (devices is not { Length: > 0 })
         {
             throw new ArgumentException("At least one device is required.", nameof(devices));
         }
-        IHost host = await Server.StartSdkAsync(
-            brain ?? throw new ArgumentNullException(nameof(brain)),
-            devices,
-            name ?? brain.HostName,
-            hostIPAddress ?? await brain.GetFallbackHostIPAddressAsync(cancellationToken).ConfigureAwait(false),
+        return brain.StartServerAsync(
+            _ => devices,
+            name,
+            hostIPAddress,
             port,
-            configureLogging,
+            serviceConfigurations: serviceConfigurations,
+            configureLogging: configureLogging,
             cancellationToken
-        ).ConfigureAwait(false);
-        return host.Services.GetRequiredService<ISdkEnvironment>();
+        );
     }
 
     /// <summary>
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
     /// <param name="brain">The NEEO Brain.</param>
-    /// <param name="name">A name for your integration server. This name should be consistent upon restarting the driver host server.</param>
-    /// <param name="providers">An array of device providers from which to register devices with the NEEO Brain.</param>
+    /// <param name="deviceProviderTypes">
+    /// An array of types of device providers implementing <see cref="IDeviceProvider"/> to register with the NEEO Brain.
+    /// </param>
+    /// <param name="name">
+    /// A name for your integration server. This name should be consistent upon restarting the
+    /// driver host server.
+    /// </param>
     /// <param name="hostIPAddress">
-    /// The IP Address on which to bind the integration server. If not specified, falls back to the first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
+    /// The IP Address on which to bind the integration server. If not specified, falls back to the
+    /// first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
     /// </param>
     /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
-    /// <param name="configureLogging">By default, the integration server logs via debug in development. This allows overriding the behavior with a custom log configuration.</param>
+    /// <param name="serviceConfigurations">Optional additional service configuration(s).</param>
+    /// <param name="configureLogging">
+    /// By default, the integration server logs via debug in development. This allows overriding the
+    /// behavior with a custom log configuration.
+    /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> to indicate completion.</returns>
     public static Task<ISdkEnvironment> StartServerAsync(
         this Brain brain,
-        IDeviceProvider[] providers,
+        Type[] deviceProviderTypes,
         string? name = default,
         IPAddress? hostIPAddress = null,
         ushort port = 0,
+        IServiceConfiguration[]? serviceConfigurations = default,
         Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
         CancellationToken cancellationToken = default
     )
     {
-        if (providers is not { Length: > 0 })
+        ArgumentNullException.ThrowIfNull(brain);
+        ArgumentNullException.ThrowIfNull(deviceProviderTypes);
+        if (deviceProviderTypes is not { Length: > 0 })
         {
-            throw new ArgumentException("At least one device is required.", nameof(providers));
+            throw new ArgumentException("At least one device provider type is required.", nameof(deviceProviderTypes));
+        }
+        if (deviceProviderTypes.Any(type => !typeof(IDeviceProvider).IsAssignableFrom(type)))
+        {
+            throw new ArgumentException("All device provider types must implement IDeviceProvider.", nameof(deviceProviderTypes));
         }
         return brain.StartServerAsync(
-            Array.ConvertAll(providers, static provider => provider.DeviceBuilder),
+            serviceProvider => [.. serviceProvider.GetServices<IDeviceProvider>().Select(static provider => provider.DeviceBuilder)],
             name,
             hostIPAddress,
             port,
+            serviceConfigurations: [.. serviceConfigurations ?? [], new DeviceProviderServiceConfiguration(deviceProviderTypes)],
             configureLogging,
             cancellationToken
         );
     }
 
-    internal static async ValueTask<IPAddress> GetFallbackHostIPAddressAsync(this Brain brain, CancellationToken cancellationToken)
+    private static async ValueTask<IPAddress> GetFallbackHostIPAddressAsync(this Brain brain, CancellationToken cancellationToken)
     {
-        if (IPAddress.Loopback.Equals(brain.IPAddress))
+        if (!brain.IPAddress.Equals(IPAddress.Loopback))
         {
-            // If Brain address is loopback, use that.
-            return IPAddress.Loopback;
+            // Get IPv4 addresses for the current device.
+            IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
+            // If the Brain IP is not in the list, the Brain is a separate device.
+            // Return the first non-loopback IP address on this host.
+            if (Array.IndexOf(addresses, brain.IPAddress) == -1 && Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) is { } ipAddress)
+            {
+                return ipAddress;
+            }
         }
-        IPAddress[] addresses = await Dns.GetHostAddressesAsync(Dns.GetHostName(), AddressFamily.InterNetwork, cancellationToken).ConfigureAwait(false);
-        if (Array.IndexOf(addresses, brain.IPAddress) != -1)
+        return IPAddress.Loopback;
+    }
+
+    private static async Task<ISdkEnvironment> StartServerAsync(
+        this Brain brain,
+        Func<IServiceProvider, IDeviceBuilder[]> devices,
+        string? name = default,
+        IPAddress? hostIPAddress = null,
+        ushort port = 0,
+        IServiceConfiguration[]? serviceConfigurations = default,
+        Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
+        CancellationToken cancellationToken = default
+    )
+    {
+        IHost host = await Server.StartSdkAsync(
+            brain ?? throw new ArgumentNullException(nameof(brain)),
+            devices,
+            name ?? brain.HostName,
+            hostIPAddress ?? await brain.GetFallbackHostIPAddressAsync(cancellationToken).ConfigureAwait(false),
+            port,
+            serviceConfigurations,
+            configureLogging,
+            cancellationToken
+        );
+        return host.Services.GetRequiredService<ISdkEnvironment>();
+    }
+
+    private readonly struct DeviceProviderServiceConfiguration(Type[] deviceProviderTypes) : IServiceConfiguration
+    {
+        void IServiceConfiguration.ConfigureServices(IServiceCollection services)
         {
-            // If Brain is running on this device, use loopback.
-            return IPAddress.Loopback;
+            foreach (Type type in deviceProviderTypes)
+            {
+                services.Add(new(typeof(IDeviceProvider), type, ServiceLifetime.Singleton));
+            }
         }
-        // Use the first IPv4 address found, or loopback.
-        return Array.Find(addresses, static address => !IPAddress.IsLoopback(address)) is { } address
-            ? address
-            : IPAddress.Loopback;
     }
 }
