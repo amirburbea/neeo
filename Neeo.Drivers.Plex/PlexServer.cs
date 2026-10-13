@@ -72,11 +72,14 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     private readonly BehaviorSubject<string?> _selectedPlayerId = new(null);
     private readonly Func<ServerData> _serverDataLookup;
     private readonly ISettingsStore _settings;
+    private readonly ReconnectLoop _reconnectLoop;
+    private readonly Lock _sessionLock = new();
     private readonly Lazy<Task> _socketTask;
     private readonly Lazy<Task> _timelineHeartbeatTask;
     private readonly IPlexTokenStore _tokenStore;
     private int _commandId;
     private Guid _sessionId;
+    private Task _sessionTask = Task.CompletedTask;
 
     public PlexServer(
         string machineIdentifier,
@@ -126,6 +129,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 .Subscribe(),
             LazyThreadSafetyMode.ExecutionAndPublication
         );
+        this._reconnectLoop = new(TimeSpan.FromSeconds(5d), TimeSpan.FromMinutes(2d), this.TryConnectSocketAsync, logger);
         this._socketTask = new(this.ConnectSocketAsync, LazyThreadSafetyMode.ExecutionAndPublication);
         this._timelineHeartbeatTask = new(() => this.PollTimelineHeartbeatAsync(this._cancellationTokenSource.Token), LazyThreadSafetyMode.ExecutionAndPublication);
     }
@@ -193,7 +197,13 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     public void Dispose()
     {
-        this._cancellationTokenSource.Cancel();
+        Task sessionTask;
+        using (this._sessionLock.EnterScope())
+        {
+            this._cancellationTokenSource.Cancel();
+            sessionTask = this._sessionTask;
+        }
+        this._reconnectLoop.Dispose();
         if (this._playerDiscoverySubscription.IsValueCreated)
         {
             this._playerDiscoverySubscription.Value.Dispose();
@@ -202,6 +212,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         {
             this._socketTask.Value.Wait();
         }
+        sessionTask.Wait();
         if (this._timelineHeartbeatTask.IsValueCreated)
         {
             this._timelineHeartbeatTask.Value.Wait();
@@ -366,50 +377,113 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     private async Task ConnectSocketAsync()
     {
-        Uri uri = this.GetUri(Uri.UriSchemeWss, ":/websockets/notifications");
-        while (!this._cancellationTokenSource.IsCancellationRequested)
+        CancellationToken cancellationToken = this._cancellationTokenSource.Token;
+        bool connected = false;
+        try
         {
-            try
+            connected = await this.TryConnectSocketAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception e)
+        {
+            this._logger.LogError(e, "Error on Plex server: {Name}", this.Name);
+        }
+        finally
+        {
+            if (!connected)
             {
-                this._logger.LogInformation("Connecting to Plex server '{Name}'...", this.Name);
-                // Disable keep-alive pings, Plex server does not support them.
-                using ClientWebSocket webSocket = new() { Options = { KeepAliveInterval = Timeout.InfiniteTimeSpan } };
-                webSocket.Options.SetRequestHeader("X-Plex-Token", this._tokenStore.AuthToken);
-                using HttpMessageInvoker messageInvoker = new(PlexDirectConnect.CreateHttpHandler(), disposeHandler: true);
-                await webSocket.ConnectAsync(uri, messageInvoker, this._cancellationTokenSource.Token).ConfigureAwait(false);
-                this._sessionId = Guid.NewGuid();
-                this._logger.LogInformation("Connected to Plex server '{Name}'", this.Name);
-                this._isConnected.OnNext(true);
-                await this._playerDiscoveryTaskSource.Task.ConfigureAwait(false);
-                this._initializationTaskSource.TrySetResult();
-                if (this._selectedPlayerId.Value is null &&
-                    this._settings.TryGetValue(this.MachineIdentifier, out string? playerJson) &&
-                    JsonSerializer.Deserialize<PlayerData>(playerJson, PlexJsonSerializerOptions.Default) is { MachineIdentifier: { Length: > 0 } } player)
-                {
-                    // If the player is not in the players dictionary, add it as offline.
-                    if (this._players.Value is { } players && !players.ContainsKey(player.MachineIdentifier))
-                    {
-                        this._players.OnNext(players.Add(player.MachineIdentifier, player with { IsOnline = false }));
-                    }
-                    this._selectedPlayerId.OnNext(player.MachineIdentifier);
-                }
-                await JsonWebSocket.MessageLoop<ServerMessage>(webSocket, ProcessMessageAsync, options: PlexJsonSerializerOptions.Default, cancellationToken: this._cancellationTokenSource.Token).ConfigureAwait(false);
-            }
-            catch (WebSocketException e)
-            {
-                this._logger.LogError(e, "Error on Plex server: {Name}", this.Name);
-                await Task.Delay(TimeSpan.FromSeconds(5d), this._cancellationTokenSource.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (this._cancellationTokenSource.IsCancellationRequested)
-            {
-                return;
-            }
-            finally
-            {
-                this._isConnected.OnNext(false);
+                // Let initialization complete (disconnected) rather than wait for a reconnect.
                 this._initializationTaskSource.TrySetResult();
             }
         }
+        if (!connected)
+        {
+            this._reconnectLoop.Start(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// A single connection attempt (also the <see cref="ReconnectLoop"/> callback). On success, the session runs in the
+    /// background until the socket closes, at which point the reconnect loop is started.
+    /// </summary>
+    private async Task<bool> TryConnectSocketAsync(CancellationToken cancellationToken)
+    {
+        Uri uri = this.GetUri(Uri.UriSchemeWss, ":/websockets/notifications");
+        this._logger.LogInformation("Connecting to Plex server '{Name}'...", this.Name);
+        // Disable keep-alive pings, Plex server does not support them.
+        ClientWebSocket webSocket = new() { Options = { KeepAliveInterval = Timeout.InfiniteTimeSpan } };
+        HttpMessageInvoker messageInvoker = new(PlexDirectConnect.CreateHttpHandler(), disposeHandler: true);
+        try
+        {
+            webSocket.Options.SetRequestHeader("X-Plex-Token", this._tokenStore.AuthToken);
+            await webSocket.ConnectAsync(uri, messageInvoker, cancellationToken).ConfigureAwait(false);
+            // The session is bound to the server's lifetime, not to this attempt's token (which the reconnect loop
+            // cancels once an attempt succeeds).
+            CancellationToken sessionToken = this._cancellationTokenSource.Token;
+            using (this._sessionLock.EnterScope())
+            {
+                // Checked under the lock Dispose cancels under, so a session is never started after Dispose waited for it.
+                sessionToken.ThrowIfCancellationRequested();
+                this._sessionTask = this.RunSessionAsync(webSocket, messageInvoker, sessionToken);
+            }
+            return true;
+        }
+        catch (Exception e)
+        {
+            webSocket.Dispose();
+            messageInvoker.Dispose();
+            if (e is WebSocketException)
+            {
+                this._logger.LogError(e, "Error on Plex server: {Name}", this.Name);
+                return false;
+            }
+            throw;
+        }
+    }
+
+    private async Task RunSessionAsync(ClientWebSocket webSocket, HttpMessageInvoker messageInvoker, CancellationToken cancellationToken)
+    {
+        await Task.Yield(); // Return to the caller as soon as the session is started.
+        try
+        {
+            this._sessionId = Guid.NewGuid();
+            this._logger.LogInformation("Connected to Plex server '{Name}'", this.Name);
+            this._isConnected.OnNext(true);
+            await this._playerDiscoveryTaskSource.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            this._initializationTaskSource.TrySetResult();
+            if (this._selectedPlayerId.Value is null &&
+                this._settings.TryGetValue(this.MachineIdentifier, out string? playerJson) &&
+                JsonSerializer.Deserialize<PlayerData>(playerJson, PlexJsonSerializerOptions.Default) is { MachineIdentifier: { Length: > 0 } } player)
+            {
+                // If the player is not in the players dictionary, add it as offline.
+                if (this._players.Value is { } players && !players.ContainsKey(player.MachineIdentifier))
+                {
+                    this._players.OnNext(players.Add(player.MachineIdentifier, player with { IsOnline = false }));
+                }
+                this._selectedPlayerId.OnNext(player.MachineIdentifier);
+            }
+            await JsonWebSocket.MessageLoop<ServerMessage>(webSocket, ProcessMessageAsync, options: PlexJsonSerializerOptions.Default, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Expected during shutdown.
+        }
+        catch (Exception e)
+        {
+            this._logger.LogError(e, "Error on Plex server: {Name}", this.Name);
+        }
+        finally
+        {
+            webSocket.Dispose();
+            messageInvoker.Dispose();
+            this._isConnected.OnNext(false);
+            this._initializationTaskSource.TrySetResult();
+        }
+        // Whether the server closed the socket cleanly or it failed, reconnect with backoff (a no-op once disposed).
+        this._reconnectLoop.Start(cancellationToken);
 
         async ValueTask ProcessMessageAsync(ServerMessage message, CancellationToken cancellationToken)
         {
