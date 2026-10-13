@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Utilities;
@@ -50,7 +51,8 @@ internal sealed class ValueFeature(
 
     public static ValueFeature Create(AsyncDeviceValueGetter<double> getter, AsyncDeviceValueSetter<double> setter) => new(
         ValueFeature.WrapGetter(getter, ObjectConverter<double>.Default),
-        ValueFeature.WrapSetter(setter, double.Parse)
+        // The Brain always sends '.' as the decimal separator, regardless of the host's culture.
+        ValueFeature.WrapSetter(setter, static value => double.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture))
     );
 
     public async Task<ValueResponse> GetValueAsync(string deviceId, CancellationToken cancellationToken) => new(await getter(deviceId, cancellationToken).ConfigureAwait(false));
