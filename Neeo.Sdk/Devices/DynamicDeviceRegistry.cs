@@ -35,7 +35,7 @@ public interface IDynamicDeviceRegistry
 internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logger) : IDynamicDeviceRegistry
 {
     private readonly ConcurrentDictionary<string, IDeviceAdapter> _discoveredDevices = new();
-    private readonly ConcurrentDictionary<string, Task<IDeviceAdapter?>> _pendingDiscoveries = new();
+    private readonly ConcurrentDictionary<string, Lazy<Task<IDeviceAdapter?>>> _pendingDiscoveries = new();
 
     public ValueTask<IDeviceAdapter?> GetDiscoveredDeviceAsync(IDeviceAdapter rootAdapter, string deviceId, CancellationToken cancellationToken = default)
     {
@@ -48,12 +48,17 @@ internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logge
         {
             return new(discoveredDevice);
         }
-        // Coalesce concurrent misses for the same key onto a single in-flight discovery call.
+        // Coalesce concurrent misses for the same key onto a single in-flight discovery call. The Lazy ensures only the
+        // stored entry ever starts a discovery, and the entry is removed only once it has been stored and completed (even
+        // when a driver's discovery completes synchronously). The discovery itself is not bound to any one caller's
+        // token (a cancelled first caller would otherwise fail every waiter); each caller only stops waiting when its
+        // own token is cancelled.
         Task<IDeviceAdapter?> discoveryTask = this._pendingDiscoveries.GetOrAdd(
             key,
-            _ => this.DiscoverAndRegisterAsync(feature, key, deviceId, cancellationToken)
-        );
-        return new(discoveryTask);
+            static (key, state) => state.Registry.CreatePendingDiscovery(state.Feature, key, state.DeviceId),
+            (Registry: this, Feature: feature, DeviceId: deviceId)
+        ).Value;
+        return new(discoveryTask.WaitAsync(cancellationToken));
     }
 
     public IDeviceAdapter RegisterDiscoveredDevice(IDeviceAdapter rootAdapter, string deviceId, IDeviceBuilder builder)
@@ -69,11 +74,19 @@ internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logge
 
     private static string ComputeKey(string rootAdapterName, string deviceId) => $"{rootAdapterName}|{deviceId}";
 
-    private async Task<IDeviceAdapter?> DiscoverAndRegisterAsync(IDiscoveryFeature feature, string key, string deviceId, CancellationToken cancellationToken)
+    private Lazy<Task<IDeviceAdapter?>> CreatePendingDiscovery(IDiscoveryFeature feature, string key, string deviceId)
+    {
+        Lazy<Task<IDeviceAdapter?>>? pending = null;
+        // Only evaluated (via .Value) after GetOrAdd has stored this entry, so the removal in the finally block below
+        // always happens after insertion - even when the driver's discovery completes synchronously.
+        return pending = new(() => this.DiscoverAndRegisterAsync(feature, key, deviceId, pending!));
+    }
+
+    private async Task<IDeviceAdapter?> DiscoverAndRegisterAsync(IDiscoveryFeature feature, string key, string deviceId, Lazy<Task<IDeviceAdapter?>> pending)
     {
         try
         {
-            if (await feature.DiscoverAsync(deviceId, cancellationToken).ConfigureAwait(false) is not { DeviceBuilder: { } builder })
+            if (await feature.DiscoverAsync(deviceId, CancellationToken.None).ConfigureAwait(false) is not { DeviceBuilder: { } builder })
             {
                 return null;
             }
@@ -83,7 +96,7 @@ internal sealed class DynamicDeviceRegistry(ILogger<DynamicDeviceRegistry> logge
         }
         finally
         {
-            this._pendingDiscoveries.TryRemove(key, out _);
+            this._pendingDiscoveries.TryRemove(KeyValuePair.Create(key, pending));
         }
     }
 
