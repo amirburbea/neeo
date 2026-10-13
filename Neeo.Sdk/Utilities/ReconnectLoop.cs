@@ -19,6 +19,7 @@ public sealed class ReconnectLoop : IDisposable
     private readonly Lock _lock = new();
     private readonly Func<CancellationToken, Task<bool>> _tryConnectAsync;
     private bool _isDisposed;
+    private CancellationTokenSource? _cycleCancellation;
     private PeriodicTimer? _timer;
 
     /// <summary>
@@ -43,7 +44,8 @@ public sealed class ReconnectLoop : IDisposable
     public bool IsRunning => this._timer is not null;
 
     /// <summary>
-    /// Stops the loop (if running) and marks it as disposed - it can not be started again afterward.
+    /// Stops the loop (if running), cancelling any connect attempt in flight, and marks it as disposed - it can not be
+    /// started again afterward.
     /// </summary>
     public void Dispose()
     {
@@ -63,6 +65,7 @@ public sealed class ReconnectLoop : IDisposable
     public void Start(CancellationToken cancellationToken = default)
     {
         PeriodicTimer timer;
+        CancellationToken cycleToken;
         using (this._lock.EnterScope())
         {
             if (this._isDisposed || this._timer is not null)
@@ -70,8 +73,12 @@ public sealed class ReconnectLoop : IDisposable
                 return;
             }
             this._timer = timer = new(this._initialDelay);
+            this._cycleCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cycleToken = this._cycleCancellation.Token;
         }
-        _ = Task.Run(() => this.RunAsync(timer, cancellationToken), cancellationToken);
+        // Deliberately not passing the token to Task.Run: if it were already cancelled, RunAsync would never run, its
+        // finally block would never clear _timer, and the loop would report IsRunning forever.
+        _ = Task.Run(() => this.RunAsync(timer, cycleToken), CancellationToken.None);
     }
 
     private async Task RunAsync(PeriodicTimer timer, CancellationToken cancellationToken)
@@ -121,6 +128,9 @@ public sealed class ReconnectLoop : IDisposable
 
     private void StopTimer()
     {
+        this._cycleCancellation?.Cancel();
+        this._cycleCancellation?.Dispose();
+        this._cycleCancellation = null;
         this._timer?.Dispose();
         this._timer = null;
     }

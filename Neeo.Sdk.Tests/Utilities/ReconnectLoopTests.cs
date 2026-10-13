@@ -165,6 +165,63 @@ public sealed class ReconnectLoopTests
         Assert.Equal(0, attempts);
     }
 
+    [Fact]
+    public async Task Start_with_an_already_cancelled_token_does_not_leave_the_loop_stuck_running()
+    {
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(40),
+            _ =>
+            {
+                Interlocked.Increment(ref attempts);
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(new CancellationToken(canceled: true));
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+        Assert.Equal(0, attempts);
+
+        // The loop can be started again afterward.
+        loop.Start(cancellationToken);
+        await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Dispose_cancels_a_connect_attempt_in_flight()
+    {
+        TaskCompletionSource<bool> attemptCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(40),
+            async token =>
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    attemptCancelled.TrySetResult(true);
+                    throw;
+                }
+                return true;
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken);
+        await Task.Delay(50, cancellationToken);
+        loop.Dispose();
+
+        Assert.True(await attemptCancelled.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        Assert.False(loop.IsRunning);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken cancellationToken)
     {
         for (int i = 0; i < 500 && !condition(); i++)
