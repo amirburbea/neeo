@@ -27,7 +27,7 @@ public sealed class WebOSDeviceProviderTests
         IDeviceBuilder builder = provider.DeviceBuilder;
 
         Assert.NotNull(builder);
-        Assert.Equal("LG OLED TV", builder.Name);
+        Assert.Equal("WebOS TV", builder.Name);
         Assert.Equal("LG", builder.Manufacturer);
         Assert.True(builder.HasPowerStateSensor);
         Assert.Contains("Apps", builder.Directories);
