@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Neeo.Sdk.Utilities;
 
@@ -29,7 +29,7 @@ partial class PlexServer
     }
 
     [JsonConverter(typeof(TextJsonConverter<ServerNotificationType>))]
-    private enum ServerNotificationType
+    internal enum ServerNotificationType
     {
         Unknown = 0,
 
@@ -64,11 +64,11 @@ partial class PlexServer
         TranscodeSessionEnd,
     }
 
-    private record struct ClientsMediaContainer(
+    internal record struct ClientsMediaContainer(
         [property: JsonPropertyName("Server")] ClientServer[]? Clients
     );
 
-    private record struct ClientServer(
+    internal record struct ClientServer(
         string Name,
         string Host,
         string Address,
@@ -82,7 +82,7 @@ partial class PlexServer
         PlayerCapabilities ProtocolCapabilities
     );
 
-    private record struct PlayStateNotification(
+    internal record struct PlayStateNotification(
         string ClientIdentifier,
         string Guid,
         string Key,
@@ -95,21 +95,21 @@ partial class PlexServer
         int ViewOffset
     );
 
-    private record struct Response<TContainer>(
+    internal record struct Response<TContainer>(
         [property: JsonPropertyName("MediaContainer")] TContainer MediaContainer
     ) where TContainer : struct;
 
-    private record struct ServerMessage(
+    internal record struct ServerMessage(
         [property: JsonPropertyName("NotificationContainer")] ServerNotificationContainer? Container
     );
 
-    private record struct ServerNotificationContainer(
+    internal record struct ServerNotificationContainer(
         int Size,
         [property: JsonPropertyName("Type")] ServerNotificationType Type,
         [property: JsonPropertyName("PlaySessionStateNotification")] JsonElement? Notifications
     );
 
-    private record struct MediaItemDetailContainer(
+    internal record struct MediaItemDetailContainer(
         [property: JsonPropertyName("Metadata")] MediaItemMetadata[]? Metadata
     );
 
@@ -123,7 +123,7 @@ partial class PlexServer
         Music = 2
     }
 
-    private record struct MediaItemMetadata
+    internal record struct MediaItemMetadata
     (
         int RatingKey,
         MediaType Type,
@@ -135,9 +135,9 @@ partial class PlexServer
         int? Duration = null
     );
 
-    private record struct MediaPlayer(string MachineIdentifier, PlayState State);
+    internal record struct MediaPlayer(string MachineIdentifier, PlayState State);
 
-    private record struct LibraryDirectory(
+    internal record struct LibraryDirectory(
         string Key,
         string Title,
         bool Secondary = false,
@@ -147,7 +147,7 @@ partial class PlexServer
         int? Size = null
     );
 
-    private record struct LibraryMediaContainer(
+    internal record struct LibraryMediaContainer(
         [property: JsonPropertyName("title1")] string Title,
         [property: JsonPropertyName("Directory")] LibraryDirectory[]? Directories,
         [property: JsonPropertyName("Metadata")] MediaItemMetadata[]? Metadata,

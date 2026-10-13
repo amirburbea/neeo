@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -18,8 +18,9 @@ namespace Neeo.Drivers.Kodi;
 public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger) : IDisposable
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
+    private readonly SemaphoreSlim _connectLock = new(1, 1);
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private CancellationTokenSource? _cancellationTokenSource;
-    private Task<bool>? _connectTask;
     private Func<KodiClient, CancellationToken, Task>? _pendingButtonAction;
     private ReconnectLoop? _reconnectLoop;
     private ClientWebSocket? _webSocket;
@@ -36,13 +37,22 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     public event EventHandler<DataEventArgs<int>>? VolumeChanged;
 
-    private event EventHandler? Disposed;
-
-    public string DeviceId => this.MacAddress.ToString();
+    public string DeviceId => this.MacAddress.Equals(PhysicalAddress.None) ? this.IPAddress.ToString() : this.MacAddress.ToString();
 
     public string DisplayName => displayName;
 
     public IPAddress IPAddress => ipAddress;
+
+    public int HttpPort => httpPort;
+
+    private string? _userName;
+    private string? _password;
+
+    public void SetCredentials(string userName, string password)
+    {
+        this._userName = userName;
+        this._password = password;
+    }
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open };
 
@@ -68,60 +78,74 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         private set => this.SetValue(ref field, value, this.VolumeChanged);
     }
 
-    public Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
     {
-        return this._connectTask ??= ConnectAsync();
-
-        async Task<bool> ConnectAsync()
+        ObjectDisposedException.ThrowIf(this.IsDisposed, this);
+        if (this.IsConnected)
         {
-            logger.LogInformation("Connecting to {ipAddress}:9090/jsonrpc...", this.IPAddress);
-            ClientWebSocket webSocket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
-            CancellationTokenSource cts = new();
-            try
+            return true;
+        }
+        await this._connectLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (this.IsConnected)
             {
-                await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:9090/jsonrpc"), cancellationToken).ConfigureAwait(false);
-                this._cancellationTokenSource = cts;
-                this._webSocket = webSocket;
-                // Task.Factory.StartNew with an async delegate returns Task<Task> - without Unwrap(), the
-                // outer task completes at the first await, so a fault in the real loop would become an
-                // unobserved task exception rather than something we can see.
-                _ = Task.Factory.StartNew(this.MessageLoop, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default)
-                    .Unwrap()
-                    .ContinueWith(
-                        task => logger.LogError(task.Exception, "Kodi message loop terminated unexpectedly."),
-                        TaskContinuationOptions.OnlyOnFaulted
-                    );
-                await this.OnConnected().ConfigureAwait(false);
-                logger.LogInformation("Connected to {ipAddress}:9090/jsonrpc...", this.IPAddress);
-                if (Interlocked.Exchange(ref this._pendingButtonAction, null) is { } pendingAction)
-                {
-                    _ = this.ReplayPendingActionAsync(pendingAction);
-                }
                 return true;
             }
-            catch (WebSocketException)
+            return await this.PerformConnectAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            this._connectLock.Release();
+        }
+    }
+
+    private async Task<bool> PerformConnectAsync(CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Connecting to {ipAddress}:9090/jsonrpc...", this.IPAddress);
+        ClientWebSocket webSocket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
+        CancellationTokenSource cts = new();
+        try
+        {
+            await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:9090/jsonrpc"), cancellationToken).ConfigureAwait(false);
+            this._cancellationTokenSource = cts;
+            this._webSocket = webSocket;
+            Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
+            _ = Task.Run(this.MessageLoop, cts.Token);
+            await this.OnConnectedAsync().ConfigureAwait(false);
+            logger.LogInformation("Connected to {ipAddress}:9090/jsonrpc...", this.IPAddress);
+            if (Interlocked.Exchange(ref this._pendingButtonAction, null) is { } pendingAction)
             {
-                logger.LogWarning("Failed to connect to {ipAddress}:9090/jsonrpc.", this.IPAddress);
-                cts.Dispose();
-                webSocket.Dispose();
-                return false;
+                _ = this.ReplayPendingActionAsync(pendingAction);
             }
-            finally
-            {
-                this._connectTask = null;
-            }
+            return true;
+        }
+        catch (WebSocketException)
+        {
+            logger.LogWarning("Failed to connect to {ipAddress}:9090/jsonrpc.", this.IPAddress);
+            cts.Dispose();
+            webSocket.Dispose();
+            return false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Unexpected error connecting to {ipAddress}:9090/jsonrpc.", this.IPAddress);
+            cts.Dispose();
+            webSocket.Dispose();
+            return false;
         }
     }
 
     public void Dispose()
     {
-        this.CleanUp();
         if (this.IsDisposed)
         {
             return;
         }
         this.IsDisposed = true;
-        this.Disposed?.Invoke(this, EventArgs.Empty);
+        this.CleanUp();
+        this._connectLock.Dispose();
+        this._sendLock.Dispose();
     }
 
     /// <summary>
@@ -145,8 +169,15 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     public Task<QueryData<AlbumInfo>> GetAlbumsAsync(int start = 0, int end = -1, int? artistId = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "AudioLibrary.GetAlbums",
-        new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = AlbumInfo.Fields },
-        static (AlbumListResult result) => QueryData.Create(result.Limits.Total, result.Albums),
+        new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = AlbumInfo.Fields, Filter = artistId is int id ? new { artistid = id } : null },
+        static (AlbumListResult result) => QueryData.Create(result.Limits.Total, result.Albums ?? []),
+        cancellationToken
+    );
+
+    public Task<QueryData<ArtistInfo>> GetArtistsAsync(int start = 0, int end = -1, CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "AudioLibrary.GetArtists",
+        new { Sort = new SortOrder("artist"), Limits = new { start, end }, Properties = ArtistInfo.Fields },
+        static (ArtistListResult result) => QueryData.Create(result.Limits.Total, result.Artists ?? []),
         cancellationToken
     );
 
@@ -160,11 +191,24 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     public Task<QueryData<EpisodeInfo>> GetEpisodesAsync(int start = 0, int end = -1, int? tvShowId = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "VideoLibrary.GetEpisodes",
         new { Sort = new SortOrder("season"), Limits = new { start, end }, Properties = EpisodeInfo.Fields, tvshowid = tvShowId },
-        static (EpisodeListResult result) => QueryData.Create(result.Limits.Total, result.Episodes),
+        static (EpisodeListResult result) => QueryData.Create(result.Limits.Total, result.Episodes ?? []),
         cancellationToken
     );
 
-    public string GetImageUrl(string image) => $"http://{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
+    public string GetImageUrl(string image)
+    {
+        if (string.IsNullOrEmpty(image))
+        {
+            return Images.Kodi;
+        }
+        if (this._userName is { Length: > 0 } user && this._password is { Length: > 0 } pass)
+        {
+            return $"http://{Uri.EscapeDataString(user)}:{Uri.EscapeDataString(pass)}@{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
+        }
+        return $"http://{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
+    }
+
+    public string GetRawImageUrl(string image) => $"http://{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
 
     public Task<string> GetLabelAsync(string label, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "Xbmc.GetInfoLabels",
@@ -176,7 +220,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     public Task<QueryData<VideoInfo>> GetMoviesAsync(int start = 0, int end = -1, Filter? filter = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "VideoLibrary.GetMovies",
         new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = VideoInfo.Fields, Filter = filter },
-        static (MoviesListResult result) => QueryData.Create(result.Limits.Total, result.Movies),
+        static (MoviesListResult result) => QueryData.Create(result.Limits.Total, result.Movies ?? []),
         cancellationToken
     );
 
@@ -186,10 +230,38 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         cancellationToken
     );
 
+    public Task<QueryData<AlbumInfo>> GetRecentlyAddedAlbumsAsync(int start = 0, int end = -1, CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "AudioLibrary.GetRecentlyAddedAlbums",
+        new { Limits = new { start, end }, Properties = AlbumInfo.Fields },
+        static (AlbumListResult result) => QueryData.Create(result.Limits.Total, result.Albums ?? []),
+        cancellationToken
+    );
+
+    public Task<QueryData<EpisodeInfo>> GetRecentlyAddedEpisodesAsync(int start = 0, int end = -1, CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "VideoLibrary.GetRecentlyAddedEpisodes",
+        new { Limits = new { start, end }, Properties = EpisodeInfo.Fields },
+        static (EpisodeListResult result) => QueryData.Create(result.Limits.Total, result.Episodes ?? []),
+        cancellationToken
+    );
+
+    public Task<QueryData<VideoInfo>> GetRecentlyAddedMoviesAsync(int start = 0, int end = -1, CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "VideoLibrary.GetRecentlyAddedMovies",
+        new { Limits = new { start, end }, Properties = VideoInfo.Fields },
+        static (MoviesListResult result) => QueryData.Create(result.Limits.Total, result.Movies ?? []),
+        cancellationToken
+    );
+
+    public Task<QueryData<SongInfo>> GetSongsAsync(int start = 0, int end = -1, int? albumId = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "AudioLibrary.GetSongs",
+        new { Sort = new SortOrder("track"), Limits = new { start, end }, Properties = SongInfo.Fields, Filter = albumId is int id ? new { albumid = id } : null },
+        static (SongListResult result) => QueryData.Create(result.Limits.Total, result.Songs ?? []),
+        cancellationToken
+    );
+
     public Task<QueryData<TVShowInfo>> GetTVShowsAsync(int start = 0, int end = -1, Filter? filter = default, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "VideoLibrary.GetTVShows",
         new { Sort = new SortOrder("title"), Limits = new { start, end }, Properties = TVShowInfo.Fields, Filter = filter },
-        static (TVShowsListResult result) => QueryData.Create(result.Limits.Total, result.TVShows),
+        static (TVShowsListResult result) => QueryData.Create(result.Limits.Total, result.TVShows ?? []),
         cancellationToken
     );
 
@@ -200,9 +272,23 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         cancellationToken
     );
 
-    public Task<bool> GoHomeAsync(CancellationToken cancellationToken = default) => this.SendMessageAsync(
+    public Task<bool> ActivateWindowAsync(string window, CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "GUI.ActivateWindow",
-        new { window = "home" },
+        new { window },
+        static (string result) => result == "OK",
+        cancellationToken
+    );
+
+    public Task<bool> GoHomeAsync(CancellationToken cancellationToken = default) => this.ActivateWindowAsync("home", cancellationToken);
+
+    public Task<bool> ScanAudioLibraryAsync(CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "AudioLibrary.Scan",
+        static (string result) => result == "OK",
+        cancellationToken
+    );
+
+    public Task<bool> ScanVideoLibraryAsync(CancellationToken cancellationToken = default) => this.SendMessageAsync(
+        "VideoLibrary.Scan",
         static (string result) => result == "OK",
         cancellationToken
     );
@@ -226,7 +312,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
             return sent;
         }
         return await this.SendMessageAsync(
-            command is InputCommand.Select ? "Input.ShowOSD" : "Player.Seek",
+            "Player.Seek",
             command switch
             {
                 InputCommand.Left => CursorParameters(big: false, forward: false),
@@ -241,7 +327,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
         static object CursorParameters(bool big, bool forward) => new { playerid = 1, value = new { step = string.Concat(big ? "big" : "small", forward ? "forward" : "backward") } };
 
-        static bool IsCursorCommand(InputCommand command) => command is InputCommand.Right or InputCommand.Left or InputCommand.Up or InputCommand.Down or InputCommand.Select;
+        static bool IsCursorCommand(InputCommand command) => command is InputCommand.Right or InputCommand.Left or InputCommand.Up or InputCommand.Down;
     }
 
     public async Task<int> SetVolumeAsync(int volume, CancellationToken cancellationToken = default) => this.Volume = volume is >= 0 and <= 100
@@ -264,28 +350,50 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     )
     {
         ObjectDisposedException.ThrowIf(this.IsDisposed, this);
-        if (this._webSocket is { State: WebSocketState.Open } webSocket)
+        if (this._webSocket is not { State: WebSocketState.Open } webSocket)
         {
-            return SendRequestAsync();
+            _ = this.ConnectAsync(cancellationToken);
+            return Task.FromCanceled<TResult>(new(true));
         }
-        _ = this.ConnectAsync(cancellationToken);
-        return CreateCanceledTask();
 
-        static Task<TResult> CreateCanceledTask() => Task.FromCanceled<TResult>(new(true));
+        return SendRequestAsync();
 
         async Task<TResult> SendRequestAsync()
         {
             JsonRpcRequest request = new(method, parameters);
-            TaskCompletionSource<JsonElement> elementSource = new();
+            TaskCompletionSource<JsonElement> elementSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
             this._taskSources.TryAdd(request.Id, elementSource);
-            await webSocket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(request, JsonSerializerOptions.Web).AsMemory(), WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
-            // Each operation can take as much as 2.5s to complete.
-            if (object.Equals(elementSource.Task, await Task.WhenAny(elementSource.Task, Task.Delay(2500, cancellationToken)).ConfigureAwait(false)))
+            try
             {
-                return transform(ExtractPayload(await elementSource.Task.ConfigureAwait(false)));
+                byte[] requestBytes = JsonSerializer.SerializeToUtf8Bytes(request, KodiJsonSerializerOptions.Default);
+                await this._sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await webSocket.SendAsync(requestBytes.AsMemory(), WebSocketMessageType.Text, true, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    this._sendLock.Release();
+                }
+
+                using CancellationTokenSource timeoutCts = new(TimeSpan.FromMilliseconds(2500d));
+                using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+                using (linkedCts.Token.Register(static state => ((TaskCompletionSource<JsonElement>)state!).TrySetCanceled(), elementSource))
+                {
+                    JsonElement element = await elementSource.Task.ConfigureAwait(false);
+                    return transform(ExtractPayload(element));
+                }
             }
-            logger.LogWarning("Something went wrong (SendMessageAsync timed out)");
-            return await CreateCanceledTask().ConfigureAwait(false);
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning("Kodi RPC request {Method} (id: {Id}) timed out.", method, request.Id);
+                return await Task.FromCanceled<TResult>(new(true)).ConfigureAwait(false);
+            }
+            finally
+            {
+                this._taskSources.TryRemove(request.Id, out _);
+            }
 
             TPayload ExtractPayload(JsonElement element)
             {
@@ -295,7 +403,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 }
                 try
                 {
-                    return element.Deserialize<TPayload>(JsonSerializerOptions.Web)!;
+                    return element.Deserialize<TPayload>(KodiJsonSerializerOptions.Default)!;
                 }
                 catch (JsonException)
                 {
@@ -336,10 +444,19 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     {
         for (int i = 0; i < 5; i++)
         {
-            if (await this.GetLabelAsync("Network.MacAddress").ConfigureAwait(false) is { } label && PhysicalAddress.TryParse(label, out PhysicalAddress? macAddress))
+            try
             {
-                return macAddress;
+                if (await this.GetLabelAsync("Network.MacAddress").ConfigureAwait(false) is { } label && PhysicalAddress.TryParse(label, out PhysicalAddress? macAddress))
+                {
+                    return macAddress;
+                }
             }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to query MAC address from Kodi (authentication may be required).");
+                break;
+            }
+            await Task.Delay(200).ConfigureAwait(false);
         }
         return PhysicalAddress.None;
     }
@@ -360,13 +477,25 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                     webSocket,
                     (response, _) =>
                     {
-                        if (response.Error is { Message: { } errorMessage })
+                        if (response.Id is { } id && this._taskSources.TryRemove(id, out TaskCompletionSource<JsonElement>? taskSource))
+                        {
+                            if (response.Error is { Message: { } errorMessage })
+                            {
+                                taskSource.TrySetException(new ApplicationException($"Kodi RPC error: {errorMessage}"));
+                                this.Error?.Invoke(this, errorMessage);
+                            }
+                            else if (response.Result is { } element)
+                            {
+                                taskSource.TrySetResult(element);
+                            }
+                            else
+                            {
+                                taskSource.TrySetResult(default);
+                            }
+                        }
+                        else if (response.Error is { Message: { } errorMessage })
                         {
                             this.Error?.Invoke(this, errorMessage);
-                        }
-                        else if (response is { Id: { } id } && this._taskSources.TryRemove(id, out TaskCompletionSource<JsonElement>? taskSource) && response.Result is { } element)
-                        {
-                            taskSource.TrySetResult(element);
                         }
                         else if (response is { Method: { } method, Parameters.Data: { } responseData })
                         {
@@ -375,9 +504,14 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                         return ValueTask.CompletedTask;
                     },
                     this.OnDisconnected,
+                    options: KodiJsonSerializerOptions.Default,
                     cancellationToken: token
                 ).ConfigureAwait(false);
             }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Kodi message loop terminated unexpectedly.");
         }
         finally
         {
@@ -385,16 +519,73 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         }
     }
 
-    private async Task OnConnected()
+    private async Task OnConnectedAsync()
     {
         if (this.MacAddress.Equals(PhysicalAddress.None))
         {
             this.MacAddress = await this.GetMacAddressAsync().ConfigureAwait(false);
         }
         this.Connected?.Invoke(this, EventArgs.Empty);
-        this.ProcessVolumeInfo(await this.GetVolumeAsync().ConfigureAwait(false));
-        // TODO: Query player state.
-        this.PlayerState = PlayerState.Defaults;
+    }
+
+    public async Task RefreshStateAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            this.ProcessVolumeInfo(await this.GetVolumeAsync().ConfigureAwait(false));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to query volume from Kodi.");
+        }
+        await this.QueryPlayerStateAsync().ConfigureAwait(false);
+    }
+
+    private async Task QueryPlayerStateAsync()
+    {
+        try
+        {
+            PlayerInfo[] players = await this.SendMessageAsync(
+                "Player.GetActivePlayers",
+                static (PlayerInfo[] players) => players
+            ).ConfigureAwait(false);
+
+            if (players is not [{ Id: var activePlayerId }, ..])
+            {
+                this.PlayerState = PlayerState.Defaults;
+                return;
+            }
+
+            JsonElement element = await this.SendMessageAsync(
+                "Player.GetItem",
+                new
+                {
+                    playerid = activePlayerId,
+                    properties = new[] { "title", "showtitle", "season", "episode", "art", "thumbnail", "year", "genre", "album", "artist", "track" }
+                },
+                static (JsonElement el) => el.GetProperty("item")
+            ).ConfigureAwait(false);
+
+            string type = element.TryGetProperty("type", out JsonElement typeProp) ? typeProp.GetString() ?? string.Empty : string.Empty;
+            this.PlayerState = type switch
+            {
+                "picture" when element.Deserialize<PictureInfo>(KodiJsonSerializerOptions.Default) is { } picture => new(
+                    PlayState.Playing,
+                    picture.Label,
+                    string.Empty,
+                    this.GetImageUrl(picture.Thumbnail)
+                ),
+                "episode" when element.Deserialize<EpisodeInfo>(KodiJsonSerializerOptions.Default) is { } episode => this.CreatePlayerState(episode),
+                "song" when element.Deserialize<SongInfo>(KodiJsonSerializerOptions.Default) is { } song => this.CreatePlayerState(song),
+                _ when element.Deserialize<VideoInfo>(KodiJsonSerializerOptions.Default) is { } video => this.CreatePlayerState(video),
+                _ => PlayerState.Defaults,
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to query active player state on connect to Kodi.");
+            this.PlayerState = PlayerState.Defaults;
+        }
     }
 
     private void OnDisconnected()
@@ -416,46 +607,53 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         loop.Start();
     }
 
-    private async void OnPlay(PlayParameters parameters)
+    private async Task OnPlayAsync(PlayParameters parameters)
     {
-        if (parameters.Item.Type is not ItemType.Episode and not ItemType.Movie and not ItemType.MusicVideo and not ItemType.Picture and not ItemType.Song)
+        try
         {
-            return;
+            if (parameters.Item.Type is not ItemType.Episode and not ItemType.Movie and not ItemType.MusicVideo and not ItemType.Picture and not ItemType.Song)
+            {
+                return;
+            }
+            string[] properties = parameters.Item.Type switch
+            {
+                ItemType.Episode => EpisodeInfo.Fields,
+                ItemType.Picture => PictureInfo.Fields,
+                ItemType.Song => SongInfo.Fields,
+                _ => VideoInfo.Fields, // Movie/MusicVideo
+            };
+            JsonElement element = await this.SendMessageAsync(
+                "Player.GetItem",
+                new { playerid = parameters.Player.Id, properties },
+                static (JsonElement el) => el.GetProperty("item")
+            ).ConfigureAwait(false);
+            this.PlayerState = parameters.Item.Type switch
+            {
+                ItemType.Picture when element.Deserialize<PictureInfo>(KodiJsonSerializerOptions.Default) is { } picture => new(
+                   PlayState.Playing,
+                   picture.Label,
+                   parameters.Item.File ?? parameters.Item.ToString(),
+                   this.GetImageUrl(picture.Thumbnail)
+                ),
+                ItemType.Episode when element.Deserialize<EpisodeInfo>(KodiJsonSerializerOptions.Default) is { } episode => this.CreatePlayerState(episode),
+                ItemType.Song when element.Deserialize<SongInfo>(KodiJsonSerializerOptions.Default) is { } song => this.CreatePlayerState(song),
+                _ when element.Deserialize<VideoInfo>(KodiJsonSerializerOptions.Default) is { } video => this.CreatePlayerState(video),
+
+                _ => this.PlayerState,
+            };
         }
-        string[] properties = parameters.Item.Type switch
+        catch (Exception ex)
         {
-            ItemType.Episode => EpisodeInfo.Fields,
-            ItemType.Picture => PictureInfo.Fields,
-            ItemType.Song => SongInfo.Fields,
-            _ => VideoInfo.Fields, // Movie/MusicVideo
-        };
-        JsonElement element = await this.SendMessageAsync(
-            "Player.GetItem",
-            new { playerid = parameters.Player.Id, properties },
-            (JsonElement element) => element.GetProperty("item")
-        ).ConfigureAwait(false);
-        this.PlayerState = parameters.Item.Type switch
-        {
-            ItemType.Picture when element.Deserialize<PictureInfo>(JsonSerializerOptions.Web) is { } picture => new(
-               PlayState.Playing,
-               picture.Label,
-               parameters.Item.File ?? parameters.Item.ToString(),
-               this.GetImageUrl(picture.Thumbnail)
-            ),
-            ItemType.Episode when element.Deserialize<EpisodeInfo>(JsonSerializerOptions.Web) is { } episode => CreatePlayerState(episode),
-            ItemType.Song when element.Deserialize<SongInfo>(JsonSerializerOptions.Web) is { } song => CreatePlayerState(song),
-            _ when element.Deserialize<VideoInfo>(JsonSerializerOptions.Web) is { } video => CreatePlayerState(video),
-
-            _ => this.PlayerState,
-        };
-
-        PlayerState CreatePlayerState(IMediaInfo media) => new(
-            PlayState.Playing,
-            media.GetTitle(),
-            media.GetDescription(),
-            this.GetImageUrl(media.GetCoverArt())
-        );
+            logger.LogError(ex, "Failed to handle Kodi Player.OnPlay notification.");
+        }
     }
+
+    private PlayerState CreatePlayerState(IMediaInfo media) => new(
+        PlayState.Playing,
+        media.GetTitle(),
+        media.GetDescription(),
+        this.GetImageUrl(media.GetCoverArt())
+    );
 
     private void ProcessIncomingMessage(string method, JsonElement parameters)
     {
@@ -465,13 +663,19 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 this.PlayerState = PlayerState.Defaults;
                 break;
             case "Application.OnVolumeChanged":
-                this.ProcessVolumeInfo(parameters.Deserialize<VolumeInfo>(JsonSerializerOptions.Web));
+                if (parameters.Deserialize<VolumeInfo>(KodiJsonSerializerOptions.Default) is { } volumeInfo)
+                {
+                    this.ProcessVolumeInfo(volumeInfo);
+                }
                 break;
             case "Player.OnPause":
                 this.PlayerState = this.PlayerState with { PlayState = PlayState.Paused };
                 break;
             case "Player.OnPlay":
-                this.OnPlay(parameters.Deserialize<PlayParameters>(JsonSerializerOptions.Web));
+                if (parameters.Deserialize<PlayParameters>(KodiJsonSerializerOptions.Default) is { } playParams)
+                {
+                    _ = this.OnPlayAsync(playParams);
+                }
                 break;
         }
     }
@@ -499,28 +703,41 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         valueChanged?.Invoke(this, value);
     }
 
-    private readonly record struct AlbumListResult(
+    internal readonly record struct AlbumListResult(
         Limits Limits,
-        AlbumInfo[] Albums
+        AlbumInfo[]? Albums
     );
 
-    private readonly record struct EpisodeListResult(
+    internal readonly record struct ArtistListResult(
         Limits Limits,
-        EpisodeInfo[] Episodes
+        ArtistInfo[]? Artists
     );
 
-    private readonly record struct ItemInfo(
+    internal readonly record struct EpisodeListResult(
+        Limits Limits,
+        EpisodeInfo[]? Episodes
+    );
+
+    internal readonly record struct SongListResult(
+        Limits Limits,
+        SongInfo[]? Songs
+    );
+
+    internal readonly record struct ItemInfo(
         string? File,
         int Id,
         ItemType Type
     );
 
-    private readonly record struct JsonRpcError(
+    internal readonly record struct JsonRpcError(
         int Code,
         string Message
     );
 
-    private readonly record struct JsonRpcRequest(string Method, [property: JsonPropertyName("params")] object? Parameters)
+    internal readonly record struct JsonRpcRequest(
+        string Method,
+        [property: JsonPropertyName("params"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? Parameters = null
+    )
     {
         public string Id { get; } = Guid.NewGuid().ToString();
 
@@ -528,7 +745,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         public string JsonRpcVersion { get; } = "2.0";
     }
 
-    private readonly record struct JsonRpcResponse(
+    internal readonly record struct JsonRpcResponse(
         JsonRpcError? Error = default,
         string? Id = default,
         string? Method = default,
@@ -536,25 +753,25 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         JsonElement? Result = default
     );
 
-    private readonly record struct Limits(
+    internal readonly record struct Limits(
         int Start,
         int End,
         int Total
     );
 
-    private readonly record struct MoviesListResult(
+    internal readonly record struct MoviesListResult(
         Limits Limits,
         VideoInfo[] Movies
     );
 
-    private readonly record struct Notification(
+    internal readonly record struct Notification(
         string Title,
         string Message,
         string? Image,
         [property: JsonPropertyName("displaytime")] int DisplayTime
     );
 
-    private readonly record struct PictureInfo(
+    internal readonly record struct PictureInfo(
         string Label,
         string Thumbnail
     )
@@ -562,51 +779,51 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         public static readonly string[] Fields = ["thumbnail", "title"];
     }
 
-    private readonly record struct PlayerInfo(
+    internal readonly record struct PlayerInfo(
         [property: JsonPropertyName("playerid")] int Id,
         int? Speed = default,
         PlayerType? Type = default
     );
 
-    private readonly record struct PlayParameters(
+    internal readonly record struct PlayParameters(
         ItemInfo Item,
         PlayerInfo Player
     );
 
-    private readonly record struct ResponseParameters(
+    internal readonly record struct ResponseParameters(
         JsonElement Data,
         string Sender
     );
 
-    private readonly record struct SeekResult(
+    internal readonly record struct SeekResult(
         double Percentage,
         Time Time,
         Time TotalTime
     );
 
-    private readonly record struct SortOrder(
+    internal readonly record struct SortOrder(
         string Method,
         string Order = "ascending",
         [property: JsonPropertyName("ignorearticle")] bool IgnoreArticle = true
     );
 
-    private readonly record struct Time(
+    internal readonly record struct Time(
         int Hours,
         int Minutes,
         int Seconds,
         int Milliseconds
     );
 
-    private readonly record struct TVShowsListResult(
+    internal readonly record struct TVShowsListResult(
         Limits Limits,
         [property: JsonPropertyName("tvshows")] TVShowInfo[] TVShows
     );
 
-    private readonly record struct VolumeInfo(
+    internal readonly record struct VolumeInfo(
         int Volume,
         bool Muted = false
     )
     {
         public static readonly string[] Properties = ["muted", "volume"];
-}
+    }
 }

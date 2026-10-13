@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -57,8 +57,13 @@ public abstract partial class PlexDeviceProviderBase(
     };
 
     private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
+    private static readonly UrlTokenStore _imageUrlTokens = new();
     private static readonly Uri _signInUri = new("https://plex.tv/users/sign_in.json");
     private static readonly Uri _userUri = new($"https://plex.tv/api/v2/user");
+
+    public static string RegisterImageUrl(string imageUrl) => PlexDeviceProviderBase._imageUrlTokens.Register(imageUrl);
+
+    public static string? ResolveImageUrl(string token) => PlexDeviceProviderBase._imageUrlTokens.Resolve(token);
 
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
     private readonly ConcurrentDictionary<string, IPlexServer> _servers = [];
@@ -117,8 +122,9 @@ public abstract partial class PlexDeviceProviderBase(
     protected string GetThumbnailUrl(Uri plexUri, ImageSize size = ImageSize.Large)
     {
         int pixels = size is ImageSize.Large ? 480 : 100;
-        string suffix = PlexDeviceProviderBase.EncodeBase64($"{plexUri}&width={pixels}&height={pixels}");
-        return $"{this._uriPrefix}{VirtualDirectories.Thumbnail}/{suffix}";
+        string imageUrl = $"{plexUri}&width={pixels}&height={pixels}";
+        string token = PlexDeviceProviderBase.RegisterImageUrl(imageUrl);
+        return $"{this._uriPrefix}{VirtualDirectories.Thumbnail}/{token}";
     }
 
     protected string GetTitle(string machineIdentifier) => this.GetActiveMediaText(machineIdentifier, static media => media.Title);
@@ -146,19 +152,6 @@ public abstract partial class PlexDeviceProviderBase(
     }
 
     protected bool IsPlaying(string machineIdentifier) => this.GetServer(machineIdentifier) is { PlayState: PlayState.Playing or PlayState.Buffering };
-
-    private static string DecodeBase64(string text)
-    {
-        string base64 = $"{text[..^1].Replace('-', '+').Replace('_', '/')}{new string('=', int.Parse(text[^1..]))}";
-        return Encoding.UTF8.GetString(Convert.FromBase64String(base64));
-    }
-
-    private static string EncodeBase64(string text)
-    {
-        string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text)).Replace('+', '-').Replace('/', '_');
-        string trimmed = base64.TrimEnd('=');
-        return $"{trimmed}{base64.Length - trimmed.Length}";
-    }
 
     private static string GetContentType(string fileName) => PlexDeviceProviderBase._contentTypeProvider.TryGetContentType(fileName, out string? contentType)
         ? contentType
@@ -299,7 +292,6 @@ public abstract partial class PlexDeviceProviderBase(
         media.Title,
         media.Summary,
         ActionIdentifier: media.Type is MediaType.Episode or MediaType.Movie or MediaType.Video ? $"media.{media.RatingKey}" : null,
-
         ThumbnailUri: media.ThumbnailUri is { } uri ? this.GetThumbnailUrl(uri, ImageSize.Small) : null
     );
 
@@ -382,7 +374,10 @@ public abstract partial class PlexDeviceProviderBase(
 
         async Task<ActionResult> HandleThumbnailRouteAsync(string suffix)
         {
-            string imageUrl = PlexDeviceProviderBase.DecodeBase64(suffix);
+            if (PlexDeviceProviderBase.ResolveImageUrl(suffix) is not { } imageUrl)
+            {
+                return new NotFoundResult();
+            }
             try
             {
                 using HttpRequestMessage request = new(HttpMethod.Get, new Uri(imageUrl)) { Headers = { { "X-Plex-Token", tokenStore.AuthToken } } };
@@ -400,7 +395,7 @@ public abstract partial class PlexDeviceProviderBase(
             }
             catch (HttpRequestException e)
             {
-                Console.WriteLine(e);
+                logger.LogWarning(e, "Failed to proxy Plex image from {Url}.", imageUrl);
                 return new StatusCodeResult(503);
             }
         }

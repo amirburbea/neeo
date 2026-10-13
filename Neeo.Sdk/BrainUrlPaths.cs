@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk;
+namespace Neeo.Sdk;
 
 internal static class BrainUrlPaths
 {
@@ -13,6 +13,8 @@ internal static class BrainUrlPaths
     public const string RegisterServer = "/v1/api/registerSdkDeviceAdapter";
 
     public const string SubscriptionsFormat = "/v1/api/subscriptions/{0}/{1}";
+
+    public const string SystemInfo = "/systeminfo";
 
     public const string UnregisterServer = "/v1/api/unregisterSdkDeviceAdapter";
 }

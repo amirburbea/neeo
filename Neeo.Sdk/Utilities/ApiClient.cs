@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,6 +35,13 @@ public interface IApiClient
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
         where TBody : notnull;
+
+    /// <summary>
+    /// Asynchronously probes the NEEO Brain to verify it is reachable and responsive.
+    /// </summary>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <returns><see langword="true"/> if the Brain responded successfully; otherwise <see langword="false"/>.</returns>
+    Task<bool> IsAliveAsync(CancellationToken cancellationToken = default);
 }
 
 internal sealed class ApiClient(
@@ -69,5 +76,27 @@ internal sealed class ApiClient(
             .PostAsync<TBody, SuccessResponse>(builder.Uri, body, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         return response.Success;
+    }
+
+    public async Task<bool> IsAliveAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            UriBuilder builder = new(this._baseUri) { Path = BrainUrlPaths.SystemInfo };
+            using HttpResponseMessage response = await this._httpClient.GetAsync(
+                builder.Uri,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken
+            ).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

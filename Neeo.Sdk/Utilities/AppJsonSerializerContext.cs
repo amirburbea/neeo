@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Components;
@@ -48,6 +49,7 @@ namespace Neeo.Sdk.Utilities;
 [JsonSerializable(typeof(SecureController.PgpPublicKeyResponse))]
 [JsonSerializable(typeof(JsonElement))]
 [JsonSerializable(typeof(string[]))]
+[JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(SdkRegistration.RegisterServerRequest))]
 [JsonSerializable(typeof(SdkRegistration.UnregisterServerRequest))]
 [JsonSerializable(typeof(DeviceBuilder.Credentials))]

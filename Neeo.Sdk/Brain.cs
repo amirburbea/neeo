@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -102,16 +102,17 @@ public static class BrainMethods
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
     /// <param name="brain">The NEEO Brain.</param>
+    /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
     /// <param name="name">
     /// A name for your integration server. This name should be consistent upon restarting the
     /// driver host server.
     /// </param>
-    /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
     /// <param name="hostIPAddress">
     /// The IP Address on which to bind the integration server. If not specified, falls back to the
     /// first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
     /// </param>
     /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
+    /// <param name="serviceConfigurations">Optional additional service configuration(s).</param>
     /// <param name="configureLogging">
     /// By default, the integration server logs via debug in development. This allows overriding the
     /// behavior with a custom log configuration.
@@ -124,10 +125,12 @@ public static class BrainMethods
         string? name = default,
         IPAddress? hostIPAddress = null,
         ushort port = 0,
+        IServiceConfiguration[]? serviceConfigurations = default,
         Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
         CancellationToken cancellationToken = default
     )
     {
+        ArgumentNullException.ThrowIfNull(brain);
         if (devices is not { Length: > 0 })
         {
             throw new ArgumentException("At least one device is required.", nameof(devices));
@@ -137,7 +140,7 @@ public static class BrainMethods
             name,
             hostIPAddress,
             port,
-            serviceConfigurations: default,
+            serviceConfigurations: serviceConfigurations,
             configureLogging: configureLogging,
             cancellationToken
         );
@@ -147,57 +150,12 @@ public static class BrainMethods
     /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
     /// </summary>
     /// <param name="brain">The NEEO Brain.</param>
-    /// <param name="name">
-    /// A name for your integration server. This name should be consistent upon restarting the
-    /// driver host server.
-    /// </param>
-    /// <param name="devices">An array of devices to register with the NEEO Brain.</param>
-    /// <param name="hostIPAddress">
-    /// The IP Address on which to bind the integration server. If not specified, falls back to the
-    /// first non-loopack IPv4 address or <see cref="IPAddress.Loopback"/> if not found.
-    /// </param>
-    /// <param name="port">The port to listen on, if 0 the port will be assigned randomly.</param>
-    /// <param name="configureLogging">
-    /// By default, the integration server logs via debug in development. This allows overriding the
-    /// behavior with a custom log configuration.
-    /// </param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns><see cref="Task"/> to indicate completion.</returns>
-    public static Task<ISdkEnvironment> StartServerAsync(
-        this Brain brain,
-        IDeviceProvider[] devices,
-        string? name = default,
-        IPAddress? hostIPAddress = null,
-        ushort port = 0,
-        Action<HostBuilderContext, ILoggingBuilder>? configureLogging = default,
-        CancellationToken cancellationToken = default
-    )
-    {
-        if (devices is not { Length: > 0 })
-        {
-            throw new ArgumentException("At least one device is required.", nameof(devices));
-        }
-        return brain.StartServerAsync(
-            _ => [.. devices.Select(static provider => provider.DeviceBuilder)],
-            name,
-            hostIPAddress,
-            port,
-            serviceConfigurations: default,
-            configureLogging: configureLogging,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Asynchronously starts the SDK integration server and registers it on the NEEO Brain.
-    /// </summary>
-    /// <param name="brain">The NEEO Brain.</param>
-    /// <param name="name">
-    /// A name for your integration server. This name should be consistent upon restarting the
-    /// driver host server.
-    /// </param>
     /// <param name="deviceProviderTypes">
     /// An array of types of device providers implementing <see cref="IDeviceProvider"/> to register with the NEEO Brain.
+    /// </param>
+    /// <param name="name">
+    /// A name for your integration server. This name should be consistent upon restarting the
+    /// driver host server.
     /// </param>
     /// <param name="hostIPAddress">
     /// The IP Address on which to bind the integration server. If not specified, falls back to the
@@ -222,8 +180,13 @@ public static class BrainMethods
         CancellationToken cancellationToken = default
     )
     {
+        ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(deviceProviderTypes);
-        if (deviceProviderTypes.Any(type => !typeof(IDeviceProvider).IsAssignableFrom(type)) )
+        if (deviceProviderTypes is not { Length: > 0 })
+        {
+            throw new ArgumentException("At least one device provider type is required.", nameof(deviceProviderTypes));
+        }
+        if (deviceProviderTypes.Any(type => !typeof(IDeviceProvider).IsAssignableFrom(type)))
         {
             throw new ArgumentException("All device provider types must implement IDeviceProvider.", nameof(deviceProviderTypes));
         }

@@ -31,6 +31,21 @@ public sealed class DirectoryFeatureTests
     }
 
     [Fact]
+    public void AddEntry_truncates_title_and_label_to_255_chars()
+    {
+        string longTitle = new('t', 300);
+        string longLabel = new('l', 400);
+        DirectoryBuilder builder = new(new(BrowseIdentifier: "root"));
+        builder.AddEntry(new DirectoryEntry(longTitle, Label: longLabel, BrowseIdentifier: ".movies"));
+
+        DirectoryData data = builder.Build();
+        JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize<IDirectoryItem>(data.Items.Single(), DirectoryFeatureTests._options));
+
+        Assert.Equal(new string('t', 255), document.RootElement.GetProperty("title").GetString());
+        Assert.Equal(new string('l', 255), document.RootElement.GetProperty("label").GetString());
+    }
+
+    [Fact]
     public void AddEntry_with_relative_thumbnail_uri_throws()
     {
         DirectoryBuilder builder = new(new(Limit: 64));

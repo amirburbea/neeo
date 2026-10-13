@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Plex;
 
@@ -27,6 +28,7 @@ public interface IPlexServerManager
     Task InitializeAsync();
 }
 
+[SettingsStore("plex.servers.bin")]
 internal sealed class PlexServerManager : IPlexServerManager, IDisposable
 {
     private static readonly byte[] _gdmRequest = Encoding.ASCII.GetBytes("M-SEARCH * HTTP/1.0\r\n\r\n");
@@ -39,17 +41,17 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
     private readonly ILogger<PlexServerManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly Dictionary<string, (PlexServer Server, List<IPlexServer> Proxies)> _servers = [];
-    private readonly IPlexSettingsManager _settingsManager;
+    private readonly ISettingsStore<PlexServerManager> _settings;
     private readonly IPlexTokenStore _tokenStore;
 
     public PlexServerManager(
         IHttpClientFactory httpClientFactory,
-        IPlexSettingsManager settingsManager,
+        ISettingsStore<PlexServerManager> settings,
         IPlexTokenStore tokenStore,
         ILoggerFactory loggerFactory
     )
     {
-        this._settingsManager = settingsManager;
+        this._settings = settings;
         this._tokenStore = tokenStore;
         this._loggerFactory = loggerFactory;
         this._httpClient = httpClientFactory.CreateClient(nameof(Plex));
@@ -127,7 +129,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
     private PlexServer CreateServer(string machineIdentifier) => new(
         machineIdentifier,
         this._httpClient,
-        this._settingsManager,
+        this._settings,
         this._tokenStore,
         () => this._discoveryData[machineIdentifier],
         this._loggerFactory.CreateLogger<PlexServer>()

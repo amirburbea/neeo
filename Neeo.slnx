@@ -1,0 +1,36 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="ARM32" />
+  </Configurations>
+  <Folder Name="/Drivers/">
+    <Project Path="Neeo.Drivers.Hisense/Neeo.Drivers.Hisense.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+    <Project Path="Neeo.Drivers.Kodi/Neeo.Drivers.Kodi.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+    <Project Path="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+  </Folder>
+  <Folder Name="/Sdk/">
+    <Project Path="Neeo.Sdk.Examples/Neeo.Sdk.Examples.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+    <Project Path="Neeo.Sdk.Server/Neeo.Sdk.Server.csproj">
+      <BuildDependency Project="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj" />
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+    <Project Path="Neeo.Sdk.Tests/Neeo.Sdk.Tests.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+    <Project Path="Neeo.Sdk/Neeo.Sdk.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

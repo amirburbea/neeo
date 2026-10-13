@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
@@ -8,12 +8,6 @@ namespace Neeo.Drivers.Kodi;
 
 public sealed class KodiPlayerDeviceProvider(KodiClientManager clientManager, ILogger<KodiPlayerDeviceProvider> logger) : KodiDeviceProviderBase(clientManager, "Player", DeviceType.MediaPlayer, logger), IPlayerWidgetController
 {
-    public bool IsQueueSupported => false;
-
-    public string? QueueDirectoryLabel { get; }
-
-    public string? RootDirectoryLabel { get; }
-
     Task<string> IPlayerWidgetController.GetCoverArtAsync(string deviceId, CancellationToken cancellationToken) => this.GetCoverArt(deviceId);
 
     Task<string> IPlayerWidgetController.GetDescriptionAsync(string deviceId, CancellationToken cancellationToken) => this.GetDescription(deviceId);
@@ -30,14 +24,7 @@ public sealed class KodiPlayerDeviceProvider(KodiClientManager clientManager, IL
 
     Task<double> IPlayerWidgetController.GetVolumeAsync(string deviceId, CancellationToken cancellationToken) => this.GetVolume(deviceId);
 
-    public Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
-    {
-        throw new System.NotImplementedException();
-    }
-
     Task IPlayerWidgetController.HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken) => this.HandleDirectoryActionAsync(deviceId, actionIdentifier, cancellationToken);
-
-    Task IPlayerWidgetController.BrowseQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken) => this.PopulateQueueDirectoryAsync(deviceId, builder, cancellationToken);
 
     Task IPlayerWidgetController.BrowseRootDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken) => this.PopulateRootDirectoryAsync(deviceId, builder, cancellationToken);
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -94,6 +94,30 @@ public sealed class ApiClientTests : IDisposable
 
         var (request, _) = lazy.Value;
         Assert.Equal($"http://127.0.0.1:1234{path}", request.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task IsAliveAsync_should_return_true_when_response_is_success()
+    {
+        this.SetupJsonResponse(new { firmwareVersion = "0.53.0" });
+
+        bool isAlive = await this._client.IsAliveAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(isAlive);
+    }
+
+    [Fact]
+    public async Task IsAliveAsync_should_return_false_when_request_throws()
+    {
+        this._mockMessageHandler
+            .Protected()
+            .As<IMessageHandlerMockedMethods>()
+            .Setup(handler => handler.SendAsync(It.IsAny<HttpRequestMessage>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        bool isAlive = await this._client.IsAliveAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(isAlive);
     }
 
     private Lazy<(HttpRequestMessage, string?)> SetupJsonResponse<T>(T data)

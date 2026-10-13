@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -58,7 +58,6 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     private readonly BehaviorSubject<MediaItem?> _activeMedia = new(null);
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly CompositeDisposable _disposable;
-    private readonly string _fileName;
     private readonly HttpClient _httpClient;
     private readonly TaskCompletionSource _initializationTaskSource = new();
     private readonly BehaviorSubject<bool> _isConnected = new(false);
@@ -72,7 +71,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     private readonly BehaviorSubject<int?> _ratingKey = new(null);
     private readonly BehaviorSubject<string?> _selectedPlayerId = new(null);
     private readonly Func<ServerData> _serverDataLookup;
-    private readonly IPlexSettingsManager _settingsManager;
+    private readonly ISettingsStore _settings;
     private readonly Lazy<Task> _socketTask;
     private readonly Lazy<Task> _timelineHeartbeatTask;
     private readonly IPlexTokenStore _tokenStore;
@@ -82,7 +81,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
     public PlexServer(
         string machineIdentifier,
         HttpClient httpClient,
-        IPlexSettingsManager settingsManager,
+        ISettingsStore settings,
         IPlexTokenStore tokenStore,
         Func<ServerData> lookupServerData,
         ILogger<PlexServer> logger
@@ -91,9 +90,8 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         this.MachineIdentifier = machineIdentifier;
         this._serverDataLookup = lookupServerData;
         this._tokenStore = tokenStore;
-        this._fileName = $"plex_{Convert.ToBase64String(Encoding.UTF8.GetBytes(machineIdentifier)).TrimEnd('=')}.json";
         this._httpClient = httpClient;
-        this._settingsManager = settingsManager;
+        this._settings = settings;
         this._logger = logger;
         this._library = new(this);
         this._disposable = new(
@@ -152,7 +150,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     public async Task DiscoverPlayersAsync(CancellationToken cancellationToken)
     {
-        if (await this._httpClient.GetAsync<Response<ClientsMediaContainer>>(this.GetUri("clients"), this.AddTokenHeaders, cancellationToken).ConfigureAwait(false) is not { MediaContainer.Clients: { } clients })
+        if (await this._httpClient.GetAsync<Response<ClientsMediaContainer>>(this.GetUri("clients"), this.AddTokenHeaders, cancellationToken, PlexJsonSerializerOptions.Default).ConfigureAwait(false) is not { MediaContainer.Clients: { } clients })
         {
             return;
         }
@@ -335,7 +333,8 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                     : []
             ),
             this.AddTokenHeaders,
-            cancellationToken
+            cancellationToken,
+            PlexJsonSerializerOptions.Default
         ).ConfigureAwait(false);
         return response.MediaContainer;
     }
@@ -383,9 +382,10 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 this._isConnected.OnNext(true);
                 await this._playerDiscoveryTaskSource.Task.ConfigureAwait(false);
                 this._initializationTaskSource.TrySetResult();
-                if (this._selectedPlayerId.Value is null && this._settingsManager.HasFile(this._fileName) && this._settingsManager.ReadAllBytes(this._fileName) is { } bytes)
+                if (this._selectedPlayerId.Value is null &&
+                    this._settings.TryGetValue(this.MachineIdentifier, out string? playerJson) &&
+                    JsonSerializer.Deserialize<PlayerData>(playerJson, PlexJsonSerializerOptions.Default) is { MachineIdentifier: { Length: > 0 } } player)
                 {
-                    PlayerData player = JsonSerializer.Deserialize<PlayerData>(bytes, JsonSerializerOptions.Web);
                     // If the player is not in the players dictionary, add it as offline.
                     if (this._players.Value is { } players && !players.ContainsKey(player.MachineIdentifier))
                     {
@@ -393,7 +393,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                     }
                     this._selectedPlayerId.OnNext(player.MachineIdentifier);
                 }
-                await JsonWebSocket.MessageLoop<ServerMessage>(webSocket, ProcessMessageAsync, cancellationToken: this._cancellationTokenSource.Token).ConfigureAwait(false);
+                await JsonWebSocket.MessageLoop<ServerMessage>(webSocket, ProcessMessageAsync, options: PlexJsonSerializerOptions.Default, cancellationToken: this._cancellationTokenSource.Token).ConfigureAwait(false);
             }
             catch (WebSocketException e)
             {
@@ -417,7 +417,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             {
                 return;
             }
-            if (element.Deserialize<PlayStateNotification[]>(JsonSerializerOptions.Web) is not { Length: > 0 } array)
+            if (element.Deserialize<PlayStateNotification[]>(PlexJsonSerializerOptions.Default) is not { Length: > 0 } array)
             {
                 this._logger.LogDebug("Received empty playing notification from Plex server '{Name}'", this.Name);
                 return;
@@ -460,7 +460,8 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         Response<MediaItemDetailContainer> response = await this._httpClient.GetAsync<Response<MediaItemDetailContainer>>(
             this.GetUri($"library/metadata/{ratingKey}"),
             this.AddTokenHeaders,
-            cancellationToken
+            cancellationToken,
+            PlexJsonSerializerOptions.Default
         ).ConfigureAwait(false);
         return response.MediaContainer.Metadata is [{ } metadata, ..] ? this.CreateMediaItem(metadata) : null;
     }
@@ -474,17 +475,16 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         Response<MediaItemDetailContainer> response = await this._httpClient.GetAsync<Response<MediaItemDetailContainer>>(
             this.GetUri("status/sessions"),
             this.AddTokenHeaders,
-            cancellationToken
+            cancellationToken,
+            PlexJsonSerializerOptions.Default
         ).ConfigureAwait(false);
         return response.MediaContainer.Metadata is { } array && Array.FindIndex(array, media => media.Player?.MachineIdentifier == id) is int index and not -1
             ? array[index]
             : null;
     }
 
-    private void SaveSelectedPlayer(PlayerData player) => this._settingsManager.WriteAllBytes(
-        this._fileName,
-        JsonSerializer.SerializeToUtf8Bytes(player, JsonSerializerOptions.Web)
-    );
+    private void SaveSelectedPlayer(PlayerData player) =>
+        this._settings[this.MachineIdentifier] = JsonSerializer.Serialize(player, PlexJsonSerializerOptions.Default);
 
     private async Task SeekAsync(int seconds, CancellationToken cancellationToken)
     {

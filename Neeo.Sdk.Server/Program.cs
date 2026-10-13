@@ -76,6 +76,7 @@ public static class Program
                 }
             }
         }
+        serviceConfigurations.Add(new ConfigurationServiceConfiguration(configuration));
         // Provider types and driver service configurations are handed to SdkService as data, rather than
         // being registered/applied against this (outer) container - SdkService threads them through to
         // Brain.StartServerAsync's Type[] overload, which applies them inside the same (inner) container
@@ -101,5 +102,10 @@ public static class Program
         protected override nint LoadUnmanagedDll(string unmanagedDllName) => this._resolver.ResolveUnmanagedDllToPath(unmanagedDllName) is { } path
             ? this.LoadUnmanagedDllFromPath(path)
             : default;
+    }
+
+    private sealed class ConfigurationServiceConfiguration(IConfiguration configuration) : IServiceConfiguration
+    {
+        public void ConfigureServices(IServiceCollection services) => services.AddSingleton(configuration);
     }
 }

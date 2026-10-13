@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
@@ -66,7 +66,9 @@ internal static class Server
     {
         builder
             .ClearProviders()
-            .SetMinimumLevel(LogLevel.Warning)
+            .SetMinimumLevel(LogLevel.Information)
+            .AddFilter("Microsoft.AspNetCore", LogLevel.Warning)
+            .AddFilter("System.Net.Http", LogLevel.Warning)
             .AddSimpleConsole(options => options.SingleLine = true);
         if (context.HostingEnvironment.IsDevelopment())
         {
@@ -85,6 +87,8 @@ internal static class Server
             .AddSingleton<INotificationService, NotificationService>()
             .AddSingleton<IPgpEncryption, PgpEncryption>()
             .AddSingleton<ISdkEnvironment, SdkEnvironment>()
+            .AddSingleton<ISettingsStoreProvider, SettingsStoreProvider>()
+            .AddSingleton(typeof(ISettingsStore<>), typeof(SettingsStore<>))
             .AddSingleton<IBrain>(brain)
             .AddSingleton(devices)
             .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")

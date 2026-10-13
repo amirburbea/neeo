@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,17 +25,6 @@ public sealed class PlexMediaPlayerDeviceProvider(
     "Media Player"
 ), IPlayerWidgetController
 {
-    bool IPlayerWidgetController.IsQueueSupported => false;
-
-    string? IPlayerWidgetController.QueueDirectoryLabel => throw new NotSupportedException();
-
-    string? IPlayerWidgetController.RootDirectoryLabel => null;
-
-    Task IPlayerWidgetController.BrowseQueueDirectoryAsync(string machineIdentifier, IDirectoryBuilder builder, CancellationToken cancellationToken)
-    {
-        throw new NotSupportedException();
-    }
-
     Task IPlayerWidgetController.BrowseRootDirectoryAsync(string machineIdentifier, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         return this.BrowseDirectoryAsync(machineIdentifier, builder, cancellationToken);
@@ -79,11 +68,6 @@ public sealed class PlexMediaPlayerDeviceProvider(
     Task<double> IPlayerWidgetController.GetVolumeAsync(string machineIdentifier, CancellationToken cancellationToken)
     {
         return Task.FromResult(0d);
-    }
-
-    Task IPlayerWidgetController.HandleQueueDirectoryActionAsync(string machineIdentifier, string actionIdentifier, CancellationToken cancellationToken)
-    {
-        throw new NotSupportedException();
     }
 
     Task IPlayerWidgetController.HandleRootDirectoryActionAsync(string machineIdentifier, string actionIdentifier, CancellationToken cancellationToken)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.IO;
 using System.Text;
@@ -119,9 +119,8 @@ internal sealed class PgpEncryption : IPgpEncryption
     private static string GetPublicKeyText(PgpPublicKey publicKey)
     {
         using StringWriter stringWriter = new();
-        using (ArmoredOutputStream armoredStream = new(new StringWriterOutputStream(stringWriter)))
+        using (ArmoredOutputStream armoredStream = ArmoredOutputStream.Build().SetVersion(default).Build(new StringWriterOutputStream(stringWriter)))
         {
-            armoredStream.SetHeader(ArmoredOutputStream.HeaderVersion, default);
             publicKey.Encode(armoredStream);
         }
         return stringWriter.ToString();

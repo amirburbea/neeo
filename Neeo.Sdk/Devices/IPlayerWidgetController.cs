@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Directories;
 
@@ -12,19 +12,19 @@ public interface IPlayerWidgetController
     /// <summary>
     /// Gets a value indicating if the device supports a playlist queue.
     /// </summary>
-    bool IsQueueSupported { get; }
+    bool IsQueueSupported => false;
 
     /// <summary>
     /// If supported (via <see cref="IsQueueSupported"/>), gets a label to display for the queue directory.
     /// Defaulted to "Queue" if <see langword="null" />.
     /// </summary>
-    string? QueueDirectoryLabel { get; }
+    string? QueueDirectoryLabel => null;
 
     /// <summary>
     /// Gets a label to display for the root directory.
     /// Defaulted to "Root" if <see langword="null" />.
     /// </summary>
-    string? RootDirectoryLabel { get; }
+    string? RootDirectoryLabel => null;
 
     /// <summary>
     /// If supported (via <see cref="IsQueueSupported"/>), asynchronously handles a request by the NEEO Brain to browse the queue directory.
@@ -33,7 +33,7 @@ public interface IPlayerWidgetController
     /// <param name="builder">Directory builder which can be used to populate the directory entries.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task BrowseQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken = default);
+    Task BrowseQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     /// <summary>
     /// Asynchronously handles a request by the NEEO Brain to browse the root directory.
@@ -115,7 +115,7 @@ public interface IPlayerWidgetController
     /// <param name="actionIdentifier">The identifier for the action</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
-    Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default);
+    Task HandleQueueDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     /// <summary>
     /// Asynchronously handles an action from the root directory.

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Neeo.Sdk.Devices.Directories;
@@ -200,8 +200,8 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
     );
 
     private static DirectoryEntryData ToData(DirectoryEntry entry) => new(
-        entry.Title,
-        entry.Label,
+        entry.Title is { Length: > 255 } title ? title[..255] : entry.Title,
+        entry.Label is { Length: > 255 } label ? label[..255] : entry.Label,
         entry.BrowseIdentifier,
         Validator.ValidateThumbnailUri(entry.ThumbnailUri),
         entry.IsQueueable,
