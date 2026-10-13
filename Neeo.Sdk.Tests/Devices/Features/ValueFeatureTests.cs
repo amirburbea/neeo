@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
@@ -54,6 +55,28 @@ public sealed class ValueFeatureTests
         await feature.SetValueAsync(deviceId, text, TestContext.Current.CancellationToken);
 
         mockSetter.Verify(setter => setter(deviceId, value, It.IsAny<CancellationToken>()), Times.Once());
+    }
+
+    [Theory]
+    [InlineData("de-DE")]
+    [InlineData("fr-FR")]
+    public async Task SetValueAsync_should_parse_double_values_independent_of_current_culture(string cultureName)
+    {
+        Mock<AsyncDeviceValueSetter<double>> mockSetter = new(MockBehavior.Strict);
+        mockSetter.Setup(setter => setter(It.IsAny<string>(), It.IsAny<double>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        ValueFeature feature = ValueFeature.Create(Mock.Of<AsyncDeviceValueGetter<double>>(MockBehavior.Strict), mockSetter.Object);
+        CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(cultureName);
+            await feature.SetValueAsync("device", "42.5", TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+
+        mockSetter.Verify(setter => setter("device", 42.5, It.IsAny<CancellationToken>()), Times.Once());
     }
 
     [Fact]

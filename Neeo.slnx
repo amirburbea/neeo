@@ -13,6 +13,9 @@
     <Project Path="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj">
       <Platform Solution="*|ARM32" Project="ARM32" />
     </Project>
+    <Project Path="Neeo.Drivers.WebOS/Neeo.Drivers.WebOS.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
   </Folder>
   <Folder Name="/Sdk/">
     <Project Path="Neeo.Sdk.Examples/Neeo.Sdk.Examples.csproj">

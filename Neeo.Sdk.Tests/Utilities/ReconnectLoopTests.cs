@@ -55,6 +55,29 @@ public sealed class ReconnectLoopTests
     }
 
     [Fact]
+    public async Task Attempt_token_is_cancelled_once_an_attempt_succeeds()
+    {
+        CancellationToken attemptToken = default;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(40),
+            token =>
+            {
+                attemptToken = token;
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken);
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+
+        // Work that outlives the attempt (e.g. a session started on success) must not be bound to this token.
+        Assert.True(attemptToken.IsCancellationRequested);
+    }
+
+    [Fact]
     public async Task Start_is_a_no_op_when_already_running()
     {
         TaskCompletionSource neverCompletes = new();
@@ -160,6 +183,208 @@ public sealed class ReconnectLoopTests
 
         loop.Dispose();
         loop.Start(TestContext.Current.CancellationToken);
+
+        Assert.False(loop.IsRunning);
+        Assert.Equal(0, attempts);
+    }
+
+    [Fact]
+    public async Task Start_with_an_already_cancelled_token_does_not_leave_the_loop_stuck_running()
+    {
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(40),
+            _ =>
+            {
+                Interlocked.Increment(ref attempts);
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(new CancellationToken(canceled: true));
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+        Assert.Equal(0, attempts);
+
+        // The loop can be started again afterward.
+        loop.Start(cancellationToken);
+        await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Dispose_cancels_a_connect_attempt_in_flight()
+    {
+        TaskCompletionSource<bool> attemptCancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(40),
+            async token =>
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    attemptCancelled.TrySetResult(true);
+                    throw;
+                }
+                return true;
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken);
+        await Task.Delay(50, cancellationToken);
+        loop.Dispose();
+
+        Assert.True(await attemptCancelled.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        Assert.False(loop.IsRunning);
+    }
+
+    [Fact]
+    public async Task Start_immediate_makes_the_first_attempt_without_waiting()
+    {
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMinutes(5),
+            TimeSpan.FromMinutes(5),
+            _ =>
+            {
+                Interlocked.Increment(ref attempts);
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken, immediate: true);
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public async Task TriggerNow_cuts_a_wait_short()
+    {
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMinutes(5),
+            TimeSpan.FromMinutes(5),
+            _ => Task.FromResult(Interlocked.Increment(ref attempts) >= 1),
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken);
+        await Task.Delay(50, cancellationToken);
+        Assert.Equal(0, attempts);
+        loop.TriggerNow(cancellationToken);
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public async Task TriggerNow_starts_a_stopped_loop_immediately()
+    {
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMinutes(5),
+            TimeSpan.FromMinutes(5),
+            _ =>
+            {
+                Interlocked.Increment(ref attempts);
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.TriggerNow(cancellationToken);
+        await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
+    }
+
+    [Fact]
+    public async Task TriggerNow_during_an_attempt_runs_another_attempt_without_waiting_and_restarts_backoff()
+    {
+        TaskCompletionSource firstAttemptStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource releaseFirstAttempt = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMinutes(5),
+            async _ =>
+            {
+                if (Interlocked.Increment(ref attempts) == 1)
+                {
+                    firstAttemptStarted.TrySetResult();
+                    await releaseFirstAttempt.Task.ConfigureAwait(false);
+                    return false;
+                }
+                return true;
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken, immediate: true);
+        await firstAttemptStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        loop.TriggerNow(cancellationToken);
+        loop.TriggerNow(cancellationToken); // Coalesced with the first.
+        releaseFirstAttempt.TrySetResult();
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+
+        Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task Stop_cancels_the_cycle_and_the_loop_can_be_started_again()
+    {
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMinutes(5),
+            TimeSpan.FromMinutes(5),
+            _ =>
+            {
+                Interlocked.Increment(ref attempts);
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken);
+        Assert.True(loop.IsRunning);
+        loop.Stop();
+        Assert.False(loop.IsRunning);
+        await Task.Delay(50, cancellationToken);
+        Assert.Equal(0, attempts);
+
+        loop.Start(cancellationToken, immediate: true);
+        await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
+    }
+
+    [Fact]
+    public void TriggerNow_after_Dispose_is_a_no_op()
+    {
+        int attempts = 0;
+        Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromMilliseconds(40),
+            _ =>
+            {
+                Interlocked.Increment(ref attempts);
+                return Task.FromResult(true);
+            },
+            NullLogger.Instance
+        );
+
+        loop.Dispose();
+        loop.TriggerNow(TestContext.Current.CancellationToken);
 
         Assert.False(loop.IsRunning);
         Assert.Equal(0, attempts);

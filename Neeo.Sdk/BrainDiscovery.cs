@@ -139,12 +139,7 @@ public sealed partial class BrainDiscovery : IBrainDiscovery
             _ => null
         };
 
-        Brain CreateBrain(string ip)
-        {
-            string hostName = $"{properties["hon"]}.local";
-            string version = properties["rel"];
-            return new(IPAddress.Parse(ip), hostName, version);
-        }
+        Brain CreateBrain(string ip) => new(IPAddress.Parse(ip), hostName: $"{properties["hon"]}.local", version: properties["rel"]);
     }
 
     private static class Constants

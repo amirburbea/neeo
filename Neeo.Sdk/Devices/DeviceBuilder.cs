@@ -296,6 +296,24 @@ public interface IDeviceBuilder
     IDeviceBuilder AddPowerStateSensor(DeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor.AsAsync());
 
     /// <summary>
+    /// Defines a sensor by which NEEO can detemine if the device is powered on/off, derived from whether the device's
+    /// client in the <paramref name="registry"/> is connected.
+    ///
+    /// Once the server has started, power notifications are sent to the NEEO Brain automatically whenever a client in the
+    /// <paramref name="registry"/> is added, removed, connects or disconnects - no call to <see cref="IDeviceBuilder.EnableNotifications"/>
+    /// is required for this.
+    /// </summary>
+    /// <typeparam name="TClient">The type of the client.</typeparam>
+    /// <param name="registry">The registry of device clients.</param>
+    /// <param name="sensor">
+    /// An optional callback to determine if the device is on or off when queried by the NEEO Brain. Defaults to
+    /// <see cref="IDeviceRegistry{TClient}.TryGetConnected"/>.
+    /// </param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddPowerStateSensor<TClient>(IDeviceRegistry<TClient> registry, AsyncDeviceValueGetter<bool>? sensor = null)
+        where TClient : class, IDeviceClient;
+
+    /// <summary>
     /// Adds a range sensor to the device.
     /// </summary>
     /// <param name="name">The name of the sensor to add.</param>
@@ -655,6 +673,8 @@ internal sealed partial class DeviceBuilder(
     private bool _hasInput;
     private bool _hasPlayerWidget;
     private int _roles;
+    private DeviceNotifierCallback? _notifierCallback;
+    private DeviceNotifierCallback? _registryNotifierCallbacks;
     private DeviceRouteHandler? _routeHandler;
     private UriPrefixCallback? _uriPrefixCallback;
 
@@ -692,7 +712,7 @@ internal sealed partial class DeviceBuilder(
 
     public string Name { get; } = Validator.ValidateText(name);
 
-    public DeviceNotifierCallback? NotifierCallback { get; private set; }
+    public DeviceNotifierCallback? NotifierCallback => this._notifierCallback + this._registryNotifierCallbacks;
 
     IRegistrationFeature? IDeviceBuilder.RegistrationFeature => this.RegistrationFeature;
 
@@ -751,6 +771,8 @@ internal sealed partial class DeviceBuilder(
     IDeviceBuilder IDeviceBuilder.AddPlayerWidget(IPlayerWidgetController controller) => this.AddPlayerWidget(controller);
 
     IDeviceBuilder IDeviceBuilder.AddPowerStateSensor(AsyncDeviceValueGetter<bool> sensor) => this.AddPowerStateSensor(sensor);
+
+    IDeviceBuilder IDeviceBuilder.AddPowerStateSensor<TClient>(IDeviceRegistry<TClient> registry, AsyncDeviceValueGetter<bool>? sensor) => this.AddPowerStateSensor(registry, sensor);
 
     IDeviceBuilder IDeviceBuilder.AddSensor(
         string name,
@@ -993,6 +1015,27 @@ internal sealed partial class DeviceBuilder(
            .AddSwitch(PlayerWidgetConstants.MuteSwitchName, null, controller.GetIsMutedAsync, controller.SetIsMutedAsync)
            .AddSwitch(PlayerWidgetConstants.ShuffleSwitchName, null, controller.GetShuffleAsync, controller.SetShuffleAsync)
            .AddSwitch(PlayerWidgetConstants.RepeatSwitchName, null, controller.GetRepeatAsync, controller.SetRepeatAsync);
+    }
+
+    private DeviceBuilder AddPowerStateSensor<TClient>(IDeviceRegistry<TClient> registry, AsyncDeviceValueGetter<bool>? getter)
+        where TClient : class, IDeviceClient
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        this.AddPowerStateSensor(getter ?? new AsyncDeviceValueGetter<bool>((deviceId, cancellationToken) => Task.FromResult(registry.TryGetConnected(deviceId, out _))));
+        this._registryNotifierCallbacks += notifier => registry.Changed += (_, e) => DeviceBuilder.SendPowerNotification(notifier, e.DeviceId, e.IsConnected);
+        return this;
+    }
+
+    private static void SendPowerNotification(IDeviceNotifier notifier, string deviceId, bool isConnected)
+    {
+        // Fire and forget - the registry raises changes synchronously, and the notification service queues the send
+        // (and logs a failed one) itself. Observe any fault so it is never reported as unobserved.
+        _ = notifier.SendPowerNotificationAsync(isConnected, deviceId).ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default
+        );
     }
 
     private DeviceBuilder AddPowerStateSensor(AsyncDeviceValueGetter<bool> getter)
@@ -1322,11 +1365,11 @@ internal sealed partial class DeviceBuilder(
 
     private DeviceBuilder EnableNotifications(DeviceNotifierCallback callback)
     {
-        if (this.NotifierCallback != null)
+        if (this._notifierCallback != null)
         {
             throw new InvalidOperationException($"{nameof(DeviceNotifierCallback)} already defined.");
         }
-        this.NotifierCallback = callback;
+        this._notifierCallback = callback;
         return this;
     }
 

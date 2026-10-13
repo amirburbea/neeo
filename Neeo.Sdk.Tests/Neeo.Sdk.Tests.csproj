@@ -26,6 +26,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Neeo.Drivers.Kodi\Neeo.Drivers.Kodi.csproj" />
 		<ProjectReference Include="..\Neeo.Drivers.Plex\Neeo.Drivers.Plex.csproj" />
+		<ProjectReference Include="..\Neeo.Drivers.WebOS\Neeo.Drivers.WebOS.csproj" />
 		<ProjectReference Include="..\Neeo.Sdk\Neeo.Sdk.csproj" />
 		<ProjectReference Include="..\Neeo.Sdk.Server\Neeo.Sdk.Server.csproj" />
 	</ItemGroup>

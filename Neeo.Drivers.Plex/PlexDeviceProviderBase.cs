@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -66,7 +65,7 @@ public abstract partial class PlexDeviceProviderBase(
     public static string? ResolveImageUrl(string token) => PlexDeviceProviderBase._imageUrlTokens.Resolve(token);
 
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
-    private readonly ConcurrentDictionary<string, IPlexServer> _servers = [];
+    private readonly DeviceRegistry<PlexServerClient> _servers = new(logger);
     private IDeviceNotifier? _notifier;
     private string _uriPrefix = string.Empty;
 
@@ -99,7 +98,7 @@ public abstract partial class PlexDeviceProviderBase(
     protected virtual IDeviceBuilder CreateDevice() => Device.Create(deviceName, deviceType)
         .AddAdditionalSearchTokens("PMS")
         .AddButtonHandler(this.HandleButtonAsync)
-        .AddPowerStateSensor(this.IsConnected)
+        .AddPowerStateSensor(this._servers)
         .AddTextLabel(Components.Player, "Player", (machineIdentifier) => this.GetServer(machineIdentifier)?.SelectedPlayerName ?? string.Empty)
         .EnableDeviceRoute(uriPrefix => this._uriPrefix = uriPrefix, this.HandleHttpRequestAsync)
         .EnableDiscovery("Discovering Plex Servers", "Select Plex Server", (optionalDeviceId, _) => Task.FromResult(this.GetDiscoveredServers(optionalDeviceId)))
@@ -117,7 +116,7 @@ public abstract partial class PlexDeviceProviderBase(
         media => media.Summary is { Length: > 0 } summary ? summary : media.Title
     );
 
-    protected IPlexServer? GetServer(string machineIdentifier) => this._servers.GetValueOrDefault(machineIdentifier);
+    protected IPlexServer? GetServer(string machineIdentifier) => this._servers.GetClient(machineIdentifier)?.Server;
 
     protected string GetThumbnailUrl(Uri plexUri, ImageSize size = ImageSize.Large)
     {
@@ -401,8 +400,6 @@ public abstract partial class PlexDeviceProviderBase(
         }
     }
 
-    private bool IsConnected(string machineIdentifier) => this.GetServer(machineIdentifier) is { IsConnected: true };
-
     private Task NotifyInitialServersAsync(string[] machineIdentifiers, CancellationToken cancellationToken)
     {
         if (machineIdentifiers.Length != 0)
@@ -441,18 +438,17 @@ public abstract partial class PlexDeviceProviderBase(
             return;
         }
         logger.LogInformation("Plex device added: {Name} ({IPAddress})", server.Name, server.ServerData.IPAddress);
-        if (!this._servers.TryAdd(machineIdentifier, server) || this._notifier is not { } notifier)
+        PlexServerClient client = new(server);
+        if (!this._servers.TryAdd(client))
+        {
+            client.Dispose();
+            return;
+        }
+        // Power notifications on connection changes are sent by the registry (see AddPowerStateSensor).
+        if (this._notifier is not { } notifier)
         {
             return;
         }
-        // Notify on changes to connection.
-        server.IsConnectedChanged
-            .Skip(1)
-            .DistinctUntilChanged()
-            .Select(isConnected => Observable.FromAsync((token) => notifier.SendPowerNotificationAsync(isConnected, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
         // Notify on changes to player.
         server.SelectedPlayerChanged
             .Select(data => data is { Name: { } name } ? name : string.Empty)
@@ -504,10 +500,10 @@ public abstract partial class PlexDeviceProviderBase(
 
     private Task OnServerRemovedAsync(string machineIdentifier, CancellationToken cancellationToken)
     {
-        if (this._servers.TryRemove(machineIdentifier, out IPlexServer? server))
+        if (this._servers.TryRemove(machineIdentifier, out PlexServerClient? client))
         {
             logger.LogInformation("Plex device removed: {Name}", machineIdentifier);
-            server.Dispose();
+            client.Dispose();
         }
         return Task.CompletedTask;
     }

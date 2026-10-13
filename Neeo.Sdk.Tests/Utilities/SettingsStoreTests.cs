@@ -125,12 +125,89 @@ public sealed class SettingsStoreTests : IDisposable
         ISettingsStore<PlainType> storePlain = this._provider.GetStore<PlainType>();
         storePlain["plain"] = "value";
 
-        string plainFile = Path.Combine(this._tempDirectory, "plaintype.settings.bin");
+        string plainFile = Path.Combine(this._tempDirectory, "neeo.sdk.tests.utilities.settingsstoretests.plaintype.settings.bin");
         Assert.True(File.Exists(plainFile));
+    }
+
+    [Fact]
+    public void ResolveStoreName_distinguishes_same_named_types_in_different_namespaces()
+    {
+        Assert.NotEqual(
+            SettingsStoreProvider.ResolveStoreName(typeof(DriverA.Settings)),
+            SettingsStoreProvider.ResolveStoreName(typeof(DriverB.Settings))
+        );
+    }
+
+    [Fact]
+    public void Master_key_file_is_created_once_and_reused()
+    {
+        this._provider.GetStore("key_test")["a"] = "1";
+        string keyFile = Path.Combine(this._tempDirectory, SettingsStoreProvider.KeyFileName);
+        byte[] key = File.ReadAllBytes(keyFile);
+        Assert.Equal(32, key.Length);
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(keyFile));
+        }
+
+        SettingsStoreProvider provider2 = this.CreateProvider();
+        Assert.Equal("1", provider2.GetStore("key_test").Get("a"));
+        Assert.Equal(key, File.ReadAllBytes(keyFile));
+    }
+
+    [Fact]
+    public void Unreadable_file_is_moved_aside_rather_than_overwritten()
+    {
+        this._provider.GetStore("first")["token"] = "secret";
+        string firstFile = Path.Combine(this._tempDirectory, "first.settings.bin");
+        string secondFile = Path.Combine(this._tempDirectory, "second.settings.bin");
+        // Encrypted with first's key, so second can not decrypt it.
+        File.Copy(firstFile, secondFile);
+        byte[] original = File.ReadAllBytes(secondFile);
+
+        ISettingsStore second = this.CreateProvider().GetStore("second");
+        Assert.Empty(second);
+        second["other"] = "x";
+
+        string backup = Assert.Single(Directory.GetFiles(this._tempDirectory, "second.settings.bin.*.unreadable"));
+        Assert.Equal(original, File.ReadAllBytes(backup));
+    }
+
+    [Fact]
+    public void Files_written_with_the_legacy_machine_key_are_migrated()
+    {
+        const string storeName = "legacy.settings.bin";
+        string filePath = Path.Combine(this._tempDirectory, storeName);
+        byte[] legacy = SettingsStore.Encrypt(SettingsStore.DeriveLegacyKey(storeName), Encoding.UTF8.GetBytes("{\"authToken\":\"abc\"}"));
+        File.WriteAllBytes(filePath, legacy);
+
+        Assert.Equal("abc", this._provider.GetStore("legacy").Get("authToken"));
+        // Re-encrypted with the key file's key: no longer readable with the legacy key, still readable by a new provider.
+        Assert.Null(SettingsStore.TryDecrypt(SettingsStore.DeriveLegacyKey(storeName), File.ReadAllBytes(filePath)));
+        Assert.Equal("abc", this.CreateProvider().GetStore("legacy").Get("authToken"));
+    }
+
+    private SettingsStoreProvider CreateProvider()
+    {
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection([new KeyValuePair<string, string?>("settingsPath", this._tempDirectory)])
+            .Build();
+        return new(config, NullLoggerFactory.Instance);
     }
 
     [SettingsStore("custom_named_store.bin")]
     private sealed class AttributedType;
 
     private sealed class PlainType;
+
+    private static class DriverA
+    {
+        public sealed class Settings;
+    }
+
+    private static class DriverB
+    {
+        public sealed class Settings;
+    }
 }
+
