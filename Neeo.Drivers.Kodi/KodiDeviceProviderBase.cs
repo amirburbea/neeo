@@ -95,14 +95,14 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         this._deviceName = deviceName;
         this._deviceType = deviceType;
         this._logger = logger;
-        this._clientManager.ClientDiscovered += this.ClientManager_ClientDiscovered;
+        this._clientManager.Registry.Changed += this.Registry_Changed;
     }
 
     public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
 
     public virtual void Dispose()
     {
-        this._clientManager.ClientDiscovered -= this.ClientManager_ClientDiscovered;
+        this._clientManager.Registry.Changed -= this.Registry_Changed;
         GC.SuppressFinalize(this);
     }
 
@@ -127,7 +127,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddDirectory("TVShowLibrary", "TV Shows", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".tvshows")
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
-        .AddPowerStateSensor((deviceId, _) => this.GetIsPoweredOnAsync(deviceId))
+        .AddPowerStateSensor(this._clientManager.Registry, (deviceId, _) => this.GetIsPoweredOnAsync(deviceId))
         .EnableDeviceRoute(this.SetUriPrefix, this.HandleDeviceRouteAsync)
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableRegistration(Constants.RegistrationHeader, Constants.RegistrationDescription, this.QueryIsRegisteredAsync, this.RegisterAsync)
@@ -625,31 +625,20 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private void AttachEventHandlers(KodiClient client)
     {
         client.Connected += this.Client_Connected;
-        client.Disconnected += this.Client_Disconnected;
         client.Error += this.Client_Error;
         client.PlayerStateChanged += this.Client_PlayerStateChanged;
         client.VolumeChanged += this.Client_VolumeChanged;
     }
 
+    // Power notifications on connect/disconnect are sent by the registry (see AddPowerStateSensor).
     private async void Client_Connected(object? sender, EventArgs e)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this._notifier is not { } notifier)
+        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId))
         {
             return;
         }
         await client.RefreshStateAsync().ConfigureAwait(false);
-        await Task.WhenAll(
-            notifier.SendPowerNotificationAsync(true, client.DeviceId),
-            this.NotifyConnectedAsync(client)
-        ).ConfigureAwait(false);
-    }
-
-    private async void Client_Disconnected(object? sender, EventArgs e)
-    {
-        if (sender is KodiClient client && this._notifier is { } notifier)
-        {
-            await notifier.SendPowerNotificationAsync(false, client.DeviceId).ConfigureAwait(false);
-        }
+        await this.NotifyConnectedAsync(client).ConfigureAwait(false);
     }
 
     private void Client_Error(object? sender, DataEventArgs<string> e) => this._logger.LogWarning("Client {deviceId} error encountered: {error}.", ((KodiClient)sender!).DeviceId, e.Data);
@@ -689,12 +678,15 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private async void ClientManager_ClientDiscovered(object? sender, DataEventArgs<KodiClient> e)
+    private async void Registry_Changed(object? sender, DeviceRegistryChangedEventArgs<KodiClient> e)
     {
-        KodiClient client = e.Data;
-        if (this.HasDeviceId(client.DeviceId))
+        if (e.Kind == DeviceRegistryChangeKind.Removed)
         {
-            await this.OnClientConnectedAsync(client).ConfigureAwait(false);
+            this.DetachEventHandlers(e.Client);
+        }
+        else if (e.Kind == DeviceRegistryChangeKind.Added && this.HasDeviceId(e.DeviceId))
+        {
+            await this.OnClientConnectedAsync(e.Client).ConfigureAwait(false);
         }
     }
 
@@ -703,7 +695,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private void DetachEventHandlers(KodiClient client)
     {
         client.Connected -= this.Client_Connected;
-        client.Disconnected -= this.Client_Disconnected;
         client.Error -= this.Client_Error;
         client.PlayerStateChanged -= this.Client_PlayerStateChanged;
         client.VolumeChanged -= this.Client_VolumeChanged;

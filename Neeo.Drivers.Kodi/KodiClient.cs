@@ -11,11 +11,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Kodi.Models;
+using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
 
-public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger) : IDisposable
+public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger) : IDeviceClient, IDisposable
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
     private readonly SemaphoreSlim _connectLock = new(1, 1);
@@ -26,6 +27,8 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     private ClientWebSocket? _webSocket;
 
     public event EventHandler? Connected;
+
+    public event EventHandler? ConnectionChanged;
 
     public event EventHandler? Disconnected;
 
@@ -525,6 +528,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         {
             this.MacAddress = await this.GetMacAddressAsync().ConfigureAwait(false);
         }
+        this.ConnectionChanged?.Invoke(this, EventArgs.Empty);
         this.Connected?.Invoke(this, EventArgs.Empty);
     }
 
@@ -592,6 +596,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     {
         this.CleanUp();
         this.PlayerState = PlayerState.Disconnected;
+        this.ConnectionChanged?.Invoke(this, EventArgs.Empty);
         this.Disconnected?.Invoke(this, EventArgs.Empty);
         if (this.IsDisposed)
         {
