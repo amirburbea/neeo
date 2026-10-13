@@ -110,6 +110,18 @@ public interface IDeviceRegistry<TClient>
     bool TryAdd(TClient client);
 
     /// <summary>
+    /// Gets the client for the specified <paramref name="deviceId"/>, adding the one created by <paramref name="factory"/> if
+    /// none is registered. The factory runs under the registry's lock, so it must be cheap (construct the client - don't connect
+    /// it) and must not call back into the registry. It is only invoked when no client is registered, and the client it returns
+    /// must have the same <see cref="IDeviceClient.DeviceId"/>.
+    /// </summary>
+    /// <param name="deviceId">The identifier of the device.</param>
+    /// <param name="factory">Creates the client to add if none is registered.</param>
+    /// <param name="added"><see langword="true"/> if the client was created and added by this call; otherwise <see langword="false"/>.</param>
+    /// <returns>The registered client.</returns>
+    TClient GetOrAdd(string deviceId, Func<string, TClient> factory, out bool added);
+
+    /// <summary>
     /// Removes the client for the specified <paramref name="deviceId"/>. The registry stops observing the client but does not dispose it.
     /// </summary>
     /// <param name="deviceId">The identifier of the device.</param>
@@ -177,12 +189,39 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
     }
 
     /// <inheritdoc/>
+    public TClient GetOrAdd(string deviceId, Func<string, TClient> factory, out bool added)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(deviceId);
+        ArgumentNullException.ThrowIfNull(factory);
+        Entry entry;
+        using (this._lock.EnterScope())
+        {
+            if (this._entries.GetValueOrDefault(deviceId) is { } existing)
+            {
+                added = false;
+                return existing.Client;
+            }
+            TClient client = factory(deviceId) ?? throw new InvalidOperationException("The factory returned null.");
+            if (!string.Equals(client.DeviceId, deviceId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"The factory created a client for device '{client.DeviceId}' instead of '{deviceId}'.");
+            }
+            entry = this.CreateEntry(client);
+            // Subscribing under the lock is safe here: the client was just created, so nothing else can be raising its events yet.
+            client.ConnectionChanged += entry.Handler;
+            this.Register(deviceId, entry);
+        }
+        this.DispatchPending();
+        added = true;
+        return entry.Client;
+    }
+
+    /// <inheritdoc/>
     public bool TryAdd(TClient client)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrEmpty(client.DeviceId, nameof(client));
-        Entry entry = new(client);
-        entry.Handler = (_, _) => this.OnConnectionChanged(entry);
+        Entry entry = this.CreateEntry(client);
         // Subscribe before publishing the entry (and outside the lock, so the registry's lock is never held while
         // calling into the client) - a change raised in between is ignored until the entry is registered, and the
         // state read below then picks it up.
@@ -190,11 +229,9 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
         bool added;
         using (this._lock.EnterScope())
         {
-            if (added = this._entries.TryAdd(client.DeviceId, entry))
+            if (added = !this._entries.ContainsKey(client.DeviceId))
             {
-                entry.IsRegistered = true;
-                entry.IsConnected = client.IsConnected;
-                this._pending.Enqueue(new(DeviceRegistryChangeKind.Added, client, entry.IsConnected));
+                this.Register(client.DeviceId, entry);
             }
         }
         if (!added)
@@ -228,6 +265,22 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
         this.DispatchPending();
         client = entry.Client;
         return true;
+    }
+
+    private Entry CreateEntry(TClient client)
+    {
+        Entry entry = new(client);
+        entry.Handler = (_, _) => this.OnConnectionChanged(entry);
+        return entry;
+    }
+
+    // Must be called under the lock, with no entry registered for deviceId.
+    private void Register(string deviceId, Entry entry)
+    {
+        this._entries.Add(deviceId, entry);
+        entry.IsRegistered = true;
+        entry.IsConnected = entry.Client.IsConnected;
+        this._pending.Enqueue(new(DeviceRegistryChangeKind.Added, entry.Client, entry.IsConnected));
     }
 
     private void OnConnectionChanged(Entry entry)

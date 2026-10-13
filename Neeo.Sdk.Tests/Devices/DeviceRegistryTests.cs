@@ -47,6 +47,53 @@ public sealed class DeviceRegistryTests
     }
 
     [Fact]
+    public void GetOrAdd_should_create_and_register_a_client_only_when_none_is_registered()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        List<DeviceRegistryChangedEventArgs<FakeClient>> changes = DeviceRegistryTests.Record(registry);
+        int created = 0;
+
+        FakeClient first = registry.GetOrAdd("a", id => { created++; return new(id, isConnected: true); }, out bool firstAdded);
+        FakeClient second = registry.GetOrAdd("a", id => { created++; return new(id); }, out bool secondAdded);
+
+        Assert.True(firstAdded);
+        Assert.False(secondAdded);
+        Assert.Same(first, second);
+        Assert.Equal(1, created);
+        Assert.Equal(1, first.SubscriberCount);
+        DeviceRegistryChangedEventArgs<FakeClient> change = Assert.Single(changes);
+        Assert.Equal((DeviceRegistryChangeKind.Added, "a", true), (change.Kind, change.DeviceId, change.IsConnected));
+        first.SetConnected(false);
+        Assert.Equal(DeviceRegistryChangeKind.Disconnected, changes[^1].Kind);
+    }
+
+    [Fact]
+    public void GetOrAdd_should_reject_a_client_for_a_different_device()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+
+        Assert.Throws<InvalidOperationException>(() => registry.GetOrAdd("a", static _ => new("b"), out bool _));
+        Assert.Throws<InvalidOperationException>(() => registry.GetOrAdd("a", static _ => null!, out bool _));
+        Assert.Throws<ArgumentException>(() => registry.GetOrAdd(string.Empty, static id => new(id), out bool _));
+        Assert.Empty(registry.Clients);
+    }
+
+    [Fact]
+    public async Task GetOrAdd_called_concurrently_should_create_one_client()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        int created = 0;
+
+        FakeClient[] results = await Task.WhenAll(Enumerable.Range(0, 16).Select(index => Task.Run(
+            () => registry.GetOrAdd("a", id => { Interlocked.Increment(ref created); return new(id); }, out bool _),
+            TestContext.Current.CancellationToken
+        )));
+
+        Assert.Equal(1, created);
+        Assert.All(results, result => Assert.Same(results[0], result));
+    }
+
+    [Fact]
     public void TryAdd_should_throw_for_missing_device_id()
     {
         DeviceRegistry<FakeClient> registry = new();
