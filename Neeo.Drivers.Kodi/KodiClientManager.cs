@@ -103,7 +103,6 @@ public sealed partial class KodiClientManager(
         {
             candidateHosts.Add(singleHost);
         }
-        candidateHosts.Add("Amir-ODroid.local");
         candidateHosts.Add("kodi.local");
 
         Task probeTask = Task.Run(async () =>
