@@ -69,8 +69,8 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         {
             IDeviceAdapter adapter = device.BuildAdapter();
             int id = this._containers.Count;
-            this._devices[id] = new(id, adapter);
-            if (!this._containers.TryAdd(adapter.AdapterName, new(adapter, logger)))
+            DeviceModel model = this._devices[id] = new(id, adapter);
+            if (!this._containers.TryAdd(adapter.AdapterName, new(model, adapter, logger)))
             {
                 throw new ArgumentException($"Adapter names must be unique. Adapter name {adapter.AdapterName} is reused at index {id}");
             }
@@ -90,17 +90,16 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         {
             return null;
         }
-        if (container.IsUnitialized)
+        if (container.IsUninitialized)
         {
             await container.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
         return container.Adapter;
     }
 
-    public DeviceModel? GetDeviceByAdapterName(string name)
+    public DeviceModel? GetDeviceByAdapterName(string adapterName)
     {
-        int index = Array.FindIndex(this._devices, device => device.AdapterName == name);
-        return index < 0 ? null : this._devices[index];
+        return this._containers.TryGetValue(adapterName, out DeviceAdapterContainer? container) ? container.Model : null;
     }
 
     public DeviceModel? GetDeviceById(int id)
@@ -122,7 +121,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             string[] searchTokens = [..
                 (query ?? throw new ArgumentNullException(nameof(query)))
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                    .Distinct()
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Take(5)
             ];
             List<SearchEntry> entries = [];
@@ -190,39 +189,65 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         public const int MaxSearchResults = 10;
     }
 
-    private sealed class DeviceAdapterContainer(IDeviceAdapter adapter, ILogger logger)
+    private sealed class DeviceAdapterContainer(DeviceModel model, IDeviceAdapter adapter, ILogger logger)
     {
         private readonly Lock _lock = new();
         private Task? _initializationTask;
 
+        public DeviceModel Model => model;
+
         public IDeviceAdapter Adapter => adapter;
 
-        public bool IsUnitialized => adapter.Initializer is { } && this._initializationTask is not { IsCompletedSuccessfully: true };
+        public bool IsUninitialized => adapter.Initializer is { } && this._initializationTask is not { IsCompletedSuccessfully: true };
 
-        public Task InitializeAsync(CancellationToken cancellationToken)
+        /// <summary>
+        /// Runs the adapter's initializer once, sharing the attempt between concurrent callers. A failed attempt is
+        /// logged and forgotten so that the next call retries; a caller's cancellation only stops that caller from waiting.
+        /// </summary>
+        public async Task InitializeAsync(CancellationToken cancellationToken)
         {
             if (adapter.Initializer is not { } initializer)
             {
-                return Task.CompletedTask;
+                return;
             }
-            if (this._initializationTask is not null)
+            Task task;
+            using (this._lock.EnterScope())
             {
-                return this._initializationTask;
+                task = this._initializationTask ??= this.RunAsync(initializer);
             }
-            using Lock.Scope scope = this._lock.EnterScope();
-            return this._initializationTask ??= InitializeAsync();
+            try
+            {
+                await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Already logged by the attempt itself.
+                using (this._lock.EnterScope())
+                {
+                    if (ReferenceEquals(this._initializationTask, task))
+                    {
+                        this._initializationTask = null;
+                    }
+                }
+            }
+        }
 
-            async Task InitializeAsync()
+        private async Task RunAsync(DeviceInitializer initializer)
+        {
+            logger.LogInformation("Initializing adapter {DeviceName} ({AdapterName})...", adapter.DeviceName, adapter.AdapterName);
+            try
             {
-                logger.LogInformation("Initializing adapter {DeviceName} ({AdapterName})...", adapter.DeviceName, adapter.AdapterName);
-                try
-                {
-                    await initializer(cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Error initializing adapter.");
-                }
+                // Shared between callers, so deliberately not bound to any one caller's token.
+                await initializer(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Error initializing adapter {AdapterName}.", adapter.AdapterName);
+                throw;
             }
         }
     }

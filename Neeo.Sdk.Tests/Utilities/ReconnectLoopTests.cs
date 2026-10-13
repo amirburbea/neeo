@@ -47,7 +47,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
         Assert.Equal(3, attempts);
@@ -70,7 +70,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
         // Work that outlives the attempt (e.g. a session started on success) must not be bound to this token.
@@ -95,10 +95,10 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => attempts > 0, cancellationToken);
-        loop.Start(cancellationToken);
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await Task.Delay(50, cancellationToken);
 
         Assert.True(loop.IsRunning);
@@ -126,7 +126,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
         Assert.Equal(3, attempts);
@@ -148,7 +148,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
         Assert.Equal(5, attemptTimestamps.Count);
@@ -182,7 +182,7 @@ public sealed class ReconnectLoopTests
         );
 
         loop.Dispose();
-        loop.Start(TestContext.Current.CancellationToken);
+        loop.Start(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(loop.IsRunning);
         Assert.Equal(0, attempts);
@@ -204,12 +204,12 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(new CancellationToken(canceled: true));
+        loop.Start(cancellationToken: new CancellationToken(canceled: true));
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
         Assert.Equal(0, attempts);
 
         // The loop can be started again afterward.
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
     }
 
@@ -237,7 +237,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await Task.Delay(50, cancellationToken);
         loop.Dispose();
 
@@ -261,7 +261,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken, immediate: true);
+        loop.Start(immediate: true, cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
         Assert.Equal(1, attempts);
@@ -279,7 +279,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         await Task.Delay(50, cancellationToken);
         Assert.Equal(0, attempts);
         loop.TriggerNow(cancellationToken);
@@ -331,7 +331,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken, immediate: true);
+        loop.Start(immediate: true, cancellationToken: cancellationToken);
         await firstAttemptStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         loop.TriggerNow(cancellationToken);
         loop.TriggerNow(cancellationToken); // Coalesced with the first.
@@ -357,14 +357,14 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(cancellationToken);
+        loop.Start(cancellationToken: cancellationToken);
         Assert.True(loop.IsRunning);
         loop.Stop();
         Assert.False(loop.IsRunning);
         await Task.Delay(50, cancellationToken);
         Assert.Equal(0, attempts);
 
-        loop.Start(cancellationToken, immediate: true);
+        loop.Start(immediate: true, cancellationToken: cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
     }
 

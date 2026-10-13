@@ -8,7 +8,6 @@ using System.Reactive;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -401,7 +400,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         }
         if (!connected)
         {
-            this._reconnectLoop.Start(cancellationToken);
+            this._reconnectLoop.Start(cancellationToken: cancellationToken);
         }
     }
 
@@ -456,7 +455,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             this._initializationTaskSource.TrySetResult();
             if (this._selectedPlayerId.Value is null &&
                 this._settings.TryGetValue(this.MachineIdentifier, out string? playerJson) &&
-                JsonSerializer.Deserialize<PlayerData>(playerJson, PlexJsonSerializerOptions.Default) is { MachineIdentifier: { Length: > 0 } } player)
+                JsonSerializer.Deserialize<PlayerData>(playerJson, PlexJsonSerializerOptions.Default) is { MachineIdentifier.Length: > 0 } player)
             {
                 // If the player is not in the players dictionary, add it as offline.
                 if (this._players.Value is { } players && !players.ContainsKey(player.MachineIdentifier))
@@ -483,7 +482,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             this._initializationTaskSource.TrySetResult();
         }
         // Whether the server closed the socket cleanly or it failed, reconnect with backoff (a no-op once disposed).
-        this._reconnectLoop.Start(cancellationToken);
+        this._reconnectLoop.Start(cancellationToken: cancellationToken);
 
         async ValueTask ProcessMessageAsync(ServerMessage message, CancellationToken cancellationToken)
         {

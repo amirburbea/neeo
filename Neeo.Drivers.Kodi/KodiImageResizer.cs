@@ -26,12 +26,7 @@ internal static class KodiImageResizer
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxDimension, 0);
 
-        using SKBitmap originalBitmap = SKBitmap.Decode(inputStream);
-        if (originalBitmap is null)
-        {
-            throw new InvalidOperationException("Failed to decode image from stream.");
-        }
-
+        using SKBitmap originalBitmap = SKBitmap.Decode(inputStream) ?? throw new InvalidOperationException("Failed to decode image from stream.");
         if (originalBitmap.Width <= maxDimension && originalBitmap.Height <= maxDimension)
         {
             using SKImage origImage = SKImage.FromBitmap(originalBitmap);

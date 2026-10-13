@@ -18,6 +18,9 @@ namespace Neeo.Drivers.Kodi;
 
 public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger) : IDeviceClient, IDisposable
 {
+    private static readonly string[] _currentWindowProperties = ["currentwindow"];
+    private static readonly string[] _getItemProperties = ["title", "showtitle", "season", "episode", "art", "thumbnail", "year", "genre", "album", "artist", "track"];
+
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
@@ -448,7 +451,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     private Task<int> GetCurrentWindowIdAsync(CancellationToken cancellationToken) => this.SendMessageAsync(
         "GUI.GetProperties",
-        new { Properties = new[] { "currentwindow" } },
+        new { Properties = KodiClient._currentWindowProperties },
         static (JsonElement element) => element.GetProperty("currentwindow").GetProperty("id").GetInt32(),
         cancellationToken
     );
@@ -474,10 +477,11 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         return PhysicalAddress.None;
     }
 
-    private Task<VolumeInfo> GetVolumeAsync() => this.SendMessageAsync(
+    private Task<VolumeInfo> GetVolumeAsync(CancellationToken cancellationToken = default) => this.SendMessageAsync(
         "Application.GetProperties",
-        new { Properties = VolumeInfo.Properties },
-        (VolumeInfo info) => info
+        new { VolumeInfo.Properties },
+        (VolumeInfo info) => info,
+        cancellationToken
     );
 
     private async Task MessageLoop()
@@ -546,40 +550,39 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     {
         try
         {
-            this.ProcessVolumeInfo(await this.GetVolumeAsync().ConfigureAwait(false));
+            this.ProcessVolumeInfo(await this.GetVolumeAsync(cancellationToken).ConfigureAwait(false));
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to query volume from Kodi.");
         }
-        await this.QueryPlayerStateAsync().ConfigureAwait(false);
+        await this.QueryPlayerStateAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task QueryPlayerStateAsync()
+    private async Task QueryPlayerStateAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             PlayerInfo[] players = await this.SendMessageAsync(
                 "Player.GetActivePlayers",
-                static (PlayerInfo[] players) => players
+                static (PlayerInfo[] players) => players,
+                cancellationToken
             ).ConfigureAwait(false);
-
-            if (players is not [{ Id: var activePlayerId }, ..])
+            if (players is not [{ Id: { } activePlayerId }, ..])
             {
                 this.PlayerState = PlayerState.Defaults;
                 return;
             }
-
             JsonElement element = await this.SendMessageAsync(
                 "Player.GetItem",
                 new
                 {
                     playerid = activePlayerId,
-                    properties = new[] { "title", "showtitle", "season", "episode", "art", "thumbnail", "year", "genre", "album", "artist", "track" }
+                    properties = KodiClient._getItemProperties,
                 },
-                static (JsonElement el) => el.GetProperty("item")
+                static (JsonElement el) => el.GetProperty("item"),
+                cancellationToken
             ).ConfigureAwait(false);
-
             string type = element.TryGetProperty("type", out JsonElement typeProp) ? typeProp.GetString() ?? string.Empty : string.Empty;
             this.PlayerState = type switch
             {

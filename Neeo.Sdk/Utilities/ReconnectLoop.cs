@@ -79,11 +79,11 @@ public sealed class ReconnectLoop : IDisposable
     /// is a no-op) - only one reconnect cycle can be in flight at a time. Backoff always restarts from
     /// <see langword="initialDelay"/> for a new cycle.
     /// </summary>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <param name="immediate">
     /// <see langword="true"/> to make the first attempt immediately rather than after <see langword="initialDelay"/>.
     /// </param>
-    public void Start(CancellationToken cancellationToken = default, bool immediate = false)
+    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    public void Start(bool immediate = false, CancellationToken cancellationToken = default)
     {
         CancellationTokenSource cycle;
         using (this._lock.EnterScope())
@@ -122,7 +122,7 @@ public sealed class ReconnectLoop : IDisposable
                 return;
             }
         }
-        this.Start(cancellationToken, immediate: true);
+        this.Start(immediate: true, cancellationToken: cancellationToken);
     }
 
     /// <summary>

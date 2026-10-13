@@ -137,6 +137,76 @@ public sealed class DeviceDatabaseTests
     }
 
     [Fact]
+    public async Task GetAdapterAsync_retries_initializer_after_failure()
+    {
+        var (mockBuilder, mockAdapter, _) = CreateDevice("name");
+        int calls = 0;
+        DeviceInitializer initializer = _ => ++calls == 1 ? Task.FromException(new InvalidOperationException()) : Task.CompletedTask;
+        mockAdapter.Setup(adapter => adapter.Initializer).Returns(initializer);
+        DeviceDatabase database = new(
+            [mockBuilder.Object],
+            Mock.Of<INotificationService>(),
+            NullLogger<DeviceDatabase>.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        Assert.Same(mockAdapter.Object, await database.GetAdapterAsync("name", cancellationToken));
+        Assert.Same(mockAdapter.Object, await database.GetAdapterAsync("name", cancellationToken));
+        Assert.Same(mockAdapter.Object, await database.GetAdapterAsync("name", cancellationToken));
+
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task GetAdapterAsync_caller_cancellation_does_not_poison_initialization()
+    {
+        var (mockBuilder, mockAdapter, _) = CreateDevice("name");
+        TaskCompletionSource source = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int calls = 0;
+        DeviceInitializer initializer = _ =>
+        {
+            calls++;
+            return source.Task;
+        };
+        mockAdapter.Setup(adapter => adapter.Initializer).Returns(initializer);
+        DeviceDatabase database = new(
+            [mockBuilder.Object],
+            Mock.Of<INotificationService>(),
+            NullLogger<DeviceDatabase>.Instance
+        );
+        using CancellationTokenSource cts = new();
+
+        ValueTask<IDeviceAdapter?> canceled = database.GetAdapterAsync("name", cts.Token);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await canceled);
+        source.SetResult();
+        Assert.Same(mockAdapter.Object, await database.GetAdapterAsync("name", TestContext.Current.CancellationToken));
+
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public void Search_ignores_case_when_deduplicating_tokens()
+    {
+        var (mockBuilder1, mockAdapter1, _) = CreateDevice("first");
+        var (mockBuilder2, mockAdapter2, _) = CreateDevice("second");
+        mockAdapter1.Setup(adapter => adapter.Manufacturer).Returns("Acme");
+        mockAdapter2.Setup(adapter => adapter.Manufacturer).Returns("Zed");
+        mockAdapter1.Setup(adapter => adapter.Type).Returns(DeviceType.TV);
+        mockAdapter2.Setup(adapter => adapter.Type).Returns(DeviceType.TV);
+        DeviceDatabase database = new(
+            [mockBuilder1.Object, mockBuilder2.Object],
+            Mock.Of<INotificationService>(),
+            NullLogger<DeviceDatabase>.Instance
+        );
+
+        // Case variants of one token must not use up the five-token cap and push "zed" out.
+        DeviceSearchResult[] results = database.Search("acme ACME Acme aCME acMe zed");
+
+        Assert.Equal(2, results.Length);
+    }
+
+    [Fact]
     public async Task GetAdapterAsync_returns_built_adapter()
     {
         var (mockBuilder, mockAdapter, _) = CreateDevice("name");

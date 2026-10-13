@@ -22,4 +22,8 @@
 	</ProjectReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Images\*" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>
