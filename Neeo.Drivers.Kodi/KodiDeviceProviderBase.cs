@@ -112,7 +112,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return true;
         }
-        _ = client.ConnectAsync();
+        client.RequestReconnect();
         return false;
     }
 

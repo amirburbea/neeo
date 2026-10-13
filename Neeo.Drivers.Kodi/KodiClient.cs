@@ -113,7 +113,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
             await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:9090/jsonrpc"), cancellationToken).ConfigureAwait(false);
             this._cancellationTokenSource = cts;
             this._webSocket = webSocket;
-            Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
             _ = Task.Run(this.MessageLoop, cts.Token);
             await this.OnConnectedAsync().ConfigureAwait(false);
             logger.LogInformation("Connected to {ipAddress}:9090/jsonrpc...", this.IPAddress);
@@ -146,6 +145,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
             return;
         }
         this.IsDisposed = true;
+        this._reconnectLoop?.Dispose();
         this.CleanUp();
         this._connectLock.Dispose();
         this._sendLock.Dispose();
@@ -157,6 +157,17 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     /// disconnected doesn't replay all of them once the connection comes back.
     /// </summary>
     public void QueuePendingButtonAction(Func<KodiClient, CancellationToken, Task> action) => Interlocked.Exchange(ref this._pendingButtonAction, action);
+
+    /// <summary>
+    /// Requests a reconnection attempt as soon as possible (coalesced with any attempt already in flight). A no-op once disposed.
+    /// </summary>
+    public void RequestReconnect()
+    {
+        if (!this.IsDisposed)
+        {
+            this.GetReconnectLoop().TriggerNow();
+        }
+    }
 
     private async Task ReplayPendingActionAsync(Func<KodiClient, CancellationToken, Task> action)
     {
@@ -433,7 +444,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         using WebSocket? webSocket = Interlocked.Exchange(ref this._webSocket, default);
         using CancellationTokenSource? source = Interlocked.Exchange(ref this._cancellationTokenSource, default);
         source?.Cancel();
-        Interlocked.Exchange(ref this._reconnectLoop, default)?.Dispose();
     }
 
     private Task<int> GetCurrentWindowIdAsync(CancellationToken cancellationToken) => this.SendMessageAsync(
@@ -602,14 +612,27 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         {
             return;
         }
-        ReconnectLoop loop = new(TimeSpan.FromSeconds(15d), TimeSpan.FromMinutes(2d), _ => this.ConnectAsync(), logger);
-        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is not null)
+        this.GetReconnectLoop().Start();
+    }
+
+    // One loop for the client's lifetime, created on first use (a field initializer can't capture this).
+    private ReconnectLoop GetReconnectLoop()
+    {
+        if (Volatile.Read(ref this._reconnectLoop) is { } existing)
         {
-            // A reconnect loop is already running - don't start a second one.
-            loop.Dispose();
-            return;
+            return existing;
         }
-        loop.Start();
+        ReconnectLoop loop = new(TimeSpan.FromSeconds(15d), TimeSpan.FromMinutes(2d), this.ConnectAsync, logger);
+        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is { } winner)
+        {
+            loop.Dispose();
+            return winner;
+        }
+        if (this.IsDisposed)
+        {
+            loop.Dispose();
+        }
+        return loop;
     }
 
     private async Task OnPlayAsync(PlayParameters parameters)
