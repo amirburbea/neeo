@@ -13,28 +13,22 @@ public class SecurityCodeExampleDeviceProvider : IDeviceProvider
     {
         this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.Accessory)
             .SetSpecificName(Constants.DeviceName)
-            .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, this.DiscoverAsync)
-            .EnableRegistration(Constants.RegistrationHeaderText, Constants.RegistrationDescription, _ => this.QueryIsRegisteredAsync(), (code, _) => this.RegisterAsync(code))
-            .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelTextAsync);
+            .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, (_, _) => Task.FromResult(this.Discover()))
+            .EnableRegistration(Constants.RegistrationHeaderText, Constants.RegistrationDescription, _ => Task.FromResult(this._isRegistered), (code, _) => Task.FromResult(this.Register(code)))
+            .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelText);
     }
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(new[] { new DiscoveredDevice("code-device", "Security Code Device", true) });
-    }
+    private DiscoveredDevice[] Discover() => [new DiscoveredDevice("code-device", "Security Code Device", true)];
 
-    private Task<string> GetLabelTextAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(
-        $"{deviceId} {(this._isRegistered ? "successfully" : "not")} registered"
-    );
+    private string GetLabelText(string deviceId) =>
+        $"{deviceId} {(this._isRegistered ? "successfully" : "not")} registered";
 
-    private Task<bool> QueryIsRegisteredAsync() => Task.FromResult(this._isRegistered);
-
-    private Task<RegistrationResult> RegisterAsync(string securityCode)
+    private RegistrationResult Register(string securityCode)
     {
         this._isRegistered = securityCode == "42";
-        return Task.FromResult(this._isRegistered ? RegistrationResult.Success : RegistrationResult.Failed("You entered an incorrect security code."));
+        return this._isRegistered ? RegistrationResult.Success : RegistrationResult.Failed("You entered an incorrect security code.");
     }
 
     private static class Constants

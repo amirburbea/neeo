@@ -40,7 +40,7 @@ public sealed class DynamicDeviceBuilderExampleProvider(
         .EnableDiscovery(
             Constants.DeviceName,
             "This example shows how devices can share code. The next screen will discover some example light devices.",
-            this.DiscoverAsync,
+            (optionalDeviceId, _) => Task.FromResult(this.Discover(optionalDeviceId)),
             enableDynamicDeviceBuilder: true
         )
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.NotifyDeviceList)
@@ -52,11 +52,7 @@ public sealed class DynamicDeviceBuilderExampleProvider(
         return new DiscoveredDevice(id, name, isReachable, room, isPro ? this.BuildProDevice() : this.BuildStandardDevice());
     }
 
-    private Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
-    {
-        DeviceInfo[] devices = this.GetDeviceInfos(optionalDeviceId);
-        return Task.FromResult(Array.ConvertAll(devices, this.CreateDiscoveredDevice));
-    }
+    private DiscoveredDevice[] Discover(string? optionalDeviceId) => Array.ConvertAll(this.GetDeviceInfos(optionalDeviceId), this.CreateDiscoveredDevice);
 
     private DeviceInfo[] GetDeviceInfos(string? optionalDeviceId)
     {

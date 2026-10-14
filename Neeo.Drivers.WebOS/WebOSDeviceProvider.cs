@@ -75,7 +75,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             SmartApplicationButtons.YouTube
         )
         .AddDirectory("Apps", "Apps & Inputs", DirectoryRole.Root, this.BrowseAppsAsync, this.LaunchAppAsync)
-        .AddPowerStateSensor(this._clientManager.Registry, (deviceId, _) => Task.FromResult(this.GetPowerState(deviceId)))
+        .AddPowerStateSensor(this._clientManager.Registry, this.GetPowerState)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
         .AddSlider("VOLUME", null, (deviceId, _) => Task.FromResult(this.GetVolume(deviceId)), this.SetVolumeAsync)
@@ -89,7 +89,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         .EnableRegistration(
             "Pairing with LG webOS TV...",
             "Turn your TV on, enter any code and submit. A prompt will then appear on your TV screen asking to allow NEEO Remote - click 'Allow' with your LG remote within 60 seconds.",
-            this.QueryIsRegisteredAsync,
+            _ => Task.FromResult(this._clientManager.HasPairedDevices),
             this.RegisterAsync
         );
 
@@ -228,11 +228,6 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
         WebOSClient[] clients = await this._clientManager.DiscoverAsync(cancellationToken).ConfigureAwait(false);
         return [.. clients.Select(static c => new DiscoveredDevice(c.DeviceId, $"{DeviceName} ({c.IPAddress}){(c.IsPaired ? string.Empty : " - not paired")}", true))];
-    }
-
-    private Task<bool> QueryIsRegisteredAsync(CancellationToken cancellationToken)
-    {
-        return Task.FromResult(this._clientManager.HasPairedDevices);
     }
 
     // The NEEO app registers before it discovers, so this is where TVs get paired. The security code itself is not used.

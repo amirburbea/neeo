@@ -27,7 +27,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             .AddAdditionalSearchTokens("SDK", "player")
             .AddButtonGroup(ButtonGroups.Power)
             .AddButtonHandler(this._controller.HandleButtonAsync)
-            .EnableDeviceRoute(prefix => this._controller.UriPrefix = prefix, EmbeddedImages.HandleRequestAsync)
+            .EnableDeviceRoute(prefix => this._controller.UriPrefix = prefix, (_, path, _) => Task.FromResult(EmbeddedImages.HandleRequest(path)))
             .AddPlayerWidget(this._controller)
             .EnableNotifications(notifier => this._controller.Notifier = notifier);
     }
@@ -109,19 +109,19 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
 
         public Task<string> GetCoverArtAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetCoverArt(this._service.Pet));
 
-        public Task<string> GetDescriptionAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<string>(PlayerKey.Description);
+        public Task<string> GetDescriptionAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetValue<string>(PlayerKey.Description));
 
-        public Task<bool> GetIsMutedAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Mute);
+        public Task<bool> GetIsMutedAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetValue<bool>(PlayerKey.Mute));
 
-        public Task<bool> GetIsPlayingAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Playing);
+        public Task<bool> GetIsPlayingAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetValue<bool>(PlayerKey.Playing));
 
-        public Task<bool> GetRepeatAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Repeat);
+        public Task<bool> GetRepeatAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetValue<bool>(PlayerKey.Repeat));
 
-        public Task<bool> GetShuffleAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<bool>(PlayerKey.Shuffle);
+        public Task<bool> GetShuffleAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetValue<bool>(PlayerKey.Shuffle));
 
-        public Task<string> GetTitleAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<string>(PlayerKey.Title);
+        public Task<string> GetTitleAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetValue<string>(PlayerKey.Title));
 
-        public Task<double> GetVolumeAsync(string deviceId, CancellationToken cancellationToken) => this.GetValueAsync<double>(PlayerKey.Volume);
+        public Task<double> GetVolumeAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetValue<double>(PlayerKey.Volume));
 
         public Task HandleButtonAsync(string deviceId, string button, CancellationToken cancellationToken = default) => Button.TryResolve(button) switch
         {
@@ -237,10 +237,10 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
             return Task.CompletedTask;
         }
 
-        private Task<TValue> GetValueAsync<TValue>(PlayerKey key)
+        private TValue GetValue<TValue>(PlayerKey key)
         {
             logger.LogInformation("Getting component state {key}", key);
-            return Task.FromResult(this._service.GetValue<TValue>(key));
+            return this._service.GetValue<TValue>(key);
         }
 
         private Task SetCoverArtAsync(string coverArt) => this.SetValueAsync(PlayerKey.CoverArt, coverArt);

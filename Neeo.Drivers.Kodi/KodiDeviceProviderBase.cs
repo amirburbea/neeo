@@ -126,10 +126,10 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddDirectory("TVShowLibrary", "TV Shows", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".tvshows")
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
-        .AddPowerStateSensor(this._clientManager.Registry, (deviceId, _) => this.GetIsPoweredOnAsync(deviceId))
+        .AddPowerStateSensor(this._clientManager.Registry, this.IsClientReady)
         .EnableDeviceRoute(this.SetUriPrefix, this.HandleDeviceRouteAsync)
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
-        .EnableRegistration(Constants.RegistrationHeader, Constants.RegistrationDescription, this.QueryIsRegisteredAsync, this.RegisterAsync)
+        .EnableRegistration(Constants.RegistrationHeader, Constants.RegistrationDescription, _ => Task.FromResult(this._clientManager.HasCredentials), this.RegisterAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
         .RegisterInitializer(cancellationToken => this._clientManager.InitializeAsync(cancellationToken: cancellationToken));
@@ -147,9 +147,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         client => this.GetThumbnailUrl(client, client.PlayerState.NowPlayingImage, ImageSize.Large),
         string.Empty
     );
-
-    protected Task<bool> QueryIsRegisteredAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(this._clientManager.HasCredentials);
 
     protected async Task<RegistrationResult> RegisterAsync(string userName, string password, CancellationToken cancellationToken = default)
     {
@@ -318,7 +315,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         ? contentType
         : "application/octet-stream";
 
-    private string GetThumbnailUrl(KodiClient client, string? coverArt, ImageSize size = ImageSize.Large)
+    internal string GetThumbnailUrl(KodiClient client, string? coverArt, ImageSize size = ImageSize.Large)
     {
         if (string.IsNullOrEmpty(coverArt) || coverArt == Images.Kodi)
         {
@@ -326,9 +323,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
         if (string.IsNullOrEmpty(this._uriPrefix))
         {
-            return coverArt.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || coverArt.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-                ? coverArt
-                : client.GetImageUrl(coverArt);
+            return Images.Kodi;
         }
         if (coverArt.StartsWith(this._uriPrefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -660,7 +655,10 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
                 tasks.Add(notifier.SendNotificationAsync("PLAYING_SENSOR", e.Data.PlayState == PlayState.Playing, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("TITLE_SENSOR", e.Data.NowPlayingLabel, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
-                tasks.Add(notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, e.Data.NowPlayingImage, ImageSize.Large), deviceId));
+                if (!string.IsNullOrEmpty(this._uriPrefix))
+                {
+                    tasks.Add(notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, e.Data.NowPlayingImage, ImageSize.Large), deviceId));
+                }
                 break;
         }
         if (tasks.Count != 0)
@@ -710,14 +708,12 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return [.. this._clientManager.Clients.Select(this.CreateDiscoveredDevice)];
         }
-        if ((client = this.GetClientOrDefault(deviceId)) != null)
+        if (this.GetClientOrDefault(deviceId) is { } deviceClient)
         {
-            return [this.CreateDiscoveredDevice(client)];
+            return [this.CreateDiscoveredDevice(deviceClient)];
         }
         return [];
     }
-
-    private Task<bool> GetIsPoweredOnAsync(string deviceId) => Task.FromResult(this.IsClientReady(deviceId));
 
     private async Task HandleButtonAsync(string deviceId, string buttonName, CancellationToken cancellationToken)
     {
@@ -839,7 +835,34 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private void SetUriPrefix(string prefix) => this._uriPrefix = prefix;
+    private void SetUriPrefix(string prefix)
+    {
+        this._uriPrefix = prefix;
+        _ = this.NotifyCoverArtAsync();
+    }
+
+    private async Task NotifyCoverArtAsync()
+    {
+        if (this._notifier is not { } notifier)
+        {
+            return;
+        }
+        foreach (KodiClient client in this._clientManager.Clients)
+        {
+            if (!this.HasDeviceId(client.DeviceId) || !KodiDeviceProviderBase.IsClientReady(client))
+            {
+                continue;
+            }
+            try
+            {
+                await notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, client.PlayerState.NowPlayingImage, ImageSize.Large), client.DeviceId).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                this._logger.LogWarning(ex, "Failed to send cover art for {deviceId}.", client.DeviceId);
+            }
+        }
+    }
 
     private readonly struct EmbeddedImages(string uriPrefix)
     {
