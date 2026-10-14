@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -45,20 +46,7 @@ public sealed partial class KodiClientManager(
 
     public bool HasCredentials => settings.ContainsKey("username") && settings.ContainsKey("password");
 
-    public (string? UserName, string? Password) GetCredentials(string? deviceId = null)
-    {
-        if (deviceId is not null && settings.TryGetValue($"{deviceId}:username", out string? user) && settings.TryGetValue($"{deviceId}:password", out string? pass))
-        {
-            return (user, pass);
-        }
-        if (settings.TryGetValue("username", out string? defaultUser) && settings.TryGetValue("password", out string? defaultPass))
-        {
-            return (defaultUser, defaultPass);
-        }
-        return (null, null);
-    }
-
-    public void SetCredentials(string userName, string password, string? deviceId = null)
+    public void SetCredentials(string userName, string password)
     {
         this._authorizationHeader = new AuthenticationHeaderValue(
             "Basic",
@@ -68,19 +56,7 @@ public sealed partial class KodiClientManager(
         {
             dict["username"] = userName;
             dict["password"] = password;
-            if (deviceId is not null)
-            {
-                dict[$"{deviceId}:username"] = userName;
-                dict[$"{deviceId}:password"] = password;
-            }
         });
-        foreach (KodiClient client in this._clients.Clients)
-        {
-            if (deviceId is null || client.DeviceId == deviceId)
-            {
-                client.SetCredentials(userName, password);
-            }
-        }
     }
 
     public Task DiscoverAsync(int scanTime = 5000, CancellationToken cancellationToken = default) => this.DiscoverAsync(scanTime, default, cancellationToken);
@@ -94,7 +70,6 @@ public sealed partial class KodiClientManager(
             callback: OnHostDiscovered,
             cancellationToken: cts.Token
         );
-
         List<string> candidateHosts = [];
         if (configuration.GetSection("Kodi:Hosts").Get<string[]>() is { Length: > 0 } configHosts)
         {
@@ -105,7 +80,6 @@ public sealed partial class KodiClientManager(
             candidateHosts.Add(singleHost);
         }
         candidateHosts.Add("kodi.local");
-
         Task probeTask = Task.Run(async () =>
         {
             foreach (string host in candidateHosts.Distinct(StringComparer.OrdinalIgnoreCase))
@@ -131,7 +105,6 @@ public sealed partial class KodiClientManager(
                 }
             }
         }, cts.Token);
-
         await Task.WhenAll(zeroconfTask, probeTask).ConfigureAwait(false);
 
         async void OnHostDiscovered(IZeroconfHost host)
@@ -172,7 +145,7 @@ public sealed partial class KodiClientManager(
             try
             {
                 IPAddress[] addrs = await Dns.GetHostAddressesAsync(hostNameOrAddress, cancellationToken).ConfigureAwait(false);
-                ip = Array.Find(addrs, static a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+                ip = Array.Find(addrs, static a => a.AddressFamily is AddressFamily.InterNetwork);
             }
             catch
             {
@@ -212,21 +185,12 @@ public sealed partial class KodiClientManager(
 
                 logger.LogInformation("Connecting to Kodi at {displayName} ({targetIp}:{port})...", displayName, targetIp, port);
                 KodiClient newClient = new(displayName, targetIp, port, logger);
-                if (this.GetCredentials() is ({ Length: > 0 } initUser, { Length: > 0 } initPass))
-                {
-                    newClient.SetCredentials(initUser, initPass);
-                }
                 if (!await newClient.ConnectAsync(cancellationToken).ConfigureAwait(false) || newClient.MacAddress.Equals(PhysicalAddress.None))
                 {
                     logger.LogWarning("Failed to connect or retrieve MAC address from Kodi at {targetIp}.", targetIp);
                     newClient.Dispose();
                     return null;
                 }
-                if (this.GetCredentials(newClient.DeviceId) is ({ Length: > 0 } devUser, { Length: > 0 } devPass))
-                {
-                    newClient.SetCredentials(devUser, devPass);
-                }
-
                 if (this._clients.TryRemove(newClient.DeviceId, out KodiClient? oldClient))
                 {
                     oldClient.Dispose();
@@ -270,7 +234,6 @@ public sealed partial class KodiClientManager(
         {
             return false;
         }
-
         try
         {
             using HttpClient httpClient = httpClientFactory.CreateClient();
@@ -278,7 +241,7 @@ public sealed partial class KodiClientManager(
             {
                 Content = new StringContent("{\"jsonrpc\":\"2.0\",\"method\":\"JSONRPC.Ping\",\"id\":1}", Encoding.UTF8, "application/json")
             };
-            request.Headers.Authorization = new AuthenticationHeaderValue(
+            request.Headers.Authorization = new(
                 "Basic",
                 Convert.ToBase64String(Encoding.UTF8.GetBytes($"{userName}:{password}"))
             );
@@ -300,13 +263,11 @@ public sealed partial class KodiClientManager(
     public async Task<(byte[] Bytes, string ContentType)?> FetchImageAsync(string imageUrl, int maxDimension = 480, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(maxDimension, 0);
-
         string cacheKey = $"{maxDimension}:{imageUrl}";
         if (this._imageCache.TryGet(cacheKey, out (byte[] Bytes, string ContentType) cached))
         {
             return cached;
         }
-
         try
         {
             using HttpClient httpClient = httpClientFactory.CreateClient();
@@ -317,7 +278,6 @@ public sealed partial class KodiClientManager(
                 logger.LogWarning("Failed to fetch Kodi image from '{url}' (status: {statusCode}).", imageUrl, response.StatusCode);
                 return null;
             }
-
             using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             byte[] resizedBytes = KodiImageResizer.Resize(responseStream, maxDimension);
             (byte[] Bytes, string ContentType) result = (resizedBytes, "image/jpeg");

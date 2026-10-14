@@ -51,15 +51,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     public int HttpPort => httpPort;
 
-    private string? _userName;
-    private string? _password;
-
-    public void SetCredentials(string userName, string password)
-    {
-        this._userName = userName;
-        this._password = password;
-    }
-
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open };
 
     public bool IsDisposed { get; private set; }
@@ -218,13 +209,10 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         {
             return Images.Kodi;
         }
-        if (this._userName is { Length: > 0 } user && this._password is { Length: > 0 } pass)
-        {
-            return $"http://{Uri.EscapeDataString(user)}:{Uri.EscapeDataString(pass)}@{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
-        }
-        return $"http://{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
+        return this.GetRawImageUrl(image);
     }
 
+    // Never embeds credentials: the image fetcher authenticates with a header (see KodiClientManager.FetchImageAsync).
     public string GetRawImageUrl(string image) => $"http://{this.IPAddress}:{httpPort}/vfs/{Uri.EscapeDataString(image)}";
 
     public Task<string> GetLabelAsync(string label, CancellationToken cancellationToken = default) => this.SendMessageAsync(

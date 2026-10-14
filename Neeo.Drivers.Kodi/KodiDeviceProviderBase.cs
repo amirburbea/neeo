@@ -136,13 +136,13 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     protected KodiClient? GetClientOrDefault(string deviceId) => this._clientManager.GetClientOrDefault(deviceId);
 
-    protected Task<TValue> GetClientValue<TValue>(
+    protected TValue GetClientValue<TValue>(
         string deviceId,
         Func<KodiClient, TValue> projection,
         TValue defaultValue
-    ) => Task.FromResult(this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) ? projection(client) : defaultValue);
+    ) => this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client) ? projection(client) : defaultValue;
 
-    protected Task<string> GetCoverArt(string deviceId) => this.GetClientValue(
+    protected string GetCoverArt(string deviceId) => this.GetClientValue(
         deviceId,
         client => this.GetThumbnailUrl(client, client.PlayerState.NowPlayingImage, ImageSize.Large),
         string.Empty
@@ -165,33 +165,33 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         return RegistrationResult.Success;
     }
 
-    protected Task<string> GetDescription(string deviceId) => this.GetClientValue(
+    protected string GetDescription(string deviceId) => this.GetClientValue(
         deviceId,
         client => client.PlayerState.NowPlayingDescription,
         string.Empty
     );
 
-    protected virtual string GetDisplayName(KodiClient client) => client.DisplayName;
+    protected abstract string GetDisplayName(KodiClient client);
 
-    protected Task<bool> GetIsMutedAsync(string deviceId) => this.GetClientValue(
+    protected bool GetIsMuted(string deviceId) => this.GetClientValue(
         deviceId,
         client => client.IsMuted,
         default
     );
 
-    protected Task<bool> GetIsPlaying(string deviceId) => this.GetClientValue(
+    protected bool GetIsPlaying(string deviceId) => this.GetClientValue(
         deviceId,
         client => client.PlayerState.PlayState == PlayState.Playing,
         default
     );
 
-    protected Task<string> GetTitle(string deviceId) => this.GetClientValue(
+    protected string GetTitle(string deviceId) => this.GetClientValue(
         deviceId,
         client => client.PlayerState.NowPlayingLabel,
         string.Empty
     );
 
-    protected Task<double> GetVolume(string deviceId) => this.GetClientValue(
+    protected double GetVolume(string deviceId) => this.GetClientValue(
         deviceId,
         client => (double)client.Volume,
         default
