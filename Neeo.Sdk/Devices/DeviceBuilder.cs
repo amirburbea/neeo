@@ -314,6 +314,27 @@ public interface IDeviceBuilder
         where TClient : class, IDeviceClient;
 
     /// <summary>
+    /// Defines a sensor by which NEEO can detemine if the device is powered on/off, derived from whether the device's
+    /// client in the <paramref name="registry"/> is connected.
+    ///
+    /// Once the server has started, power notifications are sent to the NEEO Brain automatically whenever a client in the
+    /// <paramref name="registry"/> is added, removed, connects or disconnects - no call to <see cref="IDeviceBuilder.EnableNotifications"/>
+    /// is required for this.
+    /// </summary>
+    /// <typeparam name="TClient">The type of the client.</typeparam>
+    /// <param name="registry">The registry of device clients.</param>
+    /// <param name="sensor">
+    /// A callback to determine if the device is on or off when queried by the NEEO Brain. Defaults to
+    /// <see cref="IDeviceRegistry{TClient}.TryGetConnected"/>.
+    /// </param>
+    /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
+    IDeviceBuilder AddPowerStateSensor<TClient>(IDeviceRegistry<TClient> registry, DeviceValueGetter<bool> sensor)
+        where TClient : class, IDeviceClient
+    {
+        return this.AddPowerStateSensor(registry, sensor.AsAsync());
+    }
+
+    /// <summary>
     /// Adds a range sensor to the device.
     /// </summary>
     /// <param name="name">The name of the sensor to add.</param>
@@ -1021,7 +1042,7 @@ internal sealed partial class DeviceBuilder(
         where TClient : class, IDeviceClient
     {
         ArgumentNullException.ThrowIfNull(registry);
-        this.AddPowerStateSensor(getter ?? new AsyncDeviceValueGetter<bool>((deviceId, cancellationToken) => Task.FromResult(registry.TryGetConnected(deviceId, out _))));
+        this.AddPowerStateSensor(getter ?? new((deviceId, cancellationToken) => Task.FromResult(registry.TryGetConnected(deviceId, out _))));
         this._registryNotifierCallbacks += notifier => registry.Changed += (_, e) => DeviceBuilder.SendPowerNotification(notifier, e.DeviceId, e.IsConnected);
         return this;
     }

@@ -18,7 +18,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             .SetIcon(DeviceIconOverride.NeeoBrain)
             .AddAdditionalSearchTokens("explorer")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-            .EnableDeviceRoute(prefix => this._uriPrefix = prefix, EmbeddedImages.HandleRequestAsync)
+            .EnableDeviceRoute(prefix => this._uriPrefix = prefix, (_, path, _) => Task.FromResult(EmbeddedImages.HandleRequest(path)))
             .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, browser: this.Browse, actionHandler: this.OnDirectoryAction);
     }
 

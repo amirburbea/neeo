@@ -62,7 +62,7 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         .AddButton(Buttons.Home)
         .AddButton("HBOMAX", "HBO Max")
         .AddDirectory("Apps", default, DirectoryRole.Root, this.BrowseApps, this.LaunchApp)
-        .AddPowerStateSensor((deviceId, _) => this.GetPowerState(deviceId))
+        .AddPowerStateSensor(this.GetPowerState)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
         .EnableNotifications(notifier => this._notifier = notifier)
         .AddSlider("VOLUME", null, this.GetVolumeAsync, this.SetVolumeAsync)
@@ -108,7 +108,7 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         }
     }
 
-    private Task<bool> GetPowerState(string deviceId) => Task.FromResult(this._tv != null && this._connected);
+    private bool GetPowerState(string deviceId) => this._tv != null && this._connected;
 
     private async Task<string> GetStateAsync(string deviceId, CancellationToken cancellationToken)
     {

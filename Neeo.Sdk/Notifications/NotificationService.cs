@@ -148,11 +148,14 @@ internal sealed class NotificationService : INotificationService, IDisposable
     private async Task<bool> PostNotificationAsync(Message message, CancellationToken cancellationToken)
     {
         Uri uri = new UriBuilder(this._notificationBaseUri) { Path = BrainUrlPaths.Notifications }.Uri;
-        byte[] body = JsonSerializer.SerializeToUtf8Bytes(message, AppJsonSerializerOptions.Default);
-        using HttpRequestMessage request = new(HttpMethod.Post, uri);
-        request.Headers.Accept.Add(new("application/json"));
-        request.Content = new ByteArrayContent(body);
-        request.Content.Headers.ContentType = NotificationService._jsonUtf8;
+        using HttpRequestMessage request = new(HttpMethod.Post, uri)
+        {
+            Content = JsonContent.Create(message, mediaType: NotificationService._jsonUtf8, AppJsonSerializerOptions.Default),
+            Headers =
+            {
+                Accept = { new("application/json") }
+            }
+        };
         using HttpResponseMessage response = await this._httpClient
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);

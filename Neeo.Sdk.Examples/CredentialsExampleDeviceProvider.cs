@@ -11,30 +11,25 @@ public class CredentialsExampleDeviceProvider : IDeviceProvider
 
     public CredentialsExampleDeviceProvider() => this.DeviceBuilder = Device.Create(Constants.DeviceName, DeviceType.Accessory)
         .SetSpecificName(Constants.DeviceName)
-        .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, this.DiscoverAsync)
+        .EnableDiscovery(Constants.DiscoveryHeaderText, Constants.DiscoveryDescription, (_, _) => Task.FromResult(this.Discover()))
         .EnableRegistration(
             Constants.RegistrationHeaderText,
             Constants.RegistrationDescription,
-            (_) => this.QueryIsRegisteredAsync(),
-            (userName, password, _) => this.RegisterAsync(userName, password)
+            (_) => Task.FromResult(this._isRegistered),
+            (userName, password, _) => Task.FromResult(this.Register(userName, password))
         )
-        .AddTextLabel(Constants.TextLabelName, "Logged In", (deviceId, _) => this.GetLabelTextAsync(deviceId));
+        .AddTextLabel(Constants.TextLabelName, "Logged In", this.GetLabelText);
 
     public IDeviceBuilder DeviceBuilder { get; }
 
-    private Task<DiscoveredDevice[]> DiscoverAsync(string? optionalDeviceId, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(new[] { new DiscoveredDevice("credentialed-device", "Credentialed Device", true) });
-    }
+    private DiscoveredDevice[] Discover() => [new DiscoveredDevice("credentialed-device", "Credentialed Device", true)];
 
-    private Task<string> GetLabelTextAsync(string deviceId) => Task.FromResult(this._isRegistered ? $"{deviceId} registered as {Constants.UserName}" : $"{deviceId} not registered");
+    private string GetLabelText(string deviceId) => this._isRegistered ? $"{deviceId} registered as {Constants.UserName}" : $"{deviceId} not registered";
 
-    private Task<bool> QueryIsRegisteredAsync() => Task.FromResult(this._isRegistered);
-
-    private Task<RegistrationResult> RegisterAsync(string userName, string password)
+    private RegistrationResult Register(string userName, string password)
     {
         this._isRegistered = userName == Constants.UserName && password == Constants.Password;
-        return Task.FromResult(this._isRegistered ? RegistrationResult.Success : RegistrationResult.Failed("You entered an incorrect username and password."));
+        return this._isRegistered ? RegistrationResult.Success : RegistrationResult.Failed("You entered an incorrect username and password.");
     }
 
     private static class Constants

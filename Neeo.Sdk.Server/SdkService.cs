@@ -67,9 +67,9 @@ internal sealed class SdkService(
             stoppingToken
         ).ConfigureAwait(false);
         this._environment = environment;
-        logger.LogInformation("Started server at address {Address}...", environment.HostAddress);
-        logger.LogInformation("Brain Web-EUI is running at http://{IPAddress}:3200/eui", brain.IPAddress);
-        logger.LogInformation("Brain Web-IUI is running at http://{IPAddress}:3200/iui", brain.IPAddress);
+        logger.LogInformation("Started server at address {Address} ...", environment.HostAddress);
+        logger.LogInformation("Brain Web-EUI is running at http://{IPAddress}:3200/eui ...", brain.IPAddress);
+        logger.LogInformation("Brain Web-IUI is running at http://{IPAddress}:3200/iui ...", brain.IPAddress);
         await Task.Delay(Timeout.Infinite, stoppingToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
 
         async ValueTask<Brain> GetBrainAsync()

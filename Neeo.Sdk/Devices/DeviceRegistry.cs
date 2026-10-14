@@ -69,7 +69,7 @@ public sealed class DeviceRegistryChangedEventArgs<TClient>(DeviceRegistryChange
 /// A thread-safe registry of a driver's device clients, keyed by <see cref="IDeviceClient.DeviceId"/>, which tracks each
 /// client's connection state and reports changes via <see cref="Changed"/>.
 /// <para/>
-/// Pair with <see cref="IDeviceBuilder.AddPowerStateSensor{TClient}"/> to derive a device's power state from its
+/// Pair with <see cref="IDeviceBuilder.AddPowerStateSensor{TClient}(IDeviceRegistry{TClient}, AsyncDeviceValueGetter{bool})"/> to derive a device's power state from its
 /// client's connection, with power notifications sent to the NEEO Brain automatically.
 /// </summary>
 /// <typeparam name="TClient">The type of the client.</typeparam>
