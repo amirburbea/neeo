@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Net;
+using System.Globalization;
+using System.Linq;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +14,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Hisense;
 
-public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger) : IDeviceProvider
+public sealed class HisenseDeviceProvider : IDeviceProvider, IDisposable
 {
     private static readonly Dictionary<Buttons, RemoteKey> _remoteKeys = new()
     {
@@ -46,34 +48,46 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         { Buttons.VolumeUp, RemoteKey.VolumeUp },
     };
 
-    private readonly HashSet<string> _deviceIds = [];
+    private readonly HisenseClientManager _clientManager;
+    private readonly ILogger<HisenseDeviceProvider> _logger;
+    private readonly ConcurrentDictionary<string, byte> _subscribedDevices = new(StringComparer.Ordinal);
     private HisenseTV[] _candidates = [];
-    private bool _connected;
     private IDeviceNotifier? _notifier;
-    private HisenseTV? _tv;
+    private bool _isDisposed;
+
+    public HisenseDeviceProvider(HisenseClientManager clientManager, ILogger<HisenseDeviceProvider> logger)
+    {
+        this._clientManager = clientManager;
+        this._logger = logger;
+        this._clientManager.Registry.Changed += this.Registry_Changed;
+        foreach (HisenseTV client in this._clientManager.Clients)
+        {
+            this.AttachClientEvents(client);
+        }
+    }
 
     public IDeviceBuilder DeviceBuilder => field ??= Device.Create(Constants.DeviceName, DeviceType.TV)
         .SetManufacturer(Constants.Manufacturer)
         .SetSpecificName($"{Constants.Manufacturer} {Constants.DeviceName}")
-        .AddButtonHandler(this.OnButtonPressed)
+        .AddButtonHandler(this.OnButtonPressedAsync)
         .AddButtonGroup(ButtonGroups.Power | ButtonGroups.MenuAndBack | ButtonGroups.ControlPad | ButtonGroups.Volume | ButtonGroups.ChannelZapper | ButtonGroups.Transport | ButtonGroups.TransportSearch | ButtonGroups.NumberPad)
         .AddButton(Buttons.InputHdmi1 | Buttons.InputHdmi2 | Buttons.InputHdmi3 | Buttons.InputHdmi4 | Buttons.InputToggle)
         .AddSmartApplicationButton(SmartApplicationButtons.Amazon | SmartApplicationButtons.GooglePlay | SmartApplicationButtons.Netflix | SmartApplicationButtons.YouTube)
         .AddButton(Buttons.Home)
         .AddButton("HBOMAX", "HBO Max")
-        .AddDirectory("Apps", default, DirectoryRole.Root, this.BrowseApps, this.LaunchApp)
-        .AddPowerStateSensor(this.GetPowerState)
-        .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAdded, this.OnDeviceRemoved, this.InitializeDeviceList)
+        .AddDirectory("Apps", default, DirectoryRole.Root, this.BrowseAppsAsync, this.LaunchAppAsync)
+        .AddPowerStateSensor(this._clientManager.Registry, this.GetPowerState)
+        .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
-        .AddSlider("VOLUME", null, this.GetVolumeAsync, this.SetVolumeAsync)
-        .AddTextLabel("VOLUME-LABEL", "Volume", async (deviceId, cancellationToken) => (await this.GetVolumeAsync(deviceId, cancellationToken).ConfigureAwait(false)).ToString())
-        .AddTextLabel("STATE", "State", this.GetStateAsync)
+        .AddSlider("VOLUME", null, (deviceId, _) => Task.FromResult(this.GetVolume(deviceId)), this.SetVolumeAsync)
+        .AddTextLabel("VOLUME-LABEL", "Volume", deviceId => this.GetVolume(deviceId).ToString(CultureInfo.InvariantCulture))
+        .AddTextLabel("STATE", "State", this.GetState)
         .EnableDiscovery("Discovering TV...", "Ensure your TV is on and IP control is enabled.", this.PerformDiscoveryAsync)
         .EnableRegistration(
             "Registering TV...",
             "Enter the code showing on your TV. If no code is displayed, try 0000 or hit back and try again (after verifying the TV is on).",
-            this.QueryIsRegistered,
-            this.Register
+            this.QueryIsRegisteredAsync,
+            this.RegisterAsync
         );
 
     private static Task<IState?> AuthenticatedStateAsync(HisenseTV tv, string? code = null, CancellationToken cancellationToken = default)
@@ -85,17 +99,15 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         static IState? AuthenticatedState(IState? state) => state is { Type: not StateType.AuthenticationRequired } ? state : default;
     }
 
-    private static Task NotifyStateAsync(IDeviceNotifier notifier, HisenseTV tv, IState state) => notifier.SendNotificationAsync("STATE", state.ToString(), tv.DeviceId);
-
-    private async Task BrowseApps(string deviceId, IDirectoryBuilder list, CancellationToken cancellationToken)
+    private async Task BrowseAppsAsync(string deviceId, IDirectoryBuilder list, CancellationToken cancellationToken)
     {
-        if (this._tv is not { } tv)
+        if (!this._clientManager.TryGetConnected(deviceId, out HisenseTV? tv))
         {
             return;
         }
         list.AddTileRow([new("https://logodownload.org/wp-content/uploads/2019/11/hisense-logo.png")]);
         AppInfo[] apps = Array.FindAll(await tv.GetAppsAsync(cancellationToken).ConfigureAwait(false), static app => !app.IsUninstalled);
-        Array.Sort(apps, (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
+        Array.Sort(apps, static (x, y) => StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name));
         (_, int limit, int offset) = list.Parameters;
         if (offset is > 0 && limit < apps.Length)
         {
@@ -108,48 +120,48 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
         }
     }
 
-    private bool GetPowerState(string deviceId) => this._tv != null && this._connected;
+    private bool GetPowerState(string deviceId) => this._clientManager.TryGetConnected(deviceId, out _);
 
-    private async Task<string> GetStateAsync(string deviceId, CancellationToken cancellationToken)
+    private double GetVolume(string deviceId) => this._clientManager.TryGetConnected(deviceId, out HisenseTV? tv) ? tv.Volume : 0d;
+
+    private string GetState(string deviceId) => this._clientManager.TryGetConnected(deviceId, out HisenseTV? tv) ? tv.CurrentState?.ToString() ?? string.Empty : string.Empty;
+
+    private Task InitializeDeviceListAsync(string[] deviceIds, CancellationToken cancellationToken)
     {
-        return this._tv is { } tv && await tv.GetStateAsync(cancellationToken).ConfigureAwait(false) is { } state
-            ? state.ToString()
-            : string.Empty;
+        this._logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceListAsync), string.Join(',', deviceIds));
+        foreach (string deviceId in deviceIds)
+        {
+            this._subscribedDevices.TryAdd(deviceId, default);
+            this._clientManager.GetOrCreateKnownClient(deviceId);
+        }
+        return Task.CompletedTask;
     }
 
-    private async Task<double> GetVolumeAsync(string deviceId, CancellationToken cancellationToken) => this._tv is { } tv
-        ? await tv.GetVolumeAsync(cancellationToken).ConfigureAwait(false)
-        : 0d;
-
-    private async Task InitializeDeviceList(string[] deviceIds, CancellationToken cancellationToken)
+    private Task LaunchAppAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
     {
-        logger.LogInformation("{method}:[{devices}]", nameof(this.InitializeDeviceList), string.Join(',', deviceIds));
-        Array.ForEach(deviceIds, deviceId => this._deviceIds.Add(deviceId));
-        if (deviceIds is not [{ } macAddress])
-        {
-            return;
-        }
-        if (await HisenseTV.TryCreateAsync(PhysicalAddress.Parse(macAddress), logger, useCertificates: true, cancellationToken: cancellationToken).ConfigureAwait(false) is not { } tv)
-        {
-            logger.LogError("Failed to recreate TV based on mac address {macAddress}.", macAddress);
-            return;
-        }
-        this.SetTV(tv, tv.IsConnected ? await tv.GetStateAsync(cancellationToken).ConfigureAwait(false) : default);
+        return this._clientManager.TryGetConnected(deviceId, out HisenseTV? tv)
+            ? tv.LaunchAppAsync(actionIdentifier, cancellationToken)
+            : Task.CompletedTask;
     }
 
-    private Task LaunchApp(string deviceId, string actionIdentifier, CancellationToken cancellationToken) => this._tv?.LaunchAppAsync(actionIdentifier, cancellationToken) ?? Task.CompletedTask;
-
-    private Task OnButtonPressed(string deviceId, string buttonName, CancellationToken cancellationToken)
+    private async Task OnButtonPressedAsync(string deviceId, string buttonName, CancellationToken cancellationToken)
     {
-        if (this._tv is not { } tv)
-        {
-            return Task.CompletedTask;
-        }
         if (Button.TryResolve(buttonName) is { } button)
         {
-            return button switch
+            if (button == Buttons.PowerOn)
             {
-                Buttons.PowerOn => tv.MacAddress.WakeAsync(cancellationToken),
+                if (this._clientManager.GetClient(deviceId) is { } registeredTv)
+                {
+                    await registeredTv.MacAddress.WakeAsync(cancellationToken).ConfigureAwait(false);
+                }
+                return;
+            }
+            if (!this._clientManager.TryGetConnected(deviceId, out HisenseTV? tv))
+            {
+                return;
+            }
+            Task task = button switch
+            {
                 Buttons.InputHdmi1 => tv.ChangeSourceAsync("HDMI 1", cancellationToken),
                 Buttons.InputHdmi2 => tv.ChangeSourceAsync("HDMI 2", cancellationToken),
                 Buttons.InputHdmi3 => tv.ChangeSourceAsync("HDMI 3", cancellationToken),
@@ -157,182 +169,204 @@ public sealed class HisenseDeviceProvider(ILogger<HisenseDeviceProvider> logger)
                 _ when HisenseDeviceProvider._remoteKeys.TryGetValue(button, out RemoteKey key) => tv.SendKeyAsync(key, cancellationToken),
                 _ => Task.CompletedTask
             };
+            await task.ConfigureAwait(false);
+            return;
         }
+
+        if (!this._clientManager.TryGetConnected(deviceId, out HisenseTV? client))
+        {
+            return;
+        }
+
         if (SmartApplicationButton.TryResolve(buttonName) is { } smartButton)
         {
-            return smartButton switch
+            Task task = smartButton switch
             {
-                SmartApplicationButtons.Netflix => tv.LaunchAppAsync("Netflix", cancellationToken),
-                SmartApplicationButtons.YouTube => tv.LaunchAppAsync("YouTube", cancellationToken),
-                SmartApplicationButtons.GooglePlay => tv.LaunchAppAsync("Play Store", cancellationToken),
-                SmartApplicationButtons.Amazon => tv.LaunchAppAsync("Prime Video", cancellationToken),
+                SmartApplicationButtons.Netflix => client.LaunchAppAsync("Netflix", cancellationToken),
+                SmartApplicationButtons.YouTube => client.LaunchAppAsync("YouTube", cancellationToken),
+                SmartApplicationButtons.GooglePlay => client.LaunchAppAsync("Play Store", cancellationToken),
+                SmartApplicationButtons.Amazon => client.LaunchAppAsync("Prime Video", cancellationToken),
                 _ => Task.CompletedTask
             };
+            await task.ConfigureAwait(false);
+            return;
         }
-        return buttonName switch
+
+        if (buttonName == "HBOMAX")
         {
-            "HBOMAX" => tv.LaunchAppAsync("HBO Max", cancellationToken),
-            _ => Task.CompletedTask
-        };
+            await client.LaunchAppAsync("HBO Max", cancellationToken).ConfigureAwait(false);
+        }
     }
 
-    private Task OnDeviceAdded(string deviceId, CancellationToken cancellationToken)
+    private Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
     {
-        this._deviceIds.Add(deviceId);
+        this._subscribedDevices.TryAdd(deviceId, default);
         return Task.CompletedTask;
     }
 
-    private Task OnDeviceRemoved(string deviceId, CancellationToken cancellationToken)
+    private Task OnDeviceRemovedAsync(string deviceId, CancellationToken cancellationToken)
     {
-        this._deviceIds.Remove(deviceId);
-        if (this._tv == null)
+        this._subscribedDevices.TryRemove(deviceId, out _);
+        if (this._clientManager.Registry.TryRemove(deviceId, out HisenseTV? tv))
         {
-            return Task.CompletedTask;
+            tv.Dispose();
         }
-        using HisenseTV tv = Interlocked.Exchange(ref this._tv, null);
-        tv.VolumeChanged -= this.TV_VolumeChanged;
-        tv.Sleep -= this.TV_Disconnected;
-        tv.Disconnected -= this.TV_Disconnected;
-        tv.Connected -= this.TV_Connected;
-        tv.StateChanged -= this.TV_StateChanged;
-        this._connected = false;
         return Task.CompletedTask;
     }
 
     private async Task<DiscoveredDevice[]> PerformDiscoveryAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
-        if (this._tv == null && optionalDeviceId != null &&
-            await HisenseTV.TryCreateAsync(
-                PhysicalAddress.Parse(optionalDeviceId),
-                logger,
-                connectionRequired: true,
-                useCertificates: true,
-                cancellationToken: cancellationToken
-            ).ConfigureAwait(false) is { } tv &&
-            await HisenseDeviceProvider.AuthenticatedStateAsync(tv, cancellationToken: cancellationToken).ConfigureAwait(false) is { } state)
+        if (optionalDeviceId != null &&
+            this._clientManager.GetOrCreateKnownClient(optionalDeviceId) is { } tv &&
+            await HisenseDeviceProvider.AuthenticatedStateAsync(tv, cancellationToken: cancellationToken).ConfigureAwait(false) is not null)
         {
-            this.SetTV(tv, state);
+            return [new(tv.DeviceId, $"Hisense TV ({tv.MacAddress})", true)];
         }
-        return (tv = this._tv) is null
-            ? []
-            : [new(tv.DeviceId, $"Hisense TV ({tv.MacAddress})", true)];
+        HisenseTV[] discovered = await this._clientManager.DiscoverAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return [.. discovered.Select(static tv => new DiscoveredDevice(tv.DeviceId, $"Hisense TV ({tv.MacAddress})", true))];
+        }
+        finally
+        {
+            // Discovery only reports; nothing is registered until the user pairs a TV.
+            this._clientManager.Release(discovered);
+        }
     }
 
-    private async Task<bool> QueryIsRegistered(CancellationToken cancellationToken)
+    private async Task<bool> QueryIsRegisteredAsync(CancellationToken cancellationToken)
     {
-        if (this._tv is { } tv)
+        HisenseTV[] candidates = await this.GatherCandidatesAsync(cancellationToken).ConfigureAwait(false);
+        foreach (HisenseTV candidate in candidates)
         {
-            return await HisenseDeviceProvider.AuthenticatedStateAsync(tv, cancellationToken: cancellationToken).ConfigureAwait(false) is not null;
+            if (await HisenseDeviceProvider.AuthenticatedStateAsync(candidate, cancellationToken: cancellationToken).ConfigureAwait(false) is not null)
+            {
+                this.AdoptCandidate(candidate);
+                return true;
+            }
         }
-        HisenseTV[] tvs = await HisenseTV.DiscoverAsync(logger, useCertificates: true, cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (tvs.Length == 1 && await HisenseDeviceProvider.AuthenticatedStateAsync(tv = tvs[0], cancellationToken: cancellationToken).ConfigureAwait(false) is { } state)
-        {
-            this.SetTV(tv, state);
-            return true;
-        }
-        this._candidates = tvs;
         return false;
     }
 
-    private async Task<RegistrationResult> Register(string code, CancellationToken cancellationToken)
+    private async Task<RegistrationResult> RegisterAsync(string code, CancellationToken cancellationToken)
     {
-        if (code == "0000" && await this.QueryIsRegistered(cancellationToken).ConfigureAwait(false))
+        if (code == "0000" && await this.QueryIsRegisteredAsync(cancellationToken).ConfigureAwait(false))
         {
             return RegistrationResult.Success;
         }
-        HisenseTV[] candidates = this._tv is { } tv ? [tv] : this._candidates;
-        for (int index = 0; index < candidates.Length; index++)
+        HisenseTV[] candidates = this._candidates.Length > 0 ? this._candidates : await this.GatherCandidatesAsync(cancellationToken).ConfigureAwait(false);
+        foreach (HisenseTV candidate in candidates)
         {
-            HisenseTV candidate = candidates[index];
-            if (await HisenseDeviceProvider.AuthenticatedStateAsync(candidate, code, cancellationToken).ConfigureAwait(false) is { } state)
+            if (await HisenseDeviceProvider.AuthenticatedStateAsync(candidate, code, cancellationToken).ConfigureAwait(false) is not null)
             {
-                this.SetTV(candidate, state);
-                if (candidates.Length != 1)
-                {
-                    // Dispose of the other candidates.
-                    for (int other = 0; other < candidates.Length; other++)
-                    {
-                        if (other != index)
-                        {
-                            candidates[other].Dispose();
-                        }
-                    }
-                }
+                this.AdoptCandidate(candidate);
                 return RegistrationResult.Success;
             }
         }
         return RegistrationResult.Failed("Passcode was either incorrect or you took too long.");
     }
 
-    private async void SetTV(HisenseTV tv, IState? state = default)
+    /// <summary>
+    /// Collects TVs that could be paired: known clients not yet added as devices, or - if there are none - freshly discovered ones.
+    /// Previously gathered candidates that were never adopted are released.
+    /// </summary>
+    private async Task<HisenseTV[]> GatherCandidatesAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Setting TV to {ipAddress}.", tv.IPAddress);
-        this._tv = tv;
-        this._connected = tv.IsConnected;
-        tv.VolumeChanged += this.TV_VolumeChanged;
-        tv.Sleep += this.TV_Disconnected;
-        tv.Disconnected += this.TV_Disconnected;
-        tv.Connected += this.TV_Connected;
-        tv.StateChanged += this.TV_StateChanged;
-        if (!this._connected || this._notifier is not { } notifier || !this._deviceIds.Contains(tv.DeviceId))
+        this._clientManager.Release(Interlocked.Exchange(ref this._candidates, []));
+        HisenseTV[] candidates = [.. this._clientManager.Clients.Where(client => !this._subscribedDevices.ContainsKey(client.DeviceId))];
+        if (candidates.Length == 0)
         {
-            return;
+            candidates = [.. (await this._clientManager.DiscoverAsync(cancellationToken).ConfigureAwait(false)).Where(client => !this._subscribedDevices.ContainsKey(client.DeviceId))];
         }
-        await notifier.SendPowerNotificationAsync(true, tv.DeviceId).ConfigureAwait(false);
-        if (state != null)
-        {
-            await HisenseDeviceProvider.NotifyStateAsync(notifier, tv, state).ConfigureAwait(false);
-        }
+        this._candidates = candidates;
+        return candidates;
+    }
+
+    private void AdoptCandidate(HisenseTV candidate)
+    {
+        HisenseTV[] others = [.. Interlocked.Exchange(ref this._candidates, []).Where(other => !ReferenceEquals(other, candidate))];
+        this._clientManager.Adopt(candidate);
+        this._clientManager.Release(others);
     }
 
     private async Task SetVolumeAsync(string deviceId, double value, CancellationToken cancellationToken)
     {
-        if (this._tv is { } tv)
+        if (this._clientManager.TryGetConnected(deviceId, out HisenseTV? tv))
         {
             await tv.ChangeVolumeAsync((int)value, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async void TV_Connected(object? sender, EventArgs e)
+    private void Registry_Changed(object? sender, DeviceRegistryChangedEventArgs<HisenseTV> e)
     {
-        if (this._tv is not { DeviceId: { } deviceId } || this._notifier is not { } notifier || this._connected)
+        if (e.Kind == DeviceRegistryChangeKind.Removed)
+        {
+            this.DetachClientEvents(e.Client);
+        }
+        else if (e.Kind == DeviceRegistryChangeKind.Added)
+        {
+            this.AttachClientEvents(e.Client);
+        }
+    }
+
+    private void AttachClientEvents(HisenseTV client)
+    {
+        this.DetachClientEvents(client);
+        client.VolumeChanged += this.Client_VolumeChanged;
+        client.StateChanged += this.Client_StateChanged;
+    }
+
+    private void DetachClientEvents(HisenseTV client)
+    {
+        client.VolumeChanged -= this.Client_VolumeChanged;
+        client.StateChanged -= this.Client_StateChanged;
+    }
+
+    private async void Client_VolumeChanged(object? sender, DataEventArgs<int> e)
+    {
+        if (sender is HisenseTV tv && this._subscribedDevices.ContainsKey(tv.DeviceId) && this._notifier is { } notifier)
+        {
+            await this.NotifyAsync(() => Task.WhenAll(
+                notifier.SendNotificationAsync("VOLUME", (double)e.Data, tv.DeviceId),
+                notifier.SendNotificationAsync("VOLUME-LABEL", e.Data.ToString(CultureInfo.InvariantCulture), tv.DeviceId)
+            )).ConfigureAwait(false);
+        }
+    }
+
+    private async void Client_StateChanged(object? sender, DataEventArgs<IState> e)
+    {
+        if (sender is HisenseTV tv && this._subscribedDevices.ContainsKey(tv.DeviceId) && this._notifier is { } notifier)
+        {
+            await this.NotifyAsync(() => notifier.SendNotificationAsync("STATE", e.Data.ToString(), tv.DeviceId)).ConfigureAwait(false);
+        }
+    }
+
+    // Event handlers are async void, so failures must be caught here or they would crash the process.
+    private async Task NotifyAsync(Func<Task> send)
+    {
+        try
+        {
+            await send().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogWarning(ex, "Failed to send notification.");
+        }
+    }
+
+    public void Dispose()
+    {
+        if (this._isDisposed)
         {
             return;
         }
-        this._connected = true;
-        await notifier.SendPowerNotificationAsync(true, deviceId).ConfigureAwait(false);
-    }
-
-    private async void TV_Disconnected(object? sender, EventArgs e)
-    {
-        if (this._tv is not { DeviceId: { } deviceId } || this._notifier is not { } notifier || !this._connected)
+        this._isDisposed = true;
+        this._clientManager.Registry.Changed -= this.Registry_Changed;
+        foreach (HisenseTV client in this._clientManager.Clients)
         {
-            return;
-        }
-        this._connected = false;
-        await notifier.SendPowerNotificationAsync(false, deviceId).ConfigureAwait(false);
-    }
-
-    private async void TV_StateChanged(object? sender, DataEventArgs<IState> e)
-    {
-        if (this._tv is { } tv && this._notifier is { } notifier)
-        {
-            await HisenseDeviceProvider.NotifyStateAsync(notifier, tv, e.Data).ConfigureAwait(false);
+            this.DetachClientEvents(client);
         }
     }
-
-    private async void TV_VolumeChanged(object? sender, DataEventArgs<int> e)
-    {
-        if (this._tv is { DeviceId: { } deviceId } && this._notifier is { } notifier)
-        {
-            await Task.WhenAll(
-                notifier.SendNotificationAsync("VOLUME", (double)e.Data, deviceId),
-                notifier.SendNotificationAsync("VOLUME-LABEL", e.Data.ToString(), deviceId)
-            ).ConfigureAwait(false);
-        }
-    }
-
-    private readonly record struct DeviceTuple(IPAddress IPAddress, PhysicalAddress MacAddress);
 
     private static class Constants
     {

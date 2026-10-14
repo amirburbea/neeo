@@ -7,6 +7,9 @@
     <Project Path="Neeo.Drivers.Hisense/Neeo.Drivers.Hisense.csproj">
       <Platform Solution="*|ARM32" Project="ARM32" />
     </Project>
+    <Project Path="Neeo.Drivers.Hisense.Tests/Neeo.Drivers.Hisense.Tests.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
     <Project Path="Neeo.Drivers.Kodi/Neeo.Drivers.Kodi.csproj">
       <Platform Solution="*|ARM32" Project="ARM32" />
     </Project>
