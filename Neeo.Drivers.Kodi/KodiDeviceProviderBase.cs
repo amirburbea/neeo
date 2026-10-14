@@ -835,33 +835,44 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private void SetUriPrefix(string prefix)
     {
         this._uriPrefix = prefix;
-        _ = this.RefreshCoverArtAsync();
+        _ = RefreshCoverArtAsync();
+
+        Task RefreshCoverArtAsync()
+        {
+            IReadOnlyCollection<KodiClient> clients = this._clientManager.Clients;
+            if (clients.Count == 0)
+            {
+                return Task.CompletedTask;
+            }
+            List<Task> tasks = new(clients.Count);
+            foreach (KodiClient client in clients)
+            {
+                if (this.HasDeviceId(client.DeviceId) && KodiDeviceProviderBase.IsClientReady(client))
+                {
+                    tasks.Add(NotifyAsync(client));
+                }
+            }
+            return Task.WhenAll(tasks);
+
+            async Task NotifyAsync(KodiClient client)
+            {
+                try
+                {
+                    await this.NotifyCoverArtAsync(client, client.PlayerState.NowPlayingImage).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    this._logger.LogWarning(ex, "Failed to send cover art for {deviceId}.", client.DeviceId);
+                }
+            }
+        }
     }
 
     private Task NotifyCoverArtAsync(KodiClient client, string? image)
     {
-        return this._notifier is { } notifier && !string.IsNullOrEmpty(this._uriPrefix)
+        return this._notifier is { } notifier && this._uriPrefix is { Length: > 0 }
             ? notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, image, ImageSize.Large), client.DeviceId)
             : Task.CompletedTask;
-    }
-
-    private async Task RefreshCoverArtAsync()
-    {
-        foreach (KodiClient client in this._clientManager.Clients)
-        {
-            if (!this.HasDeviceId(client.DeviceId) || !KodiDeviceProviderBase.IsClientReady(client))
-            {
-                continue;
-            }
-            try
-            {
-                await this.NotifyCoverArtAsync(client, client.PlayerState.NowPlayingImage).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                this._logger.LogWarning(ex, "Failed to send cover art for {deviceId}.", client.DeviceId);
-            }
-        }
     }
 
     private readonly struct EmbeddedImages(string uriPrefix)
