@@ -70,7 +70,7 @@ internal partial class DeviceController
     }
 
     [HttpPost("{adapterName}/{componentName}/{deviceId}/action")]
-    public async Task<ActionResult<SuccessResponse>> PerformDirectoryActionAsync(
+    public async Task<ActionResult> PerformDirectoryActionAsync(
         string adapterName,
         string componentName,
         string deviceId,
@@ -83,7 +83,8 @@ internal partial class DeviceController
             return this.NotFound();
         }
         logger.LogInformation("Perform directory action {Action} on {Name}:{Id}", action.ActionIdentifier, adapter.DeviceName, deviceId);
-        return await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier, cancellationToken);
+        await directoryFeature.PerformActionAsync(deviceId, action.ActionIdentifier, cancellationToken);
+        return this.Ok();
     }
 
     [HttpGet("{adapterName}/{componentName}/{deviceId}/{value}")]

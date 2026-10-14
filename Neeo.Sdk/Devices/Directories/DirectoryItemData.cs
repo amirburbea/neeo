@@ -10,7 +10,6 @@ internal sealed record class DirectoryEntryData(
     string? Label,
     string? BrowseIdentifier,
     string? ThumbnailUri,
-    bool? IsQueueable,
     string? ActionIdentifier,
     DirectoryUIAction? UIAction
 ) : ClickableDirectoryItem(ActionIdentifier, UIAction), IDirectoryItem
@@ -22,7 +21,7 @@ internal sealed record class DirectoryEntryData(
 /// Wire representation of a <see cref="DirectoryButton"/>, produced by <see cref="DirectoryBuilder"/> after validation.
 /// </summary>
 internal sealed record class DirectoryButtonData(
-    [property: JsonPropertyName("title")] string Text,
+    [property: JsonPropertyName("title")] string? Text,
     [property: JsonPropertyName("iconName")] DirectoryButtonIcon? Icon,
     bool? Inverse,
     string? ActionIdentifier,

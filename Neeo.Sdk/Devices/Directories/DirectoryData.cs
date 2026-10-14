@@ -47,7 +47,7 @@ public readonly struct DirectoryData(
         current: new(parameters, this.Offset),
         previous: this.Offset switch
         {
-            int offset and not 0 => new(parameters, offset: Math.Max(offset - this.Limit, 0)),
+            int offset and not 0 => new(parameters, offset: Math.Max(offset - this.Limit, 0), limit: Math.Min(this.Limit, offset)),
             _ => null
         },
         next: (this.Offset + entryCount) switch

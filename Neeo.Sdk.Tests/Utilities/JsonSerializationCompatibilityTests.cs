@@ -66,6 +66,20 @@ public sealed class JsonSerializationCompatibilityTests
     }
 
     [Fact]
+    public void DeviceModel_without_timing_serializes_an_empty_timing_object()
+    {
+        IDeviceAdapter adapter = Device.Create("Test Device", DeviceType.Accessory)
+            .AddTextLabel("TXT", "Text", _ => "x")
+            .BuildAdapter();
+
+        using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(new DeviceModel(0, adapter), AppJsonSerializerOptions.Default));
+
+        JsonElement timing = document.RootElement.GetProperty("timing");
+        Assert.Equal(JsonValueKind.Object, timing.ValueKind);
+        Assert.Empty(timing.EnumerateObject());
+    }
+
+    [Fact]
     public void DirectoryData_serializes_identically_via_reflection_and_source_gen()
     {
         DirectoryBuilder builder = new(new(BrowseIdentifier: "root", Limit: 64));

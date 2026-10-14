@@ -3,7 +3,7 @@
 /// <summary>
 /// Basic information regarding a directory page.
 /// </summary>
-public readonly struct DirectoryPageInfo(BrowseParameters parameters, int offset)
+public readonly struct DirectoryPageInfo(BrowseParameters parameters, int offset, int? limit = null)
 {
     /// <summary>
     /// Gets the browse identifier.
@@ -13,7 +13,7 @@ public readonly struct DirectoryPageInfo(BrowseParameters parameters, int offset
     /// <summary>
     /// Gets the maximum page size limit.
     /// </summary>
-    public int Limit => parameters.Limit;
+    public int Limit => limit ?? parameters.Limit;
 
     /// <summary>
     /// Gets the offset if this is not the first page (otherwise 0).

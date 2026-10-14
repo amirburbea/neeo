@@ -12,26 +12,26 @@ public enum DirectoryButtonIcon
     /// <summary>
     /// Play shuffle.
     /// </summary>
-    [Text("shuffle")]
+    [Text("Shuffle")]
     Shuffle,
 
     /// <summary>
     /// Repeat play.
     /// </summary>
-    [Text("repeat")]
+    [Text("Repeat")]
     Repeat
 }
 
 /// <summary>
 /// Parameters describing a button to add to a directory.
 /// </summary>
-/// <param name="Text">The text for the button.</param>
+/// <param name="Text">The text for the button. Optional if an <paramref name="Icon"/> is specified (the icon is then shown instead of the text).</param>
 /// <param name="Icon">Optional, standard button icon (only for Repeat and Shuffle).</param>
 /// <param name="Inverse">Optional, set to <c>true</c> to have the button appear in an inverse color scheme.</param>
 /// <param name="ActionIdentifier">The (optional) action identifier.</param>
 /// <param name="UIAction">The (optional) standardized directory UI action.</param>
 public sealed record class DirectoryButton(
-    string Text,
+    string? Text = null,
     DirectoryButtonIcon? Icon = default,
     bool? Inverse = null,
     string? ActionIdentifier = null,

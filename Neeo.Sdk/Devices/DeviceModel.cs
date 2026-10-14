@@ -64,7 +64,7 @@ public readonly struct DeviceModel(int id, IDeviceAdapter adapter)
     /// <summary>
     /// Gets the set of delays NEEO should use when interacting with the device.
     /// </summary>
-    public DeviceTiming? Timing => adapter.Timing;
+    public DeviceTiming Timing => adapter.Timing ?? default;
 
     /// <summary>
     /// Gets a string comprised of the search tokens delimited by a space.

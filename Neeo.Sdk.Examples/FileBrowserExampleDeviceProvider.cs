@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
 
@@ -20,23 +18,13 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             .SetIcon(DeviceIconOverride.NeeoBrain)
             .AddAdditionalSearchTokens("explorer")
             .AddCharacteristic(DeviceCharacteristic.AlwaysOn)
-            .EnableDeviceRoute(prefix => this._uriPrefix = prefix, HandleImageRequest)
+            .EnableDeviceRoute(prefix => this._uriPrefix = prefix, EmbeddedImages.HandleRequestAsync)
             .AddDirectory("DIRECTORY", "Directory Browser", DirectoryRole.Root, browser: this.Browse, actionHandler: this.OnDirectoryAction);
     }
 
     public IDeviceBuilder DeviceBuilder { get; }
 
     private string _uriPrefix = string.Empty;
-
-    // Serves the images embedded in this assembly, e.g. "{prefix}puppy.jpg".
-    private static Task<ActionResult> HandleImageRequest(HttpRequest request, string path, CancellationToken cancellationToken)
-    {
-        ActionResult result = path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
-            && typeof(FileBrowserExampleDeviceProvider).Assembly.GetManifestResourceStream(path) is { } stream
-            ? new FileStreamResult(stream, "image/jpeg")
-            : new NotFoundResult();
-        return Task.FromResult(result);
-    }
 
     private Task Browse(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
@@ -65,7 +53,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                     builder
                         .AddHeader(title)
                         .AddTileRow([new($"{this._uriPrefix}puppy.jpg", "puppy")])
-                        .AddInfoItem(new("Click me!", "These pics are cute, right?", "Definitely!", "No!", "INFO-OK"))
+                        .AddInfoItem(new("Click me!", "These pics are cute, right?", AffirmativeButtonText: "Definitely!", NegativeButtonText: "No!", ActionIdentifier: "INFO-OK"))
                         .AddButtonRow(
                             new("Reload", ActionIdentifier: "RELOAD", Inverse: false, UIAction: DirectoryUIAction.Reload),
                             new("BACK", ActionIdentifier: "BACKONE", Inverse: true, UIAction: DirectoryUIAction.GoBack),
@@ -80,7 +68,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
             }
             catch (Exception e)
             {
-                builder.AddInfoItem(new("Error Occurred", e.Message, "Close", "I Don't Care"));
+                builder.AddInfoItem(new("Error Occurred", e.Message, AffirmativeButtonText: "Close", NegativeButtonText: "I Don't Care"));
             }
         }
         return Task.CompletedTask;
@@ -97,7 +85,6 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                 Label: fullPath.Replace('\\', '/'),
                 BrowseIdentifier: isDirectory ? fullPath : null,
                 ActionIdentifier: isDirectory ? null : fullPath,
-                IsQueueable: isDirectory ? null : true,
                 ThumbnailUri: $"{this._uriPrefix}{(isDirectory ? "folder" : "file")}.jpg"
             );
         }
