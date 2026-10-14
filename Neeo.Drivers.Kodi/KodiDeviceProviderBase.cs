@@ -655,10 +655,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
                 tasks.Add(notifier.SendNotificationAsync("PLAYING_SENSOR", e.Data.PlayState == PlayState.Playing, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("TITLE_SENSOR", e.Data.NowPlayingLabel, deviceId));
                 tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
-                if (!string.IsNullOrEmpty(this._uriPrefix))
-                {
-                    tasks.Add(notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, e.Data.NowPlayingImage, ImageSize.Large), deviceId));
-                }
+                tasks.Add(this.NotifyCoverArtAsync(client, e.Data.NowPlayingImage));
                 break;
         }
         if (tasks.Count != 0)
@@ -838,15 +835,18 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private void SetUriPrefix(string prefix)
     {
         this._uriPrefix = prefix;
-        _ = this.NotifyCoverArtAsync();
+        _ = this.RefreshCoverArtAsync();
     }
 
-    private async Task NotifyCoverArtAsync()
+    private Task NotifyCoverArtAsync(KodiClient client, string? image)
     {
-        if (this._notifier is not { } notifier)
-        {
-            return;
-        }
+        return this._notifier is { } notifier && !string.IsNullOrEmpty(this._uriPrefix)
+            ? notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, image, ImageSize.Large), client.DeviceId)
+            : Task.CompletedTask;
+    }
+
+    private async Task RefreshCoverArtAsync()
+    {
         foreach (KodiClient client in this._clientManager.Clients)
         {
             if (!this.HasDeviceId(client.DeviceId) || !KodiDeviceProviderBase.IsClientReady(client))
@@ -855,7 +855,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
             }
             try
             {
-                await notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, client.PlayerState.NowPlayingImage, ImageSize.Large), client.DeviceId).ConfigureAwait(false);
+                await this.NotifyCoverArtAsync(client, client.PlayerState.NowPlayingImage).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
