@@ -15,30 +15,34 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Exceptions;
+using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Hisense;
 
-public sealed class HisenseTV : IDisposable
+public sealed class HisenseTV : IDeviceClient, IDisposable
 {
     private readonly string _clientIdPrefix;
     private readonly ILogger _logger;
     private readonly bool _useCertificates;
+    private readonly ReconnectLoop _reconnectLoop;
 
     private Connection? _connection;
     private bool _isDisposed;
-    private ReconnectLoop? _reconnectLoop;
 
-    private HisenseTV(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
+    internal HisenseTV(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string? clientIdPrefix)
     {
         this.IPAddress = ipAddress;
         this.MacAddress = macAddress;
         this._logger = logger;
         this._useCertificates = useCertificates;
         this._clientIdPrefix = clientIdPrefix ?? Dns.GetHostName();
+        this._reconnectLoop = new(TimeSpan.FromSeconds(14d), TimeSpan.FromMinutes(2d), this.TryConnectAsync, logger);
     }
 
     public event EventHandler? Connected;
+
+    public event EventHandler? ConnectionChanged;
 
     public event EventHandler? Disconnected;
 
@@ -50,11 +54,30 @@ public sealed class HisenseTV : IDisposable
 
     public string DeviceId => this.MacAddress.ToString();
 
-    public IPAddress IPAddress { get; }
+    public IPAddress IPAddress { get; private set; }
 
     public bool IsConnected => this._connection != null && this._connection.IsConnected;
 
     public PhysicalAddress MacAddress { get; }
+
+    public IState? CurrentState { get; private set; }
+
+    public int Volume { get; private set; }
+
+    /// <summary>
+    /// Points the client at a new address (e.g. after a DHCP lease change) and reconnects if it differs from the current one.
+    /// </summary>
+    internal void UpdateAddress(IPAddress ipAddress)
+    {
+        if (this.IPAddress.Equals(ipAddress))
+        {
+            return;
+        }
+        this.IPAddress = ipAddress;
+        this.RequestReconnect();
+    }
+
+    public void RequestReconnect() => this._reconnectLoop.TriggerNow();
 
     public static async Task<HisenseTV[]> DiscoverAsync(ILogger logger, bool useCertificates, string? clientIdPrefix = default, CancellationToken cancellationToken = default)
     {
@@ -153,10 +176,7 @@ public sealed class HisenseTV : IDisposable
     public void Dispose()
     {
         this._isDisposed = true;
-        if (Interlocked.Exchange(ref this._reconnectLoop, default) is { } loop)
-        {
-            loop.Dispose();
-        }
+        this._reconnectLoop.Dispose();
         using Connection? connection = Interlocked.Exchange(ref this._connection, null);
         if (connection != null)
         {
@@ -188,7 +208,12 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        return this._connection == null ? null : await this._connection.GetStateAsync(cancellationToken).ConfigureAwait(false);
+        IState? state = this._connection == null ? null : await this._connection.GetStateAsync(cancellationToken).ConfigureAwait(false);
+        if (state != null)
+        {
+            this.CurrentState = state;
+        }
+        return state;
     }
 
     public async Task<int> GetVolumeAsync(CancellationToken cancellationToken = default)
@@ -197,7 +222,11 @@ public sealed class HisenseTV : IDisposable
         {
             await this.TryConnectAsync(cancellationToken).ConfigureAwait(false);
         }
-        return await (this._connection?.GetVolumeAsync() ?? Task.FromResult(0)).ConfigureAwait(false);
+        if (this._connection != null)
+        {
+            this.Volume = await this._connection.GetVolumeAsync(cancellationToken).ConfigureAwait(false);
+        }
+        return this.Volume;
     }
 
     public async Task LaunchAppAsync(string name, CancellationToken cancellationToken = default)
@@ -220,7 +249,7 @@ public sealed class HisenseTV : IDisposable
         await (this._connection?.SendKeyAsync(key, cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
     }
 
-    private static async Task<HisenseTV?> TryCreate(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool connectionRequired, bool useCertificates, string? clientIdPrefix, CancellationToken cancellationToken)
+    internal static async Task<HisenseTV?> TryCreate(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool connectionRequired, bool useCertificates, string? clientIdPrefix, CancellationToken cancellationToken)
     {
         HisenseTV tv = new(ipAddress, macAddress, logger, useCertificates, clientIdPrefix);
         if (await tv.TryConnectAsync(cancellationToken).ConfigureAwait(false))
@@ -232,7 +261,7 @@ public sealed class HisenseTV : IDisposable
             tv.Dispose();
             return null;
         }
-        tv.StartReconnectTimer();
+        tv._reconnectLoop.Start();
         return tv;
     }
 
@@ -242,16 +271,25 @@ public sealed class HisenseTV : IDisposable
         this._connection = null;
         if (!this._isDisposed)
         {
-            this.StartReconnectTimer();
+            this._reconnectLoop.Start();
         }
         this.Disconnected?.Invoke(this, e);
+        this.ConnectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void Connection_Sleep(object? sender, EventArgs e) => this.Sleep?.Invoke(this, e);
 
-    private void Connection_StateChanged(object? sender, DataEventArgs<IState> e) => this.StateChanged?.Invoke(this, e);
+    private void Connection_StateChanged(object? sender, DataEventArgs<IState> e)
+    {
+        this.CurrentState = e.Data;
+        this.StateChanged?.Invoke(this, e);
+    }
 
-    private void Connection_VolumeChanged(object? sender, DataEventArgs<int> e) => this.VolumeChanged?.Invoke(this, e);
+    private void Connection_VolumeChanged(object? sender, DataEventArgs<int> e)
+    {
+        this.Volume = e.Data;
+        this.VolumeChanged?.Invoke(this, e);
+    }
 
     private void RemoveListeners(Connection connection)
     {
@@ -259,18 +297,6 @@ public sealed class HisenseTV : IDisposable
         connection.StateChanged -= this.Connection_StateChanged;
         connection.VolumeChanged -= this.Connection_VolumeChanged;
         connection.Disconnected -= this.Connection_Disconnected;
-    }
-
-    private void StartReconnectTimer()
-    {
-        ReconnectLoop loop = new(TimeSpan.FromSeconds(14d), TimeSpan.FromMinutes(2d), this.TryConnectAsync, this._logger);
-        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is not null)
-        {
-            // A reconnect loop is already running - don't start a second one.
-            loop.Dispose();
-            return;
-        }
-        loop.Start();
     }
 
     private async Task<bool> TryConnectAsync(CancellationToken cancellationToken = default)
@@ -287,20 +313,33 @@ public sealed class HisenseTV : IDisposable
         connection.Disconnected += this.Connection_Disconnected;
         connection.VolumeChanged += this.Connection_VolumeChanged;
         connection.StateChanged += this.Connection_StateChanged;
-        if (Interlocked.Exchange(ref this._reconnectLoop, default) is { } loop)
+        try
         {
-            // A direct call to TryConnectAsync succeeded while a background reconnect loop was still
-            // running (e.g. triggered by a getter method rather than the loop's own next tick) - stop it.
-            loop.Dispose();
+            this.Volume = await connection.GetVolumeAsync(cancellationToken).ConfigureAwait(false);
+            this.CurrentState = await connection.GetStateAsync(cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            // The attempt was cancelled before the connection was announced - don't leave a half-published connection behind.
+            this.RemoveListeners(connection);
+            Interlocked.CompareExchange(ref this._connection, null, connection);
+            connection.Dispose();
+            throw;
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogDebug(ex, "Failed to query initial volume/state for {deviceId}", this.DeviceId);
+        }
+        this._reconnectLoop.Stop();
         this.Connected?.Invoke(this, EventArgs.Empty);
+        this.ConnectionChanged?.Invoke(this, EventArgs.Empty);
         return true;
     }
 
     private sealed class Connection(IPAddress ipAddress, PhysicalAddress macAddress, ILogger logger, bool useCertificates, string clientIdPrefix) : IDisposable
     {
         private static readonly MqttClientFactory _clientFactory = new();
-        private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions _jsonOptions = HisenseJsonSerializerContext.Default.Options;
         private readonly IMqttClient _client = Connection._clientFactory.CreateMqttClient();
 
         private readonly MqttClientOptions _options = new MqttClientOptionsBuilder()
@@ -335,8 +374,8 @@ public sealed class HisenseTV : IDisposable
 
         public async Task<IState> AuthenticateAsync(string code, CancellationToken cancellationToken)
         {
-            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "authenticationcode"), new { AuthNum = code }, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return payload.Length == 0 || JsonSerializer.Deserialize<SuccessPayload>(payload, Connection._jsonOptions).Result != 1
+            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "authenticationcode"), new AuthPayload(code), cancellationToken: cancellationToken).ConfigureAwait(false);
+            return payload.Length == 0 || JsonSerializer.Deserialize(payload, HisenseJsonSerializerContext.Default.SuccessPayload).Result != 1
                 ? new State(StateType.AuthenticationRequired)
                 : await this.GetStateAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -365,13 +404,13 @@ public sealed class HisenseTV : IDisposable
         public async Task<AppInfo[]> GetAppsAsync(CancellationToken cancellationToken)
         {
             (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "applist"), cancellationToken).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<AppInfo[]>(payload, Connection._jsonOptions)!;
+            return JsonSerializer.Deserialize(payload, HisenseJsonSerializerContext.Default.AppInfoArray)!;
         }
 
         public async Task<SourceInfo[]> GetSourcesAsync(CancellationToken cancellationToken)
         {
             (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "sourcelist"), cancellationToken).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<SourceInfo[]>(payload, Connection._jsonOptions)!;
+            return JsonSerializer.Deserialize(payload, HisenseJsonSerializerContext.Default.SourceInfoArray)!;
         }
 
         public async Task<IState> GetStateAsync(CancellationToken cancellationToken)
@@ -380,9 +419,9 @@ public sealed class HisenseTV : IDisposable
             return this.TranslateStateMessage(topic, payload);
         }
 
-        public async Task<int> GetVolumeAsync()
+        public async Task<int> GetVolumeAsync(CancellationToken cancellationToken = default)
         {
-            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "getvolume")).ConfigureAwait(false);
+            (_, string payload) = await this.SendMessageAsync(this.GetPublishTopic("ui_service", "getvolume"), cancellationToken: cancellationToken).ConfigureAwait(false);
             return Connection.TranslateVolumePayload(payload);
         }
 
@@ -465,7 +504,7 @@ public sealed class HisenseTV : IDisposable
             return X509Certificate2.CreateFromPem(certPem: certificateReader.ReadToEnd(), keyPem: privateKeyReader.ReadToEnd());
         }
 
-        private static int TranslateVolumePayload(string payload) => JsonSerializer.Deserialize<VolumeData>(payload, Connection._jsonOptions).Value;
+        private static int TranslateVolumePayload(string payload) => JsonSerializer.Deserialize(payload, HisenseJsonSerializerContext.Default.VolumeData).Value;
 
         private string GetDataTopic(string service, string action) => $"/remoteapp/mobile/{this._options.ClientId}/{service}/data/{action}";
 
@@ -514,7 +553,7 @@ public sealed class HisenseTV : IDisposable
                     return new State(StateType.Settings);
 
                 case BroadcastTopics.State:
-                    StateData data = JsonSerializer.Deserialize<StateData>(payload, Connection._jsonOptions);
+                    StateData data = JsonSerializer.Deserialize(payload, HisenseJsonSerializerContext.Default.StateData);
                     return data.Type switch
                     {
                         "livetv" => new State(StateType.LiveTV),
@@ -536,16 +575,18 @@ public sealed class HisenseTV : IDisposable
         }
     }
 
-    private readonly record struct State(StateType Type) : IState;
+    internal readonly record struct State(StateType Type) : IState;
 
-    private readonly record struct SuccessPayload(int Result);
+    internal readonly record struct SuccessPayload(int Result);
 
-    private readonly record struct VolumeData(
+    internal readonly record struct AuthPayload([property: JsonPropertyName("AuthNum")] string AuthNum);
+
+    internal readonly record struct VolumeData(
         [property: JsonPropertyName("volume_type")] int Type,
         [property: JsonPropertyName("volume_value")] int Value
     );
 
-    private readonly record struct StateData(
+    internal readonly record struct StateData(
         [property: JsonPropertyName("statetype")] string Type,
         string? Name = default,
         string? Url = default
