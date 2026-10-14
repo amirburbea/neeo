@@ -12,7 +12,7 @@ using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 using Xunit;
 
-namespace Neeo.Sdk.Tests.Devices;
+namespace Neeo.Drivers.WebOS.Tests;
 
 public sealed class WebOSDeviceProviderTests
 {

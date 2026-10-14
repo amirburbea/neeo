@@ -1,8 +1,5 @@
 using System;
-using System.Runtime.CompilerServices;
 using Neeo.Sdk.Utilities;
-
-[assembly: InternalsVisibleTo("Neeo.Sdk.Tests")]
 
 namespace Neeo.Drivers.Plex;
 

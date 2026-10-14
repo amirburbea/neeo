@@ -10,10 +10,19 @@
     <Project Path="Neeo.Drivers.Kodi/Neeo.Drivers.Kodi.csproj">
       <Platform Solution="*|ARM32" Project="ARM32" />
     </Project>
+    <Project Path="Neeo.Drivers.Kodi.Tests/Neeo.Drivers.Kodi.Tests.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
     <Project Path="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj">
       <Platform Solution="*|ARM32" Project="ARM32" />
     </Project>
+    <Project Path="Neeo.Drivers.Plex.Tests/Neeo.Drivers.Plex.Tests.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
     <Project Path="Neeo.Drivers.WebOS/Neeo.Drivers.WebOS.csproj">
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+    <Project Path="Neeo.Drivers.WebOS.Tests/Neeo.Drivers.WebOS.Tests.csproj">
       <Platform Solution="*|ARM32" Project="ARM32" />
     </Project>
   </Folder>
@@ -23,6 +32,9 @@
     </Project>
     <Project Path="Neeo.Sdk.Server/Neeo.Sdk.Server.csproj">
       <BuildDependency Project="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj" />
+      <Platform Solution="*|ARM32" Project="ARM32" />
+    </Project>
+    <Project Path="Neeo.Sdk.Server.Tests/Neeo.Sdk.Server.Tests.csproj">
       <Platform Solution="*|ARM32" Project="ARM32" />
     </Project>
     <Project Path="Neeo.Sdk.Tests/Neeo.Sdk.Tests.csproj">

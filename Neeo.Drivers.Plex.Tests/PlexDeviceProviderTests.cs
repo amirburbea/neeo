@@ -8,7 +8,7 @@ using Neeo.Drivers.Plex;
 using Neeo.Sdk.Utilities;
 using Xunit;
 
-namespace Neeo.Sdk.Tests.Devices;
+namespace Neeo.Drivers.Plex.Tests;
 
 public sealed class PlexDeviceProviderTests : IDisposable
 {

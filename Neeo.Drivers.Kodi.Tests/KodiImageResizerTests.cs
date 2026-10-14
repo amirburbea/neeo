@@ -4,7 +4,7 @@ using Neeo.Drivers.Kodi;
 using SkiaSharp;
 using Xunit;
 
-namespace Neeo.Sdk.Tests.Devices;
+namespace Neeo.Drivers.Kodi.Tests;
 
 public class KodiImageResizerTests
 {
