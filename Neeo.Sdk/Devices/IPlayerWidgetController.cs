@@ -16,7 +16,7 @@ public interface IPlayerWidgetController
 
     /// <summary>
     /// If supported (via <see cref="IsQueueSupported"/>), gets a label to display for the queue directory.
-    /// Defaulted to "Queue" if <see langword="null" />.
+    /// Defaulted to "QUEUE" if <see langword="null" />.
     /// </summary>
     string? QueueDirectoryLabel => null;
 

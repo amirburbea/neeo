@@ -192,7 +192,7 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
     }
 
     private static DirectoryButtonData ToData(DirectoryButton button) => new(
-        button.Text is { Length: > 0 } text ? text : throw new ArgumentException("Button text must not be null or empty.", nameof(button)),
+        button.Text is { Length: > 0 } text ? text : button.Icon is not null ? null : throw new ArgumentException("Button must have text or an icon.", nameof(button)),
         button.Icon,
         button.Inverse,
         button.ActionIdentifier,
@@ -204,7 +204,6 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
         entry.Label is { Length: > 255 } label ? label[..255] : entry.Label,
         entry.BrowseIdentifier,
         Validator.ValidateThumbnailUri(entry.ThumbnailUri),
-        entry.IsQueueable,
         entry.ActionIdentifier,
         entry.UIAction
     );

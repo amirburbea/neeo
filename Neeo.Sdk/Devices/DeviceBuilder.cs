@@ -1002,7 +1002,7 @@ internal sealed partial class DeviceBuilder(
         this._hasPlayerWidget = true;
         if (controller.IsQueueSupported)
         {
-            this.AddDirectory(PlayerWidgetConstants.QueueDirectoryName, controller.QueueDirectoryLabel ?? "Queue", DirectoryRole.Queue, controller.BrowseQueueDirectoryAsync, controller.HandleQueueDirectoryActionAsync);
+            this.AddDirectory(PlayerWidgetConstants.QueueDirectoryName, controller.QueueDirectoryLabel ?? "QUEUE", DirectoryRole.Queue, controller.BrowseQueueDirectoryAsync, controller.HandleQueueDirectoryActionAsync);
         }
         return this
            .AddButton(PlayerWidgetConstants.PlayerButtons)

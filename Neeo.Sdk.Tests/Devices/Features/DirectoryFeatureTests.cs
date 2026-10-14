@@ -84,17 +84,46 @@ public sealed class DirectoryFeatureTests
 
         JsonElement button = document.RootElement.GetProperty("buttons")[0];
         Assert.True(button.GetProperty("isButton").GetBoolean());
-        // The Brain reads the label from "title" (as the TypeScript SDK emits), not "text".
         Assert.Equal("Shuffle", button.GetProperty("title").GetString());
         Assert.False(button.TryGetProperty("text", out _));
-        Assert.Equal("shuffle", button.GetProperty("iconName").GetString());
+        Assert.Equal("Shuffle", button.GetProperty("iconName").GetString());
     }
 
     [Fact]
-    public void AddButtonRow_with_empty_text_throws()
+    public void AddButtonRow_allows_icon_only_button_without_title()
+    {
+        DirectoryBuilder builder = new(new(Limit: 64));
+        builder.AddButtonRow(new DirectoryButton(Icon: DirectoryButtonIcon.Repeat, ActionIdentifier: "REPEAT"));
+
+        JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize<IDirectoryItem>(builder.Build().Items.Single(), DirectoryFeatureTests._options));
+
+        JsonElement button = document.RootElement.GetProperty("buttons")[0];
+        Assert.Equal("Repeat", button.GetProperty("iconName").GetString());
+        Assert.False(button.TryGetProperty("title", out _));
+    }
+
+    [Theory]
+    [InlineData(10, 64, 0, 10)] // Short first page: only the 10 earlier items.
+    [InlineData(64, 64, 0, 64)]
+    [InlineData(100, 64, 36, 64)]
+    public void Metadata_previous_page_covers_only_the_items_before_the_offset(int offset, int limit, int previousOffset, int previousLimit)
+    {
+        DirectoryBuilder builder = new(new("root", limit, offset));
+        builder.AddEntry(new DirectoryEntry("Entry"));
+
+        DirectoryPageInfo? previous = builder.Build().Metadata.Previous;
+
+        Assert.NotNull(previous);
+        Assert.Equal(previousOffset, previous.Value.Offset);
+        Assert.Equal(previousLimit, previous.Value.Limit);
+    }
+
+    [Fact]
+    public void AddButtonRow_with_neither_text_nor_icon_throws()
     {
         DirectoryBuilder builder = new(new(Limit: 64));
         Assert.Throws<ArgumentException>(() => builder.AddButtonRow(new DirectoryButton("")));
+        Assert.Throws<ArgumentException>(() => builder.AddButtonRow(new DirectoryButton()));
     }
 
     [Fact]
