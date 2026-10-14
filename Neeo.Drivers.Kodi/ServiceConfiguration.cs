@@ -5,9 +5,7 @@ namespace Neeo.Drivers.Kodi;
 
 public sealed class ServiceConfiguration : IServiceConfiguration
 {
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddHttpClient();
-        services.AddSingleton<KodiClientManager>();
-    }
+    public void ConfigureServices(IServiceCollection services) => services
+        .AddHttpClient()
+        .AddSingleton<KodiClientManager>();
 }

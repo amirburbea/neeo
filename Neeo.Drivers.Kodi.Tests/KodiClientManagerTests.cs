@@ -7,7 +7,7 @@ using Neeo.Drivers.Kodi;
 using Neeo.Sdk.Utilities;
 using Xunit;
 
-namespace Neeo.Sdk.Tests.Devices;
+namespace Neeo.Drivers.Kodi.Tests;
 
 public class KodiClientManagerTests
 {

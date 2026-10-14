@@ -11,7 +11,7 @@ using Neeo.Sdk.Server;
 using Neeo.Sdk.Utilities;
 using Xunit;
 
-namespace Neeo.Sdk.Tests.Server;
+namespace Neeo.Sdk.Server.Tests;
 
 public sealed class SdkServiceTests
 {
@@ -60,6 +60,30 @@ public sealed class SdkServiceTests
         mockEnvironment.Verify(environment => environment.StopAsync(It.IsAny<CancellationToken>()), Times.Once);
         // The configured Brain IP path must never invoke discovery - enforced implicitly by the strict mock
         // above having no setups (an unexpected call would have thrown inside ExecuteAsync).
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_completes_without_throwing_when_the_host_stops()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Brain"] = "127.0.0.1", ["ServerName"] = "test-server" })
+            .Build();
+        Mock<ISdkEnvironment> mockEnvironment = new(MockBehavior.Strict);
+        mockEnvironment.Setup(environment => environment.HostAddress).Returns("http://127.0.0.1:1234");
+        mockEnvironment.Setup(environment => environment.StopAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        Mock<ISdkServerStarter> mockStarter = new(MockBehavior.Strict);
+        mockStarter
+            .Setup(starter => starter.StartServerAsync(It.IsAny<Brain>(), It.IsAny<Type[]>(), "test-server", It.IsAny<IServiceConfiguration[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockEnvironment.Object);
+        SdkService service = new([], [], configuration, Mock.Of<IBrainDiscovery>(), mockStarter.Object, Mock.Of<IHostApplicationLifetime>(), NullLogger<SdkService>.Instance);
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        await service.StartAsync(cancellationToken);
+        await SdkServiceTests.WaitUntilAsync(() => mockEnvironment.Invocations.Count > 0, cancellationToken);
+        await service.StopAsync(cancellationToken);
+
+        // Waiting on the stopping token must end quietly: a cancelled ExecuteTask throws TaskCanceledException into the debugger.
+        Assert.True(service.ExecuteTask?.IsCompletedSuccessfully);
     }
 
     [Fact]

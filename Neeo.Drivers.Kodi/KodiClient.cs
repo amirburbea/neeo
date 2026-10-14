@@ -380,10 +380,8 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 {
                     this._sendLock.Release();
                 }
-
                 using CancellationTokenSource timeoutCts = new(TimeSpan.FromMilliseconds(2500d));
                 using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
                 using (linkedCts.Token.Register(static state => ((TaskCompletionSource<JsonElement>)state!).TrySetCanceled(), elementSource))
                 {
                     JsonElement element = await elementSource.Task.ConfigureAwait(false);

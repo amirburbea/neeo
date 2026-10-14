@@ -3,7 +3,7 @@ using Neeo.Drivers.Kodi;
 using Neeo.Drivers.Kodi.Models;
 using Xunit;
 
-namespace Neeo.Sdk.Tests.Devices;
+namespace Neeo.Drivers.Kodi.Tests;
 
 public class ArtistInfoTests
 {
