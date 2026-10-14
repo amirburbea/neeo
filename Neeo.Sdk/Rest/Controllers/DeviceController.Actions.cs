@@ -111,7 +111,7 @@ internal partial class DeviceController
         CancellationToken cancellationToken
     )
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter)
+        if (await this.GetAdapterAsync(adapterName, cancellationToken).ConfigureAwait(false) is not { } adapter)
         {
             return default;
         }
@@ -121,7 +121,7 @@ internal partial class DeviceController
             return (adapter, feature);
         }
         // Check for a discovered device with the name `deviceId` and has a component named `componentName`.
-        if (await dynamicDeviceRegistry.GetDiscoveredDeviceAsync(adapter, deviceId, cancellationToken) is { } dynamicAdapter && dynamicAdapter.GetFeature(componentName) is { } dynamicFeature)
+        if (await dynamicDeviceRegistry.GetDiscoveredDeviceAsync(adapter, deviceId, cancellationToken).ConfigureAwait(false) is { } dynamicAdapter && dynamicAdapter.GetFeature(componentName) is { } dynamicFeature)
         {
             return (dynamicAdapter, dynamicFeature);
         }
