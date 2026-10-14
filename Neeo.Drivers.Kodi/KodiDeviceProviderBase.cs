@@ -839,8 +839,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
         Task RefreshCoverArtAsync()
         {
-            IReadOnlyCollection<KodiClient> clients = this._clientManager.Clients;
-            if (clients.Count == 0)
+            if (this._clientManager.Clients is not { Count: > 0 } clients)
             {
                 return Task.CompletedTask;
             }
