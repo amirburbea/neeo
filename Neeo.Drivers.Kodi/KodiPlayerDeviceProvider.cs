@@ -8,21 +8,21 @@ namespace Neeo.Drivers.Kodi;
 
 public sealed class KodiPlayerDeviceProvider(KodiClientManager clientManager, ILogger<KodiPlayerDeviceProvider> logger) : KodiDeviceProviderBase(clientManager, "Player", DeviceType.MediaPlayer, logger), IPlayerWidgetController
 {
-    Task<string> IPlayerWidgetController.GetCoverArtAsync(string deviceId, CancellationToken cancellationToken) => this.GetCoverArt(deviceId);
+    Task<string> IPlayerWidgetController.GetCoverArtAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetCoverArt(deviceId));
 
-    Task<string> IPlayerWidgetController.GetDescriptionAsync(string deviceId, CancellationToken cancellationToken) => this.GetDescription(deviceId);
+    Task<string> IPlayerWidgetController.GetDescriptionAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetDescription(deviceId));
 
-    Task<bool> IPlayerWidgetController.GetIsMutedAsync(string deviceId, CancellationToken cancellationToken) => this.GetIsMutedAsync(deviceId);
+    Task<bool> IPlayerWidgetController.GetIsMutedAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetIsMuted(deviceId));
 
-    Task<bool> IPlayerWidgetController.GetIsPlayingAsync(string deviceId, CancellationToken cancellationToken) => this.GetIsPlaying(deviceId);
+    Task<bool> IPlayerWidgetController.GetIsPlayingAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetIsPlaying(deviceId));
 
     Task<bool> IPlayerWidgetController.GetRepeatAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(false);
 
     Task<bool> IPlayerWidgetController.GetShuffleAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(false);
 
-    Task<string> IPlayerWidgetController.GetTitleAsync(string deviceId, CancellationToken cancellationToken) => this.GetTitle(deviceId);
+    Task<string> IPlayerWidgetController.GetTitleAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetTitle(deviceId));
 
-    Task<double> IPlayerWidgetController.GetVolumeAsync(string deviceId, CancellationToken cancellationToken) => this.GetVolume(deviceId);
+    Task<double> IPlayerWidgetController.GetVolumeAsync(string deviceId, CancellationToken cancellationToken) => Task.FromResult(this.GetVolume(deviceId));
 
     Task IPlayerWidgetController.HandleRootDirectoryActionAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken) => this.HandleDirectoryActionAsync(deviceId, actionIdentifier, cancellationToken);
 

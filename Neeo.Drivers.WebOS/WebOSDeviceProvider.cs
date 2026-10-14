@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -76,12 +75,12 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             SmartApplicationButtons.YouTube
         )
         .AddDirectory("Apps", "Apps & Inputs", DirectoryRole.Root, this.BrowseAppsAsync, this.LaunchAppAsync)
-        .AddPowerStateSensor(this._clientManager.Registry, (deviceId, _) => this.GetPowerStateAsync(deviceId))
+        .AddPowerStateSensor(this._clientManager.Registry, (deviceId, _) => Task.FromResult(this.GetPowerState(deviceId)))
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
-        .AddSlider("VOLUME", null, this.GetVolumeAsync, this.SetVolumeAsync)
-        .AddTextLabel("VOLUME-LABEL", "Volume", async (deviceId, ct) => (await this.GetVolumeAsync(deviceId, ct).ConfigureAwait(false)).ToString(CultureInfo.InvariantCulture))
-        .AddTextLabel("APP", "Current App", this.GetForegroundAppAsync)
+        .AddSlider("VOLUME", null, (deviceId, _) => Task.FromResult(this.GetVolume(deviceId)), this.SetVolumeAsync)
+        .AddTextLabel("VOLUME-LABEL", "Volume", deviceId => this.GetVolume(deviceId).ToString(CultureInfo.InvariantCulture))
+        .AddTextLabel("APP", "Current App", this.GetForegroundApp)
         .EnableDiscovery(
             "Discovering LG webOS TV...",
             "Ensure your TV is turned on, connected to the local network, and 'LG Connect Apps' is enabled. To turn the TV on from NEEO, also enable 'Turn on via Wi-Fi' (or 'Turn on via LAN').",
@@ -94,20 +93,20 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             this.RegisterAsync
         );
 
-    private Task<bool> GetPowerStateAsync(string deviceId)
+    private bool GetPowerState(string deviceId)
     {
         if (this._clientManager.TryGetConnected(deviceId, out _))
         {
-            return Task.FromResult(true);
+            return true;
         }
         // The Brain asking is a good moment to retry (coalesced, and restarts the backoff) - e.g. the TV was just turned on.
         this._clientManager.GetClient(deviceId)?.RequestReconnect();
-        return Task.FromResult(false);
+        return false;
     }
 
-    private Task<double> GetVolumeAsync(string deviceId, CancellationToken cancellationToken)
+    private double GetVolume(string deviceId)
     {
-        return Task.FromResult(this._clientManager.GetClient(deviceId) is { } client ? (double)client.Volume : 0d);
+        return this._clientManager.GetClient(deviceId) is { } client ? client.Volume : 0d;
     }
 
     private async Task SetVolumeAsync(string deviceId, double value, CancellationToken cancellationToken)
@@ -118,9 +117,9 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         }
     }
 
-    private Task<string> GetForegroundAppAsync(string deviceId, CancellationToken cancellationToken)
+    private string GetForegroundApp(string deviceId)
     {
-        return Task.FromResult(this._clientManager.GetClient(deviceId)?.ForegroundApp ?? string.Empty);
+        return this._clientManager.GetClient(deviceId)?.ForegroundApp ?? string.Empty;
     }
 
     private async Task OnButtonPressedAsync(string deviceId, string buttonName, CancellationToken cancellationToken)
@@ -194,10 +193,14 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             return;
         }
 
-        WebOSAppInfo[] apps = await client.GetAppsAsync(cancellationToken).ConfigureAwait(false);
-        WebOSAppInfo[] inputs = await client.GetExternalInputsAsync(cancellationToken).ConfigureAwait(false);
+        // Responses are matched to requests by id, so the two queries can be in flight together.
+        WebOSAppInfo[][] results = await Task.WhenAll(
+            client.GetAppsAsync(cancellationToken),
+            client.GetExternalInputsAsync(cancellationToken)
+        ).ConfigureAwait(false);
+        (WebOSAppInfo[] apps, WebOSAppInfo[] inputs) = (results[0], results[1]);
 
-        List<WebOSAppInfo> allItems = [.. inputs, .. apps.Where(app => !app.Id.StartsWith("com.webos.app.hdmi", StringComparison.OrdinalIgnoreCase))];
+        List<WebOSAppInfo> allItems = [.. inputs, .. apps.Where(app => !app.Id.StartsWith("com.webos.app.hdmi", StringComparison.Ordinal))];
 
         foreach (WebOSAppInfo item in allItems)
         {

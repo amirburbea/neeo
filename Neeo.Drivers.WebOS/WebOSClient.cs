@@ -101,7 +101,6 @@ public sealed class WebOSClient(
         {
             return true;
         }
-
         await this._connectLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -471,7 +470,6 @@ public sealed class WebOSClient(
         {
             return true;
         }
-
         try
         {
             WebOSResponse response = await this.SendRequestAsync("ssap://com.webos.service.networkinput/getPointerInputSocket", null, cancellationToken).ConfigureAwait(false);
