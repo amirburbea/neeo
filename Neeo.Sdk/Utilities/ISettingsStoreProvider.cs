@@ -13,5 +13,5 @@ public interface ISettingsStoreProvider
     /// <summary>
     /// Gets or creates the <see cref="ISettingsStore{T}"/> associated with type <typeparamref name="T"/>.
     /// </summary>
-    ISettingsStore<T> GetStore<T>();
+    ISettingsStore<T> GetStore<T>() where T : class;
 }

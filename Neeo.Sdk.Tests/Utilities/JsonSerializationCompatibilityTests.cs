@@ -12,7 +12,7 @@ namespace Neeo.Sdk.Tests.Utilities;
 
 /// <summary>
 /// Guards wire compatibility with the NEEO Brain: the source-generated <see cref="AppJsonSerializerContext"/>
-/// (via <see cref="AppJsonSerializerOptions.Default"/>) must produce byte-identical JSON to whatever each
+/// (via <see cref="AppJsonSerializerContext.Options"/>) must produce byte-identical JSON to whatever each
 /// type's actual current production path is - for <see cref="DeviceModel"/>/<see cref="DirectoryData"/>
 /// that's the MVC pipeline's camelCase+ignore-null options (see <c>Server.ConfigureJsonOptions</c>), for
 /// <see cref="NotificationService.Message"/> it's the raw <see cref="JsonSerializerOptions.Web"/> default
@@ -60,7 +60,7 @@ public sealed class JsonSerializationCompatibilityTests
         DeviceModel model = new(1, mockAdapter.Object);
 
         string reflectionJson = JsonSerializer.Serialize(model, JsonSerializationCompatibilityTests._currentMvcOptions);
-        string sourceGenJson = JsonSerializer.Serialize(model, AppJsonSerializerOptions.Default);
+        string sourceGenJson = JsonSerializer.Serialize(model, AppJsonSerializerContext.Default.Options);
 
         Assert.Equal(reflectionJson, sourceGenJson);
     }
@@ -72,7 +72,7 @@ public sealed class JsonSerializationCompatibilityTests
             .AddTextLabel("TXT", "Text", _ => "x")
             .BuildAdapter();
 
-        using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(new DeviceModel(0, adapter), AppJsonSerializerOptions.Default));
+        using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(new DeviceModel(0, adapter), AppJsonSerializerContext.Default.Options));
 
         JsonElement timing = document.RootElement.GetProperty("timing");
         Assert.Equal(JsonValueKind.Object, timing.ValueKind);
@@ -92,7 +92,7 @@ public sealed class JsonSerializationCompatibilityTests
         DirectoryData data = builder.Build();
 
         string reflectionJson = JsonSerializer.Serialize(data, JsonSerializationCompatibilityTests._currentMvcOptions);
-        string sourceGenJson = JsonSerializer.Serialize(data, AppJsonSerializerOptions.Default);
+        string sourceGenJson = JsonSerializer.Serialize(data, AppJsonSerializerContext.Default.Options);
 
         Assert.Equal(reflectionJson, sourceGenJson);
     }
@@ -105,11 +105,11 @@ public sealed class JsonSerializationCompatibilityTests
 
         Assert.Equal(
             JsonSerializer.Serialize(valueMessage, JsonSerializerOptions.Web),
-            JsonSerializer.Serialize(valueMessage, AppJsonSerializerOptions.Default)
+            JsonSerializer.Serialize(valueMessage, AppJsonSerializerContext.Default.Options)
         );
         Assert.Equal(
             JsonSerializer.Serialize(sensorMessage, JsonSerializerOptions.Web),
-            JsonSerializer.Serialize(sensorMessage, AppJsonSerializerOptions.Default)
+            JsonSerializer.Serialize(sensorMessage, AppJsonSerializerContext.Default.Options)
         );
     }
 }

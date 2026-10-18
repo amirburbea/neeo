@@ -3,6 +3,8 @@
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
+		<IsAotCompatible>true</IsAotCompatible>
+		<EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -37,8 +39,8 @@
 	</ItemGroup>
 	
 	<ItemGroup>
-		<Compile Update="Rest\Controllers\DeviceController.*.cs">
-			<DependentUpon>DeviceController.cs</DependentUpon>
+		<Compile Update="Rest\Endpoints\DeviceEndpoints.*.cs">
+			<DependentUpon>DeviceEndpoints.cs</DependentUpon>
 		</Compile>
 	</ItemGroup>
 

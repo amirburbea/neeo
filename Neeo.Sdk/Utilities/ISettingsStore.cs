@@ -23,4 +23,4 @@ public interface ISettingsStore : IDictionary<string, string>
 /// <summary>
 /// A persistent, encrypted key-value store associated with the type <typeparamref name="T"/>.
 /// </summary>
-public interface ISettingsStore<T> : ISettingsStore;
+public interface ISettingsStore<T> : ISettingsStore where T : class;

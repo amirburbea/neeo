@@ -16,8 +16,13 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
 
-public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger) : IDeviceClient, IDisposable
+public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger, int webSocketPort = KodiClient.DefaultWebSocketPort) : IDeviceClient, IDisposable
 {
+    /// <summary>
+    /// The port Kodi serves its JSON-RPC WebSocket on by default.
+    /// </summary>
+    public const int DefaultWebSocketPort = 9090;
+
     private static readonly string[] _currentWindowProperties = ["currentwindow"];
     private static readonly string[] _getItemProperties = ["title", "showtitle", "season", "episode", "art", "thumbnail", "year", "genre", "album", "artist", "track"];
 
@@ -75,6 +80,11 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         private set => this.SetValue(ref field, value, this.VolumeChanged);
     }
 
+    /// <summary>
+    /// Gets or sets how long to wait for Kodi to answer an RPC request before failing it with a <see cref="TimeoutException"/>.
+    /// </summary>
+    internal TimeSpan RequestTimeout { get; set; } = TimeSpan.FromMilliseconds(2500d);
+
     public async Task<bool> ConnectAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(this.IsDisposed, this);
@@ -99,17 +109,17 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     private async Task<bool> PerformConnectAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Connecting to {ipAddress}:9090/jsonrpc...", this.IPAddress);
+        logger.LogInformation("Connecting to {ipAddress}:{port}/jsonrpc...", this.IPAddress, webSocketPort);
         ClientWebSocket webSocket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
         CancellationTokenSource cts = new();
         try
         {
-            await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:9090/jsonrpc"), cancellationToken).ConfigureAwait(false);
+            await webSocket.ConnectAsync(new($"ws://{this.IPAddress}:{webSocketPort}/jsonrpc"), cancellationToken).ConfigureAwait(false);
             this._cancellationTokenSource = cts;
             this._webSocket = webSocket;
             _ = Task.Run(this.MessageLoop, cts.Token);
             await this.OnConnectedAsync().ConfigureAwait(false);
-            logger.LogInformation("Connected to {ipAddress}:9090/jsonrpc...", this.IPAddress);
+            logger.LogInformation("Connected to {ipAddress}:{port}/jsonrpc...", this.IPAddress, webSocketPort);
             if (Interlocked.Exchange(ref this._pendingButtonAction, null) is { } pendingAction)
             {
                 _ = this.ReplayPendingActionAsync(pendingAction);
@@ -118,14 +128,14 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         }
         catch (WebSocketException)
         {
-            logger.LogWarning("Failed to connect to {ipAddress}:9090/jsonrpc.", this.IPAddress);
+            logger.LogWarning("Failed to connect to {ipAddress}:{port}/jsonrpc.", this.IPAddress, webSocketPort);
             cts.Dispose();
             webSocket.Dispose();
             return false;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogError(ex, "Unexpected error connecting to {ipAddress}:9090/jsonrpc.", this.IPAddress);
+            logger.LogError(ex, "Unexpected error connecting to {ipAddress}:{port}/jsonrpc.", this.IPAddress, webSocketPort);
             cts.Dispose();
             webSocket.Dispose();
             return false;
@@ -358,7 +368,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         if (this._webSocket is not { State: WebSocketState.Open } webSocket)
         {
             _ = this.ConnectAsync(cancellationToken);
-            return Task.FromCanceled<TResult>(new(true));
+            return Task.FromException<TResult>(new InvalidOperationException("Not connected to Kodi."));
         }
 
         return SendRequestAsync();
@@ -380,18 +390,28 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 {
                     this._sendLock.Release();
                 }
-                using CancellationTokenSource timeoutCts = new(TimeSpan.FromMilliseconds(2500d));
+                using CancellationTokenSource timeoutCts = new(this.RequestTimeout);
                 using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
                 using (linkedCts.Token.Register(static state => ((TaskCompletionSource<JsonElement>)state!).TrySetCanceled(), elementSource))
                 {
-                    JsonElement element = await elementSource.Task.ConfigureAwait(false);
+                    JsonElement element;
+                    try
+                    {
+                        element = await elementSource.Task.ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        // Not cancelled by the caller: either Kodi did not answer in time, or the connection dropped (which cancels
+                        // all outstanding requests). Report which, rather than as a cancellation nobody asked for.
+                        if (timeoutCts.IsCancellationRequested)
+                        {
+                            logger.LogWarning("Kodi RPC request {Method} (id: {Id}) timed out.", method, request.Id);
+                            throw new TimeoutException($"Kodi RPC request '{method}' timed out after {this.RequestTimeout.TotalMilliseconds:0} ms.");
+                        }
+                        throw new WebSocketException(WebSocketError.ConnectionClosedPrematurely, $"The connection to Kodi was lost before '{method}' was answered.");
+                    }
                     return transform(ExtractPayload(element));
                 }
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                logger.LogWarning("Kodi RPC request {Method} (id: {Id}) timed out.", method, request.Id);
-                return await Task.FromCanceled<TResult>(new(true)).ConfigureAwait(false);
             }
             finally
             {
@@ -476,7 +496,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         {
             if (this._cancellationTokenSource is { Token: { } token } && this._webSocket is { State: WebSocketState.Open } webSocket)
             {
-                await JsonWebSocket.MessageLoop<JsonRpcResponse>(
+                await JsonWebSocket.MessageLoop(
                     webSocket,
                     (response, _) =>
                     {
@@ -506,8 +526,8 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                         }
                         return ValueTask.CompletedTask;
                     },
+                    KodiJsonSerializerContext.Default.JsonRpcResponse,
                     this.OnDisconnected,
-                    options: KodiJsonSerializerOptions.Default,
                     cancellationToken: token
                 ).ConfigureAwait(false);
             }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reactive;
 using System.Reactive.Linq;
 using System.Reflection;
 using System.Text;
@@ -12,7 +13,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -346,35 +346,35 @@ public abstract partial class PlexDeviceProviderBase(
         }
     }
 
-    private async Task<ActionResult> HandleHttpRequestAsync(HttpRequest request, string path, CancellationToken cancellationToken)
+    private async Task<IResult> HandleHttpRequestAsync(HttpRequest request, string path, CancellationToken cancellationToken)
     {
         int index = path.IndexOf('/');
         if (index == -1)
         {
-            return new NotFoundResult();
+            return Results.NotFound();
         }
         string suffix = path[(index + 1)..];
         return path[..index] switch
         {
             VirtualDirectories.Embedded => await HandleEmbeddedImageRouteAsync(suffix).ConfigureAwait(false),
             VirtualDirectories.Thumbnail => await HandleThumbnailRouteAsync(suffix).ConfigureAwait(false),
-            _ => new NotFoundResult(),
+            _ => Results.NotFound(),
         };
 
-        static async Task<ActionResult> HandleEmbeddedImageRouteAsync(string fileName)
+        static async Task<IResult> HandleEmbeddedImageRouteAsync(string fileName)
         {
             if (Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(PlexServer).Namespace}.Images.{fileName}") is not { } stream)
             {
-                return new NotFoundResult();
+                return Results.NotFound();
             }
-            return new FileStreamResult(stream, PlexDeviceProviderBase.GetContentType(fileName)) { FileDownloadName = fileName };
+            return Results.File(stream, PlexDeviceProviderBase.GetContentType(fileName), fileName);
         }
 
-        async Task<ActionResult> HandleThumbnailRouteAsync(string suffix)
+        async Task<IResult> HandleThumbnailRouteAsync(string suffix)
         {
             if (PlexDeviceProviderBase.ResolveImageUrl(suffix) is not { } imageUrl)
             {
-                return new NotFoundResult();
+                return Results.NotFound();
             }
             try
             {
@@ -382,19 +382,19 @@ public abstract partial class PlexDeviceProviderBase(
                 HttpResponseMessage response = await this._httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
-                    return new StatusCodeResult((int)response.StatusCode);
+                    return Results.StatusCode((int)response.StatusCode);
                 }
                 Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                return new FileStreamResult(stream, response.Content.Headers.ContentType?.MediaType ?? "image/jpeg");
+                return Results.Stream(stream, response.Content.Headers.ContentType?.MediaType ?? "image/jpeg");
             }
             catch (FormatException)
             {
-                return new BadRequestResult();
+                return Results.BadRequest();
             }
             catch (HttpRequestException e)
             {
                 logger.LogWarning(e, "Failed to proxy Plex image from {Url}.", imageUrl);
-                return new StatusCodeResult(503);
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
         }
     }
@@ -407,13 +407,29 @@ public abstract partial class PlexDeviceProviderBase(
         }
         return Task.CompletedTask;
 
+        // Runs unobserved in the background, so every failure must be handled (and logged) here.
         async Task InitializeUponStartup()
         {
-            await this._startupTask.ConfigureAwait(false); // Wait for NEEO SDK to initialize
-            await this.InitializeAsync(cancellationToken: default).ConfigureAwait(false);
+            try
+            {
+                await this._startupTask.ConfigureAwait(false); // Wait for NEEO SDK to initialize
+                await this.InitializeAsync(cancellationToken: default).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to initialize the Plex servers.");
+                return;
+            }
             foreach (string machineIdentifier in machineIdentifiers)
             {
-                await this.OnServerAddedAsync(machineIdentifier, cancellationToken: default).ConfigureAwait(false);
+                try
+                {
+                    await this.OnServerAddedAsync(machineIdentifier, cancellationToken: default).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "Failed to initialize Plex server {MachineIdentifier}.", machineIdentifier);
+                }
             }
         }
     }
@@ -449,52 +465,83 @@ public abstract partial class PlexDeviceProviderBase(
             return;
         }
         // Notify on changes to player.
-        server.SelectedPlayerChanged
-            .Select(data => data is { Name: { } name } ? name : string.Empty)
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(playerName => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Player.SensorName, playerName, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
+        PlexDeviceProviderBase.NotifyOnChange(
+            server.SelectedPlayerChanged.Select(data => data is { Name: { } name } ? name : string.Empty),
+            server.Disposed,
+            (playerName, token) => notifier.SendNotificationAsync(Components.Player.SensorName, playerName, machineIdentifier, token),
+            logger,
+            Components.Player.SensorName
+        );
         // Notify on changes to play state.
-        server.PlayStateChanged
-            .Select(state => state is PlayState.Playing or PlayState.Buffering)
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(isPlaying => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
+        PlexDeviceProviderBase.NotifyOnChange(
+            server.PlayStateChanged.Select(state => state is PlayState.Playing or PlayState.Buffering),
+            server.Disposed,
+            (isPlaying, token) => notifier.SendNotificationAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token),
+            logger,
+            Components.Playing.SensorName
+        );
         // Notify on changes to active media.
-        server.IsConnectedChanged
-            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
-            .Select(_ => this.GetTitle(machineIdentifier))
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Title.SensorName, value, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        server.IsConnectedChanged
-            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
-            .Select(_ => this.GetDescription(machineIdentifier))
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.Description.SensorName, value, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
-        server.IsConnectedChanged
-            .CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged)
-            .Select(_ => this.GetCoverArt(machineIdentifier))
-            .DistinctUntilChanged()
-            .Skip(1)
-            .Select(value => Observable.FromAsync((token) => notifier.SendNotificationAsync(Components.CoverArt.SensorName, value, machineIdentifier, token)))
-            .Switch()
-            .TakeUntil(server.Disposed)
-            .Subscribe();
+        IObservable<Unit> mediaChanged = server.IsConnectedChanged.CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged).Select(static _ => Unit.Default);
+        PlexDeviceProviderBase.NotifyOnChange(
+            mediaChanged.Select(_ => this.GetTitle(machineIdentifier)),
+            server.Disposed,
+            (value, token) => notifier.SendNotificationAsync(Components.Title.SensorName, value, machineIdentifier, token),
+            logger,
+            Components.Title.SensorName
+        );
+        PlexDeviceProviderBase.NotifyOnChange(
+            mediaChanged.Select(_ => this.GetDescription(machineIdentifier)),
+            server.Disposed,
+            (value, token) => notifier.SendNotificationAsync(Components.Description.SensorName, value, machineIdentifier, token),
+            logger,
+            Components.Description.SensorName
+        );
+        PlexDeviceProviderBase.NotifyOnChange(
+            mediaChanged.Select(_ => this.GetCoverArt(machineIdentifier)),
+            server.Disposed,
+            (value, token) => notifier.SendNotificationAsync(Components.CoverArt.SensorName, value, machineIdentifier, token),
+            logger,
+            Components.CoverArt.SensorName
+        );
         await server.InitializeAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends a notification each time <paramref name="values"/> changes (ignoring the initial value), until <paramref name="until"/> fires.
+    /// A newer value supersedes one still being sent. A failed send is logged and later values are still sent; an error in the
+    /// <paramref name="values"/> stream itself is logged rather than left unhandled (which would terminate the process).
+    /// </summary>
+    internal static IDisposable NotifyOnChange<TValue>(
+        IObservable<TValue> values,
+        IObservable<Unit> until,
+        Func<TValue, CancellationToken, Task> send,
+        ILogger logger,
+        string description
+    ) => values
+        .DistinctUntilChanged()
+        .Skip(1)
+        .Select(value => Observable.FromAsync(token => PlexDeviceProviderBase.SendSafelyAsync(send, value, logger, description, token)))
+        .Switch()
+        .TakeUntil(until)
+        .Subscribe(
+            static _ => { },
+            exception => logger.LogError(exception, "Plex '{Description}' notifications stopped unexpectedly.", description)
+        );
+
+    private static async Task SendSafelyAsync<TValue>(Func<TValue, CancellationToken, Task> send, TValue value, ILogger logger, string description, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await send(value, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Superseded by a newer value, or the server was disposed.
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to send Plex '{Description}' notification.", description);
+        }
     }
 
     private Task OnServerRemovedAsync(string machineIdentifier, CancellationToken cancellationToken)
@@ -507,35 +554,46 @@ public abstract partial class PlexDeviceProviderBase(
         return Task.CompletedTask;
     }
 
-    private async Task<bool> QueryIsRegisteredAsync(CancellationToken cancellationToken)
+    internal async Task<bool> QueryIsRegisteredAsync(CancellationToken cancellationToken)
     {
         // Check if token exists, we have not previously registered if it doesn't.
         if (string.IsNullOrEmpty(tokenStore.AuthToken))
         {
             return false;
         }
-        // Check if token is valid.
-        if (await TryValidateTokenAsync(cancellationToken).ConfigureAwait(false))
+        switch (await GetTokenStatusAsync(cancellationToken).ConfigureAwait(false))
         {
-            return true;
+            case HttpStatusCode.OK:
+                return true;
+            case HttpStatusCode.Unauthorized:
+                // Plex has rejected the token: clear it so the user is asked to register again.
+                tokenStore.AuthToken = null;
+                return false;
+            default:
+                // Plex couldn't be reached or failed to answer. The token may well still be valid, so keep it (clearing it would
+                // force the user to sign in again after every outage) and don't report the device as unregistered.
+                logger.LogWarning("Could not verify the Plex token with plex.tv; keeping it.");
+                return true;
         }
-        // Clear any invalid token.
-        tokenStore.AuthToken = null;
-        return false;
 
-        async Task<bool> TryValidateTokenAsync(CancellationToken cancellationToken)
+        async Task<HttpStatusCode?> GetTokenStatusAsync(CancellationToken cancellationToken)
         {
             try
             {
-                return HttpStatusCode.OK == await this._httpClient.HeadAsync(
+                return await this._httpClient.HeadAsync(
                     PlexDeviceProviderBase._userUri,
                     request => request.Headers.Add("X-Plex-Token", tokenStore.AuthToken),
                     cancellationToken
                 ).ConfigureAwait(false);
             }
-            catch
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                return false;
+                throw;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Failed to reach plex.tv to verify the Plex token.");
+                return null;
             }
         }
     }
@@ -544,8 +602,9 @@ public abstract partial class PlexDeviceProviderBase(
     {
         try
         {
-            JsonElement element = await this._httpClient.PostAsync<JsonElement>(
+            JsonElement element = await this._httpClient.PostAsync(
                 PlexDeviceProviderBase._signInUri,
+                PlexJsonSerializerContext.Default.JsonElement,
                 configureRequest: ConfigureRequest,
                 cancellationToken: cancellationToken
             ).ConfigureAwait(false);

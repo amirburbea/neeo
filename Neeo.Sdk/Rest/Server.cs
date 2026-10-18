@@ -2,20 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
+using Neeo.Sdk.Rest.Endpoints;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Rest;
@@ -53,13 +51,13 @@ internal static class Server
         AddBrainClient(NotificationService.NotificationsHttpClientName);
     }
 
-    private static void ConfigureJsonOptions(JsonSerializerOptions options)
+    internal static void ConfigureJsonOptions(JsonSerializerOptions options)
     {
         // Share the exact same naming policy/null-handling/resolver as the rest of the SDK (see
-        // AppJsonSerializerOptions), rather than configuring MVC's options independently.
-        options.DictionaryKeyPolicy = options.PropertyNamingPolicy = AppJsonSerializerOptions.Default.PropertyNamingPolicy;
-        options.DefaultIgnoreCondition = AppJsonSerializerOptions.Default.DefaultIgnoreCondition;
-        options.TypeInfoResolver = AppJsonSerializerOptions.Default.TypeInfoResolver;
+        // AppJsonSerializerContext), rather than configuring the HTTP JSON options independently.
+        options.DictionaryKeyPolicy = options.PropertyNamingPolicy = AppJsonSerializerContext.Default.Options.PropertyNamingPolicy;
+        options.DefaultIgnoreCondition = AppJsonSerializerContext.Default.Options.DefaultIgnoreCondition;
+        options.TypeInfoResolver = AppJsonSerializerContext.Default.Options.TypeInfoResolver;
     }
 
     private static void ConfigureLoggingDefaults(HostBuilderContext context, ILoggingBuilder builder)
@@ -98,7 +96,7 @@ internal static class Server
         Array.ForEach(serviceConfigurations ?? [], configuration => configuration.ConfigureServices(services));
     }
 
-    private static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPAddress hostAddress, int port) => builder
+    internal static void ConfigureWebHostDefaults(IWebHostBuilder builder, IPAddress hostAddress, int port) => builder
         .ConfigureKestrel(options =>
         {
             options.AddServerHeader = false;
@@ -108,34 +106,25 @@ internal static class Server
         .ConfigureServices(services =>
         {
             services
-               .AddMvcCore(options => options.AllowEmptyInputInBodyModelBinding = true)
-               .AddJsonOptions(options => Server.ConfigureJsonOptions(options.JsonSerializerOptions))
-               .AddCors(options => options.AddDefaultPolicy(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
-               .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(AssemblyControllerFeatureProvider.Instance));
+                .AddRouting()
+                .AddCors(options => options.AddDefaultPolicy(builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()))
+                .ConfigureHttpJsonOptions(options => Server.ConfigureJsonOptions(options.SerializerOptions));
         })
         .Configure((context, builder) =>
         {
             builder
                 .UseRouting()
                 .UseCors()
-                .UseEndpoints(endpoints => endpoints.MapControllers());
+                .UseEndpoints(endpoints =>
+                {
+                    endpoints.MapDatabaseEndpoints();
+                    endpoints.MapDeviceEndpoints();
+                    endpoints.MapSecureEndpoints();
+                });
         });
 
     private static class Constants
     {
         public const int MaxRequestBodySize = 2 * 1024 * 1024;
-    }
-
-    /// <summary>
-    /// Registers all controllers in this assembly, whether public or internal.
-    /// </summary>
-    private sealed class AssemblyControllerFeatureProvider : ControllerFeatureProvider
-    {
-        public static readonly ControllerFeatureProvider Instance = new AssemblyControllerFeatureProvider();
-
-        protected override bool IsController(TypeInfo info)
-        {
-            return info.Assembly == Assembly.GetExecutingAssembly() && info.IsAssignableTo(typeof(ControllerBase));
-        }
     }
 }

@@ -1,5 +1,5 @@
 using System;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 
 namespace Neeo.Sdk.Examples;
 
@@ -8,8 +8,8 @@ namespace Neeo.Sdk.Examples;
 /// </summary>
 internal static class EmbeddedImages
 {
-    public static ActionResult HandleRequest(string path) => path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+    public static IResult HandleRequest(string path) => path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
         && typeof(EmbeddedImages).Assembly.GetManifestResourceStream(path) is { } stream
-        ? new FileStreamResult(stream, "image/jpeg")
-        : new NotFoundResult();
+        ? Results.Stream(stream, "image/jpeg")
+        : Results.NotFound();
 }

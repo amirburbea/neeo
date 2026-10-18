@@ -109,11 +109,15 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         this._ratingKey
             .DistinctUntilChanged()
             .Select(value => value is { } key and > 0
-                ? Observable.FromAsync(token => this.QueryMediaItemAsync(key, token))
+                ? Observable.FromAsync(token => this.TryQueryMediaItemAsync(key, token))
                 : Observable.Return(default(MediaItem?)))
             .Switch()
             .TakeUntil(this._cancellationTokenSource.Token)
-            .Subscribe(this._activeMedia);
+            .Subscribe(
+                this._activeMedia.OnNext,
+                exception => this._logger.LogError(exception, "Plex active media updates stopped unexpectedly for server {MachineIdentifier}.", this.MachineIdentifier),
+                this._activeMedia.OnCompleted
+            );
         this.SelectedPlayerChanged = this._selectedPlayerId
             .CombineLatest(this._players, (id, players) => PlexServer.GetPlayerById(players, id))
             .DistinctUntilChanged()
@@ -121,11 +125,14 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         this._playerDiscoverySubscription = new(
             () => Observable.Interval(TimeSpan.FromSeconds(30d))
                 .StartWith(0L)
-                .Select(_ => Observable.FromAsync(this.DiscoverPlayersAsync))
+                .Select(_ => Observable.FromAsync(this.TryDiscoverPlayersAsync))
                 .Switch()
                 .Do(_ => this._playerDiscoveryTaskSource.TrySetResult())
                 .TakeUntil(this._cancellationTokenSource.Token)
-                .Subscribe(),
+                .Subscribe(
+                    static _ => { },
+                    exception => this._logger.LogError(exception, "Plex player discovery stopped unexpectedly for server {MachineIdentifier}.", this.MachineIdentifier)
+                ),
             LazyThreadSafetyMode.ExecutionAndPublication
         );
         this._reconnectLoop = new(TimeSpan.FromSeconds(5d), TimeSpan.FromMinutes(2d), this.TryConnectSocketAsync, logger);
@@ -153,7 +160,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     public async Task DiscoverPlayersAsync(CancellationToken cancellationToken)
     {
-        if (await this._httpClient.GetAsync<Response<ClientsMediaContainer>>(this.GetUri("clients"), this.AddTokenHeaders, cancellationToken, PlexJsonSerializerOptions.Default).ConfigureAwait(false) is not { MediaContainer.Clients: { } clients })
+        if (await this._httpClient.GetAsync(this.GetUri("clients"), PlexJsonSerializerContext.Default.ResponseClientsMediaContainer, this.AddTokenHeaders, cancellationToken).ConfigureAwait(false) is not { MediaContainer.Clients: { } clients })
         {
             return;
         }
@@ -192,6 +199,47 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             next.Add(id, player);
         }
         this._players.OnNext(next.ToImmutableDictionary());
+    }
+
+    /// <summary>
+    /// Discovers players for the background poll: a failure (the server being briefly unreachable, say) is logged and
+    /// the next poll tries again, rather than terminating the poll.
+    /// </summary>
+    internal async Task TryDiscoverPlayersAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await this.DiscoverPlayersAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            this._logger.LogWarning("Failed to discover Plex players on server {MachineIdentifier}: {Message}", this.MachineIdentifier, e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks up a media item for the active media pipeline: a failure is logged and treated as "no media" rather than
+    /// terminating the pipeline.
+    /// </summary>
+    internal async Task<MediaItem?> TryQueryMediaItemAsync(int ratingKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await this.QueryMediaItemAsync(ratingKey, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            this._logger.LogWarning("Failed to query Plex media item {RatingKey} on server {MachineIdentifier}: {Message}", ratingKey, this.MachineIdentifier, e.Message);
+            return null;
+        }
     }
 
     public void Dispose()
@@ -335,16 +383,16 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     private async Task<LibraryMediaContainer> BrowseLibraryAsync(string? suffix, PaginationParameters? pagination, CancellationToken cancellationToken)
     {
-        Response<LibraryMediaContainer> response = await this._httpClient.GetAsync<Response<LibraryMediaContainer>>(
+        Response<LibraryMediaContainer> response = await this._httpClient.GetAsync(
             this.GetUri(
                 $"library/sections{(suffix == null ? string.Empty : $"/{suffix}")}",
                 pagination is { } parameters
                     ? [("X-Plex-Container-Start", $"{parameters.Offset}"), ("X-Plex-Container-Size", $"{parameters.PageSize}")]
                     : []
             ),
+            PlexJsonSerializerContext.Default.ResponseLibraryMediaContainer,
             this.AddTokenHeaders,
-            cancellationToken,
-            PlexJsonSerializerOptions.Default
+            cancellationToken
         ).ConfigureAwait(false);
         return response.MediaContainer;
     }
@@ -464,7 +512,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 }
                 this._selectedPlayerId.OnNext(player.MachineIdentifier);
             }
-            await JsonWebSocket.MessageLoop<ServerMessage>(webSocket, ProcessMessageAsync, options: PlexJsonSerializerOptions.Default, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await JsonWebSocket.MessageLoop(webSocket, ProcessMessageAsync, PlexJsonSerializerContext.Default.ServerMessage, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -530,11 +578,11 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     private async Task<MediaItem?> QueryMediaItemAsync(int ratingKey, CancellationToken cancellationToken)
     {
-        Response<MediaItemDetailContainer> response = await this._httpClient.GetAsync<Response<MediaItemDetailContainer>>(
+        Response<MediaItemDetailContainer> response = await this._httpClient.GetAsync(
             this.GetUri($"library/metadata/{ratingKey}"),
+            PlexJsonSerializerContext.Default.ResponseMediaItemDetailContainer,
             this.AddTokenHeaders,
-            cancellationToken,
-            PlexJsonSerializerOptions.Default
+            cancellationToken
         ).ConfigureAwait(false);
         return response.MediaContainer.Metadata is [{ } metadata, ..] ? this.CreateMediaItem(metadata) : null;
     }
@@ -545,11 +593,11 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         {
             return null;
         }
-        Response<MediaItemDetailContainer> response = await this._httpClient.GetAsync<Response<MediaItemDetailContainer>>(
+        Response<MediaItemDetailContainer> response = await this._httpClient.GetAsync(
             this.GetUri("status/sessions"),
+            PlexJsonSerializerContext.Default.ResponseMediaItemDetailContainer,
             this.AddTokenHeaders,
-            cancellationToken,
-            PlexJsonSerializerOptions.Default
+            cancellationToken
         ).ConfigureAwait(false);
         return response.MediaContainer.Metadata is { } array && Array.FindIndex(array, media => media.Player?.MachineIdentifier == id) is int index and not -1
             ? array[index]
@@ -561,18 +609,18 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
 
     private async Task SeekAsync(int seconds, CancellationToken cancellationToken)
     {
-        MediaItemMetadata? metadata = await this.QueryPlayerSessionAsync(cancellationToken).ConfigureAwait(false);
-        if (metadata is { ViewOffset: { } offset, Type: { } type, Duration: { } duration })
+        if (await this.QueryPlayerSessionAsync(cancellationToken).ConfigureAwait(false) is not { ViewOffset: { } offset, Type: { } type, Duration: { } duration })
         {
-            await this.SendPlayerCommandAsync(
-                "playback/seekTo",
-                [
-                    ("type", TextAttribute.GetText(PlexServer.GetMediaCategory(type))),
-                    ("offset", $"{Math.Min(duration, Math.Max(0, offset + seconds * 1000))}")
-                ],
-                cancellationToken: cancellationToken
-            ).ConfigureAwait(false);
+            return;
         }
+        await this.SendPlayerCommandAsync(
+            "playback/seekTo",
+            [
+                ("type", TextAttribute.GetText(PlexServer.GetMediaCategory(type))),
+                ("offset", $"{Math.Min(duration, Math.Max(0, offset + seconds * 1000))}")
+            ],
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
     }
 
     private async Task<PlayerData?> SelectPlayerAsync(string playerIdentifier, CancellationToken cancellationToken)

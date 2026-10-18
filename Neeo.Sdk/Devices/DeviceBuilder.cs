@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -876,7 +877,8 @@ internal sealed partial class DeviceBuilder(
         description,
         RegistrationType.Credentials,
         queryIsRegistered,
-        (Credentials credentials, CancellationToken cancellationToken) => processor(credentials.UserName, credentials.Password, cancellationToken)
+        AppJsonSerializerContext.Default.Credentials,
+        (credentials, cancellationToken) => processor(credentials.UserName, credentials.Password, cancellationToken)
     );
 
     IDeviceBuilder IDeviceBuilder.EnableRegistration(
@@ -889,7 +891,8 @@ internal sealed partial class DeviceBuilder(
         description,
         RegistrationType.SecurityCode,
         queryIsRegistered,
-        (SecurityCodeContainer container, CancellationToken cancellationToken) => processor(container.SecurityCode, cancellationToken)
+        AppJsonSerializerContext.Default.SecurityCodeContainer,
+        (container, cancellationToken) => processor(container.SecurityCode, cancellationToken)
     );
 
     IDeviceBuilder IDeviceBuilder.RegisterDeviceSubscriptionCallbacks(
@@ -1394,7 +1397,7 @@ internal sealed partial class DeviceBuilder(
         return this;
     }
 
-    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, Func<TPayload, CancellationToken, Task<RegistrationResult>> processor)
+    private DeviceBuilder EnableRegistration<TPayload>(string headerText, string description, RegistrationType type, QueryIsRegistered queryIsRegistered, JsonTypeInfo<TPayload> typeInfo, Func<TPayload, CancellationToken, Task<RegistrationResult>> processor)
         where TPayload : struct
     {
         if (this.Setup.RegistrationType.HasValue)
@@ -1407,7 +1410,7 @@ internal sealed partial class DeviceBuilder(
         }
         this.Setup.RegistrationHeaderText = Validator.ValidateText(headerText, maxLength: 255);
         this.Setup.RegistrationSummary = Validator.ValidateText(description, maxLength: 255);
-        this.RegistrationFeature = RegistrationFeature.Create(queryIsRegistered, processor);
+        this.RegistrationFeature = RegistrationFeature.Create(queryIsRegistered, typeInfo, processor);
         this.Setup.RegistrationType = type;
         return this;
     }

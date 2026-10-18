@@ -71,7 +71,7 @@ public sealed class ApiClientTests : IDisposable
     [Fact]
     public void PostAsync_should_use_HTTP_POST_and_serialize_body()
     {
-        var body = new { A = "123" };
+        SuccessResponse body = new(true);
         var lazy = this.SetupJsonResponse(new SuccessResponse(true));
 
         _ = this._client.PostAsync("/", body, TestContext.Current.CancellationToken);

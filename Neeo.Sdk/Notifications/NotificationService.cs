@@ -150,7 +150,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         Uri uri = new UriBuilder(this._notificationBaseUri) { Path = BrainUrlPaths.Notifications }.Uri;
         using HttpRequestMessage request = new(HttpMethod.Post, uri)
         {
-            Content = JsonContent.Create(message, mediaType: NotificationService._jsonUtf8, AppJsonSerializerOptions.Default),
+            Content = JsonContent.Create(message, AppJsonSerializerContext.Default.Message, NotificationService._jsonUtf8),
             Headers =
             {
                 Accept = { new("application/json") }
@@ -164,7 +164,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
             string contents = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             throw new WebException($"Server returned status {(int)response.StatusCode} ({response.StatusCode}). {contents}");
         }
-        SuccessResponse result = (await response.Content.ReadFromJsonAsync<SuccessResponse>(AppJsonSerializerOptions.Default, cancellationToken).ConfigureAwait(false))!;
+        SuccessResponse result = (await response.Content.ReadFromJsonAsync(AppJsonSerializerContext.Default.SuccessResponse, cancellationToken).ConfigureAwait(false))!;
         return result.Success;
     }
 

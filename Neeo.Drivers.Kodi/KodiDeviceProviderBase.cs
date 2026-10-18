@@ -7,7 +7,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Kodi.Models;
@@ -22,60 +21,59 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 {
     private static readonly Dictionary<Buttons, Func<KodiClient, CancellationToken, Task>> _buttonFunctions = new()
     {
-        [Buttons.Back] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Back, cancellationToken),
-        [Buttons.ChannelDown] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ChannelDown, cancellationToken),
-        [Buttons.ChannelUp] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ChannelUp, cancellationToken),
-        [Buttons.CursorDown] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Down, cancellationToken),
-        [Buttons.CursorEnter] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Select, cancellationToken),
-        [Buttons.CursorLeft] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Left, cancellationToken),
-        [Buttons.CursorRight] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Right, cancellationToken),
-        [Buttons.CursorUp] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Up, cancellationToken),
-        [Buttons.Digit0] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number0, cancellationToken),
-        [Buttons.Digit1] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number1, cancellationToken),
-        [Buttons.Digit2] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number2, cancellationToken),
-        [Buttons.Digit3] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number3, cancellationToken),
-        [Buttons.Digit4] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number4, cancellationToken),
-        [Buttons.Digit5] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number5, cancellationToken),
-        [Buttons.Digit6] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number6, cancellationToken),
-        [Buttons.Digit7] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number7, cancellationToken),
-        [Buttons.Digit8] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number8, cancellationToken),
-        [Buttons.Digit9] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number9, cancellationToken),
-        [Buttons.DigitSeparator] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.NumberSeperator, cancellationToken),
-        [Buttons.Exit] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Back, cancellationToken),
-        [Buttons.Home] = (client, cancellationToken) => client.GoHomeAsync(cancellationToken),
-        [Buttons.Info] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Info, cancellationToken),
-        [Buttons.Language] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Language, cancellationToken),
-        [Buttons.Menu] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Menu, cancellationToken),
-        [Buttons.MuteToggle] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.MuteToggle, cancellationToken),
-        [Buttons.Next] = (client, cancellationToken) => client.SendGoToCommandAsync(next: true, cancellationToken),
-        [Buttons.NextTrack] = (client, cancellationToken) => client.SendGoToCommandAsync(next: true, cancellationToken),
-        [Buttons.Pause] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Pause, cancellationToken),
-        [Buttons.Play] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Play, cancellationToken),
-        [Buttons.PlayToggle] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Pause, cancellationToken),
-        [Buttons.PlayPauseToggle] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Pause, cancellationToken),
-        [Buttons.Previous] = (client, cancellationToken) => client.SendGoToCommandAsync(next: false, cancellationToken),
-        [Buttons.PreviousTrack] = (client, cancellationToken) => client.SendGoToCommandAsync(next: false, cancellationToken),
-        [Buttons.SkipBackward] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.SkipPrevious, cancellationToken),
-        [Buttons.SkipForward] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.SkipNext, cancellationToken),
-        [Buttons.Stop] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Stop, cancellationToken),
-        [Buttons.Subtitle] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Subtitle, cancellationToken),
-        [Buttons.VolumeDown] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.VolumeDown, cancellationToken),
-        [Buttons.VolumeUp] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.VolumeUp, cancellationToken),
+        { Buttons.Back, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Back, cancellationToken) },
+        { Buttons.ChannelDown, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ChannelDown, cancellationToken) },
+        { Buttons.ChannelUp, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ChannelUp, cancellationToken) },
+        { Buttons.CursorDown, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Down, cancellationToken) },
+        { Buttons.CursorEnter, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Select, cancellationToken) },
+        { Buttons.CursorLeft, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Left, cancellationToken) },
+        { Buttons.CursorRight, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Right, cancellationToken) },
+        { Buttons.CursorUp, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Up, cancellationToken) },
+        { Buttons.Digit0, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number0, cancellationToken) },
+        { Buttons.Digit1, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number1, cancellationToken) },
+        { Buttons.Digit2, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number2, cancellationToken) },
+        { Buttons.Digit3, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number3, cancellationToken) },
+        { Buttons.Digit4, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number4, cancellationToken) },
+        { Buttons.Digit5, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number5, cancellationToken) },
+        { Buttons.Digit6, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number6, cancellationToken) },
+        { Buttons.Digit7, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number7, cancellationToken) },
+        { Buttons.Digit8, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number8, cancellationToken) },
+        { Buttons.Digit9, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number9, cancellationToken) },
+        { Buttons.DigitSeparator, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.NumberSeperator, cancellationToken) },
+        { Buttons.Exit, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Back, cancellationToken) },
+        { Buttons.Home, (client, cancellationToken) => client.GoHomeAsync(cancellationToken) },
+        { Buttons.Info, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Info, cancellationToken) },
+        { Buttons.Language, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Language, cancellationToken) },
+        { Buttons.Menu, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Menu, cancellationToken) },
+        { Buttons.MuteToggle, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.MuteToggle, cancellationToken) },
+        { Buttons.Next, (client, cancellationToken) => client.SendGoToCommandAsync(next: true, cancellationToken) },
+        { Buttons.NextTrack, (client, cancellationToken) => client.SendGoToCommandAsync(next: true, cancellationToken) },
+        { Buttons.Pause, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Pause, cancellationToken) },
+        { Buttons.Play, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Play, cancellationToken) },
+        { Buttons.PlayToggle, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Pause, cancellationToken) },
+        { Buttons.PlayPauseToggle, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Pause, cancellationToken) },
+        { Buttons.Previous, (client, cancellationToken) => client.SendGoToCommandAsync(next: false, cancellationToken) },
+        { Buttons.PreviousTrack, (client, cancellationToken) => client.SendGoToCommandAsync(next: false, cancellationToken) },
+        { Buttons.SkipBackward, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.SkipPrevious, cancellationToken) },
+        { Buttons.SkipForward, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.SkipNext, cancellationToken) },
+        { Buttons.Stop, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Stop, cancellationToken) },
+        { Buttons.Subtitle, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Subtitle, cancellationToken) },
+        { Buttons.VolumeDown, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.VolumeDown, cancellationToken) },
+        { Buttons.VolumeUp, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.VolumeUp, cancellationToken) },
     };
 
     private static readonly Dictionary<string, Func<KodiClient, CancellationToken, Task>> _customButtonFunctions = new(StringComparer.Ordinal)
     {
-        ["CHANNEL SEARCH"] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ChannelSearch, cancellationToken),
-        ["FAVORITE"] = (client, cancellationToken) => client.ActivateWindowAsync("pvrosdchannels", cancellationToken),
-        ["OSD"] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.OnScreenDisplay, cancellationToken),
-        ["PLAY PAUSE"] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.PlayPauseToggle, cancellationToken),
-        ["TOGGLE FULLSCREEN"] = (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ToggleFullScreen, cancellationToken),
-        ["Scan Video Library"] = (client, cancellationToken) => client.ScanVideoLibraryAsync(cancellationToken),
-        ["Scan Audio Library"] = (client, cancellationToken) => client.ScanAudioLibraryAsync(cancellationToken),
+        { "CHANNEL SEARCH", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ChannelSearch, cancellationToken) },
+        { "FAVORITE", (client, cancellationToken) => client.ActivateWindowAsync("pvrosdchannels", cancellationToken) },
+        { "OSD", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.OnScreenDisplay, cancellationToken) },
+        { "PLAY PAUSE", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.PlayPauseToggle, cancellationToken) },
+        { "TOGGLE FULLSCREEN", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ToggleFullScreen, cancellationToken) },
+        { "Scan Video Library", (client, cancellationToken) => client.ScanVideoLibraryAsync(cancellationToken) },
+        { "Scan Audio Library", (client, cancellationToken) => client.ScanAudioLibraryAsync(cancellationToken) },
     };
 
     private static readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
-    private static readonly TimeSpan _scanTime = TimeSpan.FromSeconds(5d);
 
     private readonly KodiClientManager _clientManager;
     private readonly Lazy<IDeviceBuilder> _deviceBuilder;
@@ -84,7 +82,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private readonly DeviceType _deviceType;
     private readonly ReaderWriterLockSlim _lock = new();
     private readonly ILogger _logger;
-    private IDeviceNotifier? _notifier;
     private string _uriPrefix = string.Empty;
 
     protected KodiDeviceProviderBase(KodiClientManager clientManager, string deviceName, DeviceType deviceType, ILogger logger)
@@ -98,6 +95,11 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
+
+    /// <summary>
+    /// Gets or sets the notifier directly (test seam - normally set by the SDK when the server starts).
+    /// </summary>
+    internal IDeviceNotifier? Notifier { get; set; }
 
     public virtual void Dispose()
     {
@@ -130,7 +132,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .EnableDeviceRoute(this.SetUriPrefix, this.HandleDeviceRouteAsync)
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableRegistration(Constants.RegistrationHeader, Constants.RegistrationDescription, _ => Task.FromResult(this._clientManager.HasCredentials), this.RegisterAsync)
-        .EnableNotifications(notifier => this._notifier = notifier)
+        .EnableNotifications(notifier => this.Notifier = notifier)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
         .RegisterInitializer(cancellationToken => this._clientManager.InitializeAsync(cancellationToken: cancellationToken));
 
@@ -164,7 +166,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     protected string GetDescription(string deviceId) => this.GetClientValue(
         deviceId,
-        client => client.PlayerState.NowPlayingDescription,
+        static client => client.PlayerState.NowPlayingDescription,
         string.Empty
     );
 
@@ -172,25 +174,25 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     protected bool GetIsMuted(string deviceId) => this.GetClientValue(
         deviceId,
-        client => client.IsMuted,
+        static client => client.IsMuted,
         default
     );
 
     protected bool GetIsPlaying(string deviceId) => this.GetClientValue(
         deviceId,
-        client => client.PlayerState.PlayState == PlayState.Playing,
+        static client => client.PlayerState.PlayState == PlayState.Playing,
         default
     );
 
     protected string GetTitle(string deviceId) => this.GetClientValue(
         deviceId,
-        client => client.PlayerState.NowPlayingLabel,
+        static client => client.PlayerState.NowPlayingLabel,
         string.Empty
     );
 
     protected double GetVolume(string deviceId) => this.GetClientValue(
         deviceId,
-        client => (double)client.Volume,
+        static client => (double)client.Volume,
         default
     );
 
@@ -202,15 +204,17 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    protected async Task PopulateQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
+    protected Task PopulateQueueDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
         if (this.GetClientOrDefault(deviceId) is not { } client || !KodiDeviceProviderBase.IsClientReady(client))
         {
             builder.AddEntry(new("Kodi is not connected!", "Try reloading the list.", ThumbnailUri: Images.Kodi, UIAction: DirectoryUIAction.Reload));
-            return;
         }
-        builder.AddEntry(new("Queue is empty", "No items in current playlist.", ThumbnailUri: Images.Kodi));
-        await Task.CompletedTask.ConfigureAwait(false);
+        else
+        {
+            builder.AddEntry(new("Queue is empty", "No items in current playlist.", ThumbnailUri: Images.Kodi));
+        }
+        return Task.CompletedTask;
     }
 
     protected async Task PopulateRootDirectoryAsync(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
@@ -317,11 +321,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     internal string GetThumbnailUrl(KodiClient client, string? coverArt, ImageSize size = ImageSize.Large)
     {
-        if (string.IsNullOrEmpty(coverArt) || coverArt == Images.Kodi)
-        {
-            return Images.Kodi;
-        }
-        if (string.IsNullOrEmpty(this._uriPrefix))
+        if (string.IsNullOrEmpty(coverArt) || coverArt == Images.Kodi || string.IsNullOrEmpty(this._uriPrefix))
         {
             return Images.Kodi;
         }
@@ -337,22 +337,22 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         return $"{this._uriPrefix}thumbnail/{maxDimension}/{token}";
     }
 
-    private async Task<ActionResult> HandleDeviceRouteAsync(HttpRequest request, string path, CancellationToken cancellationToken) =>
+    private async Task<IResult> HandleDeviceRouteAsync(HttpRequest request, string path, CancellationToken cancellationToken) =>
         path.StartsWith("thumbnail/", StringComparison.OrdinalIgnoreCase)
             ? await this.HandleThumbnailRouteAsync(path[10..], cancellationToken).ConfigureAwait(false)
             : KodiDeviceProviderBase.HandleEmbeddedImageRoute(path);
 
-    private static ActionResult HandleEmbeddedImageRoute(string path)
+    private static IResult HandleEmbeddedImageRoute(string path)
     {
         if (Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(KodiClient).Namespace}.Images.{path.Replace('/', '.')}") is not { } stream)
         {
-            return new NotFoundResult();
+            return Results.NotFound();
         }
         string fileDownloadName = path.LastIndexOf('/') is int index and not -1 ? path[(index + 1)..] : path;
-        return new FileStreamResult(stream, KodiDeviceProviderBase.GetContentType(fileDownloadName)) { FileDownloadName = fileDownloadName };
+        return Results.File(stream, KodiDeviceProviderBase.GetContentType(fileDownloadName), fileDownloadName);
     }
 
-    private async Task<ActionResult> HandleThumbnailRouteAsync(string suffix, CancellationToken cancellationToken)
+    private async Task<IResult> HandleThumbnailRouteAsync(string suffix, CancellationToken cancellationToken)
     {
         int maxDimension = 480;
         string token = suffix;
@@ -362,15 +362,13 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
             maxDimension = parsedDimension;
             token = suffix[(slashIndex + 1)..];
         }
-
         if (this._clientManager.ResolveImageUrl(token) is not { } imageUrl)
         {
-            return new NotFoundResult();
+            return Results.NotFound();
         }
-
         return await this._clientManager.FetchImageAsync(imageUrl, maxDimension, cancellationToken).ConfigureAwait(false) is ({ } bytes, { } contentType)
-            ? new FileContentResult(bytes, contentType)
-            : new NotFoundResult();
+            ? Results.Bytes(bytes, contentType)
+            : Results.NotFound();
     }
 
     [GeneratedRegex("^(?<key>[a-z]+)[:](?<id>[\\d]+)([:](?<suffix>.+))?$", RegexOptions.ExplicitCapture | RegexOptions.Compiled)]
@@ -603,7 +601,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         ? new(groups["key"].Value, int.Parse(groups["id"].Value), groups["suffix"].Value ?? string.Empty)
         : null;
 
-    private void AddDeviceId(string deviceId)
+    internal void AddDeviceId(string deviceId)
     {
         try
         {
@@ -625,62 +623,93 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     // Power notifications on connect/disconnect are sent by the registry (see AddPowerStateSensor).
-    private async void Client_Connected(object? sender, EventArgs e)
+    private void Client_Connected(object? sender, EventArgs e) => _ = this.HandleClientConnectedAsync(sender);
+
+    internal async Task HandleClientConnectedAsync(object? sender)
     {
         if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId))
         {
             return;
         }
-        await client.RefreshStateAsync().ConfigureAwait(false);
-        await this.NotifyConnectedAsync(client).ConfigureAwait(false);
+        try
+        {
+            await client.RefreshStateAsync().ConfigureAwait(false);
+            await this.NotifyConnectedAsync(client).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogWarning(ex, "Kodi connected handling for {DeviceId} failed.", client.DeviceId);
+        }
     }
 
     private void Client_Error(object? sender, DataEventArgs<string> e) => this._logger.LogWarning("Client {deviceId} error encountered: {error}.", ((KodiClient)sender!).DeviceId, e.Data);
 
-    private async void Client_PlayerStateChanged(object? sender, DataEventArgs<PlayerState> e)
+    private void Client_PlayerStateChanged(object? sender, DataEventArgs<PlayerState> e) => _ = this.HandlePlayerStateChangedAsync(sender, e.Data);
+
+    internal async Task HandlePlayerStateChangedAsync(object? sender, PlayerState state)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this._notifier is not { } notifier)
+        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this.Notifier is not { } notifier)
         {
             return;
         }
-        string deviceId = client.DeviceId;
-        List<Task> tasks = [];
-        switch (e.Data.PlayState)
+        try
         {
-            case PlayState.Paused:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING_SENSOR", false, deviceId));
-                tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
-                break;
-            case PlayState.Stopped or PlayState.Playing:
-                tasks.Add(notifier.SendNotificationAsync("PLAYING_SENSOR", e.Data.PlayState == PlayState.Playing, deviceId));
-                tasks.Add(notifier.SendNotificationAsync("TITLE_SENSOR", e.Data.NowPlayingLabel, deviceId));
-                tasks.Add(notifier.SendNotificationAsync("DESCRIPTION_SENSOR", e.Data.NowPlayingDescription, deviceId));
-                tasks.Add(this.NotifyCoverArtAsync(client, e.Data.NowPlayingImage));
-                break;
-        }
-        if (tasks.Count != 0)
-        {
+            string deviceId = client.DeviceId;
+            Task[] tasks = state.PlayState is PlayState.Paused
+                ? [
+                    notifier.SendNotificationAsync("PLAYING_SENSOR", false, deviceId),
+                    notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
+                ]
+                : [
+                    notifier.SendNotificationAsync("PLAYING_SENSOR", state.PlayState is PlayState.Playing, deviceId),
+                    notifier.SendNotificationAsync("TITLE_SENSOR", state.NowPlayingLabel, deviceId),
+                    notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
+                    this.NotifyCoverArtAsync(client, state.NowPlayingImage)
+                ];
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
-    }
-
-    private async void Client_VolumeChanged(object? sender, DataEventArgs<int> e)
-    {
-        if (sender is KodiClient { DeviceId: { } deviceId } && this._notifier is { } notifier)
+        catch (Exception ex)
         {
-            await notifier.SendNotificationAsync("VOLUME_SENSOR", e.Data, deviceId).ConfigureAwait(false);
+            this._logger.LogWarning(ex, "Kodi player state notification for {DeviceId} failed.", client.DeviceId);
         }
     }
 
-    private async void Registry_Changed(object? sender, DeviceRegistryChangedEventArgs<KodiClient> e)
+    private void Client_VolumeChanged(object? sender, DataEventArgs<int> e) => _ = this.HandleVolumeChangedAsync(sender, e.Data);
+
+    internal async Task HandleVolumeChangedAsync(object? sender, int volume)
     {
-        if (e.Kind == DeviceRegistryChangeKind.Removed)
+        if (sender is not KodiClient { DeviceId: { } deviceId } || this.Notifier is not { } notifier)
+        {
+            return;
+        }
+        try
+        {
+            await notifier.SendNotificationAsync("VOLUME_SENSOR", volume, deviceId).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogWarning(ex, "Kodi volume notification for {DeviceId} failed.", deviceId);
+        }
+    }
+
+    private void Registry_Changed(object? sender, DeviceRegistryChangedEventArgs<KodiClient> e) => _ = this.HandleRegistryChangedAsync(e);
+
+    internal async Task HandleRegistryChangedAsync(DeviceRegistryChangedEventArgs<KodiClient> e)
+    {
+        if (e.Kind is DeviceRegistryChangeKind.Removed)
         {
             this.DetachEventHandlers(e.Client);
         }
         else if (e.Kind == DeviceRegistryChangeKind.Added && this.HasDeviceId(e.DeviceId))
         {
-            await this.OnClientConnectedAsync(e.Client).ConfigureAwait(false);
+            try
+            {
+                await this.OnClientConnectedAsync(e.Client).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                this._logger.LogWarning(ex, "Kodi connection handling for {DeviceId} failed.", e.DeviceId);
+            }
         }
     }
 
@@ -767,7 +796,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         foreach (string deviceId in deviceIds)
         {
             await this.OnDeviceAddedAsync(deviceId, cancellationToken).ConfigureAwait(false);
-            if (this.IsClientReady(deviceId) && this._notifier is { } notifier)
+            if (this.IsClientReady(deviceId) && this.Notifier is { } notifier)
             {
                 await notifier.SendPowerNotificationAsync(true, deviceId, cancellationToken).ConfigureAwait(false);
             }
@@ -867,11 +896,12 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private Task NotifyCoverArtAsync(KodiClient client, string? image)
+    private async Task NotifyCoverArtAsync(KodiClient client, string? image)
     {
-        return this._notifier is { } notifier && this._uriPrefix is { Length: > 0 }
-            ? notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, image, ImageSize.Large), client.DeviceId)
-            : Task.CompletedTask;
+        if (this.Notifier is { } notifier && this._uriPrefix.Length > 0)
+        {
+            await notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, image, ImageSize.Large), client.DeviceId).ConfigureAwait(false);
+        }
     }
 
     private readonly struct EmbeddedImages(string uriPrefix)
