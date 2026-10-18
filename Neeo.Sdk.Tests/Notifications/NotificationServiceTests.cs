@@ -33,7 +33,8 @@ public sealed class NotificationServiceTests : IDisposable
         this._mockNotificationMapping
             .Setup(mapping => mapping.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([Constants.NotificationKey]);
-        TaskCompletionSource tcs = new();
+        // Completed from the service's worker thread; run continuations asynchronously so the test (and its Dispose) never executes on that thread.
+        TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         Mock<HttpMessageHandler> handlerMock = new(MockBehavior.Strict);
         handlerMock
             .Protected()

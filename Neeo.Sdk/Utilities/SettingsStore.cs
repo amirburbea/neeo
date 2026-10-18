@@ -64,7 +64,7 @@ public sealed class SettingsStoreProvider(IConfiguration configuration, ILoggerF
     }
 
     /// <inheritdoc/>
-    public ISettingsStore<T> GetStore<T>() => new SettingsStore<T>(this);
+    public ISettingsStore<T> GetStore<T>() where T : class => new SettingsStore<T>(this);
 
     /// <summary>
     /// Resolves the store file name for the specified type, honoring <see cref="SettingsStoreAttribute"/> if present.
@@ -436,7 +436,7 @@ internal sealed class SettingsStore : ISettingsStore
                 tag: encryptedData.AsSpan(IvLength, TagLength),
                 plaintext: decryptedBytes
             );
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedBytes, AppJsonSerializerOptions.Default) is { } dict
+            return JsonSerializer.Deserialize(decryptedBytes, AppJsonSerializerContext.Default.DictionaryStringString) is { } dict
                 ? new(dict, StringComparer.Ordinal)
                 : null;
         }
@@ -478,7 +478,7 @@ internal sealed class SettingsStore : ISettingsStore
             {
                 Directory.CreateDirectory(directory);
             }
-            byte[] encrypted = SettingsStore.Encrypt(this._key, JsonSerializer.SerializeToUtf8Bytes(this._entries, AppJsonSerializerOptions.Default));
+            byte[] encrypted = SettingsStore.Encrypt(this._key, JsonSerializer.SerializeToUtf8Bytes(this._entries, AppJsonSerializerContext.Default.DictionaryStringString));
             string tempFile = $"{this._filePath}.{Guid.NewGuid():N}.tmp";
             File.WriteAllBytes(tempFile, encrypted);
             File.Move(tempFile, this._filePath, overwrite: true);
@@ -525,7 +525,7 @@ internal sealed class SettingsStore : ISettingsStore
 /// <summary>
 /// Generic adapter wrapping <see cref="ISettingsStore"/> for type <typeparamref name="T"/>.
 /// </summary>
-internal sealed class SettingsStore<T>(ISettingsStoreProvider provider) : ISettingsStore<T>
+internal sealed class SettingsStore<T>(ISettingsStoreProvider provider) : ISettingsStore<T> where T : class
 {
     private readonly ISettingsStore _inner = provider.GetStore(SettingsStoreProvider.ResolveStoreName(typeof(T)));
 

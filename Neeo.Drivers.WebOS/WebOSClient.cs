@@ -501,15 +501,15 @@ public sealed class WebOSClient(
         {
             if (this._cancellationTokenSource is { Token: { } token } && this._webSocket is { State: WebSocketState.Open } webSocket)
             {
-                await JsonWebSocket.MessageLoop<WebOSResponse>(
+                await JsonWebSocket.MessageLoop(
                     webSocket,
                     (response, _) =>
                     {
                         this.ProcessIncomingResponse(response);
                         return ValueTask.CompletedTask;
                     },
+                    WebOSJsonSerializerContext.Default.WebOSResponse,
                     this.OnDisconnected,
-                    options: WebOSJsonSerializerOptions.Default,
                     cancellationToken: token
                 ).ConfigureAwait(false);
             }

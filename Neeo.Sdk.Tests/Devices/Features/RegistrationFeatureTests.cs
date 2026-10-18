@@ -21,6 +21,7 @@ public sealed class RegistrationFeatureTests
             .ReturnsAsync(true);
         RegistrationFeature feature = RegistrationFeature.Create<TestCredentials>(
             queryIsRegistered: mockQuery.Object,
+            typeInfo: TestJsonContext.Default.TestCredentials,
             register: (_, _) => Task.FromResult(RegistrationResult.Success)
         );
 
@@ -46,6 +47,7 @@ public sealed class RegistrationFeatureTests
             });
         RegistrationFeature feature = RegistrationFeature.Create(
             queryIsRegistered: (_) => Task.FromResult(true),
+            typeInfo: TestJsonContext.Default.TestCredentials,
             register: mockRegister.Object
         );
 

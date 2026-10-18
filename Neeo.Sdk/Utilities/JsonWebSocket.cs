@@ -3,6 +3,7 @@ using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.WebSockets;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,21 +24,19 @@ public static class JsonWebSocket
     /// <typeparam name="TMessage">Type of the JSON messages received.</typeparam>
     /// <param name="webSocket">The websocket on which to listen for messages.</param>
     /// <param name="processMessage">Callback to asynchronously process received messages.</param>
-    /// <param name="onDisconnected">Optional callback invoked upon disconnection.</param>
-    /// <param name="options">
-    /// The <see cref="JsonSerializerOptions"/> to deserialize messages with. Defaults to
-    /// <see cref="JsonSerializerOptions.Web"/> - this is a general-purpose utility consumed by driver
-    /// assemblies with their own message types, so it must not assume any particular caller's JSON
-    /// configuration (e.g. Neeo.Sdk's own source-generated context, which only knows about Neeo.Sdk's
-    /// own wire types).
+    /// <param name="typeInfo">
+    /// The source-generated JSON metadata to deserialize messages with. This is a general-purpose utility
+    /// consumed by driver assemblies with their own message types, so the caller supplies the metadata
+    /// from its own <see cref="System.Text.Json.Serialization.JsonSerializerContext"/>.
     /// </param>
+    /// <param name="onDisconnected">Optional callback invoked upon disconnection.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns><see cref="Task"/> representing the asynchronous operation.</returns>
     public static async Task MessageLoop<TMessage>(
         WebSocket webSocket,
         Func<TMessage, CancellationToken, ValueTask> processMessage,
+        JsonTypeInfo<TMessage> typeInfo,
         Action? onDisconnected = null,
-        JsonSerializerOptions? options = null,
         CancellationToken cancellationToken = default
     ) where TMessage : notnull
     {
@@ -53,7 +52,7 @@ public static class JsonWebSocket
         try
         {
             Task fillTask = JsonWebSocket.FillPipeAsync(webSocket, pipe.Writer, fillCancellation.Token);
-            Task readTask = JsonWebSocket.ReadPipeUntilCompleteAsync(pipe.Reader, processMessage, options, fillCancellation, cancellationToken);
+            Task readTask = JsonWebSocket.ReadPipeUntilCompleteAsync(pipe.Reader, processMessage, typeInfo, fillCancellation, cancellationToken);
             await Task.WhenAll(fillTask, readTask).ConfigureAwait(false);
             // Both sides completed without a fault - that only happens via a graceful close (or the
             // WebSocket's own state changing away from Open), which is a disconnection the caller needs
@@ -127,7 +126,7 @@ public static class JsonWebSocket
     private static async Task ReadPipeUntilCompleteAsync<TMessage>(
         PipeReader reader,
         Func<TMessage, CancellationToken, ValueTask> processMessage,
-        JsonSerializerOptions? options,
+        JsonTypeInfo<TMessage> typeInfo,
         CancellationTokenSource fillCancellation,
         CancellationToken cancellationToken
     ) where TMessage : notnull
@@ -139,7 +138,7 @@ public static class JsonWebSocket
             {
                 result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
                 ReadOnlySequence<byte> buffer = result.Buffer;
-                while (JsonWebSocket.TryReadMessage(ref buffer, result.IsCompleted, options, out TMessage? message))
+                while (JsonWebSocket.TryReadMessage(ref buffer, result.IsCompleted, typeInfo, out TMessage? message))
                 {
                     if (message is not null)
                     {
@@ -165,7 +164,7 @@ public static class JsonWebSocket
     /// slicing anything) when the buffer doesn't yet contain a complete value - the caller should read
     /// more data and try again.
     /// </summary>
-    private static bool TryReadMessage<TMessage>(ref ReadOnlySequence<byte> buffer, bool isFinalBlock, JsonSerializerOptions? options, out TMessage? message)
+    private static bool TryReadMessage<TMessage>(ref ReadOnlySequence<byte> buffer, bool isFinalBlock, JsonTypeInfo<TMessage> typeInfo, out TMessage? message)
         where TMessage : notnull
     {
         if (buffer.IsEmpty)
@@ -181,7 +180,7 @@ public static class JsonWebSocket
         }
         using (document)
         {
-            message = document.Deserialize<TMessage>(options ?? JsonSerializerOptions.Web);
+            message = document.Deserialize(typeInfo);
         }
         buffer = buffer.Slice(jsonReader.BytesConsumed);
         return true;

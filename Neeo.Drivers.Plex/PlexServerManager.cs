@@ -69,7 +69,10 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
                 })
                 .Select(_ => Observable.FromAsync(this.DiscoverServersViaGdmAsync))
                 .Switch()
-                .Subscribe(),
+                .Subscribe(
+                    static _ => { },
+                    exception => this._logger.LogError(exception, "Plex server discovery stopped unexpectedly.")
+                ),
             true
         );
     }
@@ -145,7 +148,17 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         using CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         source.CancelAfter(TimeSpan.FromSeconds(1.5d));
         using UdpClient udpClient = new() { Client = { EnableBroadcast = true } };
-        await udpClient.SendAsync(PlexServerManager._gdmRequest, new(IPAddress.Broadcast, Constants.DiscoveryPort), source.Token).ConfigureAwait(false);
+        try
+        {
+            await udpClient.SendAsync(PlexServerManager._gdmRequest, new(IPAddress.Broadcast, Constants.DiscoveryPort), source.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // E.g. the network is not available yet (at boot); the next scheduled scan tries again. Don't leave InitializeAsync waiting for it.
+            this._logger.LogWarning(ex, "Failed to send the Plex server discovery (GDM) request.");
+            this._initializationSource.TrySetResult();
+            return;
+        }
         while (!source.Token.IsCancellationRequested)
         {
             try

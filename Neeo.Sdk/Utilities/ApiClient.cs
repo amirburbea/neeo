@@ -61,7 +61,7 @@ internal sealed class ApiClient(
         {
             logger.LogDebug("Making GET request to {uri}...", builder.Uri);
         }
-        return this._httpClient.GetAsync<TData>(builder.Uri, cancellationToken: cancellationToken);
+        return this._httpClient.GetAsync(builder.Uri, AppJsonSerializerContext.TypeInfo<TData>(), cancellationToken: cancellationToken);
     }
 
     public async Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken = default)
@@ -73,7 +73,7 @@ internal sealed class ApiClient(
             logger.LogDebug("Making POST request to {uri}...", builder.Uri);
         }
         SuccessResponse response = await this._httpClient
-            .PostAsync<TBody, SuccessResponse>(builder.Uri, body, cancellationToken: cancellationToken)
+            .PostAsync(builder.Uri, body, AppJsonSerializerContext.TypeInfo<TBody>(), AppJsonSerializerContext.Default.SuccessResponse, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         return response.Success;
     }

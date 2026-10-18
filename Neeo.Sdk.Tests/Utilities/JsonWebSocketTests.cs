@@ -35,13 +35,14 @@ public sealed class JsonWebSocketTests : IAsyncLifetime
         (WebSocket client, WebSocket server) = await this.CreateWebSocketPairAsync(cancellationToken);
         List<TestMessage> received = [];
 
-        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop<TestMessage>(
+        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop(
             client,
             (message, _) =>
             {
                 received.Add(message);
                 return ValueTask.CompletedTask;
             },
+            TestJsonContext.Default.TestMessage,
             cancellationToken: cancellationToken
         );
 
@@ -60,13 +61,14 @@ public sealed class JsonWebSocketTests : IAsyncLifetime
         (WebSocket client, WebSocket server) = await this.CreateWebSocketPairAsync(cancellationToken);
         List<TestMessage> received = [];
 
-        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop<TestMessage>(
+        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop(
             client,
             (message, _) =>
             {
                 received.Add(message);
                 return ValueTask.CompletedTask;
             },
+            TestJsonContext.Default.TestMessage,
             cancellationToken: cancellationToken
         );
 
@@ -90,13 +92,14 @@ public sealed class JsonWebSocketTests : IAsyncLifetime
         (WebSocket client, WebSocket server) = await this.CreateWebSocketPairAsync(cancellationToken);
         List<TestMessage> received = [];
 
-        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop<TestMessage>(
+        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop(
             client,
             (message, _) =>
             {
                 received.Add(message);
                 return ValueTask.CompletedTask;
             },
+            TestJsonContext.Default.TestMessage,
             cancellationToken: cancellationToken
         );
 
@@ -117,9 +120,10 @@ public sealed class JsonWebSocketTests : IAsyncLifetime
         (WebSocket client, WebSocket server) = await this.CreateWebSocketPairAsync(cancellationToken);
         int disconnectedCount = 0;
 
-        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop<TestMessage>(
+        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop(
             client,
             static (_, _) => ValueTask.CompletedTask,
+            TestJsonContext.Default.TestMessage,
             onDisconnected: () => Interlocked.Increment(ref disconnectedCount),
             cancellationToken: cancellationToken
         );
@@ -137,9 +141,10 @@ public sealed class JsonWebSocketTests : IAsyncLifetime
         (WebSocket client, WebSocket server) = await this.CreateWebSocketPairAsync(cancellationToken);
         int disconnectedCount = 0;
 
-        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop<TestMessage>(
+        Task loopTask = Neeo.Sdk.Utilities.JsonWebSocket.MessageLoop(
             client,
             static (_, _) => throw new InvalidOperationException("Simulated failure in processMessage."),
+            TestJsonContext.Default.TestMessage,
             onDisconnected: () => Interlocked.Increment(ref disconnectedCount),
             cancellationToken: cancellationToken
         );

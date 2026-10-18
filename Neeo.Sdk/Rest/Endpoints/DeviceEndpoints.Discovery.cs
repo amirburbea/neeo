@@ -1,31 +1,43 @@
-﻿using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Devices.Setup;
 
-namespace Neeo.Sdk.Rest.Controllers;
+namespace Neeo.Sdk.Rest.Endpoints;
 
-internal partial class DeviceController
+internal static partial class DeviceEndpoints
 {
-    [HttpGet("{adapterName}/discover")]
-    public async Task<ActionResult<Array>> DiscoverAsync(string adapterName, CancellationToken cancellationToken)
+    private static void MapDiscovery(RouteGroupBuilder group)
     {
-        if (await this.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
+        group.MapGet("{adapterName}/discover", DeviceEndpoints.DiscoverAsync);
+    }
+
+    private static async Task<Results<Ok<DiscoveredDevice[]>, Ok<DynamicDiscoveredDevice[]>, NotFound>> DiscoverAsync(
+        string adapterName,
+        IDeviceDatabase database,
+        IDynamicDeviceRegistry dynamicDeviceRegistry,
+        ILogger<LogCategory> logger,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await database.GetAdapterAsync(adapterName, cancellationToken) is not { } adapter || adapter.GetFeature(ComponentType.Discovery) is not IDiscoveryFeature feature)
         {
-            return this.NotFound();
+            return TypedResults.NotFound();
         }
         logger.LogInformation("Performing discovery for {adapter}...", adapter.DeviceName);
         DiscoveredDevice[] devices = await feature.DiscoverAsync(cancellationToken);
         if (!feature.EnableDynamicDeviceBuilder || devices.Length == 0)
         {
-            return devices;
+            return TypedResults.Ok(devices);
         }
         DynamicDiscoveredDevice[] dynamicDevices = new DynamicDiscoveredDevice[devices.Length];
         for (int index = 0; index < devices.Length; index++)
@@ -35,7 +47,7 @@ internal partial class DeviceController
             IDeviceAdapter deviceAdapter = dynamicDeviceRegistry.RegisterDiscoveredDevice(adapter, id, builder!);
             dynamicDevices[index] = new(id, name, reachable, room, new(deviceAdapter));
         }
-        return dynamicDevices;
+        return TypedResults.Ok(dynamicDevices);
     }
 
     internal readonly record struct DynamicDiscoveredDevice(

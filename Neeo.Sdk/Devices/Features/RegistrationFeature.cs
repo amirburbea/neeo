@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Setup;
@@ -33,15 +34,16 @@ public interface IRegistrationFeature : IFeature
 
 internal sealed class RegistrationFeature(QueryIsRegistered queryIsRegistered, Func<byte[], CancellationToken, Task<RegistrationResult>> register) : IRegistrationFeature
 {
-    public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, Func<TPayload, CancellationToken, Task<RegistrationResult>> register)
+    public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, JsonTypeInfo<TPayload> typeInfo, Func<TPayload, CancellationToken, Task<RegistrationResult>> register)
         where TPayload : struct
     {
         ArgumentNullException.ThrowIfNull(queryIsRegistered, nameof(queryIsRegistered));
+        ArgumentNullException.ThrowIfNull(typeInfo, nameof(typeInfo));
         ArgumentNullException.ThrowIfNull(register, nameof(register));
         return new(
             queryIsRegistered,
             (utf8Bytes, cancellationToken) => register(
-                JsonSerializer.Deserialize<TPayload>(utf8Bytes, AppJsonSerializerOptions.Default),
+                JsonSerializer.Deserialize(utf8Bytes, typeInfo),
                 cancellationToken
             )
         );
