@@ -15,10 +15,7 @@ internal sealed class UriPrefixNotifier(IDeviceDatabase database, ISdkEnvironmen
     {
         foreach (IDeviceAdapter adapter in database.Adapters)
         {
-            if (adapter.UriPrefixCallback is { } callback)
-            {
-                callback($"{environment.HostAddress}/device/{adapter.AdapterName}/custom/");
-            }
+            adapter.UriPrefixCallback?.Invoke($"{environment.HostAddress}/device/{adapter.AdapterName}/custom/");
         }
         return Task.CompletedTask;
     }
