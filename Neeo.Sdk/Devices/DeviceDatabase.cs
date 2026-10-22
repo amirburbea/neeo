@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk.Notifications;
 
@@ -60,7 +61,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
     private readonly DeviceModel[] _devices;
     private readonly INotificationService _notificationService;
 
-    public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> devices, INotificationService notificationService, ILogger<DeviceDatabase> logger)
+    public DeviceDatabase(IReadOnlyCollection<IDeviceBuilder> devices, INotificationService notificationService, IHostApplicationLifetime applicationLifetime, ILogger<DeviceDatabase> logger)
     {
         this._notificationService = notificationService;
         this._devices = new DeviceModel[devices.Count];
@@ -70,14 +71,11 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             IDeviceAdapter adapter = device.BuildAdapter();
             int id = this._containers.Count;
             DeviceModel model = this._devices[id] = new(id, adapter);
-            if (!this._containers.TryAdd(adapter.AdapterName, new(model, adapter, logger)))
+            if (!this._containers.TryAdd(adapter.AdapterName, new(model, adapter, logger, applicationLifetime.ApplicationStopping)))
             {
                 throw new ArgumentException($"Adapter names must be unique. Adapter name {adapter.AdapterName} is reused at index {id}");
             }
-            if (device.NotifierCallback is { } callback)
-            {
-                callback(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor));
-            }
+            device.NotifierCallback?.Invoke(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor));
         }
         this._deviceIndex = new(this._devices);
     }
@@ -97,10 +95,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         return container.Adapter;
     }
 
-    public DeviceModel? GetDeviceByAdapterName(string adapterName)
-    {
-        return this._containers.TryGetValue(adapterName, out DeviceAdapterContainer? container) ? container.Model : null;
-    }
+    public DeviceModel? GetDeviceByAdapterName(string adapterName) => this._containers.GetValueOrDefault(adapterName)?.Model;
 
     public DeviceModel? GetDeviceById(int id)
     {
@@ -149,8 +144,8 @@ internal sealed class DeviceDatabase : IDeviceDatabase
                 entries.Add(new(device) { Score = score });
             }
             return DeviceIndex.Normalize(entries, maxScore)
-                .OrderBy(entry => entry.Score, Comparer<double>.Default)
-                .ThenBy(entry => entry.Device.Name, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static entry => entry.Score, Comparer<double>.Default)
+                .ThenBy(static entry => entry.Device.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(entry => new DeviceSearchResult(entry.Device, entry.Score, maxScore));
         }
 
@@ -189,8 +184,9 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         public const int MaxSearchResults = 10;
     }
 
-    private sealed class DeviceAdapterContainer(DeviceModel model, IDeviceAdapter adapter, ILogger logger)
+    private sealed class DeviceAdapterContainer(DeviceModel model, IDeviceAdapter adapter, ILogger logger, CancellationToken cancellationToken)
     {
+        private readonly CancellationToken _cancellationToken = cancellationToken;
         private readonly Lock _lock = new();
         private Task? _initializationTask;
 
@@ -203,6 +199,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         /// <summary>
         /// Runs the adapter's initializer once, sharing the attempt between concurrent callers. A failed attempt is
         /// logged and forgotten so that the next call retries; a caller's cancellation only stops that caller from waiting.
+        /// The initializer itself is only cancelled when the application is stopping.
         /// </summary>
         public async Task InitializeAsync(CancellationToken cancellationToken)
         {
@@ -219,7 +216,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             {
                 await task.WaitAsync(cancellationToken).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || this._cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -228,7 +225,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
                 // Already logged by the attempt itself.
                 using (this._lock.EnterScope())
                 {
-                    if (ReferenceEquals(this._initializationTask, task))
+                    if (object.ReferenceEquals(this._initializationTask, task))
                     {
                         this._initializationTask = null;
                     }
@@ -242,7 +239,12 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             try
             {
                 // Shared between callers, so deliberately not bound to any one caller's token.
-                await initializer(CancellationToken.None).ConfigureAwait(false);
+                await initializer(this._cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (this._cancellationToken.IsCancellationRequested)
+            {
+                logger.LogInformation("Initialization of adapter {AdapterName} canceled: the application is stopping.", adapter.AdapterName);
+                throw;
             }
             catch (Exception e)
             {

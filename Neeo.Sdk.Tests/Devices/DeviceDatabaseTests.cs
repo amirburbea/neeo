@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
@@ -20,6 +21,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
            [mockBuilder.Object],
            Mock.Of<INotificationService>(),
+           Mock.Of<IHostApplicationLifetime>(),
            NullLogger<DeviceDatabase>.Instance
         );
 
@@ -38,6 +40,7 @@ public sealed class DeviceDatabaseTests
         _ = new DeviceDatabase(
             Array.ConvertAll(mockBuilders, static mockDevice => mockDevice.Object),
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -55,6 +58,7 @@ public sealed class DeviceDatabaseTests
         _ = new DeviceDatabase(
             [mockBuilder.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -70,6 +74,7 @@ public sealed class DeviceDatabaseTests
         Assert.Throws<ArgumentException>(() => new DeviceDatabase(
             [mockBuilder1.Object, mockBuilder2.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         ));
     }
@@ -84,6 +89,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [mockBuilder.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -103,6 +109,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [mockBuilder.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -125,6 +132,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [mockBuilder.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -146,6 +154,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [mockBuilder.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
@@ -172,6 +181,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [mockBuilder.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
         using CancellationTokenSource cts = new();
@@ -186,6 +196,34 @@ public sealed class DeviceDatabaseTests
     }
 
     [Fact]
+    public async Task GetAdapterAsync_cancels_initializer_when_application_is_stopping()
+    {
+        var (mockBuilder, mockAdapter, _) = CreateDevice("name");
+        CancellationToken received = default;
+        DeviceInitializer initializer = async cancellationToken =>
+        {
+            received = cancellationToken;
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        };
+        mockAdapter.Setup(adapter => adapter.Initializer).Returns(initializer);
+        using CancellationTokenSource stopping = new();
+        Mock<IHostApplicationLifetime> mockLifetime = new();
+        mockLifetime.Setup(lifetime => lifetime.ApplicationStopping).Returns(stopping.Token);
+        DeviceDatabase database = new(
+            [mockBuilder.Object],
+            Mock.Of<INotificationService>(),
+            mockLifetime.Object,
+            NullLogger<DeviceDatabase>.Instance
+        );
+
+        ValueTask<IDeviceAdapter?> pending = database.GetAdapterAsync("name", TestContext.Current.CancellationToken);
+        stopping.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await pending);
+        Assert.Equal(stopping.Token, received);
+    }
+
+    [Fact]
     public void Search_ignores_case_when_deduplicating_tokens()
     {
         var (mockBuilder1, mockAdapter1, _) = CreateDevice("first");
@@ -197,6 +235,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [mockBuilder1.Object, mockBuilder2.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -214,6 +253,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [mockBuilder.Object],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -226,6 +266,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -245,6 +286,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
            builders,
            Mock.Of<INotificationService>(),
+           Mock.Of<IHostApplicationLifetime>(),
            NullLogger<DeviceDatabase>.Instance
         );
 
@@ -262,6 +304,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
             [],
             Mock.Of<INotificationService>(),
+            Mock.Of<IHostApplicationLifetime>(),
             NullLogger<DeviceDatabase>.Instance
         );
 
@@ -281,6 +324,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
            builders,
            Mock.Of<INotificationService>(),
+           Mock.Of<IHostApplicationLifetime>(),
            NullLogger<DeviceDatabase>.Instance
         );
 
@@ -297,6 +341,7 @@ public sealed class DeviceDatabaseTests
         DeviceDatabase database = new(
            [],
            Mock.Of<INotificationService>(),
+           Mock.Of<IHostApplicationLifetime>(),
            NullLogger<DeviceDatabase>.Instance
         );
 
