@@ -44,4 +44,4 @@ Upon startup, will resolve drivers implementing `Neeo.Sdk.Devices.IDeviceProvide
 
 ### Why aren't you using (INSERT RANDOM LIBRARY OR FEATURE HERE)?
 
-*Do I want to? Open a github issue and convice me - perhaps show me an example via a PR (getting the idea yet?)*
+*Do I want to? Open a github issue and convince me - perhaps show me an example via a PR (getting the idea yet?)*
