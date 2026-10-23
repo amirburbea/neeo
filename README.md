@@ -12,6 +12,19 @@ It will automatically find the first Brain on the network, and then load the dri
 
 Upon startup, will resolve drivers implementing `Neeo.Sdk.Devices.IDeviceProvider`, and drivers can further configure the dependency injector via an implementation of `Neeo.Sdk.Utilities.IServiceConfiguration`.
 
+## Running in Docker
+
+The `Dockerfile` publishes the server together with the Hisense, Kodi, Plex and WebOS drivers; `compose.yaml` runs it:
+
+```
+docker compose up -d
+```
+
+- **Host networking** (`network_mode: host`, Linux hosts) is required so mDNS discovery, wake-on-LAN and the ARP lookups see your network, and so the Brain can reach the server. On Docker Desktop or OrbStack the container is not on your LAN, so it can start and register but the Brain won't be able to call it.
+- **Storage:** registrations and their encryption key are kept in `/data` (a volume, via `NEEO_SETTINGS_PATH`). Keep that volume, or the server forgets its pairings on restart.
+- **Configuration** can be given as `NEEO_`-prefixed environment variables, with `__` as the section separator: `NEEO_Brain`, `NEEO_ServerName`, `NEEO_Kodi__Host`. Environment variables override `appsettings.json`, and command line arguments override both.
+- **Choosing drivers:** all four are loaded by default. Set `NEEO_Drivers` to a semicolon-separated list of assemblies (for example `/app/drivers/Kodi/Neeo.Drivers.Kodi.dll;/app/drivers/WebOS/Neeo.Drivers.WebOS.dll`) to run only some.
+
 ## FAQ
 
 ### What is NEEO?
