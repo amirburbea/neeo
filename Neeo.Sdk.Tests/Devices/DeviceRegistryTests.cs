@@ -2,6 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
@@ -336,27 +339,30 @@ public sealed class DeviceRegistryTests
         return changes;
     }
 
-    private sealed class FakeClient(string deviceId, bool isConnected = false) : IDeviceClient
+    private sealed class FakeClient : IDeviceClient
     {
-        private EventHandler? _connectionChanged;
+        private readonly BehaviorSubject<bool> _isConnectedSubject;
         private int _subscriberCount;
-        private volatile bool _isConnected = isConnected;
+        private volatile bool _isConnected;
 
-        public event EventHandler? ConnectionChanged
+        public FakeClient(string deviceId, bool isConnected = false)
         {
-            add
+            this.DeviceId = deviceId;
+            this._isConnected = isConnected;
+            this._isConnectedSubject = new(isConnected);
+            this.IsConnectedChanged = Observable.Create<bool>(observer =>
             {
-                this._connectionChanged += value;
                 Interlocked.Increment(ref this._subscriberCount);
-            }
-            remove
-            {
-                this._connectionChanged -= value;
-                Interlocked.Decrement(ref this._subscriberCount);
-            }
+                IDisposable subscription = this._isConnectedSubject.Subscribe(observer);
+                return Disposable.Create(() =>
+                {
+                    subscription.Dispose();
+                    Interlocked.Decrement(ref this._subscriberCount);
+                });
+            });
         }
 
-        public string DeviceId { get; } = deviceId;
+        public string DeviceId { get; }
 
         public bool IsConnected
         {
@@ -364,9 +370,11 @@ public sealed class DeviceRegistryTests
             set => this._isConnected = value;
         }
 
+        public IObservable<bool> IsConnectedChanged { get; }
+
         public int SubscriberCount => Volatile.Read(ref this._subscriberCount);
 
-        public void RaiseConnectionChanged() => this._connectionChanged?.Invoke(this, EventArgs.Empty);
+        public void RaiseConnectionChanged() => this._isConnectedSubject.OnNext(this.IsConnected);
 
         public void SetConnected(bool isConnected)
         {

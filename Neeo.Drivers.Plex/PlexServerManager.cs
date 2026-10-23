@@ -259,10 +259,10 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         public const string ResourceIdentifierPrefix = "Resource-Identifier";
     }
 
-    private static class PlexServerProxy
+    internal static class PlexServerProxy
     {
         public static Func<IPlexServer, IPlexServer> Create = PlexServerProxy.CreateProxyFactory();
-        
+
         private static Func<IPlexServer, IPlexServer> CreateProxyFactory()
         {
             AssemblyName assemblyName = new($"{nameof(PlexServer)}Assembly");
@@ -272,7 +272,8 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             FieldBuilder subject = typeBuilder.DefineField("_disposed", typeof(Subject<Unit>), FieldAttributes.Private | FieldAttributes.InitOnly);
             FieldBuilder server = typeBuilder.DefineField("_server", typeof(IPlexServer), FieldAttributes.Private | FieldAttributes.InitOnly);
             PlexServerProxy.GenerateConstructor(typeBuilder, server: server, subject: subject);
-            foreach (PropertyInfo property in typeof(IPlexServer).GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            Type[] interfaces = [typeof(IPlexServer), .. typeof(IPlexServer).GetInterfaces()];
+            foreach (PropertyInfo property in interfaces.SelectMany(static type => type.GetProperties(BindingFlags.Instance | BindingFlags.Public)))
             {
                 if (property.Name is nameof(IPlexServer.Disposed))
                 {
@@ -286,12 +287,11 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             PlexServerProxy.GenerateDisposeMethod(typeBuilder, subject: subject);
             foreach (MethodInfo method in typeof(IPlexServer).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
             {
-                if (method.IsSpecialName)
+                // Getters/setters were already generated, so ignore.
+                if (!method.IsSpecialName)
                 {
-                    // Getters/setters were already generated, so ignore.
-                    continue;
+                    PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, method);
                 }
-                PlexServerProxy.GenerateProxiedMethod(typeBuilder, server, method);
             }
             return PlexServerProxy.GenerateFactory(typeBuilder.CreateType());
         }

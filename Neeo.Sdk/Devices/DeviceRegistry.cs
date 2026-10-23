@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reactive.Disposables;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
@@ -206,9 +207,10 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
             {
                 throw new InvalidOperationException($"The factory created a client for device '{client.DeviceId}' instead of '{deviceId}'.");
             }
-            entry = this.CreateEntry(client);
-            // Subscribing under the lock is safe here: the client was just created, so nothing else can be raising its events yet.
-            client.ConnectionChanged += entry.Handler;
+            entry = new(client);
+            // Subscribing under the lock is safe here: the client was just created, so nothing else can be emitting on it yet
+            // (and an initial synchronous replay is ignored because IsRegistered is still false).
+            entry.Subscription = client.IsConnectedChanged.Subscribe(_ => this.OnConnectionChanged(entry));
             this.Register(deviceId, entry);
         }
         this.DispatchPending();
@@ -221,11 +223,12 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrEmpty(client.DeviceId, nameof(client));
-        Entry entry = this.CreateEntry(client);
+        Entry entry = new(client);
         // Subscribe before publishing the entry (and outside the lock, so the registry's lock is never held while
-        // calling into the client) - a change raised in between is ignored until the entry is registered, and the
-        // state read below then picks it up.
-        client.ConnectionChanged += entry.Handler;
+        // calling into the client) - a change emitted in between (or an initial replay) is ignored until the entry is
+        // registered, and the state read below then picks it up.
+        IDisposable subscription = client.IsConnectedChanged.Subscribe(_ => this.OnConnectionChanged(entry));
+        entry.Subscription = subscription;
         bool added;
         using (this._lock.EnterScope())
         {
@@ -236,7 +239,7 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
         }
         if (!added)
         {
-            client.ConnectionChanged -= entry.Handler;
+            subscription.Dispose();
             return false;
         }
         this.DispatchPending();
@@ -261,17 +264,10 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
             entry.IsRegistered = false;
             this._pending.Enqueue(new(DeviceRegistryChangeKind.Removed, entry.Client, false));
         }
-        entry.Client.ConnectionChanged -= entry.Handler;
+        entry.Subscription.Dispose();
         this.DispatchPending();
         client = entry.Client;
         return true;
-    }
-
-    private Entry CreateEntry(TClient client)
-    {
-        Entry entry = new(client);
-        entry.Handler = (_, _) => this.OnConnectionChanged(entry);
-        return entry;
     }
 
     // Must be called under the lock, with no entry registered for deviceId.
@@ -342,7 +338,7 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
     {
         public TClient Client { get; } = client;
 
-        public EventHandler Handler { get; set; } = static delegate { };
+        public IDisposable Subscription { get; set; } = Disposable.Empty;
 
         // The following are only read/written under the registry's lock.
         public bool IsConnected { get; set; }

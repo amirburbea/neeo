@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.WebSockets;
+using System.Reactive.Subjects;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +25,7 @@ public sealed class WebOSClient(
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<WebOSResponse>> _pendingRequests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new(StringComparer.Ordinal);
+    private readonly BehaviorSubject<bool> _isConnected = new(false);
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
@@ -41,8 +43,6 @@ public sealed class WebOSClient(
     public event EventHandler? Connected;
 
     public event EventHandler? Disconnected;
-
-    public event EventHandler? ConnectionChanged;
 
     public event EventHandler<DataEventArgs<int>>? VolumeChanged;
 
@@ -65,6 +65,8 @@ public sealed class WebOSClient(
     public bool IsPaired => !string.IsNullOrEmpty(this._clientKey);
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open } && this._isRegistered;
+
+    public IObservable<bool> IsConnectedChanged => this._isConnected;
 
     public int Volume { get; private set; }
 
@@ -327,7 +329,7 @@ public sealed class WebOSClient(
         }
         if (connected)
         {
-            this.ConnectionChanged?.Invoke(this, EventArgs.Empty);
+            this._isConnected.OnNext(true);
             this.Connected?.Invoke(this, EventArgs.Empty);
             logger.LogInformation("Successfully connected and paired with webOS TV at {endpoint}.", endpoint);
             return true;
@@ -569,14 +571,12 @@ public sealed class WebOSClient(
     private void OnDisconnected()
     {
         this.CleanUp();
-        this.ConnectionChanged?.Invoke(this, EventArgs.Empty);
+        this._isConnected.OnNext(false);
         this.Disconnected?.Invoke(this, EventArgs.Empty);
-
         if (this._isDisposed)
         {
             return;
         }
-
         this.GetReconnectLoop().Start();
     }
 
@@ -651,6 +651,7 @@ public sealed class WebOSClient(
         Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
         this.CleanUp();
         this.CancelOutstanding();
+        this._isConnected.OnCompleted();
         this._connectLock.Dispose();
         this._sendLock.Dispose();
     }
