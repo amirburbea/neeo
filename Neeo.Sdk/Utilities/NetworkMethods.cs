@@ -1,9 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,7 +29,7 @@ public static partial class NetworkMethods
             where unicastInfo.Address.AddressFamily == AddressFamily.InterNetwork
             select KeyValuePair.Create(unicastInfo.Address, nic.GetPhysicalAddress())
         );
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        if (OperatingSystem.IsWindows())
         {
             // Uses a win32 API to get access to the table.
             NetworkMethods.PopulateNetworkDevicesViaInterop(output);

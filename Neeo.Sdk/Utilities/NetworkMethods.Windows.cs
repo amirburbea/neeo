@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Neeo.Sdk.Utilities;
 
@@ -13,6 +14,7 @@ public static partial class NetworkMethods
 
     private static ReadOnlySpan<byte> VirtualAddress => [0, 0, 0, 0, 0, 0];
 
+    [SupportedOSPlatform("windows")]
     private static void PopulateNetworkDevicesViaInterop(Dictionary<IPAddress, PhysicalAddress> output)
     {
         // Get the space needed by requesting the table, but not giving any space at all.
@@ -98,6 +100,7 @@ public static partial class NetworkMethods
         public int dwType;
     }
 
+    [SupportedOSPlatform("windows")]
     private static partial class NativeMethods
     {
         [LibraryImport("iphlpapi.dll")]
