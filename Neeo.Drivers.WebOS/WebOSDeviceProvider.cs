@@ -192,20 +192,14 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         {
             return;
         }
-
         // Responses are matched to requests by id, so the two queries can be in flight together.
         WebOSAppInfo[][] results = await Task.WhenAll(
             client.GetAppsAsync(cancellationToken),
             client.GetExternalInputsAsync(cancellationToken)
         ).ConfigureAwait(false);
         (WebOSAppInfo[] apps, WebOSAppInfo[] inputs) = (results[0], results[1]);
-
         List<WebOSAppInfo> allItems = [.. inputs, .. apps.Where(app => !app.Id.StartsWith("com.webos.app.hdmi", StringComparison.Ordinal))];
-
-        foreach (WebOSAppInfo item in allItems)
-        {
-            list.AddEntry(new(item.Title, item.Icon, ActionIdentifier: item.Id));
-        }
+        list.AddPageEntries(allItems, static item => new(item.Title, item.Icon, ActionIdentifier: item.Id));
     }
 
     private async Task LaunchAppAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)
@@ -238,7 +232,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             : RegistrationResult.Failed("No TV was paired - make sure it is on, then accept the prompt on the TV within 60 seconds.");
     }
 
-    private Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
+    internal Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
     {
         this._subscribedDevices.TryAdd(deviceId, default);
         this._clientManager.GetOrCreateKnownClient(deviceId);
@@ -294,20 +288,38 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         client.ForegroundAppChanged -= this.Client_ForegroundAppChanged;
     }
 
-    private void Client_VolumeChanged(object? sender, DataEventArgs<int> e)
+    private void Client_VolumeChanged(object? sender, DataEventArgs<int> e) => _ = this.HandleVolumeChangedAsync(sender, e.Data);
+
+    internal async Task HandleVolumeChangedAsync(object? sender, int volume)
     {
         if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
         {
-            _ = notifier.SendNotificationAsync("VOLUME", (double)e.Data, client.DeviceId);
-            _ = notifier.SendNotificationAsync("VOLUME-LABEL", e.Data.ToString(CultureInfo.InvariantCulture), client.DeviceId);
+            await this.NotifyAsync(() => Task.WhenAll(
+                notifier.SendNotificationAsync("VOLUME", (double)volume, client.DeviceId),
+                notifier.SendNotificationAsync("VOLUME-LABEL", volume.ToString(CultureInfo.InvariantCulture), client.DeviceId)
+            )).ConfigureAwait(false);
         }
     }
 
-    private void Client_ForegroundAppChanged(object? sender, DataEventArgs<string> e)
+    private void Client_ForegroundAppChanged(object? sender, DataEventArgs<string> e) => _ = this.HandleForegroundAppChangedAsync(sender, e.Data);
+
+    internal async Task HandleForegroundAppChangedAsync(object? sender, string appId)
     {
         if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
         {
-            _ = notifier.SendNotificationAsync("APP", e.Data, client.DeviceId);
+            await this.NotifyAsync(() => notifier.SendNotificationAsync("APP", appId, client.DeviceId)).ConfigureAwait(false);
+        }
+    }
+
+    private async Task NotifyAsync(Func<Task> send)
+    {
+        try
+        {
+            await send().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogWarning(ex, "Failed to send webOS notification.");
         }
     }
 

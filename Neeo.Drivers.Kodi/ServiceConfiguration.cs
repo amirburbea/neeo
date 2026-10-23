@@ -7,5 +7,6 @@ public sealed class ServiceConfiguration : IServiceConfiguration
 {
     public void ConfigureServices(IServiceCollection services) => services
         .AddHttpClient()
+        .AddSingleton<IKodiHostLocator, ZeroconfKodiHostLocator>()
         .AddSingleton<KodiClientManager>();
 }

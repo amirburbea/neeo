@@ -1,45 +1,22 @@
 <Solution>
-  <Configurations>
-    <Platform Name="Any CPU" />
-    <Platform Name="ARM32" />
-  </Configurations>
   <Folder Name="/Drivers/">
-    <Project Path="Neeo.Drivers.Kodi/Neeo.Drivers.Kodi.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
-    <Project Path="Neeo.Drivers.Kodi.Tests/Neeo.Drivers.Kodi.Tests.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
-    <Project Path="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
-    <Project Path="Neeo.Drivers.Plex.Tests/Neeo.Drivers.Plex.Tests.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
-    <Project Path="Neeo.Drivers.WebOS/Neeo.Drivers.WebOS.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
-    <Project Path="Neeo.Drivers.WebOS.Tests/Neeo.Drivers.WebOS.Tests.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
+    <Project Path="Neeo.Drivers.Kodi/Neeo.Drivers.Kodi.csproj" />
+    <Project Path="Neeo.Drivers.Kodi.Tests/Neeo.Drivers.Kodi.Tests.csproj" />
+    <Project Path="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj" />
+    <Project Path="Neeo.Drivers.Plex.Tests/Neeo.Drivers.Plex.Tests.csproj" />
+    <Project Path="Neeo.Drivers.WebOS/Neeo.Drivers.WebOS.csproj" />
+    <Project Path="Neeo.Drivers.WebOS.Tests/Neeo.Drivers.WebOS.Tests.csproj" />
   </Folder>
   <Folder Name="/Sdk/">
-    <Project Path="Neeo.Sdk.Examples/Neeo.Sdk.Examples.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
+    <Project Path="Neeo.Sdk.Examples/Neeo.Sdk.Examples.csproj" />
     <Project Path="Neeo.Sdk.Server/Neeo.Sdk.Server.csproj">
+      <BuildDependency Project="Neeo.Drivers.Kodi/Neeo.Drivers.Kodi.csproj" />
       <BuildDependency Project="Neeo.Drivers.Plex/Neeo.Drivers.Plex.csproj" />
-      <Platform Solution="*|ARM32" Project="ARM32" />
+      <BuildDependency Project="Neeo.Drivers.WebOS/Neeo.Drivers.WebOS.csproj" />
     </Project>
-    <Project Path="Neeo.Sdk.Server.Tests/Neeo.Sdk.Server.Tests.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
-    <Project Path="Neeo.Sdk.Tests/Neeo.Sdk.Tests.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
-    <Project Path="Neeo.Sdk/Neeo.Sdk.csproj">
-      <Platform Solution="*|ARM32" Project="ARM32" />
-    </Project>
+    <Project Path="Neeo.Sdk.Server.Tests/Neeo.Sdk.Server.Tests.csproj" />
+    <Project Path="Neeo.Sdk.Tests/Neeo.Sdk.Tests.csproj" />
+    <Project Path="Neeo.Sdk/Neeo.Sdk.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

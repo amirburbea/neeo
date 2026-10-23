@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Neeo.Sdk.Devices.Directories;
 
@@ -51,6 +53,26 @@ public interface IDirectoryBuilder
     /// <param name="buttons">The array of buttons to add.</param>
     /// <returns><see cref="IDirectoryBuilder"/> instance for chaining.</returns>
     IDirectoryBuilder AddButtonRow(params DirectoryButton[] buttons);
+
+    /// <summary>
+    /// Paginates <paramref name="entries"/> according to <see cref="Parameters"/> (<see cref="BrowseParameters.Offset"/>
+    /// and <see cref="BrowseParameters.Limit"/>), adds the current page's entries to the directory, and sets
+    /// <see cref="TotalMatchingItems"/> to the total count of <paramref name="entries"/>.
+    /// </summary>
+    /// <param name="entries">The full unpaginated list of entries.</param>
+    /// <returns><see cref="IDirectoryBuilder"/> instance for chaining.</returns>
+    IDirectoryBuilder AddPageEntries(IReadOnlyList<DirectoryEntry> entries);
+
+    /// <summary>
+    /// Paginates <paramref name="items"/> according to <see cref="Parameters"/> (<see cref="BrowseParameters.Offset"/>
+    /// and <see cref="BrowseParameters.Limit"/>), projects only the current page's items via <paramref name="selector"/>,
+    /// adds them to the directory, and sets <see cref="TotalMatchingItems"/> to the total count of <paramref name="items"/>.
+    /// </summary>
+    /// <typeparam name="T">The type of items in the source list.</typeparam>
+    /// <param name="items">The full unpaginated list of items.</param>
+    /// <param name="selector">Function projecting an item to a <see cref="DirectoryEntry"/>.</param>
+    /// <returns><see cref="IDirectoryBuilder"/> instance for chaining.</returns>
+    IDirectoryBuilder AddPageEntries<T>(IReadOnlyList<T> items, Func<T, DirectoryEntry> selector);
 
     /// <summary>
     /// Adds an entry - which represents a file or directory - to the directory.
@@ -120,6 +142,43 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
         return this.AddItem(new DirectoryButtonRow(data));
     }
 
+    public DirectoryBuilder AddPageEntries(IReadOnlyList<DirectoryEntry> entries) => this.AddPageEntries(entries, static entry => entry);
+
+    public DirectoryBuilder AddPageEntries<T>(IReadOnlyList<T> items, Func<T, DirectoryEntry> selector)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(selector);
+        int total = items.Count;
+        int offset = Math.Clamp(this.Parameters.Offset, 0, total);
+        int count = Math.Clamp(total - offset, 0, Math.Max(0, this.Parameters.Limit - this.EntryCount));
+        if (count != 0)
+        {
+            // An empty span means the items are not a T[] or List<T> (count != 0 rules out an empty list).
+            if (AsSpanOrEmpty(items) is { IsEmpty: false } span)
+            {
+                foreach (T item in span.Slice(offset, count))
+                {
+                    this.AddEntry(selector(item));
+                }
+            }
+            else
+            {
+                for (int index = offset; index < offset + count; index++)
+                {
+                    this.AddEntry(selector(items[index]));
+                }
+            }
+        }
+        return this.SetTotalMatchingItems(total);
+
+        static ReadOnlySpan<T> AsSpanOrEmpty(IReadOnlyList<T> items) => items switch
+        {
+            T[] array => array,
+            List<T> list => CollectionsMarshal.AsSpan(list),
+            _ => default,
+        };
+    }
+
     public DirectoryBuilder AddEntry(DirectoryEntry entry)
     {
         return this.AddItem(DirectoryBuilder.ToData(entry ?? throw new ArgumentNullException(nameof(entry))));
@@ -170,6 +229,8 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
     }
 
     IDirectoryBuilder IDirectoryBuilder.AddButtonRow(params DirectoryButton[] buttons) => this.AddButtonRow(buttons);
+    IDirectoryBuilder IDirectoryBuilder.AddPageEntries(IReadOnlyList<DirectoryEntry> entries) => this.AddPageEntries(entries);
+    IDirectoryBuilder IDirectoryBuilder.AddPageEntries<T>(IReadOnlyList<T> items, Func<T, DirectoryEntry> selector) => this.AddPageEntries(items, selector);
     IDirectoryBuilder IDirectoryBuilder.AddEntry(DirectoryEntry entry) => this.AddEntry(entry);
     IDirectoryBuilder IDirectoryBuilder.AddHeader(string title) => this.AddHeader(title);
     IDirectoryBuilder IDirectoryBuilder.AddInfoItem(DirectoryInfoItem infoItem) => this.AddInfoItem(infoItem);

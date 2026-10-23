@@ -5,8 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <UserSecretsId>dotnet-Neeo.Sdk.Server-2c418634-5430-474e-a24e-2aa6b202c70f</UserSecretsId>
-    <Platforms>AnyCPU;ARM32</Platforms>
-	<RuntimeIdentifiers>win-x64;linux-arm</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>

@@ -74,6 +74,28 @@ public sealed class PlexServerResilienceTests
         }
     }
 
+    [Fact]
+    public async Task Dispose_completes_cleanly_and_signals_Disposed_when_in_flight_tasks_are_cancelled()
+    {
+        TaskCompletionSource pollStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        StubHttpMessageHandler handler = new(async (_, token) =>
+        {
+            pollStarted.TrySetResult();
+            await Task.Delay(Timeout.Infinite, token);
+            return new HttpResponseMessage();
+        });
+        PlexServer server = PlexServerResilienceTests.CreateServer(handler);
+        bool disposedFired = false;
+        using IDisposable subscription = server.Disposed.Subscribe(_ => disposedFired = true);
+
+        _ = server.InitializeAsync(TestContext.Current.CancellationToken);
+        await pollStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        server.Dispose();
+
+        Assert.True(disposedFired);
+    }
+
     private static PlexServer CreateServer(StubHttpMessageHandler handler) => new(
         PlexServerResilienceTests.MachineIdentifier,
         new HttpClient(handler, disposeHandler: false),

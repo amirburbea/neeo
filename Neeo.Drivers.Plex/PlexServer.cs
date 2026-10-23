@@ -257,15 +257,32 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         }
         if (this._socketTask.IsValueCreated)
         {
-            this._socketTask.Value.Wait();
+            this.WaitForCompletion(this._socketTask.Value);
         }
-        sessionTask.Wait();
+        this.WaitForCompletion(sessionTask);
         if (this._timelineHeartbeatTask.IsValueCreated)
         {
-            this._timelineHeartbeatTask.Value.Wait();
+            this.WaitForCompletion(this._timelineHeartbeatTask.Value);
         }
         this._isDisposed.OnNext(default);
         this._disposable.Dispose();
+    }
+
+    // Dispose must not throw, so a task that was cancelled (expected) or faulted (logged) during shutdown is not rethrown.
+    private void WaitForCompletion(Task task)
+    {
+        try
+        {
+            task.GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during disposal.
+        }
+        catch (Exception e)
+        {
+            this._logger.LogWarning(e, "A background task for Plex server {MachineIdentifier} faulted before disposal.", this.MachineIdentifier);
+        }
     }
 
     public async Task<PlayerData[]> GetPlayersAsync(bool refresh, CancellationToken cancellationToken)

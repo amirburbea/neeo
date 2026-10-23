@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -77,10 +78,9 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     private readonly KodiClientManager _clientManager;
     private readonly Lazy<IDeviceBuilder> _deviceBuilder;
-    private readonly HashSet<string> _deviceIds = [];
+    private readonly ConcurrentDictionary<string, byte> _deviceIds = new(StringComparer.Ordinal);
     private readonly string _deviceName;
     private readonly DeviceType _deviceType;
-    private readonly ReaderWriterLockSlim _lock = new();
     private readonly ILogger _logger;
     private string _uriPrefix = string.Empty;
 
@@ -601,21 +601,11 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         ? new(groups["key"].Value, int.Parse(groups["id"].Value), groups["suffix"].Value ?? string.Empty)
         : null;
 
-    internal void AddDeviceId(string deviceId)
-    {
-        try
-        {
-            this._lock.EnterWriteLock();
-            this._deviceIds.Add(deviceId);
-        }
-        finally
-        {
-            this._lock.ExitWriteLock();
-        }
-    }
+    internal void AddDeviceId(string deviceId) => this._deviceIds.TryAdd(deviceId, default);
 
     private void AttachEventHandlers(KodiClient client)
     {
+        this.DetachEventHandlers(client);
         client.Connected += this.Client_Connected;
         client.Error += this.Client_Error;
         client.PlayerStateChanged += this.Client_PlayerStateChanged;
@@ -772,18 +762,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         client.QueuePendingButtonAction(function);
     }
 
-    private bool HasDeviceId(string deviceId)
-    {
-        try
-        {
-            this._lock.EnterReadLock();
-            return this._deviceIds.Contains(deviceId);
-        }
-        finally
-        {
-            this._lock.ExitReadLock();
-        }
-    }
+    private bool HasDeviceId(string deviceId) => this._deviceIds.ContainsKey(deviceId);
 
     private async Task InitializeDeviceListAsync(string[] deviceIds, CancellationToken cancellationToken)
     {
@@ -848,18 +827,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private void RemoveDeviceId(string deviceId)
-    {
-        try
-        {
-            this._lock.EnterWriteLock();
-            this._deviceIds.Remove(deviceId);
-        }
-        finally
-        {
-            this._lock.ExitWriteLock();
-        }
-    }
+    private void RemoveDeviceId(string deviceId) => this._deviceIds.TryRemove(deviceId, out _);
 
     private void SetUriPrefix(string prefix)
     {

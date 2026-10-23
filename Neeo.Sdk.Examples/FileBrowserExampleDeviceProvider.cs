@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -28,8 +28,6 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
 
     private Task Browse(string deviceId, IDirectoryBuilder builder, CancellationToken cancellationToken)
     {
-        int offset = builder.Parameters.Offset;
-        int limit = builder.Parameters.Limit;
         if (string.IsNullOrEmpty(builder.Parameters.BrowseIdentifier))
         {
             const string title = "Drives";
@@ -48,7 +46,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                 DirectoryEntry[] array = [.. this.GetEntries(root)];
                 string title = $"{root.Replace('\\', '/')} ({array.Length})";
                 builder.SetTitle(title);
-                if (offset == 0)
+                if (builder.Parameters.Offset == 0)
                 {
                     builder
                         .AddHeader(title)
@@ -60,11 +58,7 @@ public class FileBrowserExampleDeviceProvider : IDeviceProvider
                             new("ROOT", ActionIdentifier: "BACKTOROOT", Inverse: true, UIAction: DirectoryUIAction.GoToRoot)
                         );
                 }
-                foreach (DirectoryEntry entry in array[offset..Math.Min(offset + limit, array.Length)])
-                {
-                    builder.AddEntry(entry);
-                }
-                builder.SetTotalMatchingItems(array.Length);
+                builder.AddPageEntries(array);
             }
             catch (Exception e)
             {
