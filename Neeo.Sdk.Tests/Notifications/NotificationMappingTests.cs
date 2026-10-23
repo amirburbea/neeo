@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -53,6 +53,29 @@ public sealed class NotificationMappingTests
         await this.GetNotificationKeysAsync("myAdapter", "myDevice", "myComponent");
 
         Assert.Equal($"/v1/api/notificationkey/{Constants.SdkAdapterName}/myAdapter/myDevice", this._path.Value);
+    }
+
+    [Fact]
+    public async Task Should_not_cache_empty_response_when_device_is_not_yet_added_on_brain()
+    {
+        Mock<ISdkEnvironment> mockEnvironment = new(MockBehavior.Strict);
+        mockEnvironment.Setup(environment => environment.SdkAdapterName).Returns(Constants.SdkAdapterName);
+        Mock<IApiClient> mockClient = new(MockBehavior.Strict);
+        int callCount = 0;
+        mockClient
+            .Setup(client => client.GetAsync<Entry[]>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++callCount == 1 ? [] : NotificationMappingTests._entries);
+        NotificationMapping mapping = new(mockClient.Object, mockEnvironment.Object, NullLogger<NotificationMapping>.Instance);
+        Mock<IDeviceAdapter> mockAdapter = new(MockBehavior.Strict);
+        mockAdapter.Setup(adapter => adapter.AdapterName).Returns("myAdapter");
+        mockAdapter.Setup(adapter => adapter.DeviceName).Returns("myAdapter");
+        string[] firstAttempt = await mapping.GetNotificationKeysAsync(mockAdapter.Object, "myDevice", "name1", CancellationToken.None);
+        string[] secondAttempt = await mapping.GetNotificationKeysAsync(mockAdapter.Object, "myDevice", "name1", CancellationToken.None);
+        string[] cachedAttempt = await mapping.GetNotificationKeysAsync(mockAdapter.Object, "myDevice", "name1", CancellationToken.None);
+        Assert.Empty(firstAttempt);
+        Assert.Equal(["key1"], secondAttempt);
+        Assert.Equal(["key1"], cachedAttempt);
+        Assert.Equal(2, callCount);
     }
 
     private ValueTask<string[]> GetNotificationKeysAsync(string adapterName, string deviceId, string componentName)
