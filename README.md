@@ -36,7 +36,7 @@ Upon startup, will resolve drivers implementing `Neeo.Sdk.Devices.IDeviceProvide
 
 ### Where are the unit tests?
 
-*I've begun writing tests for the SDK (only) but there is much to be done. You can help by writing some. Open a PR.*
+*There are unit tests for the SDK, the SDK server host, and the Hisense, Kodi, Plex, and WebOS drivers - each in a `*.Tests` project next to the code it covers (run them all with `dotnet test`). Coverage is uneven and there is still much to be done. You can help by writing some. Open a PR.*
 
 ### I found a bug, what should I do?
 
@@ -44,4 +44,4 @@ Upon startup, will resolve drivers implementing `Neeo.Sdk.Devices.IDeviceProvide
 
 ### Why aren't you using (INSERT RANDOM LIBRARY OR FEATURE HERE)?
 
-*Do I want to? Open a github issue and convice me - perhaps show me an example via a PR (getting the idea yet?)*
+*Do I want to? Open a github issue and convince me - perhaps show me an example via a PR (getting the idea yet?)*
