@@ -1,0 +1,20 @@
+services:
+  neeo:
+    build: .
+    restart: unless-stopped
+    # Host networking is needed for mDNS discovery of the Brain and of Kodi, wake-on-LAN broadcasts, and so the
+    # Brain can call back into the server (a bridged container would advertise an address the Brain cannot reach).
+    network_mode: host
+    volumes:
+      - neeo-data:/data
+    environment:
+      # Optional: skip discovery and use this Brain.
+      # NEEO_Brain: 192.168.1.10
+      # Optional: run only some of the drivers (defaults to all of them).
+      # NEEO_Drivers: /app/drivers/Kodi/Neeo.Drivers.Kodi.dll;/app/drivers/WebOS/Neeo.Drivers.WebOS.dll
+      # Optional: a fixed Kodi host.
+      # NEEO_Kodi__Host: 192.168.1.20
+      NEEO_ServerName: neeo
+
+volumes:
+  neeo-data:
