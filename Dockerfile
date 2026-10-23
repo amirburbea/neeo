@@ -1,4 +1,4 @@
-# Builds the Neeo SDK server image, with the Hisense, Kodi, Plex and WebOS drivers published alongside it.
+# Builds the Neeo SDK server image, with the Kodi, Plex and WebOS drivers published alongside it.
 # Which drivers actually run is chosen at runtime with NEEO_Drivers (see below), so one image serves every setup.
 #
 # Run it with host networking so Brain and device discovery (mDNS), wake-on-LAN and the ARP lookups work, and
@@ -14,7 +14,7 @@ RUN case "$TARGETARCH" in amd64) rid=linux-x64 ;; *) rid="linux-$TARGETARCH" ;; 
 # Each driver goes in its own folder: the server loads every driver into its own load context, resolving that
 # driver's dependencies (and native libraries) from the driver's folder.
 RUN case "$TARGETARCH" in amd64) rid=linux-x64 ;; *) rid="linux-$TARGETARCH" ;; esac \
-    && for driver in Hisense Kodi Plex WebOS; do \
+    && for driver in Kodi Plex WebOS; do \
         dotnet publish "Neeo.Drivers.$driver" -c Release -r "$rid" --no-self-contained -o "/app/drivers/$driver" || exit 1; \
     done
 
@@ -29,7 +29,7 @@ VOLUME /data
 
 # Semicolon-separated driver assemblies to load. Override to run only the drivers you want, e.g.
 #   NEEO_Drivers=/app/drivers/Kodi/Neeo.Drivers.Kodi.dll;/app/drivers/WebOS/Neeo.Drivers.WebOS.dll
-ENV NEEO_Drivers="/app/drivers/Hisense/Neeo.Drivers.Hisense.dll;/app/drivers/Kodi/Neeo.Drivers.Kodi.dll;/app/drivers/Plex/Neeo.Drivers.Plex.dll;/app/drivers/WebOS/Neeo.Drivers.WebOS.dll"
+ENV NEEO_Drivers="/app/drivers/Kodi/Neeo.Drivers.Kodi.dll;/app/drivers/Plex/Neeo.Drivers.Plex.dll;/app/drivers/WebOS/Neeo.Drivers.WebOS.dll"
 
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Neeo.Sdk.Server.dll"]

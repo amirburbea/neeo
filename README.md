@@ -14,7 +14,7 @@ Upon startup, will resolve drivers implementing `Neeo.Sdk.Devices.IDeviceProvide
 
 ## Running in Docker
 
-The `Dockerfile` publishes the server together with the Hisense, Kodi, Plex and WebOS drivers; `compose.yaml` runs it:
+The `Dockerfile` publishes the server together with the Kodi, Plex and WebOS drivers; `compose.yaml` runs it:
 
 ```
 docker compose up -d
@@ -23,7 +23,7 @@ docker compose up -d
 - **Host networking** (`network_mode: host`, Linux hosts) is required so mDNS discovery, wake-on-LAN and the ARP lookups see your network, and so the Brain can reach the server. On Docker Desktop or OrbStack the container is not on your LAN, so it can start and register but the Brain won't be able to call it.
 - **Storage:** registrations and their encryption key are kept in `/data` (a volume, via `NEEO_SETTINGS_PATH`). Keep that volume, or the server forgets its pairings on restart.
 - **Configuration** can be given as `NEEO_`-prefixed environment variables, with `__` as the section separator: `NEEO_Brain`, `NEEO_ServerName`, `NEEO_Kodi__Host`. Environment variables override `appsettings.json`, and command line arguments override both.
-- **Choosing drivers:** all four are loaded by default. Set `NEEO_Drivers` to a semicolon-separated list of assemblies (for example `/app/drivers/Kodi/Neeo.Drivers.Kodi.dll;/app/drivers/WebOS/Neeo.Drivers.WebOS.dll`) to run only some.
+- **Choosing drivers:** all three are loaded by default. Set `NEEO_Drivers` to a semicolon-separated list of assemblies (for example `/app/drivers/Kodi/Neeo.Drivers.Kodi.dll;/app/drivers/WebOS/Neeo.Drivers.WebOS.dll`) to run only some.
 
 ## FAQ
 
@@ -49,7 +49,7 @@ docker compose up -d
 
 ### Where are the unit tests?
 
-*There are unit tests for the SDK, the SDK server host, and the Hisense, Kodi, Plex, and WebOS drivers - each in a `*.Tests` project next to the code it covers (run them all with `dotnet test`). Coverage is uneven and there is still much to be done. You can help by writing some. Open a PR.*
+*There are unit tests for the SDK, the SDK server host, and the Kodi, Plex, and WebOS drivers - each in a `*.Tests` project next to the code it covers (run them all with `dotnet test`). Coverage is uneven and there is still much to be done. You can help by writing some. Open a PR.*
 
 ### I found a bug, what should I do?
 
