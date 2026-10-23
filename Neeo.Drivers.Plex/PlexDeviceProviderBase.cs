@@ -64,7 +64,7 @@ public abstract partial class PlexDeviceProviderBase(
     public static string? ResolveImageUrl(string token) => PlexDeviceProviderBase._imageUrlTokens.Resolve(token);
 
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
-    private readonly DeviceRegistry<PlexServerClient> _servers = new(logger);
+    private readonly DeviceRegistry<IPlexServer> _servers = new(logger);
     private IDeviceNotifier? _notifier;
     private string _uriPrefix = string.Empty;
 
@@ -115,7 +115,7 @@ public abstract partial class PlexDeviceProviderBase(
         media => media.Summary is { Length: > 0 } summary ? summary : media.Title
     );
 
-    protected IPlexServer? GetServer(string machineIdentifier) => this._servers.GetClient(machineIdentifier)?.Server;
+    protected IPlexServer? GetServer(string machineIdentifier) => this._servers.GetClient(machineIdentifier);
 
     protected string GetThumbnailUrl(Uri plexUri, ImageSize size = ImageSize.Large)
     {
@@ -462,10 +462,9 @@ public abstract partial class PlexDeviceProviderBase(
             return;
         }
         logger.LogInformation("Plex device added: {Name} ({IPAddress})", server.Name, server.ServerData.IPAddress);
-        PlexServerClient client = new(server);
-        if (!this._servers.TryAdd(client))
+        if (!this._servers.TryAdd(server))
         {
-            client.Dispose();
+            server.Dispose();
             return;
         }
         // Power notifications on connection changes are sent by the registry (see AddPowerStateSensor).
@@ -555,10 +554,10 @@ public abstract partial class PlexDeviceProviderBase(
 
     private Task OnServerRemovedAsync(string machineIdentifier, CancellationToken cancellationToken)
     {
-        if (this._servers.TryRemove(machineIdentifier, out PlexServerClient? client))
+        if (this._servers.TryRemove(machineIdentifier, out IPlexServer? server))
         {
             logger.LogInformation("Plex device removed: {Name}", machineIdentifier);
-            client.Dispose();
+            server.Dispose();
         }
         return Task.CompletedTask;
     }

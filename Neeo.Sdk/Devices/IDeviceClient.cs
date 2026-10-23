@@ -18,8 +18,8 @@ public interface IDeviceClient
     bool IsConnected { get; }
 
     /// <summary>
-    /// Raised when <see cref="IsConnected"/> may have changed. Raising it without an actual change is harmless -
-    /// the registry only reports actual transitions.
+    /// Emits when <see cref="IsConnected"/> may have changed. Emitting without an actual change (including an initial
+    /// replay on subscription) is harmless - the registry only reports actual transitions.
     /// </summary>
-    event EventHandler? ConnectionChanged;
+    IObservable<bool> IsConnectedChanged { get; }
 }

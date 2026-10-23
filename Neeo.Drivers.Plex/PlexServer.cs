@@ -12,17 +12,17 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Plex;
 
-public interface IPlexServer : IDisposable
+public interface IPlexServer : IDeviceClient, IDisposable
 {
+    string IDeviceClient.DeviceId => this.MachineIdentifier;
     MediaItem? ActiveMedia { get; }
     IObservable<MediaItem?> ActiveMediaChanged { get; }
     IObservable<Unit> Disposed { get; }
-    bool IsConnected { get; }
-    IObservable<bool> IsConnectedChanged { get; }
     IMediaLibrary Library { get; }
     string MachineIdentifier { get; }
     string Name { get; }
@@ -119,7 +119,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 this._activeMedia.OnCompleted
             );
         this.SelectedPlayerChanged = this._selectedPlayerId
-            .CombineLatest(this._players, (id, players) => PlexServer.GetPlayerById(players, id))
+            .CombineLatest(this._players, static (id, players) => PlexServer.GetPlayerById(players, id))
             .DistinctUntilChanged()
             .TakeUntil(this._cancellationTokenSource.Token);
         this._playerDiscoverySubscription = new(
@@ -171,8 +171,8 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
             return;
         }
         Dictionary<string, PlayerData> onlinePlayers = onlineClients.ToDictionary(
-            client => client.MachineIdentifier,
-            client => new PlayerData(
+            static client => client.MachineIdentifier,
+            static client => new PlayerData(
                 client.Name,
                 client.MachineIdentifier,
                 client.ProtocolCapabilities,

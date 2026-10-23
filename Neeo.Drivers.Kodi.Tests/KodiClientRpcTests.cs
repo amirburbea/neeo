@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Kodi.Models;
 using Xunit;
 
@@ -69,6 +70,44 @@ public sealed class KodiClientRpcTests
         using KodiClient client = new("Kodi", IPAddress.Loopback, 8080, new RecordingLogger(), webSocketPort: 1);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetPlayersAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Disposing_a_connected_client_completes_IsConnectedChanged_and_ignores_a_late_disconnect()
+    {
+        TaskCompletionSource disconnectEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using FakeKodiServer server = await FakeKodiServer.StartAsync(async (socket, request, number) =>
+        {
+            if (number == 1)
+            {
+                await FakeKodiServer.RespondAsync(socket, request, "{}");
+                await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
+            }
+        });
+        RecordingLogger logger = new();
+        KodiClient client = new("Kodi", IPAddress.Loopback, 8080, logger, server.Port)
+        {
+            RequestTimeout = TimeSpan.FromMilliseconds(100),
+        };
+        bool completed = false;
+        using IDisposable subscription = client.IsConnectedChanged.Subscribe(static _ => { }, () => completed = true);
+        // PlayerStateChanged fires inside OnDisconnected just before _isConnected.OnNext(false).
+        client.PlayerStateChanged += (_, e) =>
+        {
+            if (e.Data == PlayerState.Disconnected)
+            {
+                disconnectEntered.TrySetResult();
+                disposed.Task.GetAwaiter().GetResult();
+            }
+        };
+        Assert.True(await client.ConnectAsync(TestContext.Current.CancellationToken));
+        await disconnectEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
+        client.Dispose();
+        disposed.TrySetResult();
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.True(completed);
+        Assert.DoesNotContain(logger.Entries, static entry => entry.Level >= LogLevel.Error);
     }
 
     /// <summary>
