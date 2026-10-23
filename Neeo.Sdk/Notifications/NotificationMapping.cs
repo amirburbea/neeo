@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -37,13 +37,9 @@ internal sealed class NotificationMapping(
     public async ValueTask<string[]> GetNotificationKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, CancellationToken cancellationToken)
     {
         string cacheKey = string.Concat(adapter.AdapterName, "|", deviceId);
-        if (this._cache.GetValueOrDefault(cacheKey) is not { IsCompletedSuccessfully: true } loadTask)
+        if (this._cache.GetValueOrDefault(cacheKey) is not ({ IsCompletedSuccessfully: true } and { Result: { Count: > 0 } dictionary }))
         {
             return await this.ResolveKeysAsync(adapter, deviceId, componentName, cacheKey, cancellationToken).ConfigureAwait(false);
-        }
-        if (loadTask.Result is not { Count: > 0 } dictionary)
-        {
-            return [];
         }
         if (dictionary.TryGetValue(componentName, out string[]? keys))
         {
@@ -85,20 +81,23 @@ internal sealed class NotificationMapping(
 
     private async Task<Dictionary<string, string[]>?> LoadKeysAsync(string cacheKey, string adapterName, string deviceId, CancellationToken cancellationToken)
     {
+        Dictionary<string, string[]>? result = null;
         try
         {
-            return await this.FetchNotificationKeysAsync(adapterName, deviceId, cancellationToken).ConfigureAwait(false);
+            return result = await this.FetchNotificationKeysAsync(adapterName, deviceId, cancellationToken).ConfigureAwait(false);
         }
-        catch
+        finally
         {
-            this._cache.TryRemove(cacheKey, out _);
-            throw;
+            if (result is not { Count: > 0 })
+            {
+                this._cache.TryRemove(cacheKey, out _);
+            }
         }
     }
 
     private async Task<string[]> ResolveKeysAsync(IDeviceAdapter adapter, string deviceId, string componentName, string cacheKey, CancellationToken cancellationToken)
     {
-        this.TryRemoveFaultedOrCanceled(cacheKey);
+        this.TryRemoveFaultedCanceledOrEmpty(cacheKey);
         Task<Dictionary<string, string[]>?> loadTask = this._cache.GetOrAdd(
             cacheKey,
             key => this.LoadKeysAsync(key, adapter.AdapterName, deviceId, cancellationToken)
@@ -116,9 +115,9 @@ internal sealed class NotificationMapping(
         return [];
     }
 
-    private void TryRemoveFaultedOrCanceled(string cacheKey)
+    private void TryRemoveFaultedCanceledOrEmpty(string cacheKey)
     {
-        if (this._cache.TryGetValue(cacheKey, out Task<Dictionary<string, string[]>?>? existing) && existing.IsCompleted && !existing.IsCompletedSuccessfully)
+        if (this._cache.TryGetValue(cacheKey, out Task<Dictionary<string, string[]>?>? existing) && existing is { IsCompleted: true } and not ({ IsCompletedSuccessfully: true } and { Result.Count: > 0 }))
         {
             this._cache.TryRemove(cacheKey, out _);
         }
