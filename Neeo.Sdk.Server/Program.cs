@@ -19,15 +19,35 @@ public static class Program
 {
     public static Task Main() => new HostBuilder()
         .ConfigureHostConfiguration(Program.ConfigureHostConfiguration)
-        .ConfigureAppConfiguration((context, builder) => Program.ConfigureAppConfiguration(context.HostingEnvironment, builder))
+        .ConfigureAppConfiguration((context, builder) => Program.ConfigureAppConfiguration(context.HostingEnvironment, builder, Environment.GetCommandLineArgs()[1..]))
         .ConfigureServices((context, services) => Program.ConfigureServices(context.Configuration, services))
         .ConfigureLogging((context, builder) => Program.ConfigureLogging(context.HostingEnvironment, builder))
         .RunConsoleAsync();
 
-    private static void ConfigureAppConfiguration(IHostEnvironment environment, IConfigurationBuilder builder) => builder
-        .AddCommandLine(Environment.GetCommandLineArgs()[1..])
+    /// <summary>
+    /// Adds the app configuration sources. Later sources override earlier ones, so command line arguments win over
+    /// <c>NEEO_</c> environment variables (e.g. <c>NEEO_Kodi__Host</c> for <c>Kodi:Host</c>), which win over the JSON files.
+    /// </summary>
+    internal static void ConfigureAppConfiguration(IHostEnvironment environment, IConfigurationBuilder builder, string[] args) => builder
         .AddJsonFile("appsettings.json", optional: true)
-        .AddJsonFile($"appsettings.{environment.EnvironmentName}.json", optional: true);
+        .AddJsonFile($"appsettings.{environment.EnvironmentName}.json", optional: true)
+        .AddEnvironmentVariables(prefix: "NEEO_")
+        .AddCommandLine(args);
+
+    /// <summary>
+    /// Gets the driver assembly paths from the <c>Drivers</c> configuration, either as a single value of paths separated
+    /// by semicolons (convenient for an environment variable, and replacing any array from the JSON files) or as an array.
+    /// </summary>
+    internal static string[] GetDriverPaths(IConfiguration configuration)
+    {
+        IConfigurationSection section = configuration.GetSection("Drivers");
+        string[]? driverPaths = section.Value is { Length: > 0 } text
+            ? text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : section.Get<string[]>();
+        return driverPaths is { Length: > 0 }
+            ? driverPaths
+            : throw new ApplicationException("Invalid configuration, configuration should have an array \"Drivers\" with at least one driver assembly.");
+    }
 
     private static void ConfigureHostConfiguration(IConfigurationBuilder builder) => builder
         .AddEnvironmentVariables(prefix: "DOTNET_")
@@ -47,10 +67,7 @@ public static class Program
 
     private static void ConfigureServices(IConfiguration configuration, IServiceCollection services)
     {
-        if (configuration.GetSection("Drivers").Get<string[]>() is not { Length: > 0 } driverPaths)
-        {
-            throw new ApplicationException("Invalid configuration, configuration should have an array \"Drivers\" with at least one driver assembly.");
-        }
+        string[] driverPaths = Program.GetDriverPaths(configuration);
         List<Type> providerTypes = [];
         List<IServiceConfiguration> serviceConfigurations = [];
         foreach (string assemblyPath in driverPaths.Select(Path.GetFullPath))
