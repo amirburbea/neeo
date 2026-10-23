@@ -20,7 +20,8 @@ public class KodiClientManagerTests
             NullLogger<KodiClient>.Instance,
             config,
             mockSettings.Object,
-            mockHttp.Object
+            mockHttp.Object,
+            Mock.Of<IKodiHostLocator>()
         );
     }
 

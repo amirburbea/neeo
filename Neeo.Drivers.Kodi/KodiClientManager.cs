@@ -26,7 +26,8 @@ public sealed partial class KodiClientManager(
     ILogger<KodiClient> logger,
     IConfiguration configuration,
     ISettingsStore<KodiClientManager> settings,
-    IHttpClientFactory httpClientFactory
+    IHttpClientFactory httpClientFactory,
+    IKodiHostLocator hostLocator
 ) : IDisposable
 {
     private readonly ConcurrentLru<string, (byte[] Bytes, string ContentType)> _imageCache = new(
@@ -65,11 +66,10 @@ public sealed partial class KodiClientManager(
     {
         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         ConcurrentBag<Task> hostTasks = [];
-        Task zeroconfTask = ZeroconfResolver.ResolveAsync(
-            Constants.HttpServiceName,
+        Task zeroconfTask = hostLocator.ScanAsync(
             TimeSpan.FromMilliseconds(scanTime),
-            callback: host => hostTasks.Add(OnHostDiscoveredAsync(host)),
-            cancellationToken: cts.Token
+            host => hostTasks.Add(OnHostDiscoveredAsync(host)),
+            cts.Token
         );
         List<string> candidateHosts = [];
         if (configuration.GetSection("Kodi:Hosts").Get<string[]>() is { Length: > 0 } configHosts)
@@ -125,7 +125,7 @@ public sealed partial class KodiClientManager(
                     logger.LogWarning("Discovered Zeroconf host '{name}' without a valid IP address, skipping.", host.DisplayName);
                     return;
                 }
-                int? port = host.Services.TryGetValue(Constants.HttpServiceName, out IService? service)
+                int? port = host.Services.TryGetValue(ZeroconfKodiHostLocator.HttpServiceName, out IService? service)
                     ? service.Port
                     : host.Services.Values.FirstOrDefault()?.Port;
                 if (port is null or 0)
@@ -155,15 +155,7 @@ public sealed partial class KodiClientManager(
     {
         if (!IPAddress.TryParse(hostNameOrAddress, out IPAddress? ip))
         {
-            try
-            {
-                IPAddress[] addrs = await Dns.GetHostAddressesAsync(hostNameOrAddress, cancellationToken).ConfigureAwait(false);
-                ip = Array.Find(addrs, static a => a.AddressFamily is AddressFamily.InterNetwork);
-            }
-            catch
-            {
-                return false;
-            }
+            ip = await hostLocator.ResolveAsync(hostNameOrAddress, cancellationToken).ConfigureAwait(false);
         }
         if (ip is null)
         {
@@ -197,7 +189,7 @@ public sealed partial class KodiClientManager(
                 }
 
                 logger.LogInformation("Connecting to Kodi at {displayName} ({targetIp}:{port})...", displayName, targetIp, port);
-                KodiClient newClient = new(displayName, targetIp, port, logger);
+                KodiClient newClient = new(displayName, targetIp, port, logger, configuration.GetValue("Kodi:WebSocketPort", KodiClient.DefaultWebSocketPort));
                 if (!await newClient.ConnectAsync(cancellationToken).ConfigureAwait(false) || newClient.MacAddress.Equals(PhysicalAddress.None))
                 {
                     logger.LogWarning("Failed to connect or retrieve MAC address from Kodi at {targetIp}.", targetIp);
@@ -365,10 +357,5 @@ public sealed partial class KodiClientManager(
                 // Ignore.
             }
         }
-    }
-
-    private static class Constants
-    {
-        public const string HttpServiceName = "_xbmc-jsonrpc-h._tcp.local.";
     }
 }

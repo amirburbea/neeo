@@ -122,7 +122,8 @@ public sealed class KodiEventHandlerTests
             NullLogger<KodiClient>.Instance,
             new ConfigurationBuilder().Build(),
             Mock.Of<ISettingsStore<KodiClientManager>>(),
-            Mock.Of<IHttpClientFactory>()
+            Mock.Of<IHttpClientFactory>(),
+            Mock.Of<IKodiHostLocator>()
         ),
         logger
     );
