@@ -177,6 +177,29 @@ public sealed class WebOSDeviceProviderTests
         Assert.Null(manager.GetOrCreateKnownClient("02DEADBEEF02"));
     }
 
+    [Fact]
+    public async Task Notification_handlers_do_not_throw_when_sending_fails()
+    {
+        PhysicalAddress mac = PhysicalAddress.Parse("001122334455");
+        InMemorySettings settings = new();
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+        using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
+        WebOSClient client = manager.GetOrCreateClient(IPAddress.Loopback, mac);
+        Mock<IDeviceNotifier> notifier = new();
+        notifier
+            .Setup(n => n.SendNotificationAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<string>(), default))
+            .ThrowsAsync(new InvalidOperationException("Brain unreachable"));
+        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
+        await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
+
+        await provider.HandleVolumeChangedAsync(client, 25);
+        await provider.HandleForegroundAppChangedAsync(client, "netflix");
+
+        notifier.Verify(n => n.SendNotificationAsync("VOLUME", 25d, client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.SendNotificationAsync("VOLUME-LABEL", "25", client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.SendNotificationAsync("APP", "netflix", client.DeviceId, default), Times.Once);
+    }
+
     private static WebOSClientManager CreateManager(InMemorySettings settings) => new(
         NullLogger<WebOSClient>.Instance,
         NullLogger<WebOSClientManager>.Instance,

@@ -376,16 +376,21 @@ public abstract partial class PlexDeviceProviderBase(
             {
                 return Results.NotFound();
             }
+            HttpResponseMessage? response = null;
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, new Uri(imageUrl)) { Headers = { { "X-Plex-Token", tokenStore.AuthToken } } };
-                HttpResponseMessage response = await this._httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                using HttpRequestMessage upstreamRequest = new(HttpMethod.Get, new Uri(imageUrl)) { Headers = { { "X-Plex-Token", tokenStore.AuthToken } } };
+                response = await this._httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
                     return Results.StatusCode((int)response.StatusCode);
                 }
                 Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                return Results.Stream(stream, response.Content.Headers.ContentType?.MediaType ?? "image/jpeg");
+                string contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                // The response now backs the streamed result, so it is disposed with the request rather than below.
+                request.HttpContext?.Response.RegisterForDispose(response);
+                response = null;
+                return Results.Stream(stream, contentType);
             }
             catch (FormatException)
             {
@@ -395,6 +400,10 @@ public abstract partial class PlexDeviceProviderBase(
             {
                 logger.LogWarning(e, "Failed to proxy Plex image from {Url}.", imageUrl);
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+            finally
+            {
+                response?.Dispose();
             }
         }
     }

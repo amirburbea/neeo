@@ -152,17 +152,22 @@ public sealed class ReconnectLoopTests
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
         Assert.Equal(5, attemptTimestamps.Count);
-        // Expected gaps: ~20ms, ~40ms, ~60ms (capped), ~60ms (capped). Assert they're non-decreasing
-        // with generous tolerance rather than asserting exact durations, since this runs on real timers.
-        TimeSpan? previousGap = null;
+        // Expected delays before attempts 2..5: 40ms, 60ms (capped), 60ms (capped), 60ms (capped).
+        // Compare each gap against its scheduled target (with timer tolerance) rather than the previous
+        // observed gap, since OS scheduling jitter on one capped tick does not carry over to the next.
+        TimeSpan[] expectedDelays =
+        [
+            TimeSpan.FromMilliseconds(40),
+            TimeSpan.FromMilliseconds(60),
+            TimeSpan.FromMilliseconds(60),
+            TimeSpan.FromMilliseconds(60),
+        ];
+        TimeSpan tolerance = TimeSpan.FromMilliseconds(15);
         for (int i = 1; i < attemptTimestamps.Count; i++)
         {
             TimeSpan gap = attemptTimestamps[i] - attemptTimestamps[i - 1];
-            if (previousGap is { } previous)
-            {
-                Assert.True(gap >= previous - TimeSpan.FromMilliseconds(15), $"Gap {gap} should not shrink relative to previous gap {previous}.");
-            }
-            previousGap = gap;
+            TimeSpan expected = expectedDelays[i - 1];
+            Assert.True(gap >= expected - tolerance, $"Gap {gap} was shorter than expected delay {expected} (minus tolerance).");
         }
     }
 

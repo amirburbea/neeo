@@ -5,7 +5,6 @@
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<OutputType>Exe</OutputType>
-		<Platforms>AnyCPU;ARM32</Platforms>
 	</PropertyGroup>
 
 	<ItemGroup>

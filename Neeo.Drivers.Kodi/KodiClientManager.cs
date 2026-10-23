@@ -64,10 +64,11 @@ public sealed partial class KodiClientManager(
     public async Task DiscoverAsync(int scanTime, Func<KodiClient, bool>? considerDiscoveryComplete, CancellationToken cancellationToken = default)
     {
         using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        ConcurrentBag<Task> hostTasks = [];
         Task zeroconfTask = ZeroconfResolver.ResolveAsync(
             Constants.HttpServiceName,
             TimeSpan.FromMilliseconds(scanTime),
-            callback: OnHostDiscovered,
+            callback: host => hostTasks.Add(OnHostDiscoveredAsync(host)),
             cancellationToken: cts.Token
         );
         List<string> candidateHosts = [];
@@ -95,7 +96,7 @@ public sealed partial class KodiClientManager(
                         && this.Clients.FirstOrDefault(c => c.DisplayName.Contains(host, StringComparison.OrdinalIgnoreCase)) is { } c
                         && considerDiscoveryComplete(c))
                     {
-                        cts.Cancel();
+                        await cts.CancelAsync().ConfigureAwait(false);
                         break;
                     }
                 }
@@ -104,10 +105,18 @@ public sealed partial class KodiClientManager(
                     // Ignore probe errors
                 }
             }
-        }, cts.Token);
-        await Task.WhenAll(zeroconfTask, probeTask).ConfigureAwait(false);
+        }, CancellationToken.None);
+        try
+        {
+            await Task.WhenAll(zeroconfTask, probeTask).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Discovery was cut short because considerDiscoveryComplete was satisfied.
+        }
+        await Task.WhenAll(hostTasks).ConfigureAwait(false);
 
-        async void OnHostDiscovered(IZeroconfHost host)
+        async Task OnHostDiscoveredAsync(IZeroconfHost host)
         {
             try
             {
@@ -128,8 +137,12 @@ public sealed partial class KodiClientManager(
                     && considerDiscoveryComplete != null
                     && considerDiscoveryComplete(client))
                 {
-                    cts.Cancel();
+                    await cts.CancelAsync().ConfigureAwait(false);
                 }
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                // Ignore cancellation.
             }
             catch (Exception ex)
             {
