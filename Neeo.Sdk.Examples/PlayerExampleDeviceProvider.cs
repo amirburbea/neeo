@@ -182,11 +182,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
                     new(Icon: DirectoryButtonIcon.Shuffle, ActionIdentifier: "QUEUE_SHUFFLE")
                 );
             }
-            foreach (Pet pet in queued)
-            {
-                builder.AddEntry(new(GetTitle(pet), GetDescription(pet), ThumbnailUri: this.GetCoverArt(pet), ActionIdentifier: Enum.GetName(pet)));
-            }
-            builder.SetTotalMatchingItems(queued.Length);
+            builder.AddPageEntries(queued, pet => new(GetTitle(pet), GetDescription(pet), ThumbnailUri: this.GetCoverArt(pet), ActionIdentifier: Enum.GetName(pet)));
             return Task.CompletedTask;
         }
 

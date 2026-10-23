@@ -192,20 +192,14 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         {
             return;
         }
-
         // Responses are matched to requests by id, so the two queries can be in flight together.
         WebOSAppInfo[][] results = await Task.WhenAll(
             client.GetAppsAsync(cancellationToken),
             client.GetExternalInputsAsync(cancellationToken)
         ).ConfigureAwait(false);
         (WebOSAppInfo[] apps, WebOSAppInfo[] inputs) = (results[0], results[1]);
-
         List<WebOSAppInfo> allItems = [.. inputs, .. apps.Where(app => !app.Id.StartsWith("com.webos.app.hdmi", StringComparison.Ordinal))];
-
-        foreach (WebOSAppInfo item in allItems)
-        {
-            list.AddEntry(new(item.Title, item.Icon, ActionIdentifier: item.Id));
-        }
+        list.AddPageEntries(allItems, static item => new(item.Title, item.Icon, ActionIdentifier: item.Id));
     }
 
     private async Task LaunchAppAsync(string deviceId, string actionIdentifier, CancellationToken cancellationToken)

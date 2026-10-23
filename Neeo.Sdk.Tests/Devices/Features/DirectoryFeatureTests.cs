@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.Json;
 using Neeo.Sdk.Devices.Directories;
@@ -138,5 +140,42 @@ public sealed class DirectoryFeatureTests
         Assert.True(document.RootElement.GetProperty("isInfoItem").GetBoolean());
         Assert.Equal("Are you sure?", document.RootElement.GetProperty("text").GetString());
         Assert.False(document.RootElement.TryGetProperty("uiAction", out _));
+    }
+
+    [Fact]
+    public void AddPageEntries_paginates_array_list_and_other_lists_and_sets_total_matching_items()
+    {
+        int[] sourceArray = [.. Enumerable.Range(0, 10)];
+        List<int> sourceList = [.. sourceArray];
+        ReadOnlyCollection<int> sourceReadOnly = new(sourceList);
+        foreach (IReadOnlyList<int> source in (IReadOnlyList<int>[])[sourceArray, sourceList, sourceReadOnly])
+        {
+            List<int> projected = [];
+            DirectoryBuilder builder = new(new(BrowseIdentifier: "root", Limit: 3, Offset: 4));
+            builder.AddHeader("Header does not count toward EntryCount");
+            builder.AddPageEntries(source, item =>
+            {
+                projected.Add(item);
+                return new($"Item {item}", ActionIdentifier: $"id-{item}");
+            });
+            DirectoryData data = builder.Build();
+            Assert.Equal([4, 5, 6], projected);
+            Assert.Equal(3, builder.EntryCount);
+            Assert.Equal(10, data.TotalMatchingItems);
+            Assert.Equal(7, data.Metadata.Next?.Offset);
+            Assert.Equal(1, data.Metadata.Previous?.Offset);
+        }
+    }
+
+    [Theory]
+    [InlineData(-5, 3, 3)]
+    [InlineData(0, -1, 0)]
+    [InlineData(25, 3, 0)]
+    public void AddPageEntries_tolerates_out_of_range_parameters(int offset, int limit, int expectedCount)
+    {
+        DirectoryBuilder builder = new(new(BrowseIdentifier: "root", Limit: limit, Offset: offset));
+        builder.AddPageEntries(Enumerable.Range(0, 10).ToArray(), item => new($"Item {item}", ActionIdentifier: $"id-{item}"));
+        Assert.Equal(expectedCount, builder.EntryCount);
+        Assert.Equal(10, builder.Build().TotalMatchingItems);
     }
 }
