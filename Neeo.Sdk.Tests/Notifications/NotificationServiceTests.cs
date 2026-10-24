@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -101,6 +102,25 @@ public sealed class NotificationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Updates_to_the_same_key_are_delivered_in_the_order_they_were_sent()
+    {
+        IDeviceAdapter adapter = this.CreateDeviceAdapter();
+        string[] values = [.. Enumerable.Range(0, 50).Select(static index => $"value-{index}")];
+        foreach (string value in values)
+        {
+            await this._notificationService.SendNotificationAsync(adapter, new(Constants.DeviceId, Constants.ComponentName, value), TestContext.Current.CancellationToken);
+        }
+
+        await this.WaitForCapturedBodiesAsync(values.Length);
+        string?[] delivered;
+        lock (this._capturedBodies)
+        {
+            delivered = [.. this._capturedBodies.Select(static bytes => JsonDocument.Parse(bytes).RootElement.GetProperty("data").GetString())];
+        }
+        Assert.Equal(values, delivered);
+    }
+
+    [Fact]
     public Task SendNotificationAsync_should_throw_if_property_is_null()
     {
         return Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(this.CreateDeviceAdapter(), default, TestContext.Current.CancellationToken));
@@ -134,6 +154,22 @@ public sealed class NotificationServiceTests : IDisposable
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
         return mockAdapter.Object;
+    }
+
+    private async Task WaitForCapturedBodiesAsync(int count)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            lock (this._capturedBodies)
+            {
+                if (this._capturedBodies.Count >= count)
+                {
+                    return;
+                }
+            }
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
     }
 
     private byte[] GetCapturedBody()
