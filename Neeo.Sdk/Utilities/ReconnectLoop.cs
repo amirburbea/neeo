@@ -43,8 +43,7 @@ public sealed class ReconnectLoop : IDisposable
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(initialDelay, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxDelay, initialDelay);
-        (this._initialDelay, this._maxDelay) = (initialDelay, maxDelay);
-        (this._tryConnectAsync, this._logger) = (tryConnectAsync, logger);
+        (this._initialDelay, this._maxDelay, this._tryConnectAsync, this._logger) = (initialDelay, maxDelay, tryConnectAsync, logger);
     }
 
     internal bool IsRunning
