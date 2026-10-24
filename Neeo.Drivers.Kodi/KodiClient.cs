@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.WebSockets;
-using System.Reactive.Subjects;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -17,7 +16,7 @@ using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;
 
-public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger, int webSocketPort = KodiClient.DefaultWebSocketPort) : IDeviceClient, IDisposable
+public sealed class KodiClient(string displayName, IPAddress ipAddress, int httpPort, ILogger logger, int webSocketPort = KodiClient.DefaultWebSocketPort) : IDisposable
 {
     /// <summary>
     /// The port Kodi serves its JSON-RPC WebSocket on by default.
@@ -28,7 +27,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     private static readonly string[] _getItemProperties = ["title", "showtitle", "season", "episode", "art", "thumbnail", "year", "genre", "album", "artist", "track"];
 
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
-    private readonly BehaviorSubject<bool> _isConnected = new(false);
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private CancellationTokenSource? _cancellationTokenSource;
@@ -57,8 +55,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     public int HttpPort => httpPort;
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open };
-
-    public IObservable<bool> IsConnectedChanged => this._isConnected;
 
     public bool IsDisposed { get; private set; }
 
@@ -153,7 +149,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         this.IsDisposed = true;
         this._reconnectLoop?.Dispose();
         this.CleanUp();
-        this._isConnected.OnCompleted();
         this._connectLock.Dispose();
         this._sendLock.Dispose();
     }
@@ -551,7 +546,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         {
             this.MacAddress = await this.GetMacAddressAsync().ConfigureAwait(false);
         }
-        this._isConnected.OnNext(true);
         this.Connected?.Invoke(this, EventArgs.Empty);
     }
 
@@ -618,7 +612,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     {
         this.CleanUp();
         this.PlayerState = PlayerState.Disconnected;
-        this._isConnected.OnNext(false);
         this.Disconnected?.Invoke(this, EventArgs.Empty);
         if (this.IsDisposed)
         {

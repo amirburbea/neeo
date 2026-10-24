@@ -91,7 +91,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         this._deviceName = deviceName;
         this._deviceType = deviceType;
         this._logger = logger;
-        this._clientManager.Registry.Changed += this.Registry_Changed;
+        this._clientManager.ClientAdded += this.ClientManager_ClientAdded;
     }
 
     public IDeviceBuilder DeviceBuilder => this._deviceBuilder.Value;
@@ -103,7 +103,12 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     public virtual void Dispose()
     {
-        this._clientManager.Registry.Changed -= this.Registry_Changed;
+        this._clientManager.ClientAdded -= this.ClientManager_ClientAdded;
+        foreach (KodiClient client in this._clientManager.Clients)
+        {
+            // So that shutting down does not report every Kodi as powered off.
+            this.DetachEventHandlers(client);
+        }
         GC.SuppressFinalize(this);
     }
 
@@ -128,7 +133,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddDirectory("TVShowLibrary", "TV Shows", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".tvshows")
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
-        .AddPowerStateSensor(this._clientManager.Registry, this.IsClientReady)
+        .AddPowerStateSensor(this.IsClientReady)
         .EnableDeviceRoute(this.SetUriPrefix, this.HandleDeviceRouteAsync)
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableRegistration(Constants.RegistrationHeader, Constants.RegistrationDescription, _ => Task.FromResult(this._clientManager.HasCredentials), this.RegisterAsync)
@@ -607,13 +612,15 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     {
         this.DetachEventHandlers(client);
         client.Connected += this.Client_Connected;
+        client.Disconnected += this.Client_Disconnected;
         client.Error += this.Client_Error;
         client.PlayerStateChanged += this.Client_PlayerStateChanged;
         client.VolumeChanged += this.Client_VolumeChanged;
     }
 
-    // Power notifications on connect/disconnect are sent by the registry (see AddPowerStateSensor).
     private void Client_Connected(object? sender, EventArgs e) => _ = this.HandleClientConnectedAsync(sender);
+
+    private void Client_Disconnected(object? sender, EventArgs e) => _ = this.HandleClientDisconnectedAsync(sender);
 
     internal async Task HandleClientConnectedAsync(object? sender)
     {
@@ -623,12 +630,32 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
         try
         {
+            if (this.Notifier is { } notifier)
+            {
+                await notifier.SendPowerNotificationAsync(true, client.DeviceId).ConfigureAwait(false);
+            }
             await client.RefreshStateAsync().ConfigureAwait(false);
             await this.NotifyConnectedAsync(client).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             this._logger.LogWarning(ex, "Kodi connected handling for {DeviceId} failed.", client.DeviceId);
+        }
+    }
+
+    internal async Task HandleClientDisconnectedAsync(object? sender)
+    {
+        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this.Notifier is not { } notifier)
+        {
+            return;
+        }
+        try
+        {
+            await notifier.SendPowerNotificationAsync(false, client.DeviceId).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogWarning(ex, "Kodi disconnected handling for {DeviceId} failed.", client.DeviceId);
         }
     }
 
@@ -682,24 +709,21 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         }
     }
 
-    private void Registry_Changed(object? sender, DeviceRegistryChangedEventArgs<KodiClient> e) => _ = this.HandleRegistryChangedAsync(e);
+    private void ClientManager_ClientAdded(object? sender, DataEventArgs<KodiClient> e) => _ = this.HandleClientAddedAsync(e.Data);
 
-    internal async Task HandleRegistryChangedAsync(DeviceRegistryChangedEventArgs<KodiClient> e)
+    internal async Task HandleClientAddedAsync(KodiClient client)
     {
-        if (e.Kind is DeviceRegistryChangeKind.Removed)
+        if (!this.HasDeviceId(client.DeviceId))
         {
-            this.DetachEventHandlers(e.Client);
+            return;
         }
-        else if (e.Kind == DeviceRegistryChangeKind.Added && this.HasDeviceId(e.DeviceId))
+        try
         {
-            try
-            {
-                await this.OnClientConnectedAsync(e.Client).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                this._logger.LogWarning(ex, "Kodi connection handling for {DeviceId} failed.", e.DeviceId);
-            }
+            await this.OnClientConnectedAsync(client).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogWarning(ex, "Kodi connection handling for {DeviceId} failed.", client.DeviceId);
         }
     }
 
@@ -708,6 +732,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private void DetachEventHandlers(KodiClient client)
     {
         client.Connected -= this.Client_Connected;
+        client.Disconnected -= this.Client_Disconnected;
         client.Error -= this.Client_Error;
         client.PlayerStateChanged -= this.Client_PlayerStateChanged;
         client.VolumeChanged -= this.Client_VolumeChanged;
@@ -775,10 +800,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         foreach (string deviceId in deviceIds)
         {
             await this.OnDeviceAddedAsync(deviceId, cancellationToken).ConfigureAwait(false);
-            if (this.IsClientReady(deviceId) && this.Notifier is { } notifier)
-            {
-                await notifier.SendPowerNotificationAsync(true, deviceId, cancellationToken).ConfigureAwait(false);
-            }
         }
     }
 
@@ -794,13 +815,12 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         return client.ShowNotificationAsync("NEEO", $"Disconnected from {this._deviceName}", Images.Neeo, cancellationToken: cancellationToken);
     }
 
-    private async Task OnClientConnectedAsync(KodiClient client, CancellationToken cancellationToken = default)
+    private async Task OnClientConnectedAsync(KodiClient client)
     {
         this.AttachEventHandlers(client);
         if (KodiDeviceProviderBase.IsClientReady(client))
         {
-            await client.RefreshStateAsync(cancellationToken).ConfigureAwait(false);
-            await this.NotifyConnectedAsync(client, cancellationToken).ConfigureAwait(false);
+            await this.HandleClientConnectedAsync(client).ConfigureAwait(false);
         }
     }
 
@@ -809,7 +829,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         this.AddDeviceId(deviceId);
         if (this.GetClientOrDefault(deviceId) is { } client)
         {
-            await this.OnClientConnectedAsync(client, cancellationToken).ConfigureAwait(false);
+            await this.OnClientConnectedAsync(client).ConfigureAwait(false);
         }
     }
 
