@@ -183,7 +183,7 @@ public static class BrainMethods
         {
             throw new ArgumentException("At least one device provider type is required.", nameof(deviceProviderTypes));
         }
-        if (deviceProviderTypes.Any(type => !typeof(IDeviceProvider).IsAssignableFrom(type)))
+        if (deviceProviderTypes.Any(static type => !typeof(IDeviceProvider).IsAssignableFrom(type)))
         {
             throw new ArgumentException("All device provider types must implement IDeviceProvider.", nameof(deviceProviderTypes));
         }

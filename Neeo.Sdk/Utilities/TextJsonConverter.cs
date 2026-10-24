@@ -32,7 +32,7 @@ public sealed class TextJsonConverter<TValue> : JsonConverter<TValue>
         {
             return TextAttribute.GetEnum<TValue>(text) ?? default;
         }
-        return text.Split(',').Aggregate(default(TValue), (value, text) =>
+        return text.Split(',').Aggregate(default(TValue), static (value, text) =>
         {
             if (TextAttribute.GetEnum<TValue>(text) is not { } flag)
             {

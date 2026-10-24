@@ -164,7 +164,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         {
             return;
         }
-        ClientServer[] onlineClients = [.. clients.Where(client => client.ProtocolVersion == 1 && (client.ProtocolCapabilities & PlayerCapabilities.Playback) == PlayerCapabilities.Playback)];
+        ClientServer[] onlineClients = [.. clients.Where(static client => client.ProtocolVersion == 1 && (client.ProtocolCapabilities & PlayerCapabilities.Playback) == PlayerCapabilities.Playback)];
         ImmutableDictionary<string, PlayerData> previous = this._players.Value;
         if (previous.Count == 0 && onlineClients.Length == 0)
         {
@@ -588,7 +588,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
         UriBuilder builder = new(scheme, host, port, path);
         if (queryParameters.Length != 0)
         {
-            builder.Query = string.Join('&', queryParameters.Select(entry => $"{entry.Key}={Uri.EscapeDataString(entry.Value)}"));
+            builder.Query = string.Join('&', queryParameters.Select(static entry => $"{entry.Key}={Uri.EscapeDataString(entry.Value)}"));
         }
         return builder.Uri;
     }

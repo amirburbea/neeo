@@ -484,7 +484,7 @@ public abstract partial class PlexDeviceProviderBase(
         }
         // Notify on changes to player.
         PlexDeviceProviderBase.NotifyOnChange(
-            server.SelectedPlayerChanged.Select(data => data is { Name: { } name } ? name : string.Empty),
+            server.SelectedPlayerChanged.Select(static data => data is { Name: { } name } ? name : string.Empty),
             server.Disposed,
             (playerName, token) => notifier.SendNotificationAsync(Components.Player.SensorName, playerName, machineIdentifier, token),
             logger,
@@ -492,7 +492,7 @@ public abstract partial class PlexDeviceProviderBase(
         );
         // Notify on changes to play state.
         PlexDeviceProviderBase.NotifyOnChange(
-            server.PlayStateChanged.Select(state => state is PlayState.Playing or PlayState.Buffering),
+            server.PlayStateChanged.Select(static state => state is PlayState.Playing or PlayState.Buffering),
             server.Disposed,
             (isPlaying, token) => notifier.SendNotificationAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token),
             logger,

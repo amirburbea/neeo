@@ -54,7 +54,7 @@ public sealed class TextAttribute(string text) : Attribute
         );
 
         private static readonly Dictionary<T, string> _toText = new(
-            EnumMapping<T>._fromText.Select(pair => KeyValuePair.Create(pair.Value, pair.Key))
+            EnumMapping<T>._fromText.Select(static pair => KeyValuePair.Create(pair.Value, pair.Key))
         );
 
         public static T? GetEnum(string text) => EnumMapping<T>._fromText.TryGetValue(text, out T value) ? value : default(T?);
