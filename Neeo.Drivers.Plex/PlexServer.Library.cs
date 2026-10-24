@@ -18,7 +18,7 @@ partial class PlexServer
         public async Task<char[]> ListFirstCharactersAsync(int sectionKey, CancellationToken cancellationToken)
         {
             LibraryMediaContainer container = await server.BrowseLibraryAsync($"{sectionKey}/firstCharacter", null, cancellationToken).ConfigureAwait(false);
-            return container.Directories is { } directories ? Array.ConvertAll(directories, directory => directory.Title[0]) : [];
+            return container.Directories is { } directories ? Array.ConvertAll(directories, static directory => directory.Title[0]) : [];
         }
 
         public Task<MediaDirectory> ListMediaAsync(int sectionKey, PaginationParameters pagination, CancellationToken cancellationToken)

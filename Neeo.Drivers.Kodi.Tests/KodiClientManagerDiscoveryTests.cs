@@ -113,7 +113,7 @@ public sealed class KodiClientManagerDiscoveryTests
         await manager.DiscoverAsync(5000, static _ => false, TestContext.Current.CancellationToken);
 
         Assert.Single(manager.Clients);
-        Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("Broken"));
+        Assert.Single(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("Broken"));
     }
 
     [Fact]

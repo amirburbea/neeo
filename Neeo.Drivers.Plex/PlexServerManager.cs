@@ -58,7 +58,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         this._logger = loggerFactory.CreateLogger<PlexServerManager>();
         this._discoverySubscription = new(
             () => Observable.Interval(TimeSpan.FromMinutes(5d))
-                .Select(index => index + 1) // make interval index one-based.
+                .Select(static index => index + 1) // make interval index one-based.
                 .StartWith(0L) // start immediately with 0.
                 .Do(index =>
                 {
@@ -88,7 +88,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         List<IPlexServer> proxies;
         using (this._lock.EnterScope())
         {
-            proxies = [.. this._servers.Values.SelectMany(tuple => tuple.Proxies)];
+            proxies = [.. this._servers.Values.SelectMany(static tuple => tuple.Proxies)];
         }
         foreach (IPlexServer proxy in proxies)
         {
@@ -378,7 +378,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
                 declaredMethod.Name,
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
                 declaredMethod.ReturnType,
-                parameters.Length != 0 ? Array.ConvertAll(parameters, parameter => parameter.ParameterType) : Type.EmptyTypes
+                parameters.Length != 0 ? Array.ConvertAll(parameters, static parameter => parameter.ParameterType) : Type.EmptyTypes
             );
             ILGenerator generator = methodBuilder.GetILGenerator();
             generator.Emit(OpCodes.Ldarg_0);

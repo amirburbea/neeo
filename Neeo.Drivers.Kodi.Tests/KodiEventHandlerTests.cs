@@ -33,7 +33,7 @@ public sealed class KodiEventHandlerTests
 
         await provider.HandleClientConnectedAsync(client);
 
-        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("connected handling"));
+        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("connected handling"));
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class KodiEventHandlerTests
 
         await provider.HandlePlayerStateChangedAsync(client, KodiEventHandlerTests._playing with { PlayState = playState });
 
-        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("player state notification"));
+        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("player state notification"));
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public sealed class KodiEventHandlerTests
 
         await provider.HandleVolumeChangedAsync(client, 42);
 
-        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("volume notification"));
+        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("volume notification"));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class KodiEventHandlerTests
 
         await provider.HandleClientDisconnectedAsync(client);
 
-        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("disconnected handling"));
+        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("disconnected handling"));
     }
 
     private static IDeviceNotifier CreateFailingNotifier()

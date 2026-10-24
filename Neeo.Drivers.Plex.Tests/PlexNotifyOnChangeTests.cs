@@ -48,7 +48,7 @@ public sealed class PlexNotifyOnChangeTests
         values.OnNext(3);
 
         Assert.Equal([1, 3], sent);
-        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning);
+        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning);
 
         Task Record(int value)
         {
@@ -102,7 +102,7 @@ public sealed class PlexNotifyOnChangeTests
         values.OnNext(0);
         values.OnError(new InvalidOperationException("boom"));
 
-        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]

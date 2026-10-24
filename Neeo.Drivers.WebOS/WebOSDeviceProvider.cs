@@ -198,7 +198,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             client.GetExternalInputsAsync(cancellationToken)
         ).ConfigureAwait(false);
         (WebOSAppInfo[] apps, WebOSAppInfo[] inputs) = (results[0], results[1]);
-        List<WebOSAppInfo> allItems = [.. inputs, .. apps.Where(app => !app.Id.StartsWith("com.webos.app.hdmi", StringComparison.Ordinal))];
+        List<WebOSAppInfo> allItems = [.. inputs, .. apps.Where(static app => !app.Id.StartsWith("com.webos.app.hdmi", StringComparison.Ordinal))];
         list.AddPageEntries(allItems, static item => new(item.Title, item.Icon, ActionIdentifier: item.Id));
     }
 
