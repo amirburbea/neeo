@@ -38,7 +38,6 @@ public sealed partial class KodiClientManager(
     private readonly ConcurrentDictionary<IPAddress, Task<KodiClient?>> _connectingClients = new();
     private readonly Lock _initLock = new();
     private AuthenticationHeaderValue? _authorizationHeader = KodiClientManager.CreateAuthorizationHeader(settings);
-    private PeriodicTimer? _discoveryTimer;
     private Task? _initializationTask;
 
     public event EventHandler<DataEventArgs<KodiClient>>? ClientAdded;
@@ -329,7 +328,6 @@ public sealed partial class KodiClientManager(
 
     public void Dispose()
     {
-        Interlocked.Exchange(ref this._discoveryTimer, default)?.Dispose();
         foreach (KodiClient client in this._clients.Values)
         {
             client.Dispose();

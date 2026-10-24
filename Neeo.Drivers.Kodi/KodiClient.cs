@@ -40,8 +40,6 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     public event EventHandler<DataEventArgs<string>>? Error;
 
-    public event EventHandler<DataEventArgs<bool>>? IsMutedChanged;
-
     public event EventHandler<DataEventArgs<PlayerState>>? PlayerStateChanged;
 
     public event EventHandler<DataEventArgs<int>>? VolumeChanged;
@@ -58,11 +56,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     public bool IsDisposed { get; private set; }
 
-    public bool IsMuted
-    {
-        get;
-        private set => this.SetValue(ref field, value, this.IsMutedChanged);
-    }
+    public bool IsMuted { get; private set; }
 
     public PhysicalAddress MacAddress { get; private set; } = PhysicalAddress.None;
 

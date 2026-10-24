@@ -44,8 +44,6 @@ public sealed class WebOSClient(
 
     public event EventHandler<DataEventArgs<int>>? VolumeChanged;
 
-    public event EventHandler<DataEventArgs<bool>>? MuteChanged;
-
     public event EventHandler<DataEventArgs<string>>? ForegroundAppChanged;
 
     public event EventHandler<DataEventArgs<string>>? Registered;
@@ -423,9 +421,7 @@ public sealed class WebOSClient(
         }
         if (payload.TryGetProperty("muted", out JsonElement mutedProp))
         {
-            bool muted = mutedProp.GetBoolean();
-            this.IsMuted = muted;
-            this.MuteChanged?.Invoke(this, muted);
+            this.IsMuted = mutedProp.GetBoolean();
         }
     }
 
