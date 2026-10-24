@@ -523,8 +523,7 @@ internal sealed partial class PlexServer : IPlexServer, IDisposable
                 JsonSerializer.Deserialize<PlayerData>(playerJson, PlexJsonSerializerOptions.Default) is { MachineIdentifier.Length: > 0 } player)
             {
                 // If the player is not in the players dictionary, add it as offline.
-                ImmutableDictionary<string, PlayerData> players = this._players.Value;
-                if (!players.ContainsKey(player.MachineIdentifier))
+                if (this._players.Value is { } players && !players.ContainsKey(player.MachineIdentifier))
                 {
                     this._players.OnNext(players.Add(player.MachineIdentifier, player with { IsOnline = false }));
                 }
