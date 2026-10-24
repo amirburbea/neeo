@@ -251,6 +251,27 @@ public sealed class ReconnectLoopTests
     }
 
     [Fact]
+    public async Task Start_immediate_cuts_a_wait_short()
+    {
+        int attempts = 0;
+        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
+            TimeSpan.FromMinutes(5),
+            TimeSpan.FromMinutes(5),
+            _ => Task.FromResult(Interlocked.Increment(ref attempts) >= 1),
+            NullLogger.Instance
+        );
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        loop.Start(cancellationToken: cancellationToken);
+        await Task.Delay(50, cancellationToken);
+        Assert.Equal(0, attempts);
+        loop.Start(immediate: true, cancellationToken: cancellationToken);
+        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
+
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
     public async Task Start_immediate_makes_the_first_attempt_without_waiting()
     {
         int attempts = 0;
@@ -267,54 +288,11 @@ public sealed class ReconnectLoopTests
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
         loop.Start(immediate: true, cancellationToken: cancellationToken);
-        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
-
-        Assert.Equal(1, attempts);
-    }
-
-    [Fact]
-    public async Task TriggerNow_cuts_a_wait_short()
-    {
-        int attempts = 0;
-        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
-            TimeSpan.FromMinutes(5),
-            TimeSpan.FromMinutes(5),
-            _ => Task.FromResult(Interlocked.Increment(ref attempts) >= 1),
-            NullLogger.Instance
-        );
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-
-        loop.Start(cancellationToken: cancellationToken);
-        await Task.Delay(50, cancellationToken);
-        Assert.Equal(0, attempts);
-        loop.TriggerNow(cancellationToken);
-        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
-
-        Assert.Equal(1, attempts);
-    }
-
-    [Fact]
-    public async Task TriggerNow_starts_a_stopped_loop_immediately()
-    {
-        int attempts = 0;
-        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
-            TimeSpan.FromMinutes(5),
-            TimeSpan.FromMinutes(5),
-            _ =>
-            {
-                Interlocked.Increment(ref attempts);
-                return Task.FromResult(true);
-            },
-            NullLogger.Instance
-        );
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-
-        loop.TriggerNow(cancellationToken);
         await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
     }
 
     [Fact]
-    public async Task TriggerNow_during_an_attempt_runs_another_attempt_without_waiting_and_restarts_backoff()
+    public async Task Start_immediate_during_an_attempt_runs_another_attempt_without_waiting_and_restarts_backoff()
     {
         TaskCompletionSource firstAttemptStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource releaseFirstAttempt = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -338,8 +316,8 @@ public sealed class ReconnectLoopTests
 
         loop.Start(immediate: true, cancellationToken: cancellationToken);
         await firstAttemptStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-        loop.TriggerNow(cancellationToken);
-        loop.TriggerNow(cancellationToken); // Coalesced with the first.
+        loop.Start(immediate: true, cancellationToken: cancellationToken);
+        loop.Start(immediate: true, cancellationToken: cancellationToken); // Coalesced with the first.
         releaseFirstAttempt.TrySetResult();
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
@@ -347,34 +325,7 @@ public sealed class ReconnectLoopTests
     }
 
     [Fact]
-    public async Task Stop_cancels_the_cycle_and_the_loop_can_be_started_again()
-    {
-        int attempts = 0;
-        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
-            TimeSpan.FromMinutes(5),
-            TimeSpan.FromMinutes(5),
-            _ =>
-            {
-                Interlocked.Increment(ref attempts);
-                return Task.FromResult(true);
-            },
-            NullLogger.Instance
-        );
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-
-        loop.Start(cancellationToken: cancellationToken);
-        Assert.True(loop.IsRunning);
-        loop.Stop();
-        Assert.False(loop.IsRunning);
-        await Task.Delay(50, cancellationToken);
-        Assert.Equal(0, attempts);
-
-        loop.Start(immediate: true, cancellationToken: cancellationToken);
-        await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
-    }
-
-    [Fact]
-    public void TriggerNow_after_Dispose_is_a_no_op()
+    public void Start_immediate_after_Dispose_is_a_no_op()
     {
         int attempts = 0;
         Neeo.Sdk.Utilities.ReconnectLoop loop = new(
@@ -389,7 +340,7 @@ public sealed class ReconnectLoopTests
         );
 
         loop.Dispose();
-        loop.TriggerNow(TestContext.Current.CancellationToken);
+        loop.Start(immediate: true, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(loop.IsRunning);
         Assert.Equal(0, attempts);

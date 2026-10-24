@@ -101,8 +101,7 @@ public static class JsonWebSocket
                     break;
                 }
                 writer.Advance(result.Count);
-                FlushResult flushResult = await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-                if (flushResult.IsCompleted || flushResult.IsCanceled)
+                if (await writer.FlushAsync(cancellationToken).ConfigureAwait(false) is { IsCompleted: true } or { IsCanceled: true })
                 {
                     // The reader side is done (gracefully or otherwise) - stop producing.
                     break;

@@ -167,7 +167,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     {
         if (!this.IsDisposed)
         {
-            this.GetReconnectLoop().TriggerNow();
+            this.GetReconnectLoop().Start(immediate: true);
         }
     }
 

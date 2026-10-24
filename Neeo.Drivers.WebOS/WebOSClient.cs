@@ -88,7 +88,7 @@ public sealed class WebOSClient(
     {
         if (!this._isDisposed && this.IsPaired && !this.IsConnected)
         {
-            this.GetReconnectLoop().TriggerNow();
+            this.GetReconnectLoop().Start(immediate: true);
         }
     }
 

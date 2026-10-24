@@ -12,8 +12,9 @@ namespace Neeo.Sdk.Utilities;
 /// each driver reimplementing its own retry scheduling.
 /// <para/>
 /// A driver typically keeps one loop per connection for the connection's lifetime: <see cref="Start"/> it when a
-/// connection attempt fails or a connection drops, <see cref="TriggerNow"/> it when there is reason to believe the
-/// device is reachable again (a user action, a Wake-on-LAN packet), and <see cref="Dispose"/> it with the connection.
+/// connection attempt fails or a connection drops, <see cref="Start"/> it with <c>immediate: true</c> when there is reason
+/// to believe the device is reachable again (a user action, a Wake-on-LAN packet), and <see cref="Dispose"/> it with the
+/// connection.
 /// </summary>
 public sealed class ReconnectLoop : IDisposable
 {
@@ -47,10 +48,7 @@ public sealed class ReconnectLoop : IDisposable
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// Gets a value indicating whether the loop is currently running.
-    /// </summary>
-    public bool IsRunning
+    internal bool IsRunning
     {
         get
         {
@@ -75,40 +73,21 @@ public sealed class ReconnectLoop : IDisposable
     }
 
     /// <summary>
-    /// Starts the reconnect loop, unless it is already running or has been disposed (in which case this
-    /// is a no-op) - only one reconnect cycle can be in flight at a time. Backoff always restarts from
-    /// <see langword="initialDelay"/> for a new cycle.
+    /// Starts the reconnect loop, unless it has been disposed (in which case this is a no-op) - only one reconnect cycle can
+    /// be in flight at a time. Backoff always restarts from <see langword="initialDelay"/> for a new cycle.
+    /// <para/>
+    /// If the loop is already running, this does nothing, unless <paramref name="immediate"/> is <see langword="true"/>: then
+    /// the backoff restarts from <see langword="initialDelay"/> and an attempt is made as soon as possible. If the loop is
+    /// waiting, the wait ends now; if an attempt is in flight, another follows it without waiting (unless it succeeds).
+    /// Repeated immediate calls before the attempt starts are coalesced.
     /// </summary>
     /// <param name="immediate">
-    /// <see langword="true"/> to make the first attempt immediately rather than after <see langword="initialDelay"/>.
+    /// <see langword="true"/> to attempt a connection right away (see above) rather than after <see langword="initialDelay"/>.
     /// </param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
+    /// <param name="cancellationToken">Token to monitor for cancellation requests, used only if this starts the loop.</param>
     public void Start(bool immediate = false, CancellationToken cancellationToken = default)
     {
         CancellationTokenSource cycle;
-        using (this._lock.EnterScope())
-        {
-            if (this._isDisposed || this._cycleCancellation is not null)
-            {
-                return;
-            }
-            this._cycleCancellation = cycle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            this._isTriggered = immediate;
-        }
-        // Deliberately not passing the token to Task.Run: if it were already cancelled, RunAsync would never run, its
-        // finally block would never end the cycle, and the loop would report IsRunning forever.
-        _ = Task.Run(() => this.RunAsync(cycle, cycle.Token), CancellationToken.None);
-    }
-
-    /// <summary>
-    /// Requests a connection attempt as soon as possible, restarting the backoff from <see langword="initialDelay"/>.
-    /// If the loop is waiting, the wait ends now; if an attempt is in flight, another follows it without waiting (unless it
-    /// succeeds); if the loop is stopped, it is started with an immediate attempt. Repeated calls before the attempt
-    /// starts are coalesced. A no-op once disposed.
-    /// </summary>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests, used only if this starts the loop.</param>
-    public void TriggerNow(CancellationToken cancellationToken = default)
-    {
         using (this._lock.EnterScope())
         {
             if (this._isDisposed)
@@ -117,24 +96,19 @@ public sealed class ReconnectLoop : IDisposable
             }
             if (this._cycleCancellation is not null)
             {
-                this._isTriggered = true;
-                this._wait?.Cancel();
+                if (immediate)
+                {
+                    this._isTriggered = true;
+                    this._wait?.Cancel();
+                }
                 return;
             }
+            this._cycleCancellation = cycle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            this._isTriggered = immediate;
         }
-        this.Start(immediate: true, cancellationToken: cancellationToken);
-    }
-
-    /// <summary>
-    /// Stops the loop (if running), cancelling any connect attempt in flight. Unlike <see cref="Dispose"/>, the loop can be
-    /// started again afterward.
-    /// </summary>
-    public void Stop()
-    {
-        using (this._lock.EnterScope())
-        {
-            this.StopCycle();
-        }
+        // Deliberately not passing the token to Task.Run: if it were already cancelled, RunAsync would never run, its
+        // finally block would never end the cycle, and the loop would report IsRunning forever.
+        _ = Task.Run(() => this.RunAsync(cycle, cycle.Token), CancellationToken.None);
     }
 
     private async Task RunAsync(CancellationTokenSource cycle, CancellationToken cancellationToken)
@@ -166,7 +140,7 @@ public sealed class ReconnectLoop : IDisposable
                     }
                     catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                     {
-                        // Cut short by TriggerNow.
+                        // Cut short by an immediate Start.
                         isTriggered = true;
                     }
                     finally
