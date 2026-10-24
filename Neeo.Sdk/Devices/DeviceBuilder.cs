@@ -656,7 +656,6 @@ internal sealed partial class DeviceBuilder(
     private bool _hasInput;
     private bool _hasPlayerWidget;
     private int _roles;
-    private DeviceNotifierCallback? _notifierCallback;
     private DeviceRouteHandler? _routeHandler;
     private UriPrefixCallback? _uriPrefixCallback;
 
@@ -694,7 +693,7 @@ internal sealed partial class DeviceBuilder(
 
     public string Name { get; } = Validator.ValidateText(name);
 
-    public DeviceNotifierCallback? NotifierCallback => this._notifierCallback;
+    public DeviceNotifierCallback? NotifierCallback { get; private set; }
 
     IRegistrationFeature? IDeviceBuilder.RegistrationFeature => this.RegistrationFeature;
 
@@ -1326,11 +1325,11 @@ internal sealed partial class DeviceBuilder(
 
     private DeviceBuilder EnableNotifications(DeviceNotifierCallback callback)
     {
-        if (this._notifierCallback != null)
+        if (this.NotifierCallback != null)
         {
             throw new InvalidOperationException($"{nameof(DeviceNotifierCallback)} already defined.");
         }
-        this._notifierCallback = callback;
+        this.NotifierCallback = callback;
         return this;
     }
 
