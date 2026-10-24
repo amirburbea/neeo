@@ -475,13 +475,13 @@ public abstract partial class PlexDeviceProviderBase(
             return;
         }
         // Notify on changes to connection.
-        PlexDeviceProviderBase.NotifyOnChange(
-            server.IsConnectedChanged,
-            server.Disposed,
-            (isConnected, token) => notifier.SendPowerNotificationAsync(isConnected, machineIdentifier, token),
-            logger,
-            "Power"
-        );
+        Task SendPowerAsync(bool isConnected, CancellationToken token) => notifier.SendPowerNotificationAsync(isConnected, machineIdentifier, token);
+        PlexDeviceProviderBase.NotifyOnChange(server.IsConnectedChanged, server.Disposed, SendPowerAsync, logger, "Power");
+        if (server.IsConnected)
+        {
+            // The underlying server is shared with the other Plex provider, so it may already be connected (no change will be reported).
+            await PlexDeviceProviderBase.SendSafelyAsync(SendPowerAsync, true, logger, "Power", cancellationToken).ConfigureAwait(false);
+        }
         // Notify on changes to player.
         PlexDeviceProviderBase.NotifyOnChange(
             server.SelectedPlayerChanged.Select(data => data is { Name: { } name } ? name : string.Empty),
