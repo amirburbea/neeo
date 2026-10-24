@@ -603,7 +603,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddEntry(new("TV Shows - Recent", ThumbnailUri: images.TVShow, BrowseIdentifier: ".tvshows.recent"));
 
     private static Identifier? TryTranslate(string identifier) => KodiDeviceProviderBase.IdentifierRegex().Match(identifier) is { Success: true, Groups: { } groups }
-        ? new(groups["key"].Value, int.Parse(groups["id"].Value), groups["suffix"].Value ?? string.Empty)
+        ? new(groups["key"].Value, int.Parse(groups["id"].Value), groups["suffix"].Value)
         : null;
 
     internal void AddDeviceId(string deviceId) => this._deviceIds.TryAdd(deviceId, default);

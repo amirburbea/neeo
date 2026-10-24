@@ -36,7 +36,7 @@ public interface IDiscoveryFeature : IFeature
 
 internal sealed class DiscoveryFeature(DiscoveryProcess process, bool enableDynamicDeviceBuilder = false) : IDiscoveryFeature
 {
-    private readonly DiscoveryProcess _process = process ?? throw new ArgumentNullException(nameof(process));
+    private readonly DiscoveryProcess _process = process;
 
     public bool EnableDynamicDeviceBuilder => enableDynamicDeviceBuilder;
 

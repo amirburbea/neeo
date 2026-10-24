@@ -43,7 +43,6 @@ internal sealed class PgpEncryption : IPgpEncryption
 
     public async Task<byte[]?> DecryptAsync(string encryptedText, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(encryptedText);
         if (encryptedText.Length == 0)
         {
             return null;

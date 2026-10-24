@@ -75,7 +75,6 @@ public sealed class SettingsStoreProvider(IConfiguration configuration, ILoggerF
     /// <returns>The resolved file name.</returns>
     public static string ResolveStoreName(Type type)
     {
-        ArgumentNullException.ThrowIfNull(type);
         if (type.GetCustomAttribute<SettingsStoreAttribute>() is { Name: { Length: > 0 } customName })
         {
             return customName;
@@ -355,7 +354,6 @@ internal sealed class SettingsStore : ISettingsStore
 
     public void Update(Action<IDictionary<string, string>> action)
     {
-        ArgumentNullException.ThrowIfNull(action);
         lock (this._lock)
         {
             this._batchDepth++;

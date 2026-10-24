@@ -70,8 +70,6 @@ internal sealed class NotificationService : INotificationService, IDisposable
         ILogger<NotificationService> logger
     )
     {
-        ArgumentNullException.ThrowIfNull(httpClientFactory);
-        ArgumentNullException.ThrowIfNull(brain);
         this._httpClient = httpClientFactory.CreateClient(NotificationService.NotificationsHttpClientName);
         this._notificationBaseUri = new($"http://{brain.ServiceEndPoint}");
         (this._notificationMapping, this._logger) = (notificationMapping, logger);

@@ -391,7 +391,7 @@ public abstract partial class PlexDeviceProviderBase(
                 Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
                 string contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
                 // The response now backs the streamed result, so it is disposed with the request rather than below.
-                request.HttpContext?.Response.RegisterForDispose(response);
+                request.HttpContext.Response.RegisterForDispose(response);
                 response = null;
                 return Results.Stream(stream, contentType);
             }

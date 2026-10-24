@@ -137,7 +137,7 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
         DirectoryButtonData[] data = new DirectoryButtonData[buttons.Length];
         for (int index = 0; index < buttons.Length; index++)
         {
-            data[index] = DirectoryBuilder.ToData(buttons[index] ?? throw new ArgumentException("Button must not be null.", nameof(buttons)));
+            data[index] = DirectoryBuilder.ToData(buttons[index]);
         }
         return this.AddItem(new DirectoryButtonRow(data));
     }
@@ -146,8 +146,6 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
 
     public DirectoryBuilder AddPageEntries<T>(IReadOnlyList<T> items, Func<T, DirectoryEntry> selector)
     {
-        ArgumentNullException.ThrowIfNull(items);
-        ArgumentNullException.ThrowIfNull(selector);
         int total = items.Count;
         int offset = Math.Clamp(this.Parameters.Offset, 0, total);
         int count = Math.Clamp(total - offset, 0, Math.Max(0, this.Parameters.Limit - this.EntryCount));
@@ -181,7 +179,7 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
 
     public DirectoryBuilder AddEntry(DirectoryEntry entry)
     {
-        return this.AddItem(DirectoryBuilder.ToData(entry ?? throw new ArgumentNullException(nameof(entry))));
+        return this.AddItem(DirectoryBuilder.ToData(entry));
     }
 
     public DirectoryBuilder AddHeader(string title)
@@ -191,7 +189,7 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
 
     public DirectoryBuilder AddInfoItem(DirectoryInfoItem infoItem)
     {
-        return this.AddItem(DirectoryBuilder.ToData(infoItem ?? throw new ArgumentNullException(nameof(infoItem))));
+        return this.AddItem(DirectoryBuilder.ToData(infoItem));
     }
 
     public DirectoryBuilder AddTileRow(params DirectoryTile[] tiles)
@@ -203,7 +201,7 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
         DirectoryTileData[] data = new DirectoryTileData[tiles.Length];
         for (int index = 0; index < tiles.Length; index++)
         {
-            data[index] = DirectoryBuilder.ToData(tiles[index] ?? throw new ArgumentException("Tile must not be null.", nameof(tiles)));
+            data[index] = DirectoryBuilder.ToData(tiles[index]);
         }
         return this.AddItem(new DirectoryTileRow(data));
     }
