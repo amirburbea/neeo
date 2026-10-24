@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reactive.Subjects;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 using Neeo.Drivers.Plex;
-using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 using Xunit;
 
@@ -102,24 +99,5 @@ public sealed class PlexDeviceProviderTests : IDisposable
         PlayerData roundTripped = JsonSerializer.Deserialize<PlayerData>(json, PlexJsonSerializerOptions.Default);
 
         Assert.Equal(player, roundTripped);
-    }
-
-    [Fact]
-    public void PlexServerProxy_ImplementsIDeviceClient_AndForwardsConnectionState()
-    {
-        using BehaviorSubject<bool> isConnected = new(false);
-        Mock<IPlexServer> inner = new();
-        inner.SetupGet(server => server.DeviceId).Returns("server-abc");
-        inner.SetupGet(server => server.MachineIdentifier).Returns("server-abc");
-        inner.SetupGet(server => server.IsConnected).Returns(() => isConnected.Value);
-        inner.SetupGet(server => server.IsConnectedChanged).Returns(isConnected);
-        using IPlexServer proxy = PlexServerManager.PlexServerProxy.Create(inner.Object);
-        DeviceRegistry<IPlexServer> registry = new();
-        Assert.Equal("server-abc", ((IDeviceClient)proxy).DeviceId);
-        Assert.True(registry.TryAdd(proxy));
-        Assert.False(registry.TryGetConnected("server-abc", out _));
-        isConnected.OnNext(true);
-        Assert.True(registry.TryGetConnected("server-abc", out IPlexServer? connected));
-        Assert.Same(proxy, connected);
     }
 }

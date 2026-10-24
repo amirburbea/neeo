@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -64,7 +65,7 @@ public abstract partial class PlexDeviceProviderBase(
     public static string? ResolveImageUrl(string token) => PlexDeviceProviderBase._imageUrlTokens.Resolve(token);
 
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
-    private readonly DeviceRegistry<IPlexServer> _servers = new(logger);
+    private readonly ConcurrentDictionary<string, IPlexServer> _servers = [];
     private IDeviceNotifier? _notifier;
     private string _uriPrefix = string.Empty;
 
@@ -97,7 +98,7 @@ public abstract partial class PlexDeviceProviderBase(
     protected virtual IDeviceBuilder CreateDevice() => Device.Create(deviceName, deviceType)
         .AddAdditionalSearchTokens("PMS")
         .AddButtonHandler(this.HandleButtonAsync)
-        .AddPowerStateSensor(this._servers)
+        .AddPowerStateSensor(this.IsConnected)
         .AddTextLabel(Components.Player, "Player", (machineIdentifier) => this.GetServer(machineIdentifier)?.SelectedPlayerName ?? string.Empty)
         .EnableDeviceRoute(uriPrefix => this._uriPrefix = uriPrefix, this.HandleHttpRequestAsync)
         .EnableDiscovery("Discovering Plex Servers", "Select Plex Server", (optionalDeviceId, _) => Task.FromResult(this.GetDiscoveredServers(optionalDeviceId)))
@@ -115,7 +116,7 @@ public abstract partial class PlexDeviceProviderBase(
         media => media.Summary is { Length: > 0 } summary ? summary : media.Title
     );
 
-    protected IPlexServer? GetServer(string machineIdentifier) => this._servers.GetClient(machineIdentifier);
+    protected IPlexServer? GetServer(string machineIdentifier) => this._servers.GetValueOrDefault(machineIdentifier);
 
     protected string GetThumbnailUrl(Uri plexUri, ImageSize size = ImageSize.Large)
     {
@@ -148,6 +149,8 @@ public abstract partial class PlexDeviceProviderBase(
     {
         await serverManager.InitializeAsync().ConfigureAwait(false);
     }
+
+    private bool IsConnected(string machineIdentifier) => this.GetServer(machineIdentifier) is { IsConnected: true };
 
     protected bool IsPlaying(string machineIdentifier) => this.GetServer(machineIdentifier) is { PlayState: PlayState.Playing or PlayState.Buffering };
 
@@ -462,16 +465,23 @@ public abstract partial class PlexDeviceProviderBase(
             return;
         }
         logger.LogInformation("Plex device added: {Name} ({IPAddress})", server.Name, server.ServerData.IPAddress);
-        if (!this._servers.TryAdd(server))
+        if (!this._servers.TryAdd(machineIdentifier, server))
         {
             server.Dispose();
             return;
         }
-        // Power notifications on connection changes are sent by the registry (see AddPowerStateSensor).
         if (this._notifier is not { } notifier)
         {
             return;
         }
+        // Notify on changes to connection.
+        PlexDeviceProviderBase.NotifyOnChange(
+            server.IsConnectedChanged,
+            server.Disposed,
+            (isConnected, token) => notifier.SendPowerNotificationAsync(isConnected, machineIdentifier, token),
+            logger,
+            "Power"
+        );
         // Notify on changes to player.
         PlexDeviceProviderBase.NotifyOnChange(
             server.SelectedPlayerChanged.Select(data => data is { Name: { } name } ? name : string.Empty),

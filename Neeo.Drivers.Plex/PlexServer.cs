@@ -12,17 +12,17 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Plex;
 
-public interface IPlexServer : IDeviceClient, IDisposable
+public interface IPlexServer : IDisposable
 {
-    string IDeviceClient.DeviceId => this.MachineIdentifier;
     MediaItem? ActiveMedia { get; }
     IObservable<MediaItem?> ActiveMediaChanged { get; }
     IObservable<Unit> Disposed { get; }
+    bool IsConnected { get; }
+    IObservable<bool> IsConnectedChanged { get; }
     IMediaLibrary Library { get; }
     string MachineIdentifier { get; }
     string Name { get; }

@@ -259,7 +259,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
         public const string ResourceIdentifierPrefix = "Resource-Identifier";
     }
 
-    internal static class PlexServerProxy
+    private static class PlexServerProxy
     {
         public static Func<IPlexServer, IPlexServer> Create = PlexServerProxy.CreateProxyFactory();
 
@@ -272,8 +272,7 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             FieldBuilder subject = typeBuilder.DefineField("_disposed", typeof(Subject<Unit>), FieldAttributes.Private | FieldAttributes.InitOnly);
             FieldBuilder server = typeBuilder.DefineField("_server", typeof(IPlexServer), FieldAttributes.Private | FieldAttributes.InitOnly);
             PlexServerProxy.GenerateConstructor(typeBuilder, server: server, subject: subject);
-            Type[] interfaces = [typeof(IPlexServer), .. typeof(IPlexServer).GetInterfaces()];
-            foreach (PropertyInfo property in interfaces.SelectMany(static type => type.GetProperties(BindingFlags.Instance | BindingFlags.Public)))
+            foreach (PropertyInfo property in typeof(IPlexServer).GetProperties(BindingFlags.Instance | BindingFlags.Public))
             {
                 if (property.Name is nameof(IPlexServer.Disposed))
                 {
