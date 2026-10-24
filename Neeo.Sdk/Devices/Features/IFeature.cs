@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Features;
+namespace Neeo.Sdk.Devices.Features;
 
 /// <summary>
 /// Interface for a device feature.

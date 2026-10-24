@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Features;
+namespace Neeo.Sdk.Devices.Features;
 
 /// <summary>
 /// Container for a value in response to a call to <see cref="IValueFeature.GetValueAsync" />.

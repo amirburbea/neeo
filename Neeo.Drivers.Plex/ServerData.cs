@@ -1,4 +1,4 @@
-﻿namespace Neeo.Drivers.Plex;
+namespace Neeo.Drivers.Plex;
 
 public readonly record struct ServerData(
     string Name,

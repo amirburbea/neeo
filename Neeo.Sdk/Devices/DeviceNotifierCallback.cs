@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices;
 
 /// <summary>
 /// Callback invoked when the server is started, providing an object that can be used to

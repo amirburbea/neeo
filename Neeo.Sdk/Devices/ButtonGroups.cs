@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices;
 
 using System;
 using static Buttons;

@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using Neeo.Sdk.Devices.Setup;
 using Neeo.Sdk.Utilities;
 

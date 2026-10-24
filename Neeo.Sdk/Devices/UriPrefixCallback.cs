@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices;
 
 /// <summary>
 /// When device routes are enabled (via a call to <see cref="IDeviceBuilder.EnableDeviceRoute"/>),

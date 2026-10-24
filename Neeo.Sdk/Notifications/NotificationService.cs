@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -56,12 +54,14 @@ internal sealed class NotificationService : INotificationService, IDisposable
 
     private readonly ConcurrentLru<string, object> _cache = new(Constants.MaxCachedEntries);
     private readonly CancellationTokenSource _cancellationSource = new();
-    private readonly Channel<Message>[] _channels;
+    private readonly Channel<Message> _channel = Channel.CreateBounded<Message>(
+        options: new(Constants.MaxQueuedNotifications) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true }
+    );
     private readonly HttpClient _httpClient;
     private readonly ILogger<NotificationService> _logger;
     private readonly Uri _notificationBaseUri;
     private readonly INotificationMapping _notificationMapping;
-    private readonly Task[] _processingTasks;
+    private readonly Task _processingTask;
 
     public NotificationService(
         IHttpClientFactory httpClientFactory,
@@ -73,26 +73,13 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._httpClient = httpClientFactory.CreateClient(NotificationService.NotificationsHttpClientName);
         this._notificationBaseUri = new($"http://{brain.ServiceEndPoint}");
         (this._notificationMapping, this._logger) = (notificationMapping, logger);
-        // Each shard gets its own channel/worker, and a notification key is always routed to the same
-        // shard (see GetChannel), so updates to the same key are always delivered in submission order -
-        // only unrelated keys are ever processed concurrently.
-        int workers = Math.Clamp(Environment.ProcessorCount, 2, 8);
-        int perChannelCapacity = Math.Max(Constants.MaxQueuedNotifications / workers, 16);
-        this._channels = new Channel<Message>[workers];
-        this._processingTasks = new Task[workers];
-        for (int i = 0; i < workers; i++)
-        {
-            Channel<Message> channel = this._channels[i] = Channel.CreateBounded<Message>(
-                options: new(perChannelCapacity) { FullMode = BoundedChannelFullMode.Wait }
-            );
-            this._processingTasks[i] = Task.Run(() => ProcessMessagesAsync(channel), this._cancellationSource.Token);
-        }
+        this._processingTask = Task.Run(ProcessMessagesAsync, this._cancellationSource.Token);
 
-        async Task ProcessMessagesAsync(Channel<Message> channel)
+        async Task ProcessMessagesAsync()
         {
             try
             {
-                await foreach (Message message in channel.Reader.ReadAllAsync(this._cancellationSource.Token).ConfigureAwait(false))
+                await foreach (Message message in this._channel.Reader.ReadAllAsync(this._cancellationSource.Token).ConfigureAwait(false))
                 {
                     await this.SendAsync(message).ConfigureAwait(false);
                 }
@@ -106,20 +93,16 @@ internal sealed class NotificationService : INotificationService, IDisposable
 
     public void Dispose()
     {
-        Array.ForEach(this._channels, static channel => channel.Writer.Complete());
+        this._channel.Writer.Complete();
         this._cancellationSource.Cancel();
         try
         {
-            if (!Task.WaitAll(this._processingTasks, TimeSpan.FromSeconds(5)))
+            if (!this._processingTask.Wait(TimeSpan.FromSeconds(5)))
             {
-                this._logger.LogWarning("Notification workers did not shut down within {TimeoutSeconds}s.", 5);
+                this._logger.LogWarning("Notification worker did not shut down within {TimeoutSeconds}s.", 5);
             }
         }
         catch (AggregateException ex) when (ex.InnerExceptions.All(static e => e is OperationCanceledException))
-        {
-            return;
-        }
-        catch (OperationCanceledException)
         {
             return;
         }
@@ -180,37 +163,14 @@ internal sealed class NotificationService : INotificationService, IDisposable
         string[] keys = await this._notificationMapping
             .GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken)
             .ConfigureAwait(false);
-        switch (keys)
+        foreach (string key in keys)
         {
-            case []:
-                return;
-            case [string key]:
-                if (!this.ShouldSuppressAsDuplicate(key, value))
-                {
-                    await this.GetChannel(key).Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).ConfigureAwait(false);
-                }
-                return;
-        }
-        List<Task> writeTasks = new(keys.Length);
-        for (int i = 0; i < keys.Length; i++)
-        {
-            string key = keys[i];
             if (!this.ShouldSuppressAsDuplicate(key, value))
             {
-                writeTasks.Add(this.GetChannel(key).Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).AsTask());
+                await this._channel.Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).ConfigureAwait(false);
             }
         }
-        if (writeTasks.Count > 0)
-        {
-            await Task.WhenAll(CollectionsMarshal.AsSpan(writeTasks)).ConfigureAwait(false);
-        }
     }
-
-    /// <summary>
-    /// Routes a notification key to a stable channel/worker for the lifetime of the process, so that
-    /// successive updates to the same key are always processed - and delivered to the Brain - in order.
-    /// </summary>
-    private Channel<Message> GetChannel(string key) => this._channels[(uint)key.GetHashCode() % (uint)this._channels.Length];
 
     private async Task SendAsync(Message message)
     {

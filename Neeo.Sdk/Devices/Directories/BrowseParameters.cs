@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Directories;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Parameters for a directory browse operation.

@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices;
 
 /// <summary>
 /// Describes a class responsible for providing an <see cref="IDeviceBuilder"/> for use in the REST server.

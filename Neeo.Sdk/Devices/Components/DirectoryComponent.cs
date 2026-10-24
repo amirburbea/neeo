@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Components;
+namespace Neeo.Sdk.Devices.Components;
 
 /// <summary>
 /// Describes a directory component.

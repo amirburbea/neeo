@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Directories;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Parameters describing an entry - a file or directory - to add to a directory.

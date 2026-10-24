@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk;
+namespace Neeo.Sdk;
 
 /// <summary>
 /// A structure indicating success - used as a standard return type for NEEO Brain APIs.

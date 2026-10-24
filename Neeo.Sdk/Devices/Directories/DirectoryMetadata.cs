@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Directories;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Metadata relating to the current state of a directory.
