@@ -1,4 +1,10 @@
-﻿[*.cs]
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+
+[*.cs]
 
 # CA1873: Avoid potentially expensive logging
 dotnet_diagnostic.CA1873.severity = none
