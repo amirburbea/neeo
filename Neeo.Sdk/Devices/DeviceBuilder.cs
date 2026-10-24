@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
@@ -1044,7 +1044,6 @@ internal sealed partial class DeviceBuilder(
     private DeviceBuilder AddPowerStateSensor<TClient>(IDeviceRegistry<TClient> registry, AsyncDeviceValueGetter<bool>? getter)
         where TClient : class, IDeviceClient
     {
-        ArgumentNullException.ThrowIfNull(registry);
         this.AddPowerStateSensor(getter ?? new((deviceId, cancellationToken) => Task.FromResult(registry.TryGetConnected(deviceId, out _))));
         this._registryNotifierCallbacks += notifier => registry.Changed += (_, e) => DeviceBuilder.SendPowerNotification(notifier, e.DeviceId, e.IsConnected);
         return this;

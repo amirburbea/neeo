@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reactive;
 using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
@@ -136,6 +138,28 @@ public interface IDeviceRegistry<TClient>
     /// <param name="deviceId">The identifier of the device.</param>
     /// <returns><see langword="true"/> if a client was removed; otherwise <see langword="false"/>.</returns>
     bool Remove(string deviceId);
+
+    /// <summary>
+    /// Invokes <paramref name="attach"/> once for each currently registered client and each client subsequently added,
+    /// and disposes the returned subscription when that client is removed from the registry or when the returned
+    /// <see cref="IDisposable"/> is disposed. <paramref name="attach"/> and subscription disposal always run outside the
+    /// registry's lock; because <paramref name="attach"/> runs on the serialized <see cref="Changed"/> dispatch path for
+    /// newly added clients, it should be non-blocking.
+    /// </summary>
+    /// <param name="attach">Attaches to a registered client and returns a subscription to dispose when the client is removed.</param>
+    /// <returns>A subscription that detaches from all clients and stops observing the registry when disposed.</returns>
+    IDisposable Attach(Func<TClient, IDisposable> attach);
+
+    /// <summary>
+    /// Subscribes to <paramref name="selector"/> for each currently registered client and each client subsequently added,
+    /// unsubscribing when that client is removed from the registry, and emits each <c>(Client, Value)</c> pair (serialized
+    /// across clients). If a client's stream replays its current value upon subscription (such as a <c>BehaviorSubject</c>),
+    /// that replay is emitted when the client is attached unless filtered within <paramref name="selector"/>.
+    /// </summary>
+    /// <typeparam name="TValue">The type of value emitted by the per-client observable.</typeparam>
+    /// <param name="selector">Selects the observable stream to observe for a registered client.</param>
+    /// <returns>An observable sequence of <c>(Client, Value)</c> pairs across all registered clients.</returns>
+    IObservable<(TClient Client, TValue Value)> Observe<TValue>(Func<TClient, IObservable<TValue>> selector);
 }
 
 /// <summary>
@@ -169,7 +193,6 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
     /// <inheritdoc/>
     public TClient? GetClient(string deviceId)
     {
-        ArgumentNullException.ThrowIfNull(deviceId);
         using (this._lock.EnterScope())
         {
             return this._entries.GetValueOrDefault(deviceId)?.Client;
@@ -193,7 +216,6 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
     public TClient GetOrAdd(string deviceId, Func<string, TClient> factory, out bool added)
     {
         ArgumentException.ThrowIfNullOrEmpty(deviceId);
-        ArgumentNullException.ThrowIfNull(factory);
         Entry entry;
         using (this._lock.EnterScope())
         {
@@ -202,7 +224,7 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
                 added = false;
                 return existing.Client;
             }
-            TClient client = factory(deviceId) ?? throw new InvalidOperationException("The factory returned null.");
+            TClient client = factory(deviceId);
             if (!string.Equals(client.DeviceId, deviceId, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException($"The factory created a client for device '{client.DeviceId}' instead of '{deviceId}'.");
@@ -221,7 +243,6 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
     /// <inheritdoc/>
     public bool TryAdd(TClient client)
     {
-        ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrEmpty(client.DeviceId, nameof(client));
         Entry entry = new(client);
         // Subscribe before publishing the entry (and outside the lock, so the registry's lock is never held while
@@ -252,7 +273,6 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
     /// <inheritdoc/>
     public bool TryRemove(string deviceId, [NotNullWhen(true)] out TClient? client)
     {
-        ArgumentNullException.ThrowIfNull(deviceId);
         Entry? entry;
         using (this._lock.EnterScope())
         {
@@ -268,6 +288,117 @@ public sealed class DeviceRegistry<TClient>(ILogger? logger = null) : IDeviceReg
         this.DispatchPending();
         client = entry.Client;
         return true;
+    }
+
+    /// <inheritdoc/>
+    public IDisposable Attach(Func<TClient, IDisposable> attach)
+    {
+        Lock subscriptionLock = new();
+        Dictionary<TClient, IDisposable> subscriptions = new(ReferenceEqualityComparer.Instance);
+        bool isDisposed = false;
+        this.Changed += OnRegistryChanged;
+        foreach (TClient client in this.Clients)
+        {
+            AttachClient(client);
+        }
+        return Disposable.Create(() =>
+        {
+            this.Changed -= OnRegistryChanged;
+            IDisposable[] toDispose;
+            using (subscriptionLock.EnterScope())
+            {
+                if (isDisposed)
+                {
+                    return;
+                }
+                isDisposed = true;
+                toDispose = [.. subscriptions.Values];
+                subscriptions.Clear();
+            }
+            Array.ForEach(toDispose, static subscription => subscription.Dispose());
+        });
+
+        void OnRegistryChanged(object? sender, DeviceRegistryChangedEventArgs<TClient> e)
+        {
+            switch (e.Kind)
+            {
+                case DeviceRegistryChangeKind.Added:
+                    AttachClient(e.Client);
+                    break;
+                case DeviceRegistryChangeKind.Removed:
+                    DetachClient(e.Client);
+                    break;
+            }
+        }
+
+        void AttachClient(TClient client)
+        {
+            using (subscriptionLock.EnterScope())
+            {
+                if (isDisposed || subscriptions.ContainsKey(client) || !object.ReferenceEquals(this.GetClient(client.DeviceId), client))
+                {
+                    return;
+                }
+                subscriptions.Add(client, Disposable.Empty);
+            }
+            IDisposable subscription;
+            try
+            {
+                subscription = attach(client);
+            }
+            catch (Exception e)
+            {
+                using (subscriptionLock.EnterScope())
+                {
+                    subscriptions.Remove(client);
+                }
+                logger?.LogError(e, "Failed to attach to device {deviceId}.", client.DeviceId);
+                return;
+            }
+            bool keep;
+            using (subscriptionLock.EnterScope())
+            {
+                keep = !isDisposed && subscriptions.ContainsKey(client) && object.ReferenceEquals(this.GetClient(client.DeviceId), client);
+                if (keep)
+                {
+                    subscriptions[client] = subscription;
+                }
+                else
+                {
+                    subscriptions.Remove(client);
+                }
+            }
+            if (!keep)
+            {
+                subscription.Dispose();
+            }
+        }
+
+        void DetachClient(TClient client)
+        {
+            IDisposable? subscription;
+            using (subscriptionLock.EnterScope())
+            {
+                if (!subscriptions.Remove(client, out subscription))
+                {
+                    return;
+                }
+            }
+            subscription.Dispose();
+        }
+    }
+
+    /// <inheritdoc/>
+    public IObservable<(TClient Client, TValue Value)> Observe<TValue>(Func<TClient, IObservable<TValue>> selector)
+    {
+        return Observable.Create<(TClient Client, TValue Value)>(observer =>
+        {
+            IObserver<(TClient Client, TValue Value)> synchronized = Observer.Synchronize(observer);
+            return this.Attach(client => selector(client).Subscribe(
+                value => synchronized.OnNext((client, value)),
+                e => logger?.LogError(e, "An observed stream faulted for {deviceId}.", client.DeviceId)
+            ));
+        });
     }
 
     // Must be called under the lock, with no entry registered for deviceId.

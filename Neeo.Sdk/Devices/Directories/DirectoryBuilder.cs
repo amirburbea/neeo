@@ -146,8 +146,6 @@ internal sealed class DirectoryBuilder(BrowseParameters parameters) : IDirectory
 
     public DirectoryBuilder AddPageEntries<T>(IReadOnlyList<T> items, Func<T, DirectoryEntry> selector)
     {
-        ArgumentNullException.ThrowIfNull(items);
-        ArgumentNullException.ThrowIfNull(selector);
         int total = items.Count;
         int offset = Math.Clamp(this.Parameters.Offset, 0, total);
         int count = Math.Clamp(total - offset, 0, Math.Max(0, this.Parameters.Limit - this.EntryCount));
