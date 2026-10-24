@@ -23,7 +23,7 @@ public interface IFavoritesFeature : IFeature
 
 internal sealed class FavoritesFeature(FavoriteHandler handler) : IFavoritesFeature
 {
-    private readonly FavoriteHandler _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+    private readonly FavoriteHandler _handler = handler;
 
     public async Task<SuccessResponse> ExecuteAsync(string deviceId, string favorite, CancellationToken cancellationToken)
     {

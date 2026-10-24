@@ -47,5 +47,5 @@ public readonly struct RegistrationResult(string? error = default)
     /// <param name="error">A message describing the error encountered in registration.</param>
     /// <returns></returns>
     /// <exception cref="ArgumentNullException">Thrown if the value of <paramref name="error"/> is <see langword="null"/>.</exception>
-    public static RegistrationResult Failed(string error) => new(error ?? throw new ArgumentNullException(error));
+    public static RegistrationResult Failed(string error) => new(error);
 }

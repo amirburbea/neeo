@@ -64,14 +64,10 @@ internal sealed class ValueFeature(
     }
 
     private static Func<string, CancellationToken, Task<object>> WrapGetter<TValue>(AsyncDeviceValueGetter<TValue> getter, Converter<TValue, object> converter)
-        where TValue : notnull => getter == null
-        ? throw new ArgumentNullException(nameof(getter))
-        : async (deviceId, cancellationToken) => converter(await getter(deviceId, cancellationToken).ConfigureAwait(false));
+        where TValue : notnull => async (deviceId, cancellationToken) => converter(await getter(deviceId, cancellationToken).ConfigureAwait(false));
 
     private static Func<string, string, CancellationToken, Task> WrapSetter<TValue>(AsyncDeviceValueSetter<TValue> setter, Converter<string, TValue> converter)
-        where TValue : notnull => setter == null
-        ? throw new ArgumentNullException(nameof(setter))
-        : async (deviceId, value, cancellationToken) => await setter(deviceId, converter(value), cancellationToken).ConfigureAwait(false);
+        where TValue : notnull => async (deviceId, value, cancellationToken) => await setter(deviceId, converter(value), cancellationToken).ConfigureAwait(false);
 
     private static class ObjectConverter<T>
         where T : notnull

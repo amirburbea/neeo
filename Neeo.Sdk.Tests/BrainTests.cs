@@ -49,37 +49,11 @@ public sealed class BrainTests
     }
 
     [Fact]
-    public async Task StartServerAsync_device_builders_should_throw_on_null_brain()
-    {
-        Brain brain = null!;
-        IDeviceBuilder[] builders = [Mock.Of<IDeviceBuilder>()];
-
-        await Assert.ThrowsAsync<ArgumentNullException>(() => brain.StartServerAsync(builders, cancellationToken: TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
     public async Task StartServerAsync_device_builders_should_throw_on_empty_devices()
     {
         Brain brain = new(IPAddress.Loopback);
 
         await Assert.ThrowsAsync<ArgumentException>(() => brain.StartServerAsync(Array.Empty<IDeviceBuilder>(), cancellationToken: TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task StartServerAsync_provider_types_should_throw_on_null_brain()
-    {
-        Brain brain = null!;
-        Type[] providerTypes = [typeof(ValidDeviceProvider)];
-
-        await Assert.ThrowsAsync<ArgumentNullException>(() => brain.StartServerAsync(providerTypes, cancellationToken: TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task StartServerAsync_provider_types_should_throw_on_null_types()
-    {
-        Brain brain = new(IPAddress.Loopback);
-
-        await Assert.ThrowsAsync<ArgumentNullException>(() => brain.StartServerAsync((Type[])null!, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]

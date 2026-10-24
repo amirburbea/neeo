@@ -37,9 +37,6 @@ internal sealed class RegistrationFeature(QueryIsRegistered queryIsRegistered, F
     public static RegistrationFeature Create<TPayload>(QueryIsRegistered queryIsRegistered, JsonTypeInfo<TPayload> typeInfo, Func<TPayload, CancellationToken, Task<RegistrationResult>> register)
         where TPayload : struct
     {
-        ArgumentNullException.ThrowIfNull(queryIsRegistered, nameof(queryIsRegistered));
-        ArgumentNullException.ThrowIfNull(typeInfo, nameof(typeInfo));
-        ArgumentNullException.ThrowIfNull(register, nameof(register));
         return new(
             queryIsRegistered,
             (utf8Bytes, cancellationToken) => register(

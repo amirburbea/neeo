@@ -92,7 +92,7 @@ public static class BrainMethods
     /// </summary>
     /// <param name="brain">The NEEO Brain.</param>
     public static void OpenWebUI(this Brain brain) => Process.Start(
-        startInfo: new($"http://{(brain ?? throw new ArgumentNullException(nameof(brain))).IPAddress}:3200/eui") { UseShellExecute = true }
+        startInfo: new($"http://{brain.IPAddress}:3200/eui") { UseShellExecute = true }
     )?.Dispose();
 
     /// <summary>
@@ -127,7 +127,6 @@ public static class BrainMethods
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(brain);
         if (devices is not { Length: > 0 })
         {
             throw new ArgumentException("At least one device is required.", nameof(devices));
@@ -177,8 +176,6 @@ public static class BrainMethods
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(brain);
-        ArgumentNullException.ThrowIfNull(deviceProviderTypes);
         if (deviceProviderTypes is not { Length: > 0 })
         {
             throw new ArgumentException("At least one device provider type is required.", nameof(deviceProviderTypes));
@@ -226,7 +223,7 @@ public static class BrainMethods
     )
     {
         IHost host = await Server.StartSdkAsync(
-            brain ?? throw new ArgumentNullException(nameof(brain)),
+            brain,
             devices,
             name ?? brain.HostName,
             hostIPAddress ?? await brain.GetFallbackHostIPAddressAsync(cancellationToken).ConfigureAwait(false),

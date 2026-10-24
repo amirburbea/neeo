@@ -829,7 +829,7 @@ internal sealed partial class DeviceBuilder(
         string description,
         QueryIsRegistered queryIsRegistered,
         CredentialsRegistrationProcessor processor
-    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
+    ) => this.EnableRegistration(
         headerText,
         description,
         RegistrationType.Credentials,
@@ -843,7 +843,7 @@ internal sealed partial class DeviceBuilder(
         string description,
         QueryIsRegistered queryIsRegistered,
         SecurityCodeRegistrationProcessor processor
-    ) => processor == null ? throw new ArgumentNullException(nameof(processor)) : this.EnableRegistration(
+    ) => this.EnableRegistration(
         headerText,
         description,
         RegistrationType.SecurityCode,
@@ -873,7 +873,7 @@ internal sealed partial class DeviceBuilder(
 
     private DeviceBuilder AddAdditionalSearchTokens(IEnumerable<string> tokens)
     {
-        this._additionalSearchTokens.AddRange(tokens ?? throw new ArgumentNullException(nameof(tokens)));
+        this._additionalSearchTokens.AddRange(tokens);
         return this;
     }
 
@@ -905,7 +905,7 @@ internal sealed partial class DeviceBuilder(
         {
             throw new InvalidOperationException("ButtonHandler already defined.");
         }
-        this.ButtonHandler = handler ?? throw new ArgumentNullException(nameof(handler));
+        this.ButtonHandler = handler;
         return this;
     }
 
@@ -1362,9 +1362,9 @@ internal sealed partial class DeviceBuilder(
             throw new InvalidOperationException($"{nameof(this.RegisterDeviceSubscriptionCallbacks)} was already called.");
         }
         this.SubscriptionFeature = new(
-            notifyDeviceAdded ?? throw new ArgumentNullException(nameof(notifyDeviceAdded)),
-            notifyDeviceRemoved ?? throw new ArgumentNullException(nameof(notifyDeviceRemoved)),
-            notifyDeviceList ?? throw new ArgumentNullException(nameof(notifyDeviceList))
+            notifyDeviceAdded,
+            notifyDeviceRemoved,
+            notifyDeviceList
         );
         return this;
     }
@@ -1375,7 +1375,7 @@ internal sealed partial class DeviceBuilder(
         {
             throw new InvalidOperationException($"{nameof(DeviceInitializer)} already defined.");
         }
-        this.Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
+        this.Initializer = initializer;
         return this;
     }
 

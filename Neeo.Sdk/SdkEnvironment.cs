@@ -46,7 +46,7 @@ internal sealed class SdkEnvironment(
 {
     public IBrain Brain => brain;
 
-    public string HostAddress => server.Features.Get<IServerAddressesFeature>()?.Addresses?.FirstOrDefault() ?? string.Empty;
+    public string HostAddress => server.Features.Get<IServerAddressesFeature>()?.Addresses.FirstOrDefault() ?? string.Empty;
 
     public string SdkAdapterName { get; } = (string)sdkAdapterName;
 

@@ -84,7 +84,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
 
     public async ValueTask<IDeviceAdapter?> GetAdapterAsync(string adapterName, CancellationToken cancellationToken = default)
     {
-        if (this._containers.GetValueOrDefault(adapterName ?? throw new ArgumentNullException(nameof(adapterName))) is not { } container)
+        if (this._containers.GetValueOrDefault(adapterName) is not { } container)
         {
             return null;
         }
@@ -114,7 +114,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
         public IEnumerable<DeviceSearchResult> Search(string query)
         {
             string[] searchTokens = [..
-                (query ?? throw new ArgumentNullException(nameof(query)))
+                query
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Take(5)
