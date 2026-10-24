@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Directories;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Parameters describing a (clickable) image tile to add to a directory.

@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices.Directories;
+namespace Neeo.Sdk.Devices.Directories;
 
 /// <summary>
 /// Represents a directory header row.

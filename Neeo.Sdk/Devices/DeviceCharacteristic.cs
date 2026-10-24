@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices;
 
 /// <summary>
 /// Specifies special/unique characteristics supported by the device.

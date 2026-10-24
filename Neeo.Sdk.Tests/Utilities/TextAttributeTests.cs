@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using Neeo.Sdk.Utilities;
 using Xunit;

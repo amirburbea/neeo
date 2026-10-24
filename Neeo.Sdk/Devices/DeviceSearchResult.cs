@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk.Devices;
+namespace Neeo.Sdk.Devices;
 
 /// <summary>
 /// Represents the result of a device search operation, including the matched device and its relevance scores.

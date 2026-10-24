@@ -1,4 +1,4 @@
-﻿namespace Neeo.Drivers.Kodi;
+namespace Neeo.Drivers.Kodi;
 
 internal static class Images
 {

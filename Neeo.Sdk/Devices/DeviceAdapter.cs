@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Neeo.Sdk.Devices.Components;
 using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Utilities;

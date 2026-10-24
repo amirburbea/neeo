@@ -1,4 +1,4 @@
-﻿namespace Neeo.Drivers.Kodi.Models;
+namespace Neeo.Drivers.Kodi.Models;
 
 public readonly record struct PlayerState(
     PlayState PlayState,

@@ -1,4 +1,4 @@
-﻿using Neeo.Sdk.Utilities;
+using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Plex;
 

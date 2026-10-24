@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Net.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

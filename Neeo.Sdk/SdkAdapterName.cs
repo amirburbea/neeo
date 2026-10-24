@@ -1,4 +1,4 @@
-﻿namespace Neeo.Sdk;
+namespace Neeo.Sdk;
 
 /// <summary>
 /// Wrapper for the sdk adapter name for use in dependency injection.
