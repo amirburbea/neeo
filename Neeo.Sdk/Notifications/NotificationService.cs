@@ -55,7 +55,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
     private readonly ConcurrentLru<string, object> _cache = new(Constants.MaxCachedEntries);
     private readonly CancellationTokenSource _cancellationSource = new();
     private readonly Channel<Message> _channel = Channel.CreateBounded<Message>(
-        options: new(Constants.MaxQueuedNotifications) { FullMode = BoundedChannelFullMode.Wait }
+        options: new(Constants.MaxQueuedNotifications) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true }
     );
     private readonly HttpClient _httpClient;
     private readonly ILogger<NotificationService> _logger;
