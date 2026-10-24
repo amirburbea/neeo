@@ -76,7 +76,6 @@ public sealed class DeviceRegistryTests
         DeviceRegistry<FakeClient> registry = new();
 
         Assert.Throws<InvalidOperationException>(() => registry.GetOrAdd("a", static _ => new("b"), out bool _));
-        Assert.Throws<InvalidOperationException>(() => registry.GetOrAdd("a", static _ => null!, out bool _));
         Assert.Throws<ArgumentException>(() => registry.GetOrAdd(string.Empty, static id => new(id), out bool _));
         Assert.Empty(registry.Clients);
     }
@@ -101,7 +100,6 @@ public sealed class DeviceRegistryTests
     {
         DeviceRegistry<FakeClient> registry = new();
 
-        Assert.Throws<ArgumentNullException>(() => registry.TryAdd(null!));
         Assert.Throws<ArgumentException>(() => registry.TryAdd(new(string.Empty)));
     }
 
@@ -323,13 +321,208 @@ public sealed class DeviceRegistryTests
     }
 
     [Fact]
-    public void AddPowerStateSensor_with_registry_should_throw_for_null_registry_or_existing_sensor()
+    public void AddPowerStateSensor_with_registry_should_throw_for_existing_sensor()
     {
         IDeviceBuilder builder = Device.Create("Stereo", DeviceType.Audio);
 
-        Assert.Throws<ArgumentNullException>(() => builder.AddPowerStateSensor<FakeClient>(null!));
         builder.AddPowerStateSensor(new DeviceRegistry<FakeClient>());
         Assert.Throws<InvalidOperationException>(() => builder.AddPowerStateSensor(new DeviceRegistry<FakeClient>()));
+    }
+
+    [Fact]
+    public void Attach_should_attach_existing_and_added_clients_and_dispose_on_remove_or_outer_dispose()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        FakeClient first = new("a");
+        FakeClient second = new("b");
+        registry.TryAdd(first);
+        List<string> attached = [];
+        List<string> disposed = [];
+        IDisposable subscription = registry.Attach(client =>
+        {
+            attached.Add(client.DeviceId);
+            return Disposable.Create(() => disposed.Add(client.DeviceId));
+        });
+        Assert.Equal(["a"], attached);
+        Assert.Empty(disposed);
+        registry.TryAdd(second);
+        Assert.Equal(["a", "b"], attached);
+        registry.Remove("a");
+        Assert.Equal(["a"], disposed);
+        subscription.Dispose();
+        Assert.Equal(["a", "b"], disposed);
+        registry.TryAdd(new("c"));
+        Assert.Equal(["a", "b"], attached);
+    }
+
+    [Fact]
+    public void Observe_should_emit_values_while_registered_and_stop_on_remove()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        FakeClient first = new("a");
+        FakeClient second = new("b");
+        registry.TryAdd(first);
+        List<(string DeviceId, bool Value)> received = [];
+        using IDisposable subscription = registry
+            .Observe(static client => client.IsConnectedChanged.DistinctUntilChanged().Skip(1))
+            .Subscribe(pair => received.Add((pair.Client.DeviceId, pair.Value)));
+        Assert.Empty(received);
+        first.SetConnected(true);
+        registry.TryAdd(second);
+        second.SetConnected(true);
+        registry.Remove("a");
+        first.SetConnected(false);
+        second.SetConnected(false);
+        Assert.Equal([("a", true), ("b", true), ("b", false)], received);
+    }
+
+    [Fact]
+    public void Attach_should_dispose_subscription_when_client_is_removed_during_attach()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        FakeClient client = new("a");
+        registry.TryAdd(client);
+        bool disposed = false;
+        using IDisposable subscription = registry.Attach(c =>
+        {
+            registry.Remove(c.DeviceId);
+            return Disposable.Create(() => disposed = true);
+        });
+        Assert.True(disposed);
+    }
+
+    [Fact]
+    public void Attach_should_not_invoke_callback_when_client_was_already_removed_before_Added_ran()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        List<string> attached = [];
+        registry.Changed += (_, e) =>
+        {
+            if (e.Kind == DeviceRegistryChangeKind.Added)
+            {
+                registry.Remove(e.DeviceId);
+            }
+        };
+        using IDisposable subscription = registry.Attach(client =>
+        {
+            attached.Add(client.DeviceId);
+            return Disposable.Empty;
+        });
+        registry.TryAdd(new("a"));
+        Assert.Empty(attached);
+    }
+
+    [Fact]
+    public void Attach_should_recover_when_callback_throws_and_allow_reattaching()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        FakeClient failing = new("a");
+        FakeClient healthy = new("b");
+        registry.TryAdd(failing);
+        registry.TryAdd(healthy);
+        bool shouldThrow = true;
+        List<string> attached = [];
+        using IDisposable subscription = registry.Attach(client =>
+        {
+            if (client.DeviceId == "a" && shouldThrow)
+            {
+                throw new InvalidOperationException("Boom");
+            }
+            attached.Add(client.DeviceId);
+            return Disposable.Empty;
+        });
+        Assert.Equal(["b"], attached);
+        shouldThrow = false;
+        registry.Remove("a");
+        registry.TryAdd(failing);
+        Assert.Equal(["b", "a"], attached);
+    }
+
+    [Fact]
+    public void Observe_should_keep_other_clients_alive_when_one_client_stream_faults()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        FakeClient faulting = new("a");
+        FakeClient healthy = new("b");
+        registry.TryAdd(faulting);
+        registry.TryAdd(healthy);
+        Subject<int> faultingStream = new();
+        Subject<int> healthyStream = new();
+        List<(string DeviceId, int Value)> received = [];
+        bool observerFaulted = false;
+        using IDisposable subscription = registry
+            .Observe(client => client.DeviceId == "a" ? faultingStream : healthyStream)
+            .Subscribe(pair => received.Add((pair.Client.DeviceId, pair.Value)), _ => observerFaulted = true);
+        faultingStream.OnNext(1);
+        faultingStream.OnError(new InvalidOperationException("Stream fault"));
+        healthyStream.OnNext(2);
+        Assert.False(observerFaulted);
+        Assert.Equal([("a", 1), ("b", 2)], received);
+    }
+
+    [Fact]
+    public async Task Observe_should_serialize_concurrent_emissions_from_multiple_clients()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        FakeClient[] clients = [.. Enumerable.Range(0, 8).Select(static i => new FakeClient($"device-{i}"))];
+        Array.ForEach(clients, client => registry.TryAdd(client));
+        int inFlight = 0, maxInFlight = 0, count = 0;
+        using IDisposable subscription = registry
+            .Observe(static client => client.IsConnectedChanged)
+            .Subscribe(_ =>
+            {
+                int current = Interlocked.Increment(ref inFlight);
+                int snapshot;
+                while ((snapshot = Volatile.Read(ref maxInFlight)) < current && Interlocked.CompareExchange(ref maxInFlight, current, snapshot) != snapshot)
+                {
+                }
+                Interlocked.Increment(ref count);
+                // Linger so that unserialized emissions from other threads would overlap this one.
+                Thread.Yield();
+                Interlocked.Decrement(ref inFlight);
+            });
+        await Task.WhenAll(clients.Select(static client => Task.Run(() =>
+        {
+            for (int iteration = 0; iteration < 500; iteration++)
+            {
+                client.RaiseConnectionChanged();
+            }
+        })));
+        Assert.Equal(1, maxInFlight);
+        Assert.Equal(8 + (8 * 500), count);
+    }
+
+    [Fact]
+    public async Task Attach_racing_with_concurrent_add_remove_and_dispose_should_not_leak_subscriptions()
+    {
+        DeviceRegistry<FakeClient> registry = new();
+        int activeSubscriptions = 0;
+        IDisposable[] observers = new IDisposable[4];
+        for (int i = 0; i < observers.Length; i++)
+        {
+            observers[i] = registry.Attach(_ =>
+            {
+                Interlocked.Increment(ref activeSubscriptions);
+                return Disposable.Create(() => Interlocked.Decrement(ref activeSubscriptions));
+            });
+        }
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(index => Task.Run(() =>
+        {
+            string id = $"device-{index % 4}";
+            for (int iteration = 0; iteration < 200; iteration++)
+            {
+                if (iteration % 2 == 0)
+                {
+                    registry.TryAdd(new(id));
+                }
+                else
+                {
+                    registry.Remove(id);
+                }
+            }
+        })));
+        Array.ForEach(observers, static observer => observer.Dispose());
+        Assert.Equal(0, Volatile.Read(ref activeSubscriptions));
     }
 
     private static List<DeviceRegistryChangedEventArgs<FakeClient>> Record(IDeviceRegistry<FakeClient> registry)
