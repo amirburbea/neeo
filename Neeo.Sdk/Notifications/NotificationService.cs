@@ -73,8 +73,6 @@ internal sealed class NotificationService : INotificationService, IDisposable
         this._httpClient = httpClientFactory.CreateClient(NotificationService.NotificationsHttpClientName);
         this._notificationBaseUri = new($"http://{brain.ServiceEndPoint}");
         (this._notificationMapping, this._logger) = (notificationMapping, logger);
-        // A single reader sends the notifications one at a time, in the order they were queued (the Brain handles
-        // them one at a time anyway, so more readers would only risk reordering updates to the same key).
         this._processingTask = Task.Run(ProcessMessagesAsync, this._cancellationSource.Token);
 
         async Task ProcessMessagesAsync()
