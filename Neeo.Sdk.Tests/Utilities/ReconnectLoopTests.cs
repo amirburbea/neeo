@@ -251,28 +251,6 @@ public sealed class ReconnectLoopTests
     }
 
     [Fact]
-    public async Task Start_immediate_makes_the_first_attempt_without_waiting()
-    {
-        int attempts = 0;
-        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
-            TimeSpan.FromMinutes(5),
-            TimeSpan.FromMinutes(5),
-            _ =>
-            {
-                Interlocked.Increment(ref attempts);
-                return Task.FromResult(true);
-            },
-            NullLogger.Instance
-        );
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-
-        loop.Start(immediate: true, cancellationToken: cancellationToken);
-        await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
-
-        Assert.Equal(1, attempts);
-    }
-
-    [Fact]
     public async Task TriggerNow_cuts_a_wait_short()
     {
         int attempts = 0;
@@ -336,7 +314,7 @@ public sealed class ReconnectLoopTests
         );
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        loop.Start(immediate: true, cancellationToken: cancellationToken);
+        loop.TriggerNow(cancellationToken);
         await firstAttemptStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         loop.TriggerNow(cancellationToken);
         loop.TriggerNow(cancellationToken); // Coalesced with the first.
@@ -344,33 +322,6 @@ public sealed class ReconnectLoopTests
         await ReconnectLoopTests.WaitUntilAsync(() => !loop.IsRunning, cancellationToken);
 
         Assert.Equal(2, attempts);
-    }
-
-    [Fact]
-    public async Task Stop_cancels_the_cycle_and_the_loop_can_be_started_again()
-    {
-        int attempts = 0;
-        using Neeo.Sdk.Utilities.ReconnectLoop loop = new(
-            TimeSpan.FromMinutes(5),
-            TimeSpan.FromMinutes(5),
-            _ =>
-            {
-                Interlocked.Increment(ref attempts);
-                return Task.FromResult(true);
-            },
-            NullLogger.Instance
-        );
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-
-        loop.Start(cancellationToken: cancellationToken);
-        Assert.True(loop.IsRunning);
-        loop.Stop();
-        Assert.False(loop.IsRunning);
-        await Task.Delay(50, cancellationToken);
-        Assert.Equal(0, attempts);
-
-        loop.Start(immediate: true, cancellationToken: cancellationToken);
-        await ReconnectLoopTests.WaitUntilAsync(() => attempts == 1 && !loop.IsRunning, cancellationToken);
     }
 
     [Fact]

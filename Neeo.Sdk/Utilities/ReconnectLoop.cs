@@ -47,10 +47,7 @@ public sealed class ReconnectLoop : IDisposable
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// Gets a value indicating whether the loop is currently running.
-    /// </summary>
-    public bool IsRunning
+    internal bool IsRunning
     {
         get
         {
@@ -79,26 +76,8 @@ public sealed class ReconnectLoop : IDisposable
     /// is a no-op) - only one reconnect cycle can be in flight at a time. Backoff always restarts from
     /// <see langword="initialDelay"/> for a new cycle.
     /// </summary>
-    /// <param name="immediate">
-    /// <see langword="true"/> to make the first attempt immediately rather than after <see langword="initialDelay"/>.
-    /// </param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    public void Start(bool immediate = false, CancellationToken cancellationToken = default)
-    {
-        CancellationTokenSource cycle;
-        using (this._lock.EnterScope())
-        {
-            if (this._isDisposed || this._cycleCancellation is not null)
-            {
-                return;
-            }
-            this._cycleCancellation = cycle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            this._isTriggered = immediate;
-        }
-        // Deliberately not passing the token to Task.Run: if it were already cancelled, RunAsync would never run, its
-        // finally block would never end the cycle, and the loop would report IsRunning forever.
-        _ = Task.Run(() => this.RunAsync(cycle, cycle.Token), CancellationToken.None);
-    }
+    public void Start(CancellationToken cancellationToken = default) => this.StartCycle(immediate: false, cancellationToken);
 
     /// <summary>
     /// Requests a connection attempt as soon as possible, restarting the backoff from <see langword="initialDelay"/>.
@@ -122,19 +101,24 @@ public sealed class ReconnectLoop : IDisposable
                 return;
             }
         }
-        this.Start(immediate: true, cancellationToken: cancellationToken);
+        this.StartCycle(immediate: true, cancellationToken);
     }
 
-    /// <summary>
-    /// Stops the loop (if running), cancelling any connect attempt in flight. Unlike <see cref="Dispose"/>, the loop can be
-    /// started again afterward.
-    /// </summary>
-    public void Stop()
+    private void StartCycle(bool immediate, CancellationToken cancellationToken)
     {
+        CancellationTokenSource cycle;
         using (this._lock.EnterScope())
         {
-            this.StopCycle();
+            if (this._isDisposed || this._cycleCancellation is not null)
+            {
+                return;
+            }
+            this._cycleCancellation = cycle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            this._isTriggered = immediate;
         }
+        // Deliberately not passing the token to Task.Run: if it were already cancelled, RunAsync would never run, its
+        // finally block would never end the cycle, and the loop would report IsRunning forever.
+        _ = Task.Run(() => this.RunAsync(cycle, cycle.Token), CancellationToken.None);
     }
 
     private async Task RunAsync(CancellationTokenSource cycle, CancellationToken cancellationToken)
