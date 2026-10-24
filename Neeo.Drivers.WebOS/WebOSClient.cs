@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.WebSockets;
-using System.Reactive.Subjects;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,11 +20,10 @@ public sealed class WebOSClient(
     ILogger logger,
     string? clientKey = null,
     int port = 3000
-) : IDeviceClient, IDisposable
+) : IDisposable
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<WebOSResponse>> _pendingRequests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new(StringComparer.Ordinal);
-    private readonly BehaviorSubject<bool> _isConnected = new(false);
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
@@ -65,8 +63,6 @@ public sealed class WebOSClient(
     public bool IsPaired => !string.IsNullOrEmpty(this._clientKey);
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open } && this._isRegistered;
-
-    public IObservable<bool> IsConnectedChanged => this._isConnected;
 
     public int Volume { get; private set; }
 
@@ -329,7 +325,6 @@ public sealed class WebOSClient(
         }
         if (connected)
         {
-            this._isConnected.OnNext(true);
             this.Connected?.Invoke(this, EventArgs.Empty);
             logger.LogInformation("Successfully connected and paired with webOS TV at {endpoint}.", endpoint);
             return true;
@@ -571,7 +566,6 @@ public sealed class WebOSClient(
     private void OnDisconnected()
     {
         this.CleanUp();
-        this._isConnected.OnNext(false);
         this.Disconnected?.Invoke(this, EventArgs.Empty);
         if (this._isDisposed)
         {
@@ -651,7 +645,6 @@ public sealed class WebOSClient(
         Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
         this.CleanUp();
         this.CancelOutstanding();
-        this._isConnected.OnCompleted();
         this._connectLock.Dispose();
         this._sendLock.Dispose();
     }

@@ -26,24 +26,27 @@ public sealed class WebOSClientManager(
     private const string IPAddressSuffix = "|ip";
     private static readonly int[] _ports = [3001, 3000];
 
-    private readonly DeviceRegistry<WebOSClient> _clients = new(logger);
+    private readonly ConcurrentDictionary<string, WebOSClient> _clients = new(StringComparer.Ordinal);
     private bool _isDisposed;
 
-    public IReadOnlyCollection<WebOSClient> Clients => this._clients.Clients;
+    public event EventHandler<DataEventArgs<WebOSClient>>? ClientAdded;
 
-    public IDeviceRegistry<WebOSClient> Registry => this._clients;
+    public IReadOnlyCollection<WebOSClient> Clients => [.. this._clients.Values];
 
     /// <summary>
     /// Gets a value indicating whether any TV has been paired (even if it is not currently known or connected).
     /// </summary>
     public bool HasPairedDevices => settings.Keys.Any(static key => !key.EndsWith(IPAddressSuffix, StringComparison.Ordinal));
 
-    public WebOSClient? GetClient(string deviceId) => this._clients.GetClient(deviceId);
+    public WebOSClient? GetClient(string deviceId) => this._clients.GetValueOrDefault(deviceId);
 
     public bool TryGetConnected(string deviceId, [NotNullWhen(true)] out WebOSClient? client)
     {
-        return this._clients.TryGetConnected(deviceId, out client);
+        client = this.GetClient(deviceId) is { IsConnected: true } connected ? connected : null;
+        return client is not null;
     }
+
+    public bool TryRemove(string deviceId, [NotNullWhen(true)] out WebOSClient? client) => this._clients.TryRemove(deviceId, out client);
 
     /// <summary>
     /// Gets the client for the TV, creating it (and, if it is paired, starting to connect it in the background) if needed.
@@ -52,12 +55,20 @@ public sealed class WebOSClientManager(
     {
         ObjectDisposedException.ThrowIf(this._isDisposed, this);
         string deviceId = macAddress.Equals(PhysicalAddress.None) ? ipAddress.ToString() : macAddress.ToString();
-        WebOSClient client = this._clients.GetOrAdd(deviceId, id => this.CreateClient(id, ipAddress, macAddress, port), out bool added);
-        if (added)
+        if (this._clients.GetValueOrDefault(deviceId) is { } existing)
         {
-            settings[deviceId + IPAddressSuffix] = ipAddress.ToString();
-            client.RequestReconnect();
+            return existing;
         }
+        WebOSClient client = this.CreateClient(deviceId, ipAddress, macAddress, port);
+        if (!this._clients.TryAdd(deviceId, client))
+        {
+            // Another caller registered the same TV in the meantime - keep that one.
+            client.Dispose();
+            return this._clients[deviceId];
+        }
+        settings[deviceId + IPAddressSuffix] = ipAddress.ToString();
+        this.ClientAdded?.Invoke(this, client);
+        client.RequestReconnect();
         return client;
     }
 
@@ -67,7 +78,7 @@ public sealed class WebOSClientManager(
     /// </summary>
     public WebOSClient? GetOrCreateKnownClient(string deviceId)
     {
-        if (this._clients.GetClient(deviceId) is { } existing)
+        if (this.GetClient(deviceId) is { } existing)
         {
             return existing;
         }
@@ -171,7 +182,7 @@ public sealed class WebOSClientManager(
             return;
         }
         this._isDisposed = true;
-        foreach (WebOSClient client in this._clients.Clients)
+        foreach (WebOSClient client in this._clients.Values)
         {
             client.Dispose();
         }

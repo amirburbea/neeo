@@ -34,16 +34,16 @@ public sealed partial class KodiClientManager(
         configuration.GetValue<int>("Kodi:ImageCacheCapacity") is > 0 and { } configured ? configured : 64
     );
     private readonly UrlTokenStore _imageUrlTokens = new();
-    private readonly DeviceRegistry<KodiClient> _clients = new(logger);
+    private readonly ConcurrentDictionary<string, KodiClient> _clients = [];
     private readonly ConcurrentDictionary<IPAddress, Task<KodiClient?>> _connectingClients = new();
     private readonly Lock _initLock = new();
     private AuthenticationHeaderValue? _authorizationHeader = KodiClientManager.CreateAuthorizationHeader(settings);
     private PeriodicTimer? _discoveryTimer;
     private Task? _initializationTask;
 
-    public IReadOnlyCollection<KodiClient> Clients => this._clients.Clients;
+    public event EventHandler<DataEventArgs<KodiClient>>? ClientAdded;
 
-    public IDeviceRegistry<KodiClient> Registry => this._clients;
+    public IReadOnlyCollection<KodiClient> Clients => [.. this._clients.Values];
 
     public bool HasCredentials => settings.ContainsKey("username") && settings.ContainsKey("password");
 
@@ -172,7 +172,7 @@ public sealed partial class KodiClientManager(
 
     private Task<KodiClient?> GetOrConnectClientAsync(string displayName, IPAddress ipAddress, int port, CancellationToken cancellationToken)
     {
-        if (this._clients.Clients.FirstOrDefault(c => c.IPAddress.Equals(ipAddress)) is { } existing)
+        if (this._clients.Values.FirstOrDefault(c => c.IPAddress.Equals(ipAddress)) is { } existing)
         {
             return Task.FromResult<KodiClient?>(existing);
         }
@@ -183,7 +183,7 @@ public sealed partial class KodiClientManager(
         {
             try
             {
-                if (this._clients.Clients.FirstOrDefault(c => c.IPAddress.Equals(targetIp)) is { } client)
+                if (this._clients.Values.FirstOrDefault(c => c.IPAddress.Equals(targetIp)) is { } client)
                 {
                     return client;
                 }
@@ -200,12 +200,13 @@ public sealed partial class KodiClientManager(
                 {
                     oldClient.Dispose();
                 }
-                if (!this._clients.TryAdd(newClient))
+                if (!this._clients.TryAdd(newClient.DeviceId, newClient))
                 {
                     // Another connection registered the same device in the meantime - keep that one.
                     newClient.Dispose();
-                    return this._clients.GetClient(newClient.DeviceId);
+                    return this._clients.GetValueOrDefault(newClient.DeviceId);
                 }
+                this.ClientAdded?.Invoke(this, newClient);
                 logger.LogInformation("Successfully connected and registered Kodi '{displayName}' ({id}) at {targetIp}.", displayName, newClient.DeviceId, targetIp);
                 return newClient;
             }
@@ -223,8 +224,8 @@ public sealed partial class KodiClientManager(
 
     public async Task<bool> ValidateCredentialsAsync(string userName, string password, CancellationToken cancellationToken = default)
     {
-        IPAddress? targetIp = this._clients.Clients.FirstOrDefault()?.IPAddress;
-        int port = this._clients.Clients.FirstOrDefault()?.HttpPort ?? 8080;
+        IPAddress? targetIp = this._clients.Values.FirstOrDefault()?.IPAddress;
+        int port = this._clients.Values.FirstOrDefault()?.HttpPort ?? 8080;
         if (targetIp is null && configuration.GetValue<string>("Kodi:Host") is { Length: > 0 } singleHost && IPAddress.TryParse(singleHost, out IPAddress? parsedIp))
         {
             targetIp = parsedIp;
@@ -232,8 +233,8 @@ public sealed partial class KodiClientManager(
         if (targetIp is null)
         {
             await this.DiscoverAsync(2000, cancellationToken: cancellationToken).ConfigureAwait(false);
-            targetIp = this._clients.Clients.FirstOrDefault()?.IPAddress;
-            port = this._clients.Clients.FirstOrDefault()?.HttpPort ?? 8080;
+            targetIp = this._clients.Values.FirstOrDefault()?.IPAddress;
+            port = this._clients.Values.FirstOrDefault()?.HttpPort ?? 8080;
         }
         if (targetIp is null)
         {
@@ -329,14 +330,13 @@ public sealed partial class KodiClientManager(
     public void Dispose()
     {
         Interlocked.Exchange(ref this._discoveryTimer, default)?.Dispose();
-        // Clients are left registered (rather than removed) so shutting down doesn't report them all as powered off.
-        foreach (KodiClient client in this._clients.Clients)
+        foreach (KodiClient client in this._clients.Values)
         {
             client.Dispose();
         }
     }
 
-    public KodiClient? GetClientOrDefault(string id) => this._clients.GetClient(id);
+    public KodiClient? GetClientOrDefault(string id) => this._clients.GetValueOrDefault(id);
 
     public Task InitializeAsync(string? deviceId = default, CancellationToken cancellationToken = default)
     {

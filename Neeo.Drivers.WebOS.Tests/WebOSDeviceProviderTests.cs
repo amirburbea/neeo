@@ -102,13 +102,12 @@ public sealed class WebOSDeviceProviderTests
     }
 
     [Fact]
-    public void WebOSClient_implements_IDeviceClient_contract()
+    public void A_new_client_is_identified_by_its_mac_address_and_starts_disconnected()
     {
         IPAddress ip = IPAddress.Parse("192.168.1.50");
         PhysicalAddress mac = PhysicalAddress.Parse("001122334455");
         using WebOSClient client = new(ip, mac, NullLogger.Instance);
 
-        Assert.IsAssignableFrom<IDeviceClient>(client);
         Assert.Equal(mac.ToString(), client.DeviceId);
         Assert.False(client.IsConnected);
     }
@@ -198,6 +197,58 @@ public sealed class WebOSDeviceProviderTests
         notifier.Verify(n => n.SendNotificationAsync("VOLUME", 25d, client.DeviceId, default), Times.Once);
         notifier.Verify(n => n.SendNotificationAsync("VOLUME-LABEL", "25", client.DeviceId, default), Times.Once);
         notifier.Verify(n => n.SendNotificationAsync("APP", "netflix", client.DeviceId, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Connection_changes_send_power_notifications_for_devices_the_brain_has_added()
+    {
+        InMemorySettings settings = new();
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+        using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
+        WebOSClient added = manager.GetOrCreateClient(IPAddress.Parse("10.0.0.1"), PhysicalAddress.Parse("001122334455"));
+        WebOSClient other = manager.GetOrCreateClient(IPAddress.Parse("10.0.0.2"), PhysicalAddress.Parse("001122334466"));
+        Mock<IDeviceNotifier> notifier = new();
+        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
+        await provider.OnDeviceAddedAsync(added.DeviceId, TestContext.Current.CancellationToken);
+
+        await provider.HandleConnectionChangedAsync(added, true);
+        await provider.HandleConnectionChangedAsync(added, false);
+        await provider.HandleConnectionChangedAsync(other, true);
+
+        notifier.Verify(n => n.SendPowerNotificationAsync(true, added.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.SendPowerNotificationAsync(false, added.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), other.DeviceId, default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Connection_handling_does_not_throw_when_the_power_notification_fails()
+    {
+        InMemorySettings settings = new();
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+        using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
+        WebOSClient client = manager.GetOrCreateClient(IPAddress.Loopback, PhysicalAddress.Parse("001122334455"));
+        Mock<IDeviceNotifier> notifier = new();
+        notifier.Setup(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), It.IsAny<string>(), default)).ThrowsAsync(new InvalidOperationException("Brain unreachable"));
+        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
+        await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
+
+        await provider.HandleConnectionChangedAsync(client, true);
+
+        notifier.Verify(n => n.SendPowerNotificationAsync(true, client.DeviceId, default), Times.Once);
+    }
+
+    [Fact]
+    public void The_manager_raises_ClientAdded_once_for_a_new_client()
+    {
+        InMemorySettings settings = new();
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+        int raised = 0;
+        manager.ClientAdded += (_, _) => raised++;
+
+        manager.GetOrCreateClient(IPAddress.Loopback, PhysicalAddress.Parse("001122334455"));
+        manager.GetOrCreateClient(IPAddress.Loopback, PhysicalAddress.Parse("001122334455"));
+
+        Assert.Equal(1, raised);
     }
 
     private static WebOSClientManager CreateManager(InMemorySettings settings) => new(

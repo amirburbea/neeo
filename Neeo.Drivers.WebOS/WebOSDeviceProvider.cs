@@ -31,7 +31,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         this._clientManager = clientManager;
         this._logger = logger;
-        this._clientManager.Registry.Changed += this.Registry_Changed;
+        this._clientManager.ClientAdded += this.ClientManager_ClientAdded;
         foreach (WebOSClient client in this._clientManager.Clients)
         {
             this.AttachClientEvents(client);
@@ -75,7 +75,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             SmartApplicationButtons.YouTube
         )
         .AddDirectory("Apps", "Apps & Inputs", DirectoryRole.Root, this.BrowseAppsAsync, this.LaunchAppAsync)
-        .AddPowerStateSensor(this._clientManager.Registry, this.GetPowerState)
+        .AddPowerStateSensor(this.GetPowerState)
         .RegisterDeviceSubscriptionCallbacks(this.OnDeviceAddedAsync, this.OnDeviceRemovedAsync, this.InitializeDeviceListAsync)
         .EnableNotifications(notifier => this._notifier = notifier)
         .AddSlider("VOLUME", null, (deviceId, _) => Task.FromResult(this.GetVolume(deviceId)), this.SetVolumeAsync)
@@ -232,60 +232,68 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             : RegistrationResult.Failed("No TV was paired - make sure it is on, then accept the prompt on the TV within 60 seconds.");
     }
 
-    internal Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
+    internal async Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
     {
         this._subscribedDevices.TryAdd(deviceId, default);
-        this._clientManager.GetOrCreateKnownClient(deviceId);
-        return Task.CompletedTask;
+        await this.NotifyIfConnectedAsync(this._clientManager.GetOrCreateKnownClient(deviceId)).ConfigureAwait(false);
     }
 
     private Task OnDeviceRemovedAsync(string deviceId, CancellationToken cancellationToken)
     {
         this._subscribedDevices.TryRemove(deviceId, out _);
-        if (this._clientManager.Registry.TryRemove(deviceId, out WebOSClient? client))
+        if (this._clientManager.TryRemove(deviceId, out WebOSClient? client))
         {
+            this.DetachClientEvents(client);
             client.Dispose();
         }
         return Task.CompletedTask;
     }
 
-    private Task InitializeDeviceListAsync(string[] deviceIds, CancellationToken cancellationToken)
+    private async Task InitializeDeviceListAsync(string[] deviceIds, CancellationToken cancellationToken)
     {
         foreach (string deviceId in deviceIds)
         {
             this._subscribedDevices.TryAdd(deviceId, default);
             // Starts connecting in the background (a TV that is off is retried, and picked up when it comes on).
-            this._clientManager.GetOrCreateKnownClient(deviceId);
+            await this.NotifyIfConnectedAsync(this._clientManager.GetOrCreateKnownClient(deviceId)).ConfigureAwait(false);
         }
-        return Task.CompletedTask;
     }
 
-    // Every client's events are observed for as long as it is registered; the handlers only notify for devices the Brain has
+    // Every client's events are observed from the moment it is created; the handlers only notify for devices the Brain has
     // added, so the order in which clients and subscriptions arrive does not matter.
-    private void Registry_Changed(object? sender, DeviceRegistryChangedEventArgs<WebOSClient> e)
-    {
-        if (e.Kind == DeviceRegistryChangeKind.Removed)
-        {
-            this.DetachClientEvents(e.Client);
-        }
-        else if (e.Kind == DeviceRegistryChangeKind.Added)
-        {
-            this.AttachClientEvents(e.Client);
-        }
-    }
+    private void ClientManager_ClientAdded(object? sender, DataEventArgs<WebOSClient> e) => this.AttachClientEvents(e.Data);
+
+    // A TV that is already connected when the Brain adds it will not report a change.
+    private Task NotifyIfConnectedAsync(WebOSClient? client) => client is { IsConnected: true } ? this.HandleConnectionChangedAsync(client, true) : Task.CompletedTask;
 
     private void AttachClientEvents(WebOSClient client)
     {
         // Detach first so attaching twice (constructor and Added racing) never subscribes twice.
         this.DetachClientEvents(client);
+        client.Connected += this.Client_Connected;
+        client.Disconnected += this.Client_Disconnected;
         client.VolumeChanged += this.Client_VolumeChanged;
         client.ForegroundAppChanged += this.Client_ForegroundAppChanged;
     }
 
     private void DetachClientEvents(WebOSClient client)
     {
+        client.Connected -= this.Client_Connected;
+        client.Disconnected -= this.Client_Disconnected;
         client.VolumeChanged -= this.Client_VolumeChanged;
         client.ForegroundAppChanged -= this.Client_ForegroundAppChanged;
+    }
+
+    private void Client_Connected(object? sender, EventArgs e) => _ = this.HandleConnectionChangedAsync(sender, true);
+
+    private void Client_Disconnected(object? sender, EventArgs e) => _ = this.HandleConnectionChangedAsync(sender, false);
+
+    internal async Task HandleConnectionChangedAsync(object? sender, bool isConnected)
+    {
+        if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
+        {
+            await this.NotifyAsync(() => notifier.SendPowerNotificationAsync(isConnected, client.DeviceId)).ConfigureAwait(false);
+        }
     }
 
     private void Client_VolumeChanged(object? sender, DataEventArgs<int> e) => _ = this.HandleVolumeChangedAsync(sender, e.Data);
@@ -330,7 +338,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             return;
         }
         this._isDisposed = true;
-        this._clientManager.Registry.Changed -= this.Registry_Changed;
+        this._clientManager.ClientAdded -= this.ClientManager_ClientAdded;
         foreach (WebOSClient client in this._clientManager.Clients)
         {
             this.DetachClientEvents(client);
