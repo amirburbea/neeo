@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 
@@ -16,6 +17,7 @@ namespace Neeo.Drivers.WebOS;
 
 [SettingsStore("weboskeys.json.bin")]
 public sealed class WebOSClientManager(
+    IBrain brain,
     ILogger<WebOSClient> clientLogger,
     ILogger<WebOSClientManager> logger,
     ISettingsStore<WebOSClientManager> settings
@@ -100,6 +102,7 @@ public sealed class WebOSClientManager(
     public async Task<WebOSClient[]> DiscoverAsync(CancellationToken cancellationToken = default)
     {
         ConcurrentBag<WebOSClient> discovered = [];
+        IPAddress brainAddress = brain.ServiceEndPoint.Address;
         KeyValuePair<IPAddress, PhysicalAddress>[] networkDevices = [.. NetworkMethods.GetNetworkDevices()];
 
         await Task.WhenAll(
@@ -108,6 +111,10 @@ public sealed class WebOSClientManager(
                 try
                 {
                     (IPAddress ip, PhysicalAddress mac) = device;
+                    if (brainAddress.Equals(ip))
+                    {
+                        return;
+                    }
                     foreach (int port in _ports)
                     {
                         if (await WebOSClientManager.ProbePortAsync(ip, port, 400, cancellationToken).ConfigureAwait(false))

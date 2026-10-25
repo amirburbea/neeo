@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using System.Net.NetworkInformation;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Drivers.WebOS;
 using Neeo.Drivers.WebOS.Models;
+using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 using Xunit;
@@ -21,6 +23,7 @@ public sealed class WebOSDeviceProviderTests
     {
         Mock<ISettingsStore<WebOSClientManager>> settingsMock = new();
         WebOSClientManager manager = new(
+            Mock.Of<IBrain>(b => b.ServiceEndPoint == new IPEndPoint(IPAddress.Loopback, 3000)),
             NullLogger<WebOSClient>.Instance,
             NullLogger<WebOSClientManager>.Instance,
             settingsMock.Object
@@ -228,7 +231,26 @@ public sealed class WebOSDeviceProviderTests
         Assert.Equal(1, raised);
     }
 
-    private static WebOSClientManager CreateManager(InMemorySettings settings) => new(
+    [Fact]
+    public async Task DiscoverAsync_consults_the_brain_endpoint()
+    {
+        Mock<IBrain> mockBrain = new(MockBehavior.Strict);
+        mockBrain.Setup(b => b.ServiceEndPoint).Returns(new IPEndPoint(IPAddress.Loopback, 3000));
+        InMemorySettings settings = new();
+        using WebOSClientManager manager = new(
+            mockBrain.Object,
+            NullLogger<WebOSClient>.Instance,
+            NullLogger<WebOSClientManager>.Instance,
+            settings
+        );
+
+        await manager.DiscoverAsync(TestContext.Current.CancellationToken);
+
+        mockBrain.Verify(b => b.ServiceEndPoint, Times.Once);
+    }
+
+    private static WebOSClientManager CreateManager(InMemorySettings settings, IBrain? brain = default) => new(
+        brain ?? Mock.Of<IBrain>(b => b.ServiceEndPoint == new IPEndPoint(IPAddress.Loopback, 3000)),
         NullLogger<WebOSClient>.Instance,
         NullLogger<WebOSClientManager>.Instance,
         settings
