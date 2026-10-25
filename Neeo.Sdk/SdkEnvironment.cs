@@ -50,9 +50,12 @@ internal sealed class SdkEnvironment(
 
     public string SdkAdapterName { get; } = (string)sdkAdapterName;
 
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        await server.StopAsync(cancellationToken).ConfigureAwait(false);
-        await host.StopAsync(cancellationToken).ConfigureAwait(false);
+        using (host)
+        {
+            await server.StopAsync(cancellationToken).ConfigureAwait(false);
+            await host.StopAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 }

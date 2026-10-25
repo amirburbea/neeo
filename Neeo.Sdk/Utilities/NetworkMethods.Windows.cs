@@ -43,7 +43,7 @@ public static partial class NetworkMethods
                 byte[] bytes = [row.mac0, row.mac1, row.mac2, row.mac3, row.mac4, row.mac5];
                 if (!bytes.AsSpan().SequenceEqual(NetworkMethods.VirtualAddress) && !bytes.AsSpan().SequenceEqual(NetworkMethods.BroadcastAddress))
                 {
-                    output.Add(ipAddress, new(bytes));
+                    output[ipAddress] = new(bytes);
                 }
             }
         }
