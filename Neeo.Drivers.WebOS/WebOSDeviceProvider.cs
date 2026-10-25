@@ -296,7 +296,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await this.NotifyAsync(() => notifier.SendPowerNotificationAsync(isConnected, client.DeviceId)).ConfigureAwait(false);
+            await this.NotifyAsync("power notification", client.DeviceId, () => notifier.SendPowerNotificationAsync(isConnected, client.DeviceId)).ConfigureAwait(false);
         }
     }
 
@@ -306,7 +306,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await this.NotifyAsync(() => Task.WhenAll(
+            await this.NotifyAsync("volume notification", client.DeviceId, () => Task.WhenAll(
                 notifier.SendNotificationAsync("VOLUME", (double)volume, client.DeviceId),
                 notifier.SendNotificationAsync("VOLUME-LABEL", volume.ToString(CultureInfo.InvariantCulture), client.DeviceId)
             )).ConfigureAwait(false);
@@ -319,11 +319,11 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await this.NotifyAsync(() => notifier.SendNotificationAsync("APP", appId, client.DeviceId)).ConfigureAwait(false);
+            await this.NotifyAsync("foreground app notification", client.DeviceId, () => notifier.SendNotificationAsync("APP", appId, client.DeviceId)).ConfigureAwait(false);
         }
     }
 
-    private async Task NotifyAsync(Func<Task> send)
+    private async Task NotifyAsync(string description, string deviceId, Func<Task> send)
     {
         try
         {
@@ -331,7 +331,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         }
         catch (Exception ex)
         {
-            this._logger.LogWarning(ex, "Failed to send webOS notification.");
+            this._logger.LogWarning(ex, "webOS {Description} for {DeviceId} failed.", description, deviceId);
         }
     }
 
