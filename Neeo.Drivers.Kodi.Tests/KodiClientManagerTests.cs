@@ -1,9 +1,7 @@
-using System.Collections.Generic;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Neeo.Drivers.Kodi;
 using Neeo.Sdk.Utilities;
 using Xunit;
 

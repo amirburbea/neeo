@@ -7,7 +7,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Neeo.Sdk.Server;
 using Neeo.Sdk.Utilities;
 using Xunit;
 

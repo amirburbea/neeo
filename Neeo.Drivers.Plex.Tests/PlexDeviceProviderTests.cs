@@ -4,7 +4,6 @@ using System.IO;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
-using Neeo.Drivers.Plex;
 using Neeo.Sdk.Utilities;
 using Xunit;
 

@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Setup;
