@@ -143,7 +143,7 @@ public static class HttpClientMethods
         {
             string contents = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             throw new HttpRequestException(
-                $"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}",
+                $"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). {contents}",
                 inner: null,
                 statusCode: response.StatusCode
             );
