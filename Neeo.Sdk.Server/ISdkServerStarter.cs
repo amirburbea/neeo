@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Neeo.Sdk;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Server;

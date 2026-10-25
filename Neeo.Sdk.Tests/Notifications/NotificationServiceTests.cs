@@ -12,7 +12,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Moq.Protected;
-using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
 using Neeo.Sdk.Rest;

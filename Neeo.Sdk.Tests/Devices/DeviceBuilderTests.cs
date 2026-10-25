@@ -1,9 +1,7 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Devices.Directories;
-using Neeo.Sdk.Devices.Features;
 using Neeo.Sdk.Devices.Setup;
 using Xunit;
 

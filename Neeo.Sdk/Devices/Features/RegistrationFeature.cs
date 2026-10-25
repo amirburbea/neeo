@@ -4,7 +4,6 @@ using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Sdk.Devices.Setup;
-using Neeo.Sdk.Utilities;
 
 namespace Neeo.Sdk.Devices.Features;
 

@@ -1,5 +1,3 @@
-using System;
-
 namespace Neeo.Drivers.Plex;
 
 public interface IMediaDirectoryItem

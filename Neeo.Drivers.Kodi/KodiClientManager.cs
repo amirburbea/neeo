@@ -7,7 +7,6 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -15,7 +14,6 @@ using System.Threading.Tasks;
 using BitFaster.Caching.Lru;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 using Zeroconf;
 

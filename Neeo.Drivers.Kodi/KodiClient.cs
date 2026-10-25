@@ -11,7 +11,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Drivers.Kodi.Models;
-using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.Kodi;

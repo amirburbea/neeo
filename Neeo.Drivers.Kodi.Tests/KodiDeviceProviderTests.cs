@@ -3,7 +3,6 @@ using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 using Xunit;
 

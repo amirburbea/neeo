@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Neeo.Drivers.Kodi;
 using Neeo.Drivers.Kodi.Models;
 using Xunit;
 

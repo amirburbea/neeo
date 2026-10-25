@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using System.Net.NetworkInformation;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Neeo.Drivers.WebOS;
 using Neeo.Drivers.WebOS.Models;
 using Neeo.Sdk;
 using Neeo.Sdk.Devices;
