@@ -55,7 +55,19 @@ public abstract partial class PlexDeviceProviderBase(
         string machineIdentifier = e.Data.MachineIdentifier;
         if (this._machineIdentifiers.ContainsKey(machineIdentifier) && !this._servers.ContainsKey(machineIdentifier))
         {
-            _ = this.OnServerAddedAsync(machineIdentifier, CancellationToken.None);
+            _ = AttachAsync();
+        }
+
+        async Task AttachAsync()
+        {
+            try
+            {
+                await this.OnServerAddedAsync(machineIdentifier, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to attach discovered Plex server {MachineIdentifier}.", machineIdentifier);
+            }
         }
     }
 
@@ -117,11 +129,8 @@ public abstract partial class PlexDeviceProviderBase(
         };
     }
 
-    protected virtual IDeviceBuilder CreateDevice()
-    {
-        this.EnsureSubscribed();
-        return Device.Create(deviceName, deviceType)
-            .AddAdditionalSearchTokens("PMS")
+    protected virtual IDeviceBuilder CreateDevice() => Device.Create(deviceName, deviceType)
+        .AddAdditionalSearchTokens("PMS")
         .AddButtonHandler(this.HandleButtonAsync)
         .AddPowerStateSensor(this.IsConnected)
         .AddTextLabel(Components.Player, "Player", (machineIdentifier) => this.GetServer(machineIdentifier)?.SelectedPlayerName ?? string.Empty)
@@ -133,7 +142,6 @@ public abstract partial class PlexDeviceProviderBase(
         .RegisterInitializer(this.InitializeAsync)
         .AddButtonGroup(ButtonGroups.Power)
         .SetManufacturer("Plex");
-    }
 
     protected string GetCoverArt(string machineIdentifier) => this.GetCoverArt(this.GetServer(machineIdentifier)?.ActiveMedia);
 
