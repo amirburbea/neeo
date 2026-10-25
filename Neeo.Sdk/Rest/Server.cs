@@ -37,8 +37,16 @@ internal static class Server
             .ConfigureServices(Server.ConfigureHttpClient)
             .ConfigureServices(services => Server.ConfigureServices(services, brain, devices, adapterName, serviceConfigurations))
             .Build();
-        await host.StartAsync(cancellationToken).ConfigureAwait(false);
-        return host;
+        try
+        {
+            await host.StartAsync(cancellationToken).ConfigureAwait(false);
+            return host;
+        }
+        catch
+        {
+            host.Dispose();
+            throw;
+        }
     }
 
     private static void ConfigureHttpClient(IServiceCollection services)
