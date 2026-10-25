@@ -81,6 +81,20 @@ public sealed class KodiClientManagerDiscoveryTests
     }
 
     [Fact]
+    public async Task TryAddHostAsync_allows_retry_when_previous_connection_attempt_cancelled_synchronously()
+    {
+        await using FakeKodiServer server = await KodiClientManagerDiscoveryTests.StartServerAsync();
+        using KodiClientManager manager = KodiClientManagerDiscoveryTests.CreateManager(server.Port, new RecordingLogger<KodiClient>(), Mock.Of<IKodiHostLocator>());
+
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        Assert.False(await manager.TryAddHostAsync("127.0.0.1", server.Port, cts.Token));
+
+        Assert.True(await manager.TryAddHostAsync("127.0.0.1", server.Port, TestContext.Current.CancellationToken));
+        Assert.Single(manager.Clients);
+    }
+
+    [Fact]
     public async Task DiscoverAsync_throws_when_the_caller_cancels()
     {
         Mock<IKodiHostLocator> scanner = new();

@@ -35,7 +35,7 @@ public sealed partial class KodiClientManager(
     );
     private readonly UrlTokenStore _imageUrlTokens = new();
     private readonly ConcurrentDictionary<string, KodiClient> _clients = [];
-    private readonly ConcurrentDictionary<IPAddress, Task<KodiClient?>> _connectingClients = new();
+    private readonly ConcurrentDictionary<IPAddress, Lazy<Task<KodiClient?>>> _connectingClients = new();
     private readonly Lock _initLock = new();
     private AuthenticationHeaderValue? _authorizationHeader = KodiClientManager.CreateAuthorizationHeader(settings);
     private Task? _initializationTask;
@@ -176,9 +176,13 @@ public sealed partial class KodiClientManager(
             return Task.FromResult<KodiClient?>(existing);
         }
 
-        return this._connectingClients.GetOrAdd(ipAddress, ConnectInternalAsync);
+        Lazy<Task<KodiClient?>>? lazy = null;
+        return this._connectingClients.GetOrAdd(
+            ipAddress,
+            _ => lazy = new(() => ConnectInternalAsync(ipAddress, lazy!))
+        ).Value;
 
-        async Task<KodiClient?> ConnectInternalAsync(IPAddress targetIp)
+        async Task<KodiClient?> ConnectInternalAsync(IPAddress targetIp, Lazy<Task<KodiClient?>> pending)
         {
             try
             {
@@ -216,7 +220,7 @@ public sealed partial class KodiClientManager(
             }
             finally
             {
-                this._connectingClients.TryRemove(targetIp, out _);
+                this._connectingClients.TryRemove(KeyValuePair.Create(targetIp, pending));
             }
         }
     }
