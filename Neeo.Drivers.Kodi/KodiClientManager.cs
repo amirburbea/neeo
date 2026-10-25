@@ -48,7 +48,7 @@ public sealed partial class KodiClientManager(
 
     public void SetCredentials(string userName, string password)
     {
-        this._authorizationHeader = new AuthenticationHeaderValue(
+        this._authorizationHeader = new(
             "Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes($"{userName}:{password}"))
         );
@@ -160,27 +160,23 @@ public sealed partial class KodiClientManager(
         {
             return false;
         }
-
         string displayName = hostNameOrAddress.EndsWith(".local", StringComparison.OrdinalIgnoreCase)
             ? $"Kodi ({hostNameOrAddress[..^6]})"
             : $"Kodi ({ip})";
-
-        KodiClient? client = await this.GetOrConnectClientAsync(displayName, ip, port, cancellationToken).ConfigureAwait(false);
-        return client is not null;
+        return (await this.GetOrConnectClientAsync(displayName, ip, port, cancellationToken).ConfigureAwait(false)) is not null;
     }
 
-    private Task<KodiClient?> GetOrConnectClientAsync(string displayName, IPAddress ipAddress, int port, CancellationToken cancellationToken)
+    private async Task<KodiClient?> GetOrConnectClientAsync(string displayName, IPAddress ipAddress, int port, CancellationToken cancellationToken)
     {
         if (this._clients.Values.FirstOrDefault(c => c.IPAddress.Equals(ipAddress)) is { } existing)
         {
-            return Task.FromResult<KodiClient?>(existing);
+            return existing;
         }
-
         Lazy<Task<KodiClient?>>? lazy = null;
-        return this._connectingClients.GetOrAdd(
+        return await this._connectingClients.GetOrAdd(
             ipAddress,
             _ => lazy = new(() => ConnectInternalAsync(ipAddress, lazy!))
-        ).Value;
+        ).Value.ConfigureAwait(false);
 
         async Task<KodiClient?> ConnectInternalAsync(IPAddress targetIp, Lazy<Task<KodiClient?>> pending)
         {
@@ -190,7 +186,6 @@ public sealed partial class KodiClientManager(
                 {
                     return client;
                 }
-
                 logger.LogInformation("Connecting to Kodi at {displayName} ({targetIp}:{port})...", displayName, targetIp, port);
                 KodiClient newClient = new(displayName, targetIp, port, logger, configuration.GetValue("Kodi:WebSocketPort", KodiClient.DefaultWebSocketPort));
                 if (!await newClient.ConnectAsync(cancellationToken).ConfigureAwait(false) || newClient.MacAddress.Equals(PhysicalAddress.None))
@@ -236,8 +231,9 @@ public sealed partial class KodiClientManager(
         if (targetIp is null)
         {
             await this.DiscoverAsync(2000, cancellationToken: cancellationToken).ConfigureAwait(false);
-            targetIp = this._clients.Values.FirstOrDefault()?.IPAddress;
-            port = this._clients.Values.FirstOrDefault()?.HttpPort ?? 8080;
+            KodiClient? client = this._clients.Values.FirstOrDefault();
+            targetIp = client?.IPAddress;
+            port = client?.HttpPort ?? 8080;
         }
         if (targetIp is null)
         {
