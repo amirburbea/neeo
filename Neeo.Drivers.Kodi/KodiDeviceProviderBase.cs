@@ -624,7 +624,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     internal async Task HandleClientConnectedAsync(object? sender)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId))
+        if (sender is not KodiClient client)
         {
             return;
         }
@@ -645,7 +645,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     internal async Task HandleClientDisconnectedAsync(object? sender)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this.Notifier is not { } notifier)
+        if (sender is not KodiClient client || this.Notifier is not { } notifier)
         {
             return;
         }
@@ -665,7 +665,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     internal async Task HandlePlayerStateChangedAsync(object? sender, PlayerState state)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this.Notifier is not { } notifier)
+        if (sender is not KodiClient client || this.Notifier is not { } notifier)
         {
             return;
         }

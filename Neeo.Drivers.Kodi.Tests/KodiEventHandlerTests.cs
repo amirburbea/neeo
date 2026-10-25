@@ -29,23 +29,10 @@ public sealed class KodiEventHandlerTests
         RecordingLogger<KodiRemoteDeviceProvider> logger = new();
         using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
         using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.AddDeviceId(client.DeviceId);
 
         await provider.HandleClientConnectedAsync(client);
 
         Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("connected handling"));
-    }
-
-    [Fact]
-    public async Task Connected_handling_ignores_clients_that_are_not_subscribed()
-    {
-        RecordingLogger<KodiRemoteDeviceProvider> logger = new();
-        using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
-        using KodiClient client = KodiEventHandlerTests.CreateClient();
-
-        await provider.HandleClientConnectedAsync(client);
-
-        Assert.Empty(logger.Entries);
     }
 
     [Theory]
@@ -57,7 +44,6 @@ public sealed class KodiEventHandlerTests
         RecordingLogger<KodiRemoteDeviceProvider> logger = new();
         using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
         using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.AddDeviceId(client.DeviceId);
         provider.Notifier = KodiEventHandlerTests.CreateFailingNotifier();
 
         await provider.HandlePlayerStateChangedAsync(client, KodiEventHandlerTests._playing with { PlayState = playState });
@@ -73,7 +59,6 @@ public sealed class KodiEventHandlerTests
         notifier.Setup(n => n.SendNotificationAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(new RecordingLogger<KodiRemoteDeviceProvider>());
         using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.AddDeviceId(client.DeviceId);
         provider.Notifier = notifier.Object;
 
         await provider.HandlePlayerStateChangedAsync(client, KodiEventHandlerTests._playing with { PlayState = PlayState.Paused });
@@ -107,12 +92,11 @@ public sealed class KodiEventHandlerTests
     }
 
     [Fact]
-    public async Task Connected_handling_sends_a_power_notification_for_subscribed_clients()
+    public async Task Connected_handling_sends_a_power_notification()
     {
         Mock<IDeviceNotifier> notifier = new();
         using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(new RecordingLogger<KodiRemoteDeviceProvider>());
         using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.AddDeviceId(client.DeviceId);
         provider.Notifier = notifier.Object;
 
         await provider.HandleClientConnectedAsync(client);
@@ -121,20 +105,16 @@ public sealed class KodiEventHandlerTests
     }
 
     [Fact]
-    public async Task Disconnected_handling_sends_a_power_notification_for_subscribed_clients_only()
+    public async Task Disconnected_handling_sends_a_power_notification()
     {
         Mock<IDeviceNotifier> notifier = new();
         using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(new RecordingLogger<KodiRemoteDeviceProvider>());
-        using KodiClient subscribed = KodiEventHandlerTests.CreateClient();
-        using KodiClient other = new("Other", IPAddress.Parse("10.0.0.2"), 8080, new RecordingLogger());
-        provider.AddDeviceId(subscribed.DeviceId);
+        using KodiClient client = KodiEventHandlerTests.CreateClient();
         provider.Notifier = notifier.Object;
 
-        await provider.HandleClientDisconnectedAsync(subscribed);
-        await provider.HandleClientDisconnectedAsync(other);
+        await provider.HandleClientDisconnectedAsync(client);
 
-        notifier.Verify(n => n.SendPowerNotificationAsync(false, subscribed.DeviceId, It.IsAny<CancellationToken>()), Times.Once);
-        notifier.Verify(n => n.SendPowerNotificationAsync(false, other.DeviceId, It.IsAny<CancellationToken>()), Times.Never);
+        notifier.Verify(n => n.SendPowerNotificationAsync(false, client.DeviceId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -145,7 +125,6 @@ public sealed class KodiEventHandlerTests
         notifier.Setup(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new HttpRequestException("Brain unreachable"));
         using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
         using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.AddDeviceId(client.DeviceId);
         provider.Notifier = notifier.Object;
 
         await provider.HandleClientDisconnectedAsync(client);

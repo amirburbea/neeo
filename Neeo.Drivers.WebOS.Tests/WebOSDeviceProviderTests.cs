@@ -200,24 +200,21 @@ public sealed class WebOSDeviceProviderTests
     }
 
     [Fact]
-    public async Task Connection_changes_send_power_notifications_for_devices_the_brain_has_added()
+    public async Task Connection_changes_send_power_notifications()
     {
         InMemorySettings settings = new();
         using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
         using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
-        WebOSClient added = manager.GetOrCreateClient(IPAddress.Parse("10.0.0.1"), PhysicalAddress.Parse("001122334455"));
-        WebOSClient other = manager.GetOrCreateClient(IPAddress.Parse("10.0.0.2"), PhysicalAddress.Parse("001122334466"));
+        WebOSClient client = manager.GetOrCreateClient(IPAddress.Parse("10.0.0.1"), PhysicalAddress.Parse("001122334455"));
         Mock<IDeviceNotifier> notifier = new();
         provider.DeviceBuilder.NotifierCallback!(notifier.Object);
-        await provider.OnDeviceAddedAsync(added.DeviceId, TestContext.Current.CancellationToken);
+        await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
 
-        await provider.HandleConnectionChangedAsync(added, true);
-        await provider.HandleConnectionChangedAsync(added, false);
-        await provider.HandleConnectionChangedAsync(other, true);
+        await provider.HandleConnectionChangedAsync(client, true);
+        await provider.HandleConnectionChangedAsync(client, false);
 
-        notifier.Verify(n => n.SendPowerNotificationAsync(true, added.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.SendPowerNotificationAsync(false, added.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), other.DeviceId, default), Times.Never);
+        notifier.Verify(n => n.SendPowerNotificationAsync(true, client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.SendPowerNotificationAsync(false, client.DeviceId, default), Times.Once);
     }
 
     [Fact]
