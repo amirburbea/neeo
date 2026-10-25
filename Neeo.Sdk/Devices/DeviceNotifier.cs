@@ -10,6 +10,7 @@ namespace Neeo.Sdk.Devices;
 /// An object provided as a parameter to the <see cref="DeviceNotifierCallback"/> which can be used to send notifications to
 /// the NEEO Brain about changes to the states/values of the various components defined on the device.
 /// </summary>
+/// <remarks>Notifications are queued and sent in the background. Failing to reach the Brain is logged, not thrown.</remarks>
 public interface IDeviceNotifier
 {
     /// <summary>

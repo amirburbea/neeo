@@ -22,7 +22,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     private readonly WebOSClientManager _clientManager;
     private readonly ILogger<WebOSDeviceProvider> _logger;
-    // Device IDs the Brain has added for this adapter (written from the Brain's subscription callbacks, read from client events).
+    // Device IDs the Brain has added for this adapter (written from the Brain's subscription callbacks, read when a client is created).
     private readonly ConcurrentDictionary<string, byte> _subscribedDevices = new(StringComparer.Ordinal);
     private IDeviceNotifier? _notifier;
     private bool _isDisposed;
@@ -32,10 +32,6 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         this._clientManager = clientManager;
         this._logger = logger;
         this._clientManager.ClientAdded += this.ClientManager_ClientAdded;
-        foreach (WebOSClient client in this._clientManager.Clients)
-        {
-            this.AttachClientEvents(client);
-        }
     }
 
     public IDeviceBuilder DeviceBuilder => field ??= Device.Create(DeviceName, DeviceType.TV)
@@ -235,7 +231,12 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     internal async Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
     {
         this._subscribedDevices.TryAdd(deviceId, default);
-        await this.NotifyIfConnectedAsync(this._clientManager.GetOrCreateKnownClient(deviceId)).ConfigureAwait(false);
+        // Starts connecting in the background (a TV that is off is retried, and picked up when it comes on).
+        if (this._clientManager.GetOrCreateKnownClient(deviceId) is { } client)
+        {
+            this.AttachClientEvents(client);
+            await this.NotifyIfConnectedAsync(client).ConfigureAwait(false);
+        }
     }
 
     private Task OnDeviceRemovedAsync(string deviceId, CancellationToken cancellationToken)
@@ -253,22 +254,25 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         foreach (string deviceId in deviceIds)
         {
-            this._subscribedDevices.TryAdd(deviceId, default);
-            // Starts connecting in the background (a TV that is off is retried, and picked up when it comes on).
-            await this.NotifyIfConnectedAsync(this._clientManager.GetOrCreateKnownClient(deviceId)).ConfigureAwait(false);
+            await this.OnDeviceAddedAsync(deviceId, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    // Every client's events are observed from the moment it is created; the handlers only notify for devices the Brain has
-    // added, so the order in which clients and subscriptions arrive does not matter.
-    private void ClientManager_ClientAdded(object? sender, DataEventArgs<WebOSClient> e) => this.AttachClientEvents(e.Data);
+    // A client can be created after the Brain added its device (one whose address was not known at the time).
+    private void ClientManager_ClientAdded(object? sender, DataEventArgs<WebOSClient> e)
+    {
+        if (this._subscribedDevices.ContainsKey(e.Data.DeviceId))
+        {
+            this.AttachClientEvents(e.Data);
+        }
+    }
 
     // A TV that is already connected when the Brain adds it will not report a change.
-    private Task NotifyIfConnectedAsync(WebOSClient? client) => client is { IsConnected: true } ? this.HandleConnectionChangedAsync(client, true) : Task.CompletedTask;
+    private Task NotifyIfConnectedAsync(WebOSClient client) => client.IsConnected ? this.HandleConnectionChangedAsync(client, true) : Task.CompletedTask;
 
     private void AttachClientEvents(WebOSClient client)
     {
-        // Detach first so attaching twice (constructor and Added racing) never subscribes twice.
+        // Detach first so attaching twice (the add callback and ClientAdded racing) never subscribes twice.
         this.DetachClientEvents(client);
         client.Connected += this.Client_Connected;
         client.Disconnected += this.Client_Disconnected;
@@ -290,9 +294,9 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     internal async Task HandleConnectionChangedAsync(object? sender, bool isConnected)
     {
-        if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
+        if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await this.NotifyAsync(() => notifier.SendPowerNotificationAsync(isConnected, client.DeviceId)).ConfigureAwait(false);
+            await notifier.SendPowerNotificationAsync(isConnected, client.DeviceId).ConfigureAwait(false);
         }
     }
 
@@ -300,12 +304,12 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     internal async Task HandleVolumeChangedAsync(object? sender, int volume)
     {
-        if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
+        if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await this.NotifyAsync(() => Task.WhenAll(
+            await Task.WhenAll(
                 notifier.SendNotificationAsync("VOLUME", (double)volume, client.DeviceId),
                 notifier.SendNotificationAsync("VOLUME-LABEL", volume.ToString(CultureInfo.InvariantCulture), client.DeviceId)
-            )).ConfigureAwait(false);
+            ).ConfigureAwait(false);
         }
     }
 
@@ -313,21 +317,9 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     internal async Task HandleForegroundAppChangedAsync(object? sender, string appId)
     {
-        if (sender is WebOSClient client && this._subscribedDevices.ContainsKey(client.DeviceId) && this._notifier is { } notifier)
+        if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await this.NotifyAsync(() => notifier.SendNotificationAsync("APP", appId, client.DeviceId)).ConfigureAwait(false);
-        }
-    }
-
-    private async Task NotifyAsync(Func<Task> send)
-    {
-        try
-        {
-            await send().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogWarning(ex, "Failed to send webOS notification.");
+            await notifier.SendNotificationAsync("APP", appId, client.DeviceId).ConfigureAwait(false);
         }
     }
 

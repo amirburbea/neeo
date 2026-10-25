@@ -134,7 +134,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddPowerStateSensor(this.IsClientReady)
-        .EnableDeviceRoute(this.SetUriPrefix, this.HandleDeviceRouteAsync)
+        .EnableDeviceRoute(uriPrefix => this._uriPrefix = uriPrefix, this.HandleDeviceRouteAsync)
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableRegistration(Constants.RegistrationHeader, Constants.RegistrationDescription, _ => Task.FromResult(this._clientManager.HasCredentials), this.RegisterAsync)
         .EnableNotifications(notifier => this.Notifier = notifier)
@@ -624,7 +624,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     internal async Task HandleClientConnectedAsync(object? sender)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId))
+        if (sender is not KodiClient client)
         {
             return;
         }
@@ -645,18 +645,11 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     internal async Task HandleClientDisconnectedAsync(object? sender)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this.Notifier is not { } notifier)
+        if (sender is not KodiClient client || this.Notifier is not { } notifier)
         {
             return;
         }
-        try
-        {
-            await notifier.SendPowerNotificationAsync(false, client.DeviceId).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogWarning(ex, "Kodi disconnected handling for {DeviceId} failed.", client.DeviceId);
-        }
+        await notifier.SendPowerNotificationAsync(false, client.DeviceId).ConfigureAwait(false);
     }
 
     private void Client_Error(object? sender, DataEventArgs<string> e) => this._logger.LogWarning("Client {deviceId} error encountered: {error}.", ((KodiClient)sender!).DeviceId, e.Data);
@@ -665,30 +658,23 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
 
     internal async Task HandlePlayerStateChangedAsync(object? sender, PlayerState state)
     {
-        if (sender is not KodiClient client || !this.HasDeviceId(client.DeviceId) || this.Notifier is not { } notifier)
+        if (sender is not KodiClient client || this.Notifier is not { } notifier)
         {
             return;
         }
-        try
-        {
-            string deviceId = client.DeviceId;
-            Task[] tasks = state.PlayState is PlayState.Paused
-                ? [
-                    notifier.SendNotificationAsync("PLAYING_SENSOR", false, deviceId),
-                    notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
-                ]
-                : [
-                    notifier.SendNotificationAsync("PLAYING_SENSOR", state.PlayState is PlayState.Playing, deviceId),
-                    notifier.SendNotificationAsync("TITLE_SENSOR", state.NowPlayingLabel, deviceId),
-                    notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
-                    this.NotifyCoverArtAsync(client, state.NowPlayingImage)
-                ];
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogWarning(ex, "Kodi player state notification for {DeviceId} failed.", client.DeviceId);
-        }
+        string deviceId = client.DeviceId;
+        Task[] tasks = state.PlayState is PlayState.Paused
+            ? [
+                notifier.SendNotificationAsync("PLAYING_SENSOR", false, deviceId),
+                notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
+            ]
+            : [
+                notifier.SendNotificationAsync("PLAYING_SENSOR", state.PlayState is PlayState.Playing, deviceId),
+                notifier.SendNotificationAsync("TITLE_SENSOR", state.NowPlayingLabel, deviceId),
+                notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
+                this.NotifyCoverArtAsync(client, state.NowPlayingImage)
+            ];
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     private void Client_VolumeChanged(object? sender, DataEventArgs<int> e) => _ = this.HandleVolumeChangedAsync(sender, e.Data);
@@ -699,14 +685,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        try
-        {
-            await notifier.SendNotificationAsync("VOLUME_SENSOR", volume, deviceId).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogWarning(ex, "Kodi volume notification for {DeviceId} failed.", deviceId);
-        }
+        await notifier.SendNotificationAsync("VOLUME_SENSOR", volume, deviceId).ConfigureAwait(false);
     }
 
     private void ClientManager_ClientAdded(object? sender, DataEventArgs<KodiClient> e) => _ = this.HandleClientAddedAsync(e.Data);
@@ -717,14 +696,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        try
-        {
-            await this.OnClientConnectedAsync(client).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogWarning(ex, "Kodi connection handling for {DeviceId} failed.", client.DeviceId);
-        }
+        await this.OnClientConnectedAsync(client).ConfigureAwait(false);
     }
 
     private DiscoveredDevice CreateDiscoveredDevice(KodiClient client) => new(client.DeviceId, this.GetDisplayName(client), client.IsConnected);
@@ -848,41 +820,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     private void RemoveDeviceId(string deviceId) => this._deviceIds.TryRemove(deviceId, out _);
-
-    private void SetUriPrefix(string prefix)
-    {
-        this._uriPrefix = prefix;
-        _ = RefreshCoverArtAsync();
-
-        Task RefreshCoverArtAsync()
-        {
-            if (this._clientManager.Clients is not { Count: > 0 } clients)
-            {
-                return Task.CompletedTask;
-            }
-            List<Task> tasks = new(clients.Count);
-            foreach (KodiClient client in clients)
-            {
-                if (this.HasDeviceId(client.DeviceId) && KodiDeviceProviderBase.IsClientReady(client))
-                {
-                    tasks.Add(NotifyAsync(client));
-                }
-            }
-            return Task.WhenAll(tasks);
-
-            async Task NotifyAsync(KodiClient client)
-            {
-                try
-                {
-                    await this.NotifyCoverArtAsync(client, client.PlayerState.NowPlayingImage).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    this._logger.LogWarning(ex, "Failed to send cover art for {deviceId}.", client.DeviceId);
-                }
-            }
-        }
-    }
 
     private async Task NotifyCoverArtAsync(KodiClient client, string? image)
     {
