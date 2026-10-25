@@ -181,10 +181,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
         {
             foreach (string key in keys)
             {
-                if (!this.ShouldSuppressAsDuplicate(key, value))
-                {
-                    await this._channel.Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).ConfigureAwait(false);
-                }
+                await this._channel.Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).ConfigureAwait(false);
             }
         }
         catch (ChannelClosedException)
@@ -196,7 +193,7 @@ internal sealed class NotificationService : INotificationService, IDisposable
     private async Task SendAsync(Message message)
     {
         (string key, object data) = message.CacheData;
-        if (this.ShouldSuppressAsDuplicate(key, data))
+        if (this._cache.TryGet(key, out object? cached) && cached.Equals(data))
         {
             // This message is a duplicate of a notification message recently sent.
             return;
@@ -216,11 +213,6 @@ internal sealed class NotificationService : INotificationService, IDisposable
         {
             this._logger.LogError(e, "Failed to send notification.");
         }
-    }
-
-    private bool ShouldSuppressAsDuplicate(string notificationEventKey, object data)
-    {
-        return this._cache.TryGet(notificationEventKey, out object? cached) && cached.Equals(data);
     }
 
     public readonly struct Message(string type, object data, bool isSensorNotification)
