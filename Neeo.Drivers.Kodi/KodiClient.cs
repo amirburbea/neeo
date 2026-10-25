@@ -621,7 +621,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         {
             return existing;
         }
-        ReconnectLoop loop = new(TimeSpan.FromSeconds(15d), TimeSpan.FromMinutes(2d), this.ConnectAsync, logger);
+        ReconnectLoop loop = new(TimeSpan.FromSeconds(5d), TimeSpan.FromMinutes(2d), this.ConnectAsync, logger);
         if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is { } winner)
         {
             loop.Dispose();
