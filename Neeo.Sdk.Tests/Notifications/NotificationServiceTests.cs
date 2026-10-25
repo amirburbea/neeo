@@ -23,6 +23,7 @@ namespace Neeo.Sdk.Tests.Notifications;
 public sealed class NotificationServiceTests : IDisposable
 {
     private readonly List<byte[]> _capturedBodies = [];
+    private readonly Lock _lock = new();
 
     private readonly HttpClient _httpClient;
 
@@ -56,7 +57,7 @@ public sealed class NotificationServiceTests : IDisposable
             {
                 TaskCompletionSource? gate = Volatile.Read(ref this._postGate);
                 byte[] bytes = await request.Content!.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-                lock (this._capturedBodies)
+                lock (this._lock)
                 {
                     this._capturedBodies.Add(bytes);
                 }
@@ -123,7 +124,7 @@ public sealed class NotificationServiceTests : IDisposable
 
         await this.WaitForCapturedBodiesAsync(values.Length);
         string?[] delivered;
-        lock (this._capturedBodies)
+        lock (this._lock)
         {
             delivered = [.. this._capturedBodies.Select(static bytes => JsonDocument.Parse(bytes).RootElement.GetProperty("data").GetString())];
         }
@@ -147,7 +148,7 @@ public sealed class NotificationServiceTests : IDisposable
 
         await this.WaitForCapturedBodiesAsync(3);
         string?[] delivered;
-        lock (this._capturedBodies)
+        lock (this._lock)
         {
             delivered = [.. this._capturedBodies.Select(static bytes => JsonDocument.Parse(bytes).RootElement.GetProperty("data").GetString())];
         }
@@ -257,7 +258,7 @@ public sealed class NotificationServiceTests : IDisposable
     public async Task SendAsync_logs_error_when_http_request_times_out()
     {
         Mock<ILogger<NotificationService>> mockLogger = new();
-        TaskCompletionSource errorLogged = new();
+        TaskCompletionSource errorLogged = new(TaskCreationOptions.RunContinuationsAsynchronously);
         mockLogger
             .Setup(l => l.Log(
                 LogLevel.Error,
@@ -283,7 +284,7 @@ public sealed class NotificationServiceTests : IDisposable
             .ReturnsAsync(["key"]);
 
         using NotificationService service = new(factory.Object, brain.Object, mapping.Object, mockLogger.Object);
-        await service.SendNotificationAsync(Mock.Of<IDeviceAdapter>(), new Notification("dev", "comp", "val"), TestContext.Current.CancellationToken);
+        await service.SendNotificationAsync(Mock.Of<IDeviceAdapter>(), new("dev", "comp", "val"), TestContext.Current.CancellationToken);
 
         await errorLogged.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         mockLogger.Verify(
@@ -302,7 +303,7 @@ public sealed class NotificationServiceTests : IDisposable
         DateTime deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline)
         {
-            lock (this._capturedBodies)
+            lock (this._lock)
             {
                 if (this._capturedBodies.Count >= count)
                 {
@@ -315,7 +316,7 @@ public sealed class NotificationServiceTests : IDisposable
 
     private byte[] GetCapturedBody()
     {
-        lock (this._capturedBodies)
+        lock (this._lock)
         {
             return this._capturedBodies.Count == 1
                 ? this._capturedBodies[0]

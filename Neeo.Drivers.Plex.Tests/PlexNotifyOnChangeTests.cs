@@ -62,6 +62,7 @@ public sealed class PlexNotifyOnChangeTests
     {
         Subject<int> values = new();
         List<int> sent = [];
+        Lock sentLock = new();
 
         using IDisposable subscription = PlexDeviceProviderBase.NotifyOnChange(
             values,
@@ -73,7 +74,7 @@ public sealed class PlexNotifyOnChangeTests
                 {
                     throw new HttpRequestException("Brain unreachable");
                 }
-                lock (sent)
+                lock (sentLock)
                 {
                     sent.Add(value);
                 }
@@ -83,13 +84,16 @@ public sealed class PlexNotifyOnChangeTests
         );
         values.OnNext(0);
         values.OnNext(1);
-        await PlexNotifyOnChangeTests.WaitForAsync(() => sent.Count == 1);
+        await PlexNotifyOnChangeTests.WaitForAsync(() => { lock (sentLock) return sent.Count == 1; });
         values.OnNext(2);
         await Task.Delay(100, TestContext.Current.CancellationToken);
         values.OnNext(3);
-        await PlexNotifyOnChangeTests.WaitForAsync(() => sent.Count == 2);
+        await PlexNotifyOnChangeTests.WaitForAsync(() => { lock (sentLock) return sent.Count == 2; });
 
-        Assert.Equal([1, 3], sent);
+        lock (sentLock)
+        {
+            Assert.Equal([1, 3], sent);
+        }
     }
 
     [Fact]

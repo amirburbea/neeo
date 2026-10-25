@@ -98,12 +98,13 @@ internal sealed class RecordingLogger<T> : RecordingLogger, ILogger<T>
 internal class RecordingLogger : ILogger
 {
     private readonly System.Collections.Generic.List<(LogLevel Level, string Message)> _entries = [];
+    private readonly Lock _lock = new();
 
     public System.Collections.Generic.IReadOnlyList<(LogLevel Level, string Message)> Entries
     {
         get
         {
-            lock (this._entries)
+            lock (this._lock)
             {
                 return [.. this._entries];
             }
@@ -116,7 +117,7 @@ internal class RecordingLogger : ILogger
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        lock (this._entries)
+        lock (this._lock)
         {
             this._entries.Add((logLevel, formatter(state, exception)));
         }

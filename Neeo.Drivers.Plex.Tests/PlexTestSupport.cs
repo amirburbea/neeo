@@ -43,12 +43,13 @@ internal sealed class FakeSettingsStore : Dictionary<string, string>, ISettingsS
 internal sealed class RecordingLogger : ILogger
 {
     private readonly List<(LogLevel Level, string Message)> _entries = [];
+    private readonly Lock _lock = new();
 
     public IReadOnlyList<(LogLevel Level, string Message)> Entries
     {
         get
         {
-            lock (this._entries)
+            lock (this._lock)
             {
                 return [.. this._entries];
             }
@@ -61,7 +62,7 @@ internal sealed class RecordingLogger : ILogger
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        lock (this._entries)
+        lock (this._lock)
         {
             this._entries.Add((logLevel, formatter(state, exception)));
         }
