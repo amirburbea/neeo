@@ -49,14 +49,15 @@ internal static class Server
         }
     }
 
-    private static void ConfigureHttpClient(IServiceCollection services)
+    internal static void ConfigureHttpClient(IServiceCollection services)
     {
-        void AddBrainClient(string name) => services
+        IHttpClientBuilder AddBrainClient(string name) => services
             .AddHttpClient(name)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All });
 
         AddBrainClient(nameof(ApiClient));
-        AddBrainClient(NotificationService.NotificationsHttpClientName);
+        AddBrainClient(NotificationService.NotificationsHttpClientName)
+            .ConfigureHttpClient(static client => client.Timeout = TimeSpan.FromSeconds(5d));
     }
 
     internal static void ConfigureJsonOptions(JsonSerializerOptions options)

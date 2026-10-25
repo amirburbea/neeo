@@ -7,12 +7,14 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Moq.Protected;
 using Neeo.Sdk;
 using Neeo.Sdk.Devices;
 using Neeo.Sdk.Notifications;
+using Neeo.Sdk.Rest;
 using Xunit;
 
 namespace Neeo.Sdk.Tests.Notifications;
@@ -235,6 +237,19 @@ public sealed class NotificationServiceTests : IDisposable
         mockAdapter.Setup(adapter => adapter.AdapterName).Returns(adapterName);
         mockAdapter.Setup(adapter => adapter.DeviceName).Returns(adapterName);
         return mockAdapter.Object;
+    }
+
+    [Fact]
+    public void Notifications_client_has_configured_timeout()
+    {
+        ServiceCollection services = new();
+        Server.ConfigureHttpClient(services);
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IHttpClientFactory factory = provider.GetRequiredService<IHttpClientFactory>();
+
+        using HttpClient client = factory.CreateClient(NotificationService.NotificationsHttpClientName);
+
+        Assert.Equal(TimeSpan.FromSeconds(5), client.Timeout);
     }
 
     private async Task WaitForCapturedBodiesAsync(int count)
