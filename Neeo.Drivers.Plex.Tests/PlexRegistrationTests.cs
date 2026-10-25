@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Neeo.Sdk.Devices.Setup;
 using Xunit;
 
 namespace Neeo.Drivers.Plex.Tests;
@@ -94,6 +95,19 @@ public sealed class PlexRegistrationTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => provider.QueryIsRegisteredAsync(cts.Token));
 
         Assert.Equal(Token, tokens.AuthToken);
+    }
+
+    [Fact]
+    public async Task Register_fails_with_a_message_when_plex_rejects_the_credentials()
+    {
+        FakeTokenStore tokens = new();
+        using PlexMediaPlayerDeviceProvider provider = PlexRegistrationTests.CreateProvider(tokens, new((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized))));
+
+        RegistrationResult result = await provider.RegisterAsync("user", "wrong-password", TestContext.Current.CancellationToken);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Unauthorized", result.Error);
+        Assert.Null(tokens.AuthToken);
     }
 
     public static TheoryData<Exception> NetworkFailures() => new()

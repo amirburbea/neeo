@@ -616,7 +616,7 @@ public abstract partial class PlexDeviceProviderBase(
         }
     }
 
-    private async Task<RegistrationResult> RegisterAsync(string userName, string password, CancellationToken cancellationToken)
+    internal async Task<RegistrationResult> RegisterAsync(string userName, string password, CancellationToken cancellationToken)
     {
         try
         {
