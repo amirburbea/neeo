@@ -385,7 +385,19 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
             generator.Emit(OpCodes.Ldfld, server);
             for (int index = 0; index < parameters.Length; index++)
             {
-                generator.Emit(OpCodes.Ldarg_S, (short)(index + 1));
+                if (index < 3)
+                {
+                    generator.Emit(index switch
+                    {
+                        0 => OpCodes.Ldarg_1,
+                        1 => OpCodes.Ldarg_2,
+                        _ => OpCodes.Ldarg_3,
+                    });
+                }
+                else
+                {
+                    generator.Emit(OpCodes.Ldarg_S, (byte)(index + 1));
+                }
             }
             generator.Emit(OpCodes.Callvirt, declaredMethod);
             generator.Emit(OpCodes.Ret);
