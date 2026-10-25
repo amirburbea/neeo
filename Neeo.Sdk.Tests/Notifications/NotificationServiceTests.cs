@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Moq.Protected;
@@ -250,6 +251,50 @@ public sealed class NotificationServiceTests : IDisposable
         using HttpClient client = factory.CreateClient(NotificationService.NotificationsHttpClientName);
 
         Assert.Equal(TimeSpan.FromSeconds(5), client.Timeout);
+    }
+
+    [Fact]
+    public async Task SendAsync_logs_error_when_http_request_times_out()
+    {
+        Mock<ILogger<NotificationService>> mockLogger = new();
+        TaskCompletionSource errorLogged = new();
+        mockLogger
+            .Setup(l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
+            .Callback(() => errorLogged.TrySetResult());
+
+        Mock<HttpMessageHandler> handlerMock = new();
+        handlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new TaskCanceledException("HttpClient timeout", new TimeoutException()));
+
+        using HttpClient httpClient = new(handlerMock.Object);
+        Mock<IHttpClientFactory> factory = new();
+        factory.Setup(f => f.CreateClient(NotificationService.NotificationsHttpClientName)).Returns(httpClient);
+        Mock<IBrain> brain = new();
+        brain.Setup(b => b.ServiceEndPoint).Returns(new IPEndPoint(IPAddress.Loopback, 3000));
+        Mock<INotificationMapping> mapping = new();
+        mapping.Setup(m => m.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["key"]);
+
+        using NotificationService service = new(factory.Object, brain.Object, mapping.Object, mockLogger.Object);
+        await service.SendNotificationAsync(Mock.Of<IDeviceAdapter>(), new Notification("dev", "comp", "val"), TestContext.Current.CancellationToken);
+
+        await errorLogged.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        mockLogger.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<TaskCanceledException>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once
+        );
     }
 
     private async Task WaitForCapturedBodiesAsync(int count)

@@ -205,9 +205,9 @@ internal sealed class NotificationService : INotificationService, IDisposable
                 this._cache.AddOrUpdate(key, data);
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (this._cancellationSource.IsCancellationRequested)
         {
-            // Ignore cancellation during shutdown
+            // Ignore cancellation during shutdown, HTTP timeouts will still be logged below.
         }
         catch (Exception e)
         {
