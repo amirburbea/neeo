@@ -142,7 +142,11 @@ public static class HttpClientMethods
         if (!response.IsSuccessStatusCode)
         {
             string contents = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            throw new WebException($"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}");
+            throw new HttpRequestException(
+                $"Server returned status {(int)response.StatusCode} ({Enum.GetName(response.StatusCode)}). ${contents}",
+                inner: null,
+                statusCode: response.StatusCode
+            );
         }
         return (await response.Content.ReadFromJsonAsync(typeInfo, cancellationToken).ConfigureAwait(false))!;
     }
