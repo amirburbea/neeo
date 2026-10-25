@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Neeo.Sdk.Devices;
+using Neeo.Sdk.Utilities;
 using Xunit;
 
 namespace Neeo.Drivers.Plex.Tests;
@@ -44,6 +45,27 @@ public sealed class PlexPowerNotificationTests
         provider.DeviceBuilder.NotifierCallback!(notifier.Object);
 
         await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
+
+        notifier.Verify(n => n.SendPowerNotificationAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_server_not_found_when_added_by_the_brain_attaches_when_later_discovered()
+    {
+        const string MachineIdentifier = "server-1";
+        (Mock<IPlexServer> server, _) = PlexPowerNotificationTests.CreateServer(MachineIdentifier, isConnected: true);
+        Mock<IPlexServerManager> manager = new();
+        manager.SetupSequence(m => m.GetServer(MachineIdentifier))
+            .Returns((IPlexServer?)null)
+            .Returns(server.Object);
+        Mock<IDeviceNotifier> notifier = new();
+        PlexMediaPlayerDeviceProvider provider = PlexPowerNotificationTests.CreateProvider(manager.Object);
+        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
+
+        await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
+        notifier.Verify(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        manager.Raise(m => m.ServerDiscovered += null, new DataEventArgs<ServerData>(new ServerData("Plex", MachineIdentifier, "127.0.0.1", 32400)));
 
         notifier.Verify(n => n.SendPowerNotificationAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
     }

@@ -35,6 +35,41 @@ public abstract partial class PlexDeviceProviderBase(
 ) : IDeviceProvider, IDisposable
 {
     private readonly Task _startupTask = PlexDeviceProviderBase.CreateStartupTask(applicationLifetime);
+    private readonly ConcurrentDictionary<string, byte> _machineIdentifiers = [];
+    private readonly ConcurrentDictionary<string, IPlexServer> _servers = [];
+    private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
+    private int _subscribed;
+    private IDeviceNotifier? _notifier;
+    private string _uriPrefix = string.Empty;
+
+    private void EnsureSubscribed()
+    {
+        if (Interlocked.Exchange(ref this._subscribed, 1) == 0)
+        {
+            serverManager.ServerDiscovered += this.ServerManager_ServerDiscovered;
+        }
+    }
+
+    private void ServerManager_ServerDiscovered(object? sender, DataEventArgs<ServerData> e)
+    {
+        string machineIdentifier = e.Data.MachineIdentifier;
+        if (this._machineIdentifiers.ContainsKey(machineIdentifier) && !this._servers.ContainsKey(machineIdentifier))
+        {
+            _ = AttachAsync();
+        }
+
+        async Task AttachAsync()
+        {
+            try
+            {
+                await this.OnServerAddedAsync(machineIdentifier, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to attach discovered Plex server {MachineIdentifier}.", machineIdentifier);
+            }
+        }
+    }
 
     protected static readonly Dictionary<Buttons, Func<IPlexServer, CancellationToken, Task>> ButtonHandlers = new()
     {
@@ -64,15 +99,14 @@ public abstract partial class PlexDeviceProviderBase(
 
     public static string? ResolveImageUrl(string token) => PlexDeviceProviderBase._imageUrlTokens.Resolve(token);
 
-    private readonly HttpClient _httpClient = httpClientFactory.CreateClient(nameof(Plex));
-    private readonly ConcurrentDictionary<string, IPlexServer> _servers = [];
-    private IDeviceNotifier? _notifier;
-    private string _uriPrefix = string.Empty;
-
     public IDeviceBuilder DeviceBuilder => field ??= this.CreateDevice();
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref this._subscribed, 0) == 1)
+        {
+            serverManager.ServerDiscovered -= this.ServerManager_ServerDiscovered;
+        }
         this._httpClient.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -459,6 +493,8 @@ public abstract partial class PlexDeviceProviderBase(
 
     private async Task OnServerAddedAsync(string machineIdentifier, CancellationToken cancellationToken)
     {
+        this._machineIdentifiers.TryAdd(machineIdentifier, default);
+        this.EnsureSubscribed();
         if (serverManager.GetServer(machineIdentifier) is not { } server)
         {
             logger.LogWarning("Plex device added but server not found: {Id}", machineIdentifier);
@@ -564,6 +600,7 @@ public abstract partial class PlexDeviceProviderBase(
 
     private Task OnServerRemovedAsync(string machineIdentifier, CancellationToken cancellationToken)
     {
+        this._machineIdentifiers.TryRemove(machineIdentifier, out _);
         if (this._servers.TryRemove(machineIdentifier, out IPlexServer? server))
         {
             logger.LogInformation("Plex device removed: {Name}", machineIdentifier);
