@@ -90,9 +90,9 @@ internal static class Server
             .AddSingleton<IBrain>(brain)
             .AddSingleton(devices)
             .AddSingleton((SdkAdapterName)$"src-{UniqueNameGenerator.Generate(adapterName)}")
+            .AddHostedService<UriPrefixNotifier>()
             .AddHostedService<SdkRegistration>()
-            .AddHostedService<SubscriptionsNotifier>()
-            .AddHostedService<UriPrefixNotifier>();
+            .AddHostedService<SubscriptionsNotifier>();
         Array.ForEach(serviceConfigurations ?? [], configuration => configuration.ConfigureServices(services));
     }
 

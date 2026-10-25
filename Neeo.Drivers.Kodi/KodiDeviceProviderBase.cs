@@ -134,7 +134,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         .AddDirectory("PvrLibrary", "PVR", default, this.PopulateRootDirectoryAsync, this.HandleDirectoryActionAsync, ".pvr")
         .AddDirectory("QUEUE", "Queue", DirectoryRole.Queue, this.PopulateQueueDirectoryAsync, this.HandleDirectoryActionAsync, ".queue")
         .AddPowerStateSensor(this.IsClientReady)
-        .EnableDeviceRoute(this.SetUriPrefix, this.HandleDeviceRouteAsync)
+        .EnableDeviceRoute(uriPrefix => this._uriPrefix = uriPrefix, this.HandleDeviceRouteAsync)
         .EnableDiscovery(Constants.DiscoveryHeader, Constants.DiscoveryDescription, this.DiscoverAsync)
         .EnableRegistration(Constants.RegistrationHeader, Constants.RegistrationDescription, _ => Task.FromResult(this._clientManager.HasCredentials), this.RegisterAsync)
         .EnableNotifications(notifier => this.Notifier = notifier)
@@ -828,29 +828,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     private void RemoveDeviceId(string deviceId) => this._deviceIds.TryRemove(deviceId, out _);
-
-    private void SetUriPrefix(string prefix)
-    {
-        this._uriPrefix = prefix;
-        _ = RefreshCoverArtAsync();
-
-        Task RefreshCoverArtAsync()
-        {
-            if (this._clientManager.Clients is not { Count: > 0 } clients)
-            {
-                return Task.CompletedTask;
-            }
-            List<Task> tasks = new(clients.Count);
-            foreach (KodiClient client in clients)
-            {
-                if (this.HasDeviceId(client.DeviceId) && KodiDeviceProviderBase.IsClientReady(client))
-                {
-                    tasks.Add(this.NotifyAsync("cover art notification", client.DeviceId, () => this.NotifyCoverArtAsync(client, client.PlayerState.NowPlayingImage)));
-                }
-            }
-            return Task.WhenAll(tasks);
-        }
-    }
 
     private async Task NotifyCoverArtAsync(KodiClient client, string? image)
     {
