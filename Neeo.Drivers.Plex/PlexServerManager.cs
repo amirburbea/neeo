@@ -21,6 +21,8 @@ namespace Neeo.Drivers.Plex;
 
 public interface IPlexServerManager
 {
+    event EventHandler<DataEventArgs<ServerData>>? ServerDiscovered;
+
     IReadOnlyDictionary<string, ServerData> Data { get; }
 
     IPlexServer? GetServer(string machineIdentifier);
@@ -43,6 +45,8 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
     private readonly Dictionary<string, (PlexServer Server, List<IPlexServer> Proxies)> _servers = [];
     private readonly ISettingsStore<PlexServerManager> _settings;
     private readonly IPlexTokenStore _tokenStore;
+
+    public event EventHandler<DataEventArgs<ServerData>>? ServerDiscovered;
 
     public PlexServerManager(
         IHttpClientFactory httpClientFactory,
@@ -198,12 +202,13 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
                     }
                     if ((name, machineIdentifier, port) is (not "", not "", not 0))
                     {
+                        ServerData serverData = new(name, machineIdentifier, ipAddress, port);
                         this._discoveryData.AddOrUpdate(
                             machineIdentifier,
                             (id) =>
                             {
                                 this._logger.LogInformation("Discovered Plex server '{Name}' ({IPAddress})", name, ipAddress);
-                                return new(name, id, ipAddress, port);
+                                return serverData;
                             },
                             (id, existing) =>
                             {
@@ -212,9 +217,10 @@ internal sealed class PlexServerManager : IPlexServerManager, IDisposable
                                     return existing;
                                 }
                                 this._logger.LogInformation("Plex server '{Name}' ({IPAddress}) updated", name, ipAddress);
-                                return new(name, id, ipAddress, port);
+                                return serverData;
                             }
                         );
+                        this.ServerDiscovered?.Invoke(this, new(serverData));
                         break;
                     }
                 }
