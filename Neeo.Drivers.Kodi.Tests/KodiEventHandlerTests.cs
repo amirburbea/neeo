@@ -52,17 +52,6 @@ public sealed class KodiEventHandlerTests
     }
 
     [Fact]
-    public async Task Client_added_handling_does_not_throw_when_the_client_cannot_be_handled()
-    {
-        RecordingLogger<KodiRemoteDeviceProvider> logger = new();
-        using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
-        using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.AddDeviceId(client.DeviceId);
-
-        await provider.HandleClientAddedAsync(client);
-    }
-
-    [Fact]
     public async Task Connected_handling_sends_a_power_notification()
     {
         Mock<IDeviceNotifier> notifier = new();

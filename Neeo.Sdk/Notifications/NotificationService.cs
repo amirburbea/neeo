@@ -177,12 +177,19 @@ internal sealed class NotificationService : INotificationService, IDisposable
             this._logger.LogError(e, "Failed to look up the notification keys for {Notification}.", notification);
             return;
         }
-        foreach (string key in keys)
+        try
         {
-            if (!this.ShouldSuppressAsDuplicate(key, value))
+            foreach (string key in keys)
             {
-                await this._channel.Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).ConfigureAwait(false);
+                if (!this.ShouldSuppressAsDuplicate(key, value))
+                {
+                    await this._channel.Writer.WriteAsync(new(key, value, isSensorNotification), cancellationToken).ConfigureAwait(false);
+                }
             }
+        }
+        catch (ChannelClosedException)
+        {
+            // The service is shutting down; there is nothing left to deliver to.
         }
     }
 

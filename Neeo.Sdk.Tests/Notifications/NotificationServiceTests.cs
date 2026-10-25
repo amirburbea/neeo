@@ -140,6 +140,21 @@ public sealed class NotificationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SendNotificationAsync_should_not_throw_once_the_service_is_shutting_down()
+    {
+        Mock<IHttpClientFactory> factory = new(MockBehavior.Strict);
+        factory.Setup(f => f.CreateClient(NotificationService.NotificationsHttpClientName)).Returns(this._httpClient);
+        Mock<IBrain> brain = new(MockBehavior.Strict);
+        brain.Setup(b => b.ServiceEndPoint).Returns(new IPEndPoint(IPAddress.Loopback, 3000));
+        NotificationService service = new(factory.Object, brain.Object, this._mockNotificationMapping.Object, NullLogger<NotificationService>.Instance);
+        service.Dispose();
+
+        await service.SendNotificationAsync(this.CreateDeviceAdapter(), new(Constants.DeviceId, Constants.ComponentName, Constants.Value), TestContext.Current.CancellationToken);
+
+        Assert.Empty(this._capturedBodies);
+    }
+
+    [Fact]
     public async Task SendNotificationAsync_should_still_throw_when_the_caller_cancels_the_key_lookup()
     {
         using CancellationTokenSource cancellation = new();
