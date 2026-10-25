@@ -62,11 +62,19 @@ public sealed class WebOSClient(
 
     public bool IsConnected => this._webSocket is { State: WebSocketState.Open } && this._isRegistered;
 
-    public int Volume { get; private set; }
+    public int Volume
+    {
+        get;
+        private set => this.SetValue(ref field, value, this.VolumeChanged);
+    }
 
     public bool IsMuted { get; private set; }
 
-    public string ForegroundApp { get; private set; } = string.Empty;
+    public string ForegroundApp
+    {
+        get;
+        private set => this.SetValue(ref field, value, this.ForegroundAppChanged);
+    } = string.Empty;
 
     /// <summary>
     /// Connects using the stored client key. Never prompts on the TV - an unpaired client fails (see <see cref="PairAsync"/>).
@@ -417,7 +425,6 @@ public sealed class WebOSClient(
         if (payload.TryGetProperty("volume", out JsonElement volumeProp) && volumeProp.TryGetInt32(out int volume))
         {
             this.Volume = volume;
-            this.VolumeChanged?.Invoke(this, volume);
         }
         if (payload.TryGetProperty("muted", out JsonElement mutedProp))
         {
@@ -430,7 +437,6 @@ public sealed class WebOSClient(
         if (payload.TryGetProperty("appId", out JsonElement appProp) && appProp.GetString() is { } appId)
         {
             this.ForegroundApp = appId;
-            this.ForegroundAppChanged?.Invoke(this, appId);
         }
     }
 
@@ -629,6 +635,16 @@ public sealed class WebOSClient(
         {
             this._sendLock.Release();
         }
+    }
+
+    private void SetValue<TValue>(ref TValue field, TValue value, EventHandler<DataEventArgs<TValue>>? valueChanged)
+    {
+        if (EqualityComparer<TValue>.Default.Equals(field, value))
+        {
+            return;
+        }
+        field = value;
+        valueChanged?.Invoke(this, value);
     }
 
     public void Dispose()
