@@ -628,7 +628,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        await this.NotifyAsync("connected handling", client.DeviceId, async () =>
+        try
         {
             if (this.Notifier is { } notifier)
             {
@@ -636,7 +636,11 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
             }
             await client.RefreshStateAsync().ConfigureAwait(false);
             await this.NotifyConnectedAsync(client).ConfigureAwait(false);
-        }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this._logger.LogWarning(ex, "Kodi connected handling for {DeviceId} failed.", client.DeviceId);
+        }
     }
 
     internal async Task HandleClientDisconnectedAsync(object? sender)
@@ -645,7 +649,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        await this.NotifyAsync("disconnected handling", client.DeviceId, () => notifier.SendPowerNotificationAsync(false, client.DeviceId)).ConfigureAwait(false);
+        await notifier.SendPowerNotificationAsync(false, client.DeviceId).ConfigureAwait(false);
     }
 
     private void Client_Error(object? sender, DataEventArgs<string> e) => this._logger.LogWarning("Client {deviceId} error encountered: {error}.", ((KodiClient)sender!).DeviceId, e.Data);
@@ -659,7 +663,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
             return;
         }
         string deviceId = client.DeviceId;
-        await this.NotifyAsync("player state notification", deviceId, () => Task.WhenAll(state.PlayState is PlayState.Paused
+        Task[] tasks = state.PlayState is PlayState.Paused
             ? [
                 notifier.SendNotificationAsync("PLAYING_SENSOR", false, deviceId),
                 notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
@@ -669,8 +673,8 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
                 notifier.SendNotificationAsync("TITLE_SENSOR", state.NowPlayingLabel, deviceId),
                 notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
                 this.NotifyCoverArtAsync(client, state.NowPlayingImage)
-            ]
-        )).ConfigureAwait(false);
+            ];
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     private void Client_VolumeChanged(object? sender, DataEventArgs<int> e) => _ = this.HandleVolumeChangedAsync(sender, e.Data);
@@ -681,7 +685,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        await this.NotifyAsync("volume notification", deviceId, () => notifier.SendNotificationAsync("VOLUME_SENSOR", volume, deviceId)).ConfigureAwait(false);
+        await notifier.SendNotificationAsync("VOLUME_SENSOR", volume, deviceId).ConfigureAwait(false);
     }
 
     private void ClientManager_ClientAdded(object? sender, DataEventArgs<KodiClient> e) => _ = this.HandleClientAddedAsync(e.Data);
@@ -692,7 +696,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        await this.NotifyAsync("connection handling", client.DeviceId, () => this.OnClientConnectedAsync(client)).ConfigureAwait(false);
+        await this.OnClientConnectedAsync(client).ConfigureAwait(false);
     }
 
     private DiscoveredDevice CreateDiscoveredDevice(KodiClient client) => new(client.DeviceId, this.GetDisplayName(client), client.IsConnected);
@@ -772,18 +776,6 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     }
 
     private bool IsClientReady(string deviceId) => this.GetClientOrDefault(deviceId) is { } client && KodiDeviceProviderBase.IsClientReady(client);
-
-    private async Task NotifyAsync(string description, string deviceId, Func<Task> send)
-    {
-        try
-        {
-            await send().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            this._logger.LogWarning(ex, "Kodi {Description} for {DeviceId} failed.", description, deviceId);
-        }
-    }
 
     private Task<bool> NotifyConnectedAsync(KodiClient client, CancellationToken cancellationToken = default)
     {

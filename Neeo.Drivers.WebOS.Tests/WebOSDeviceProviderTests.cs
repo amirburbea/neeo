@@ -177,7 +177,7 @@ public sealed class WebOSDeviceProviderTests
     }
 
     [Fact]
-    public async Task Notification_handlers_do_not_throw_when_sending_fails()
+    public async Task Volume_and_app_changes_send_notifications()
     {
         PhysicalAddress mac = PhysicalAddress.Parse("001122334455");
         InMemorySettings settings = new();
@@ -185,9 +185,6 @@ public sealed class WebOSDeviceProviderTests
         using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
         WebOSClient client = manager.GetOrCreateClient(IPAddress.Loopback, mac);
         Mock<IDeviceNotifier> notifier = new();
-        notifier
-            .Setup(n => n.SendNotificationAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<string>(), default))
-            .ThrowsAsync(new InvalidOperationException("Brain unreachable"));
         provider.DeviceBuilder.NotifierCallback!(notifier.Object);
         await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
 
@@ -215,23 +212,6 @@ public sealed class WebOSDeviceProviderTests
 
         notifier.Verify(n => n.SendPowerNotificationAsync(true, client.DeviceId, default), Times.Once);
         notifier.Verify(n => n.SendPowerNotificationAsync(false, client.DeviceId, default), Times.Once);
-    }
-
-    [Fact]
-    public async Task Connection_handling_does_not_throw_when_the_power_notification_fails()
-    {
-        InMemorySettings settings = new();
-        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
-        using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
-        WebOSClient client = manager.GetOrCreateClient(IPAddress.Loopback, PhysicalAddress.Parse("001122334455"));
-        Mock<IDeviceNotifier> notifier = new();
-        notifier.Setup(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), It.IsAny<string>(), default)).ThrowsAsync(new InvalidOperationException("Brain unreachable"));
-        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
-        await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
-
-        await provider.HandleConnectionChangedAsync(client, true);
-
-        notifier.Verify(n => n.SendPowerNotificationAsync(true, client.DeviceId, default), Times.Once);
     }
 
     [Fact]

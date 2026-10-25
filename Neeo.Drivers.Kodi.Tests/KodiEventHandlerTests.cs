@@ -15,8 +15,8 @@ using Xunit;
 namespace Neeo.Drivers.Kodi.Tests;
 
 /// <summary>
-/// The client event handlers are <c>async void</c>, so an exception escaping them terminates the process. Each one delegates to
-/// a method that must handle its own failures.
+/// The connected handler shows a "Connected to ..." toast over an RPC that fails when the client has just dropped, so it must
+/// handle its own failures. The notifier does not throw when the Brain is unreachable, so the others need no such guard.
 /// </summary>
 public sealed class KodiEventHandlerTests
 {
@@ -35,22 +35,6 @@ public sealed class KodiEventHandlerTests
         Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("connected handling"));
     }
 
-    [Theory]
-    [InlineData(PlayState.Playing)]
-    [InlineData(PlayState.Paused)]
-    [InlineData(PlayState.Stopped)]
-    public async Task Player_state_handling_does_not_throw_when_a_notification_fails(PlayState playState)
-    {
-        RecordingLogger<KodiRemoteDeviceProvider> logger = new();
-        using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
-        using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.Notifier = KodiEventHandlerTests.CreateFailingNotifier();
-
-        await provider.HandlePlayerStateChangedAsync(client, KodiEventHandlerTests._playing with { PlayState = playState });
-
-        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("player state notification"));
-    }
-
     [Fact]
     public async Task Player_state_handling_sends_the_sensors_when_notifications_succeed()
     {
@@ -65,19 +49,6 @@ public sealed class KodiEventHandlerTests
 
         notifier.Verify(n => n.SendNotificationAsync("PLAYING_SENSOR", false, client.DeviceId, It.IsAny<CancellationToken>()), Times.Once);
         notifier.Verify(n => n.SendNotificationAsync("DESCRIPTION_SENSOR", "Description", client.DeviceId, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Volume_handling_does_not_throw_when_the_notification_fails()
-    {
-        RecordingLogger<KodiRemoteDeviceProvider> logger = new();
-        using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
-        using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.Notifier = KodiEventHandlerTests.CreateFailingNotifier();
-
-        await provider.HandleVolumeChangedAsync(client, 42);
-
-        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("volume notification"));
     }
 
     [Fact]
@@ -115,29 +86,6 @@ public sealed class KodiEventHandlerTests
         await provider.HandleClientDisconnectedAsync(client);
 
         notifier.Verify(n => n.SendPowerNotificationAsync(false, client.DeviceId, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Disconnected_handling_does_not_throw_when_the_notification_fails()
-    {
-        RecordingLogger<KodiRemoteDeviceProvider> logger = new();
-        Mock<IDeviceNotifier> notifier = new();
-        notifier.Setup(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new HttpRequestException("Brain unreachable"));
-        using KodiRemoteDeviceProvider provider = KodiEventHandlerTests.CreateProvider(logger);
-        using KodiClient client = KodiEventHandlerTests.CreateClient();
-        provider.Notifier = notifier.Object;
-
-        await provider.HandleClientDisconnectedAsync(client);
-
-        Assert.Contains(logger.Entries, static entry => entry.Level == LogLevel.Warning && entry.Message.Contains("disconnected handling"));
-    }
-
-    private static IDeviceNotifier CreateFailingNotifier()
-    {
-        Mock<IDeviceNotifier> notifier = new();
-        notifier.Setup(n => n.SendNotificationAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new HttpRequestException("Brain unreachable"));
-        notifier.Setup(n => n.SendNotificationAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ThrowsAsync(new HttpRequestException("Brain unreachable"));
-        return notifier.Object;
     }
 
     private static KodiClient CreateClient() => new("Kodi", IPAddress.Loopback, 8080, new RecordingLogger());
