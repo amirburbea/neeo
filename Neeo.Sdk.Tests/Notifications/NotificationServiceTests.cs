@@ -29,6 +29,8 @@ public sealed class NotificationServiceTests : IDisposable
 
     private readonly Task _postCompleted;
 
+    private TaskCompletionSource? _postGate;
+
     public NotificationServiceTests()
     {
         this._mockNotificationMapping
@@ -49,6 +51,7 @@ public sealed class NotificationServiceTests : IDisposable
                 ItExpr.IsAny<CancellationToken>())
             .Returns(async (HttpRequestMessage request, CancellationToken cancellationToken) =>
             {
+                TaskCompletionSource? gate = Volatile.Read(ref this._postGate);
                 byte[] bytes = await request.Content!.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
                 lock (this._capturedBodies)
                 {
@@ -56,6 +59,10 @@ public sealed class NotificationServiceTests : IDisposable
                 }
 
                 tcs.TrySetResult();
+                if (gate is not null)
+                {
+                    await gate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = JsonContent.Create(new SuccessResponse(true), options: JsonSerializerOptions.Web),
@@ -118,6 +125,30 @@ public sealed class NotificationServiceTests : IDisposable
             delivered = [.. this._capturedBodies.Select(static bytes => JsonDocument.Parse(bytes).RootElement.GetProperty("data").GetString())];
         }
         Assert.Equal(values, delivered);
+    }
+
+    [Fact]
+    public async Task Notification_returning_to_the_last_sent_value_while_an_update_is_in_flight_is_not_dropped()
+    {
+        IDeviceAdapter adapter = this.CreateDeviceAdapter();
+        await this._notificationService.SendNotificationAsync(adapter, new(Constants.DeviceId, Constants.ComponentName, "A"), TestContext.Current.CancellationToken);
+        await this.WaitForCapturedBodiesAsync(1);
+        TaskCompletionSource gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Volatile.Write(ref this._postGate, gate);
+        await this._notificationService.SendNotificationAsync(adapter, new(Constants.DeviceId, Constants.ComponentName, "B"), TestContext.Current.CancellationToken);
+        await this.WaitForCapturedBodiesAsync(2);
+        // "A" is now cached as the last sent value while "B" is still in flight; a duplicate "B" followed by "A" must suppress only the duplicate "B".
+        await this._notificationService.SendNotificationAsync(adapter, new(Constants.DeviceId, Constants.ComponentName, "B"), TestContext.Current.CancellationToken);
+        await this._notificationService.SendNotificationAsync(adapter, new(Constants.DeviceId, Constants.ComponentName, "A"), TestContext.Current.CancellationToken);
+        gate.SetResult();
+
+        await this.WaitForCapturedBodiesAsync(3);
+        string?[] delivered;
+        lock (this._capturedBodies)
+        {
+            delivered = [.. this._capturedBodies.Select(static bytes => JsonDocument.Parse(bytes).RootElement.GetProperty("data").GetString())];
+        }
+        Assert.Equal(["A", "B", "A"], delivered);
     }
 
     [Fact]
