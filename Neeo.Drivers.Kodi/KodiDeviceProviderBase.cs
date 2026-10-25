@@ -733,6 +733,10 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         if (buttonName == TextAttribute.GetText(Buttons.PowerOn) && PhysicalAddress.TryParse(deviceId, out PhysicalAddress? macAddress))
         {
             await WakeOnLan.WakeAsync(macAddress, cancellationToken).ConfigureAwait(false);
+            if (this.GetClientOrDefault(deviceId) is null)
+            {
+                _ = this._clientManager.DiscoverAsync(10000, client => client.DeviceId == deviceId, CancellationToken.None);
+            }
         }
         if (this.GetClientOrDefault(deviceId) is not { } client)
         {
@@ -802,6 +806,10 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         if (this.GetClientOrDefault(deviceId) is { } client)
         {
             await this.OnClientConnectedAsync(client).ConfigureAwait(false);
+        }
+        else
+        {
+            _ = this._clientManager.DiscoverAsync(3000, client => client.DeviceId == deviceId, CancellationToken.None);
         }
     }
 

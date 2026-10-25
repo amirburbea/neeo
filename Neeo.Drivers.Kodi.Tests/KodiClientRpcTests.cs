@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.WebSockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Drivers.Kodi.Models;
@@ -69,6 +70,61 @@ public sealed class KodiClientRpcTests
         using KodiClient client = new("Kodi", IPAddress.Loopback, 8080, new RecordingLogger(), webSocketPort: 1);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetPlayersAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Notifications_update_player_state_for_pause_resume_and_stop()
+    {
+        WebSocket? clientSocket = null;
+        TaskCompletionSource connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using FakeKodiServer server = await FakeKodiServer.StartAsync((socket, request, _) =>
+        {
+            clientSocket = socket;
+            connected.TrySetResult();
+            return FakeKodiServer.RespondAsync(socket, request, "{}");
+        });
+        using KodiClient client = await KodiClientRpcTests.ConnectAsync(server.Port, TimeSpan.FromSeconds(5));
+        await connected.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        // Pause
+        await clientSocket!.SendAsync(
+            Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"Player.OnPause","params":{"data":{},"sender":"xbmc"}}"""),
+            WebSocketMessageType.Text,
+            true,
+            TestContext.Current.CancellationToken
+        );
+        await KodiClientRpcTests.WaitForPlayStateAsync(client, PlayState.Paused);
+
+        // Resume
+        await clientSocket.SendAsync(
+            Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"Player.OnResume","params":{"data":{},"sender":"xbmc"}}"""),
+            WebSocketMessageType.Text,
+            true,
+            TestContext.Current.CancellationToken
+        );
+        await KodiClientRpcTests.WaitForPlayStateAsync(client, PlayState.Playing);
+
+        // Stop
+        await clientSocket.SendAsync(
+            Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"Player.OnStop","params":{"data":{},"sender":"xbmc"}}"""),
+            WebSocketMessageType.Text,
+            true,
+            TestContext.Current.CancellationToken
+        );
+        await KodiClientRpcTests.WaitForPlayStateAsync(client, PlayState.Stopped);
+    }
+
+    private static async Task WaitForPlayStateAsync(KodiClient client, PlayState expected)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (client.PlayerState.PlayState != expected)
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                Assert.Equal(expected, client.PlayerState.PlayState);
+            }
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
     }
 
     /// <summary>

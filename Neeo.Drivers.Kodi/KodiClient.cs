@@ -686,6 +686,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     {
         switch (method)
         {
+            case "Player.OnStop":
             case "Application.OnStop":
                 this.PlayerState = PlayerState.Defaults;
                 break;
@@ -697,6 +698,9 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
                 break;
             case "Player.OnPause":
                 this.PlayerState = this.PlayerState with { PlayState = PlayState.Paused };
+                break;
+            case "Player.OnResume":
+                this.PlayerState = this.PlayerState with { PlayState = PlayState.Playing };
                 break;
             case "Player.OnPlay":
                 if (parameters.Deserialize<PlayParameters>(KodiJsonSerializerOptions.Default) is { } playParams)
