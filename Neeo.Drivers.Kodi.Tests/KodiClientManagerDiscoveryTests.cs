@@ -95,6 +95,36 @@ public sealed class KodiClientManagerDiscoveryTests
     }
 
     [Fact]
+    public async Task InitializeAsync_without_deviceId_does_not_cancel_discovery_when_a_host_is_found()
+    {
+        await using FakeKodiServer server = await KodiClientManagerDiscoveryTests.StartServerAsync();
+        RecordingLogger<KodiClient> logger = new();
+        bool cancelled = false;
+        Mock<IKodiHostLocator> scanner = new();
+        scanner
+            .Setup(s => s.ScanAsync(It.IsAny<TimeSpan>(), It.IsAny<Action<IZeroconfHost>>(), It.IsAny<CancellationToken>()))
+            .Returns(async (TimeSpan scanTime, Action<IZeroconfHost> onHost, CancellationToken token) =>
+            {
+                onHost(KodiClientManagerDiscoveryTests.CreateHost());
+                try
+                {
+                    await Task.Delay(scanTime, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    cancelled = true;
+                    throw;
+                }
+            });
+        using KodiClientManager manager = KodiClientManagerDiscoveryTests.CreateManager(server.Port, logger, scanner.Object);
+
+        await manager.InitializeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(cancelled);
+        Assert.Single(manager.Clients);
+    }
+
+    [Fact]
     public async Task DiscoverAsync_throws_when_the_caller_cancels()
     {
         Mock<IKodiHostLocator> scanner = new();

@@ -351,8 +351,9 @@ public sealed partial class KodiClientManager(
         {
             try
             {
-                // Use a short initial window, consider initialization complete if a device is discovered.
-                await this.DiscoverAsync(2000, client => deviceId is null || deviceId == client.DeviceId, cancellationToken).ConfigureAwait(false);
+                // If a specific device was requested, consider initialization complete once that device is discovered.
+                // Otherwise run the full initial window to discover all devices on the network.
+                await this.DiscoverAsync(2000, deviceId is not null ? client => client.DeviceId == deviceId : null, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
