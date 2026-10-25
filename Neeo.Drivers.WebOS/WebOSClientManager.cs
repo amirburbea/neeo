@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Neeo.Sdk;
-using Neeo.Sdk.Devices;
 using Neeo.Sdk.Utilities;
 
 namespace Neeo.Drivers.WebOS;
@@ -44,8 +43,13 @@ public sealed class WebOSClientManager(
 
     public bool TryGetConnected(string deviceId, [NotNullWhen(true)] out WebOSClient? client)
     {
-        client = this.GetClient(deviceId) is { IsConnected: true } connected ? connected : null;
-        return client is not null;
+        if (this.GetClient(deviceId) is { IsConnected: true } connected)
+        {
+            client = connected;
+            return true;
+        }
+        client = null;
+        return false;
     }
 
     public bool TryRemove(string deviceId, [NotNullWhen(true)] out WebOSClient? client) => this._clients.TryRemove(deviceId, out client);
@@ -103,19 +107,17 @@ public sealed class WebOSClientManager(
     {
         ConcurrentBag<WebOSClient> discovered = [];
         IPAddress brainAddress = brain.ServiceEndPoint.Address;
-        KeyValuePair<IPAddress, PhysicalAddress>[] networkDevices = [.. NetworkMethods.GetNetworkDevices()];
-
         await Task.WhenAll(
-            networkDevices.Select(async device =>
+            NetworkMethods.GetNetworkDevices().Select(async devicePair =>
             {
+                (IPAddress ip, PhysicalAddress mac) = devicePair;
                 try
                 {
-                    (IPAddress ip, PhysicalAddress mac) = device;
                     if (brainAddress.Equals(ip))
                     {
                         return;
                     }
-                    foreach (int port in _ports)
+                    foreach (int port in WebOSClientManager._ports)
                     {
                         if (await WebOSClientManager.ProbePortAsync(ip, port, 400, cancellationToken).ConfigureAwait(false))
                         {
@@ -130,11 +132,10 @@ public sealed class WebOSClientManager(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogDebug(ex, "Failed to probe device {ip}", device.Key);
+                    logger.LogDebug(ex, "Failed to probe device {ip}", ip);
                 }
             })
         ).ConfigureAwait(false);
-
         return [.. discovered];
     }
 
@@ -158,8 +159,9 @@ public sealed class WebOSClientManager(
     private WebOSClient CreateClient(string deviceId, IPAddress ipAddress, PhysicalAddress macAddress, int port)
     {
         WebOSClient client = new(ipAddress, macAddress, clientLogger, settings.Get(deviceId), port);
-        client.Registered += (_, e) =>
+        client.Registered += (sender, e) =>
         {
+            WebOSClient client = (WebOSClient)sender!;
             logger.LogInformation("Saving webOS client key for device {deviceId}.", client.DeviceId);
             settings[client.DeviceId] = e.Data;
         };
