@@ -735,7 +735,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
             await WakeOnLan.WakeAsync(macAddress, cancellationToken).ConfigureAwait(false);
             if (this.GetClientOrDefault(deviceId) is null)
             {
-                _ = this._clientManager.DiscoverAsync(10000, client => client.DeviceId == deviceId, CancellationToken.None);
+                _ = this._clientManager.DiscoverAsync(60000, client => client.DeviceId == deviceId, CancellationToken.None);
             }
         }
         if (this.GetClientOrDefault(deviceId) is not { } client)
