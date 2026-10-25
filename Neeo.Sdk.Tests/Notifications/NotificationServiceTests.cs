@@ -51,6 +51,7 @@ public sealed class NotificationServiceTests : IDisposable
                 ItExpr.IsAny<CancellationToken>())
             .Returns(async (HttpRequestMessage request, CancellationToken cancellationToken) =>
             {
+                TaskCompletionSource? gate = Volatile.Read(ref this._postGate);
                 byte[] bytes = await request.Content!.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
                 lock (this._capturedBodies)
                 {
@@ -58,7 +59,7 @@ public sealed class NotificationServiceTests : IDisposable
                 }
 
                 tcs.TrySetResult();
-                if (Volatile.Read(ref this._postGate) is { } gate)
+                if (gate is not null)
                 {
                     await gate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
                 }
