@@ -19,6 +19,7 @@ namespace Neeo.Sdk.Notifications;
 /// <summary>
 /// Interface for the service responsible for sending update notifications to the NEEO Brain.
 /// </summary>
+/// <remarks>Notifications are queued and sent in the background. Failing to reach the Brain is logged, not thrown.</remarks>
 public interface INotificationService
 {
     /// <summary>
@@ -160,9 +161,22 @@ internal sealed class NotificationService : INotificationService, IDisposable
         {
             this._logger.LogInformation("Send notification: {Notification}", notification);
         }
-        string[] keys = await this._notificationMapping
-            .GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken)
-            .ConfigureAwait(false);
+        string[] keys;
+        try
+        {
+            keys = await this._notificationMapping
+                .GetNotificationKeysAsync(adapter, deviceId, component, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            this._logger.LogError(e, "Failed to look up the notification keys for {Notification}.", notification);
+            return;
+        }
         foreach (string key in keys)
         {
             if (!this.ShouldSuppressAsDuplicate(key, value))

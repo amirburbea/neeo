@@ -121,6 +121,41 @@ public sealed class NotificationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SendNotificationAsync_should_not_throw_when_the_notification_keys_cannot_be_fetched()
+    {
+        IDeviceAdapter adapter = this.CreateDeviceAdapter();
+        this._mockNotificationMapping
+            .Setup(mapping => mapping.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Brain unreachable"));
+        await this._notificationService.SendNotificationAsync(adapter, new(Constants.DeviceId, Constants.ComponentName, "lost"), TestContext.Current.CancellationToken);
+        this._mockNotificationMapping
+            .Setup(mapping => mapping.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([Constants.NotificationKey]);
+
+        await this._notificationService.SendNotificationAsync(adapter, new(Constants.DeviceId, Constants.ComponentName, Constants.Value), TestContext.Current.CancellationToken);
+
+        await this._postCompleted;
+        using JsonDocument doc = JsonDocument.Parse(this.GetCapturedBody());
+        Assert.Equal(Constants.Value, doc.RootElement.GetProperty("data").GetString());
+    }
+
+    [Fact]
+    public async Task SendNotificationAsync_should_still_throw_when_the_caller_cancels_the_key_lookup()
+    {
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+        this._mockNotificationMapping
+            .Setup(mapping => mapping.GetNotificationKeysAsync(It.IsAny<IDeviceAdapter>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException(cancellation.Token));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => this._notificationService.SendNotificationAsync(
+            this.CreateDeviceAdapter(),
+            new(Constants.DeviceId, Constants.ComponentName, Constants.Value),
+            cancellation.Token
+        ));
+    }
+
+    [Fact]
     public Task SendNotificationAsync_should_throw_if_property_is_null()
     {
         return Assert.ThrowsAsync<ArgumentException>(() => this._notificationService.SendNotificationAsync(this.CreateDeviceAdapter(), default, TestContext.Current.CancellationToken));
