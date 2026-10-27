@@ -76,7 +76,7 @@ public enum InputCommand
     [InputCommand("Input.ExecuteAction", "number9")]
     Number9,
 
-    [InputCommand("Input.xxxx")]
+    [InputCommand("Input.ExecuteAction", "channelnumberseparator")]
     NumberSeperator,
 
     [InputCommand("Input.ExecuteAction", "osd")]
@@ -88,7 +88,7 @@ public enum InputCommand
     [InputCommand("Input.ExecuteAction", "play")]
     Play,
 
-    [InputCommand("Input.PlayPause")]
+    [InputCommand("Input.ExecuteAction", "playpause")]
     PlayPauseToggle,
 
     [InputCommand("Input.ExecuteAction", "red")]
