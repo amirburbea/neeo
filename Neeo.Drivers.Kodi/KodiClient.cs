@@ -28,6 +28,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _taskSources = new();
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private int? _activePlayerId;
     private CancellationTokenSource? _cancellationTokenSource;
     private Func<KodiClient, CancellationToken, Task>? _pendingButtonAction;
     private ReconnectLoop? _reconnectLoop;
@@ -299,12 +300,50 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         cancellationToken
     );
 
-    public Task<bool> SendGoToCommandAsync(bool next, CancellationToken cancellationToken) => this.SendMessageAsync(
-        "Player.GoTo",
-        new { playerid = 1, to = next ? "next" : "previous" },
-        static (string result) => result == "OK",
-        cancellationToken
-    );
+    public async Task<bool> SendGoToCommandAsync(bool next, CancellationToken cancellationToken)
+    {
+        if (await this.GetActivePlayerIdAsync(cancellationToken).ConfigureAwait(false) is not { } playerId)
+        {
+            return false;
+        }
+        try
+        {
+            return await this.SendMessageAsync(
+                "Player.GoTo",
+                new { playerid = playerId, to = next ? "next" : "previous" },
+                static (string result) => result == "OK",
+                cancellationToken
+            ).ConfigureAwait(false);
+        }
+        catch (ApplicationException)
+        {
+            this._activePlayerId = null;
+            if (await this.GetActivePlayerIdAsync(cancellationToken).ConfigureAwait(false) is not { } refreshedId)
+            {
+                return false;
+            }
+            return await this.SendMessageAsync(
+                "Player.GoTo",
+                new { playerid = refreshedId, to = next ? "next" : "previous" },
+                static (string result) => result == "OK",
+                cancellationToken
+            ).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<int?> GetActivePlayerIdAsync(CancellationToken cancellationToken)
+    {
+        if (this._activePlayerId is { } activePlayerId)
+        {
+            return activePlayerId;
+        }
+        PlayerInfo[] players = await this.SendMessageAsync(
+            "Player.GetActivePlayers",
+            static (PlayerInfo[] players) => players,
+            cancellationToken
+        ).ConfigureAwait(false);
+        return (this._activePlayerId = players is [{ Id: int id }, ..] ? id : default);
+    }
 
     public async Task<bool> SendInputCommandAsync(InputCommand command, CancellationToken cancellationToken = default)
     {
@@ -331,7 +370,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
             cancellationToken
         ).ConfigureAwait(false);
 
-        static object CursorParameters(bool big, bool forward) => new { playerid = 1, value = new { step = string.Concat(big ? "big" : "small", forward ? "forward" : "backward") } };
+        object CursorParameters(bool big, bool forward) => new { playerid = this._activePlayerId ?? 1, value = new { step = string.Concat(big ? "big" : "small", forward ? "forward" : "backward") } };
 
         static bool IsCursorCommand(InputCommand command) => command is InputCommand.Right or InputCommand.Left or InputCommand.Up or InputCommand.Down;
     }
@@ -441,6 +480,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
 
     private void CleanUp()
     {
+        this._activePlayerId = null;
         using WebSocket? webSocket = Interlocked.Exchange(ref this._webSocket, default);
         using CancellationTokenSource? source = Interlocked.Exchange(ref this._cancellationTokenSource, default);
         source?.Cancel();
@@ -566,9 +606,11 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
             ).ConfigureAwait(false);
             if (players is not [{ Id: { } activePlayerId }, ..])
             {
+                this._activePlayerId = null;
                 this.PlayerState = PlayerState.Defaults;
                 return;
             }
+            this._activePlayerId = activePlayerId;
             JsonElement element = await this.SendMessageAsync(
                 "Player.GetItem",
                 new
@@ -597,6 +639,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         catch (Exception ex)
         {
             logger.LogDebug(ex, "Failed to query active player state on connect to Kodi.");
+            this._activePlayerId = null;
             this.PlayerState = PlayerState.Defaults;
         }
     }
@@ -687,6 +730,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
         {
             case "Player.OnStop":
             case "Application.OnStop":
+                this._activePlayerId = null;
                 this.PlayerState = PlayerState.Defaults;
                 break;
             case "Application.OnVolumeChanged":
@@ -704,6 +748,7 @@ public sealed class KodiClient(string displayName, IPAddress ipAddress, int http
             case "Player.OnPlay":
                 if (parameters.Deserialize<PlayParameters>(KodiJsonSerializerOptions.Default) is { } playParams)
                 {
+                    this._activePlayerId = playParams.Player.Id;
                     _ = this.OnPlayAsync(playParams);
                 }
                 break;

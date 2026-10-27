@@ -11,6 +11,8 @@ public sealed class InputCommandTests
     [InlineData(InputCommand.Play, "Input.ExecuteAction", "play")]
     [InlineData(InputCommand.Pause, "Input.ExecuteAction", "pause")]
     [InlineData(InputCommand.Stop, "Input.ExecuteAction", "stop")]
+    [InlineData(InputCommand.FastForward, "Input.ExecuteAction", "fastforward")]
+    [InlineData(InputCommand.Rewind, "Input.ExecuteAction", "rewind")]
     [InlineData(InputCommand.Back, "Input.Back", null)]
     [InlineData(InputCommand.Select, "Input.Select", null)]
     public void InputCommand_has_expected_method_and_action(InputCommand command, string expectedMethod, string? expectedAction)
