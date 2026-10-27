@@ -18,10 +18,12 @@ public sealed class WebOSClient(
     IPAddress ipAddress,
     PhysicalAddress macAddress,
     ILogger logger,
-    string? clientKey = null,
-    int port = 3000
+    string? clientKey = null
 ) : IDisposable
 {
+    public const int SecurePort = 3001;
+    public const int PlainPort = 3000;
+
     private readonly ConcurrentDictionary<string, TaskCompletionSource<WebOSResponse>> _pendingRequests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _connectLock = new(1, 1);
@@ -54,7 +56,7 @@ public sealed class WebOSClient(
 
     public PhysicalAddress MacAddress { get; } = macAddress;
 
-    public int Port => this._workingEndpoint?.Port ?? port;
+    public int Port => this._workingEndpoint?.Port ?? WebOSClient.SecurePort;
 
     public string? ClientKey => this._clientKey;
 
@@ -272,13 +274,13 @@ public sealed class WebOSClient(
     }
 
     /// <summary>
-    /// Newer webOS firmware only accepts the secure socket on 3001 (with a self-signed certificate), older firmware only the
-    /// plain one on <see cref="Port"/> - try the one that last worked first.
+    /// Newer webOS firmware (webOS 4.0+) only accepts the secure socket on <see cref="SecurePort"/> (with a self-signed certificate),
+    /// older firmware only the plain one on <see cref="PlainPort"/> - try the one that last worked first.
     /// </summary>
     private IEnumerable<Uri> GetEndpoints()
     {
-        Uri secure = new($"wss://{this.IPAddress}:3001");
-        Uri plain = new($"ws://{this.IPAddress}:{port}");
+        Uri secure = new($"wss://{this.IPAddress}:{WebOSClient.SecurePort}");
+        Uri plain = new($"ws://{this.IPAddress}:{WebOSClient.PlainPort}");
         return this._workingEndpoint == plain ? [plain, secure] : [secure, plain];
     }
 
@@ -477,7 +479,7 @@ public sealed class WebOSClient(
                 return false;
             }
 
-            Uri baseUri = this._workingEndpoint ?? new($"ws://{this.IPAddress}:{port}");
+            Uri baseUri = this._workingEndpoint ?? new($"wss://{this.IPAddress}:{WebOSClient.SecurePort}");
             Uri fullUri = Uri.IsWellFormedUriString(socketPath, UriKind.Absolute)
                 ? new(socketPath)
                 : new(baseUri, socketPath);
