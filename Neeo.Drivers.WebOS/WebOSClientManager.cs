@@ -25,7 +25,6 @@ public sealed class WebOSClientManager(
     // Settings keys: "<deviceId>" holds the pairing (client) key, "<deviceId>|ip" the last known IP address (so a TV that is
     // off - and therefore missing from the ARP table - at startup can still be found).
     private const string IPAddressSuffix = "|ip";
-    private static readonly int[] _ports = [3001, 3000];
 
     private readonly ConcurrentDictionary<string, WebOSClient> _clients = new(StringComparer.Ordinal);
     private bool _isDisposed;
@@ -57,7 +56,7 @@ public sealed class WebOSClientManager(
     /// <summary>
     /// Gets the client for the TV, creating it (and, if it is paired, starting to connect it in the background) if needed.
     /// </summary>
-    public WebOSClient GetOrCreateClient(IPAddress ipAddress, PhysicalAddress macAddress, int port = 3000)
+    public WebOSClient GetOrCreateClient(IPAddress ipAddress, PhysicalAddress macAddress)
     {
         ObjectDisposedException.ThrowIf(this._isDisposed, this);
         string deviceId = macAddress.Equals(PhysicalAddress.None) ? ipAddress.ToString() : macAddress.ToString();
@@ -65,7 +64,7 @@ public sealed class WebOSClientManager(
         {
             return existing;
         }
-        WebOSClient client = this.CreateClient(deviceId, ipAddress, macAddress, port);
+        WebOSClient client = this.CreateClient(deviceId, ipAddress, macAddress);
         if (!this._clients.TryAdd(deviceId, client))
         {
             // Another caller registered the same TV in the meantime - keep that one.
@@ -117,13 +116,13 @@ public sealed class WebOSClientManager(
                     {
                         return;
                     }
-                    foreach (int port in WebOSClientManager._ports)
+                    if (
+                        await WebOSClientManager.ProbePortAsync(ip, WebOSClient.SecurePort, 400, cancellationToken).ConfigureAwait(false) ||
+                        await WebOSClientManager.ProbePortAsync(ip, WebOSClient.PlainPort, 400, cancellationToken).ConfigureAwait(false)
+                    )
                     {
-                        if (await WebOSClientManager.ProbePortAsync(ip, port, 400, cancellationToken).ConfigureAwait(false))
-                        {
-                            discovered.Add(this.GetOrCreateClient(ip, mac));
-                            return;
-                        }
+                        discovered.Add(this.GetOrCreateClient(ip, mac));
+                        return;
                     }
                 }
                 catch (OperationCanceledException)
@@ -156,9 +155,9 @@ public sealed class WebOSClientManager(
         return this.HasPairedDevices;
     }
 
-    private WebOSClient CreateClient(string deviceId, IPAddress ipAddress, PhysicalAddress macAddress, int port)
+    private WebOSClient CreateClient(string deviceId, IPAddress ipAddress, PhysicalAddress macAddress)
     {
-        WebOSClient client = new(ipAddress, macAddress, clientLogger, settings.Get(deviceId), port);
+        WebOSClient client = new(ipAddress, macAddress, clientLogger, settings.Get(deviceId));
         client.Registered += (sender, e) =>
         {
             WebOSClient client = (WebOSClient)sender!;
