@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Neeo.Drivers.Kodi.Models;
@@ -112,6 +113,77 @@ public sealed class KodiClientRpcTests
             TestContext.Current.CancellationToken
         );
         await KodiClientRpcTests.WaitForPlayStateAsync(client, PlayState.Stopped);
+    }
+
+    [Fact]
+    public async Task SendGoToCommandAsync_uses_active_player_id_for_music()
+    {
+        string? recordedGoToRequest = null;
+        await using FakeKodiServer server = await FakeKodiServer.StartAsync((socket, request, _) =>
+        {
+            if (request.Contains("Player.GetActivePlayers"))
+            {
+                return FakeKodiServer.RespondAsync(socket, request, """[{"playerid":0,"playertype":"audio"}]""");
+            }
+            if (request.Contains("Player.GoTo"))
+            {
+                recordedGoToRequest = request;
+                return FakeKodiServer.RespondAsync(socket, request, "\"OK\"");
+            }
+            return FakeKodiServer.RespondAsync(socket, request, "{}");
+        });
+        using KodiClient client = await KodiClientRpcTests.ConnectAsync(server.Port, TimeSpan.FromSeconds(5));
+
+        bool result = await client.SendGoToCommandAsync(next: true, TestContext.Current.CancellationToken);
+
+        Assert.True(result);
+        Assert.NotNull(recordedGoToRequest);
+        using JsonDocument doc = JsonDocument.Parse(recordedGoToRequest);
+        Assert.Equal(0, doc.RootElement.GetProperty("params").GetProperty("playerid").GetInt32());
+        Assert.Equal("next", doc.RootElement.GetProperty("params").GetProperty("to").GetString());
+    }
+
+    [Fact]
+    public async Task SendGoToCommandAsync_updates_player_id_from_onplay_notification()
+    {
+        WebSocket? clientSocket = null;
+        TaskCompletionSource connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        string? recordedGoToRequest = null;
+
+        await using FakeKodiServer server = await FakeKodiServer.StartAsync((socket, request, _) =>
+        {
+            clientSocket = socket;
+            connected.TrySetResult();
+            if (request.Contains("Player.GetItem"))
+            {
+                return FakeKodiServer.RespondAsync(socket, request, """{"item":{"label":"Song 1","title":"Song 1","artist":[],"thumbnail":""}}""");
+            }
+            if (request.Contains("Player.GoTo"))
+            {
+                recordedGoToRequest = request;
+                return FakeKodiServer.RespondAsync(socket, request, "\"OK\"");
+            }
+            return FakeKodiServer.RespondAsync(socket, request, "{}");
+        });
+        using KodiClient client = await KodiClientRpcTests.ConnectAsync(server.Port, TimeSpan.FromSeconds(5));
+        await connected.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        // Simulate Player.OnPlay for audio track (playerid: 0)
+        await clientSocket!.SendAsync(
+            Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"Player.OnPlay","params":{"data":{"item":{"type":"song"},"player":{"playerid":0}},"sender":"xbmc"}}"""),
+            WebSocketMessageType.Text,
+            true,
+            TestContext.Current.CancellationToken
+        );
+        await KodiClientRpcTests.WaitForPlayStateAsync(client, PlayState.Playing);
+
+        bool result = await client.SendGoToCommandAsync(next: false, TestContext.Current.CancellationToken);
+
+        Assert.True(result);
+        Assert.NotNull(recordedGoToRequest);
+        using JsonDocument doc = JsonDocument.Parse(recordedGoToRequest);
+        Assert.Equal(0, doc.RootElement.GetProperty("params").GetProperty("playerid").GetInt32());
+        Assert.Equal("previous", doc.RootElement.GetProperty("params").GetProperty("to").GetString());
     }
 
     private static async Task WaitForPlayStateAsync(KodiClient client, PlayState expected)

@@ -42,6 +42,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         { Buttons.Digit9, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Number9, cancellationToken) },
         { Buttons.DigitSeparator, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.NumberSeperator, cancellationToken) },
         { Buttons.Exit, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Back, cancellationToken) },
+        { Buttons.Forward, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.FastForward, cancellationToken) },
         { Buttons.Home, (client, cancellationToken) => client.GoHomeAsync(cancellationToken) },
         { Buttons.Info, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Info, cancellationToken) },
         { Buttons.Language, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Language, cancellationToken) },
@@ -55,6 +56,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         { Buttons.PlayPauseToggle, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.PlayPauseToggle, cancellationToken) },
         { Buttons.Previous, (client, cancellationToken) => client.SendGoToCommandAsync(next: false, cancellationToken) },
         { Buttons.PreviousTrack, (client, cancellationToken) => client.SendGoToCommandAsync(next: false, cancellationToken) },
+        { Buttons.Reverse, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Rewind, cancellationToken) },
         { Buttons.SkipBackward, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.SkipPrevious, cancellationToken) },
         { Buttons.SkipForward, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.SkipNext, cancellationToken) },
         { Buttons.Stop, (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Stop, cancellationToken) },
@@ -66,9 +68,11 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     private static readonly Dictionary<string, Func<KodiClient, CancellationToken, Task>> _customButtonFunctions = new(StringComparer.Ordinal)
     {
         { "CHANNEL SEARCH", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ChannelSearch, cancellationToken) },
+        { "FAST FORWARD", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.FastForward, cancellationToken) },
         { "FAVORITE", (client, cancellationToken) => client.ActivateWindowAsync("pvrosdchannels", cancellationToken) },
         { "OSD", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.OnScreenDisplay, cancellationToken) },
         { "PLAY PAUSE", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.PlayPauseToggle, cancellationToken) },
+        { "REWIND", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.Rewind, cancellationToken) },
         { "TOGGLE FULLSCREEN", (client, cancellationToken) => client.SendInputCommandAsync(InputCommand.ToggleFullScreen, cancellationToken) },
         { "Scan Video Library", (client, cancellationToken) => client.ScanVideoLibraryAsync(cancellationToken) },
         { "Scan Audio Library", (client, cancellationToken) => client.ScanAudioLibraryAsync(cancellationToken) },

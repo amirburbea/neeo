@@ -28,6 +28,9 @@ public enum InputCommand
     [InputCommand("Input.Down")]
     Down,
 
+    [InputCommand("Input.ExecuteAction", "fastforward")]
+    FastForward,
+
     [InputCommand("Input.ExecuteAction", "green")]
     Green,
 
@@ -93,6 +96,9 @@ public enum InputCommand
 
     [InputCommand("Input.ExecuteAction", "red")]
     Red,
+
+    [InputCommand("Input.ExecuteAction", "rewind")]
+    Rewind,
 
     [InputCommand("Input.Right")]
     Right,
