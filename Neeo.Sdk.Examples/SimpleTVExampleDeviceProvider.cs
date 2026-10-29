@@ -43,7 +43,7 @@ public class SimpleTVExampleDeviceProvider : IDeviceProvider
         this._logger.LogInformation("Button {button} pressed on device: {deviceId}.", button, deviceId);
         if (button == "SomeRandomName" && this._notifier is { } notifier)
         {
-            await notifier.SendNotificationAsync("my-label", "abcde", deviceId, cancellationToken).ConfigureAwait(false);
+            await notifier.NotifyAsync("my-label", "abcde", deviceId, cancellationToken).ConfigureAwait(false);
         }
     }
 

@@ -511,7 +511,7 @@ public abstract partial class PlexDeviceProviderBase(
             return;
         }
         // Notify on changes to connection.
-        Task SendPowerAsync(bool isConnected, CancellationToken token) => notifier.SendPowerNotificationAsync(isConnected, machineIdentifier, token);
+        Task SendPowerAsync(bool isConnected, CancellationToken token) => notifier.NotifyPowerStateAsync(isConnected, machineIdentifier, token);
         PlexDeviceProviderBase.NotifyOnChange(server.IsConnectedChanged, server.Disposed, SendPowerAsync, logger, "Power");
         if (server.IsConnected)
         {
@@ -522,7 +522,7 @@ public abstract partial class PlexDeviceProviderBase(
         PlexDeviceProviderBase.NotifyOnChange(
             server.SelectedPlayerChanged.Select(static data => data is { Name: { } name } ? name : string.Empty),
             server.Disposed,
-            (playerName, token) => notifier.SendNotificationAsync(Components.Player.SensorName, playerName, machineIdentifier, token),
+            (playerName, token) => notifier.NotifyAsync(Components.Player.SensorName, playerName, machineIdentifier, token),
             logger,
             Components.Player.SensorName
         );
@@ -530,7 +530,7 @@ public abstract partial class PlexDeviceProviderBase(
         PlexDeviceProviderBase.NotifyOnChange(
             server.PlayStateChanged.Select(static state => state is PlayState.Playing or PlayState.Buffering),
             server.Disposed,
-            (isPlaying, token) => notifier.SendNotificationAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token),
+            (isPlaying, token) => notifier.NotifyAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token),
             logger,
             Components.Playing.SensorName
         );
@@ -539,21 +539,21 @@ public abstract partial class PlexDeviceProviderBase(
         PlexDeviceProviderBase.NotifyOnChange(
             mediaChanged.Select(_ => this.GetTitle(machineIdentifier)),
             server.Disposed,
-            (value, token) => notifier.SendNotificationAsync(Components.Title.SensorName, value, machineIdentifier, token),
+            (value, token) => notifier.NotifyAsync(Components.Title.SensorName, value, machineIdentifier, token),
             logger,
             Components.Title.SensorName
         );
         PlexDeviceProviderBase.NotifyOnChange(
             mediaChanged.Select(_ => this.GetDescription(machineIdentifier)),
             server.Disposed,
-            (value, token) => notifier.SendNotificationAsync(Components.Description.SensorName, value, machineIdentifier, token),
+            (value, token) => notifier.NotifyAsync(Components.Description.SensorName, value, machineIdentifier, token),
             logger,
             Components.Description.SensorName
         );
         PlexDeviceProviderBase.NotifyOnChange(
             mediaChanged.Select(_ => this.GetCoverArt(machineIdentifier)),
             server.Disposed,
-            (value, token) => notifier.SendNotificationAsync(Components.CoverArt.SensorName, value, machineIdentifier, token),
+            (value, token) => notifier.NotifyAsync(Components.CoverArt.SensorName, value, machineIdentifier, token),
             logger,
             Components.CoverArt.SensorName
         );

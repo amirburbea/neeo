@@ -248,7 +248,7 @@ public sealed class PlayerExampleDeviceProvider : IDeviceProvider
         private async Task SetValueAsync(PlayerKey key, object value)
         {
             logger.LogInformation("Setting component {key} to {value}", key, value);
-            await (this.Notifier?.SendNotificationAsync(TextAttribute.GetText(key), value) ?? Task.CompletedTask).ConfigureAwait(false);
+            await (this.Notifier?.NotifyAsync(TextAttribute.GetText(key), value) ?? Task.CompletedTask).ConfigureAwait(false);
             this._service.SetValue(key, value);
         }
     }
