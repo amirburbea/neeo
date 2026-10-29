@@ -636,7 +636,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             if (this.Notifier is { } notifier)
             {
-                await notifier.SendPowerNotificationAsync(true, client.DeviceId).ConfigureAwait(false);
+                await notifier.NotifyPowerStateAsync(true, client.DeviceId).ConfigureAwait(false);
             }
             await client.RefreshStateAsync().ConfigureAwait(false);
             await this.NotifyConnectedAsync(client).ConfigureAwait(false);
@@ -653,7 +653,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        await notifier.SendPowerNotificationAsync(false, client.DeviceId).ConfigureAwait(false);
+        await notifier.NotifyPowerStateAsync(false, client.DeviceId).ConfigureAwait(false);
     }
 
     private void Client_Error(object? sender, DataEventArgs<string> e) => this._logger.LogWarning("Client {deviceId} error encountered: {error}.", ((KodiClient)sender!).DeviceId, e.Data);
@@ -669,13 +669,13 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         string deviceId = client.DeviceId;
         Task[] tasks = state.PlayState is PlayState.Paused
             ? [
-                notifier.SendNotificationAsync("PLAYING_SENSOR", false, deviceId),
-                notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
+                notifier.NotifyAsync("PLAYING_SENSOR", false, deviceId),
+                notifier.NotifyAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
             ]
             : [
-                notifier.SendNotificationAsync("PLAYING_SENSOR", state.PlayState is PlayState.Playing, deviceId),
-                notifier.SendNotificationAsync("TITLE_SENSOR", state.NowPlayingLabel, deviceId),
-                notifier.SendNotificationAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
+                notifier.NotifyAsync("PLAYING_SENSOR", state.PlayState is PlayState.Playing, deviceId),
+                notifier.NotifyAsync("TITLE_SENSOR", state.NowPlayingLabel, deviceId),
+                notifier.NotifyAsync("DESCRIPTION_SENSOR", state.NowPlayingDescription, deviceId),
                 this.NotifyCoverArtAsync(client, state.NowPlayingImage)
             ];
         await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -689,7 +689,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
         {
             return;
         }
-        await notifier.SendNotificationAsync("VOLUME_SENSOR", volume, deviceId).ConfigureAwait(false);
+        await notifier.NotifyAsync("VOLUME_SENSOR", volume, deviceId).ConfigureAwait(false);
     }
 
     private void ClientManager_ClientAdded(object? sender, DataEventArgs<KodiClient> e) => _ = this.HandleClientAddedAsync(e.Data);
@@ -837,7 +837,7 @@ public abstract partial class KodiDeviceProviderBase : IDeviceProvider, IDisposa
     {
         if (this.Notifier is { } notifier && this._uriPrefix.Length > 0)
         {
-            await notifier.SendNotificationAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, image, ImageSize.Large), client.DeviceId).ConfigureAwait(false);
+            await notifier.NotifyAsync("COVER_ART_SENSOR", this.GetThumbnailUrl(client, image, ImageSize.Large), client.DeviceId).ConfigureAwait(false);
         }
     }
 

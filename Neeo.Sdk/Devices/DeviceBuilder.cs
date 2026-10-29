@@ -279,7 +279,7 @@ public interface IDeviceBuilder
     /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot;.
     ///
     /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
-    /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
+    /// this enables the use of the <see cref="IDeviceNotifier.NotifyPowerStateAsync"/> method.
     /// </summary>
     /// <param name="sensor">A callback that can be used to determine if the device is on or off.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>
@@ -290,7 +290,7 @@ public interface IDeviceBuilder
     /// situations where otherwise NEEO may have labeled the device &quot;stupid&quot;.
     ///
     /// Additionally, if the device has notification support (via a call to <see cref="IDeviceBuilder.EnableNotifications"/>),
-    /// this enables the use of the <see cref="IDeviceNotifier.SendPowerNotificationAsync"/> method.
+    /// this enables the use of the <see cref="IDeviceNotifier.NotifyPowerStateAsync"/> method.
     /// </summary>
     /// <param name="sensor">A callback that can be used to determine if the device is on or off.</param>
     /// <returns><see cref="IDeviceBuilder"/> for chaining.</returns>

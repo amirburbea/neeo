@@ -296,7 +296,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await notifier.SendPowerNotificationAsync(isConnected, client.DeviceId).ConfigureAwait(false);
+            await notifier.NotifyPowerStateAsync(isConnected, client.DeviceId).ConfigureAwait(false);
         }
     }
 
@@ -307,8 +307,8 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         if (sender is WebOSClient client && this._notifier is { } notifier)
         {
             await Task.WhenAll(
-                notifier.SendNotificationAsync("VOLUME", (double)volume, client.DeviceId),
-                notifier.SendNotificationAsync("VOLUME-LABEL", volume.ToString(CultureInfo.InvariantCulture), client.DeviceId)
+                notifier.NotifyAsync("VOLUME", (double)volume, client.DeviceId),
+                notifier.NotifyAsync("VOLUME-LABEL", volume.ToString(CultureInfo.InvariantCulture), client.DeviceId)
             ).ConfigureAwait(false);
         }
     }
@@ -319,7 +319,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         if (sender is WebOSClient client && this._notifier is { } notifier)
         {
-            await notifier.SendNotificationAsync("APP", appId, client.DeviceId).ConfigureAwait(false);
+            await notifier.NotifyAsync("APP", appId, client.DeviceId).ConfigureAwait(false);
         }
     }
 

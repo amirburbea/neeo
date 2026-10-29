@@ -75,7 +75,7 @@ internal sealed class DeviceDatabase : IDeviceDatabase
             {
                 throw new ArgumentException($"Adapter names must be unique. Adapter name {adapter.AdapterName} is reused at index {id}");
             }
-            device.NotifierCallback?.Invoke(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor));
+            device.NotifierCallback?.Invoke(new DeviceNotifier(adapter, this._notificationService, device.HasPowerStateSensor, logger));
         }
         this._deviceIndex = new(this._devices);
     }

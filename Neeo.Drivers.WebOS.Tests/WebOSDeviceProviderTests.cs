@@ -192,9 +192,9 @@ public sealed class WebOSDeviceProviderTests
         await provider.HandleVolumeChangedAsync(client, 25);
         await provider.HandleForegroundAppChangedAsync(client, "netflix");
 
-        notifier.Verify(n => n.SendNotificationAsync("VOLUME", 25d, client.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.SendNotificationAsync("VOLUME-LABEL", "25", client.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.SendNotificationAsync("APP", "netflix", client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.NotifyAsync("VOLUME", 25d, client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.NotifyAsync("VOLUME-LABEL", "25", client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.NotifyAsync("APP", "netflix", client.DeviceId, default), Times.Once);
     }
 
     [Fact]
@@ -211,8 +211,8 @@ public sealed class WebOSDeviceProviderTests
         await provider.HandleConnectionChangedAsync(client, true);
         await provider.HandleConnectionChangedAsync(client, false);
 
-        notifier.Verify(n => n.SendPowerNotificationAsync(true, client.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.SendPowerNotificationAsync(false, client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.NotifyPowerStateAsync(true, client.DeviceId, default), Times.Once);
+        notifier.Verify(n => n.NotifyPowerStateAsync(false, client.DeviceId, default), Times.Once);
     }
 
     [Fact]

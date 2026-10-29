@@ -29,8 +29,8 @@ public sealed class PlexPowerNotificationTests
         isConnected.OnNext(true);
         isConnected.OnNext(false);
 
-        notifier.Verify(n => n.SendPowerNotificationAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
-        notifier.Verify(n => n.SendPowerNotificationAsync(false, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+        notifier.Verify(n => n.NotifyPowerStateAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+        notifier.Verify(n => n.NotifyPowerStateAsync(false, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class PlexPowerNotificationTests
 
         await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
 
-        notifier.Verify(n => n.SendPowerNotificationAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+        notifier.Verify(n => n.NotifyPowerStateAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -63,11 +63,11 @@ public sealed class PlexPowerNotificationTests
         provider.DeviceBuilder.NotifierCallback!(notifier.Object);
 
         await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
-        notifier.Verify(n => n.SendPowerNotificationAsync(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        notifier.Verify(n => n.NotifyPowerStateAsync(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
         manager.Raise(m => m.ServerDiscovered += null, new DataEventArgs<ServerData>(new ServerData("Plex", MachineIdentifier, "127.0.0.1", 32400)));
 
-        notifier.Verify(n => n.SendPowerNotificationAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+        notifier.Verify(n => n.NotifyPowerStateAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static (Mock<IPlexServer> Server, BehaviorSubject<bool> IsConnected) CreateServer(string machineIdentifier, bool isConnected)
