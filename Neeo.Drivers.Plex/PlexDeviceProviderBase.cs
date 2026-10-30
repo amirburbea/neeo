@@ -510,92 +510,30 @@ public abstract partial class PlexDeviceProviderBase(
         {
             return;
         }
-        // Notify on changes to connection.
-        Task SendPowerAsync(bool isConnected, CancellationToken token) => notifier.NotifyPowerStateAsync(isConnected, machineIdentifier, token);
-        PlexDeviceProviderBase.NotifyOnChange(server.IsConnectedChanged, server.Disposed, SendPowerAsync, logger, "Power");
-        if (server.IsConnected)
-        {
-            // The underlying server is shared with the other Plex provider, so it may already be connected (no change will be reported).
-            await PlexDeviceProviderBase.SendSafelyAsync(SendPowerAsync, true, logger, "Power", cancellationToken).ConfigureAwait(false);
-        }
+        // Notify on changes to connection. The initial state is sent too: the underlying server is shared with the other Plex
+        // provider, so it may already be connected (in which case no change would be reported).
+        notifier.NotifyPowerStateOnChange(server.IsConnectedChanged.TakeUntil(server.Disposed), machineIdentifier);
         // Notify on changes to player.
-        PlexDeviceProviderBase.NotifyOnChange(
-            server.SelectedPlayerChanged.Select(static data => data is { Name: { } name } ? name : string.Empty),
-            server.Disposed,
-            (playerName, token) => notifier.NotifyAsync(Components.Player.SensorName, playerName, machineIdentifier, token),
-            logger,
-            Components.Player.SensorName
+        notifier.NotifyOnChange(
+            Components.Player.SensorName,
+            Changes(server.SelectedPlayerChanged.Select(static data => data is { Name: { } name } ? name : string.Empty)),
+            machineIdentifier
         );
         // Notify on changes to play state.
-        PlexDeviceProviderBase.NotifyOnChange(
-            server.PlayStateChanged.Select(static state => state is PlayState.Playing or PlayState.Buffering),
-            server.Disposed,
-            (isPlaying, token) => notifier.NotifyAsync(Components.Playing.SensorName, isPlaying, machineIdentifier, token),
-            logger,
-            Components.Playing.SensorName
+        notifier.NotifyOnChange(
+            Components.Playing.SensorName,
+            Changes(server.PlayStateChanged.Select(static state => state is PlayState.Playing or PlayState.Buffering)),
+            machineIdentifier
         );
         // Notify on changes to active media.
         IObservable<Unit> mediaChanged = server.IsConnectedChanged.CombineLatest(server.SelectedPlayerChanged, server.ActiveMediaChanged).Select(static _ => Unit.Default);
-        PlexDeviceProviderBase.NotifyOnChange(
-            mediaChanged.Select(_ => this.GetTitle(machineIdentifier)),
-            server.Disposed,
-            (value, token) => notifier.NotifyAsync(Components.Title.SensorName, value, machineIdentifier, token),
-            logger,
-            Components.Title.SensorName
-        );
-        PlexDeviceProviderBase.NotifyOnChange(
-            mediaChanged.Select(_ => this.GetDescription(machineIdentifier)),
-            server.Disposed,
-            (value, token) => notifier.NotifyAsync(Components.Description.SensorName, value, machineIdentifier, token),
-            logger,
-            Components.Description.SensorName
-        );
-        PlexDeviceProviderBase.NotifyOnChange(
-            mediaChanged.Select(_ => this.GetCoverArt(machineIdentifier)),
-            server.Disposed,
-            (value, token) => notifier.NotifyAsync(Components.CoverArt.SensorName, value, machineIdentifier, token),
-            logger,
-            Components.CoverArt.SensorName
-        );
+        notifier.NotifyOnChange(Components.Title.SensorName, Changes(mediaChanged.Select(_ => this.GetTitle(machineIdentifier))), machineIdentifier);
+        notifier.NotifyOnChange(Components.Description.SensorName, Changes(mediaChanged.Select(_ => this.GetDescription(machineIdentifier))), machineIdentifier);
+        notifier.NotifyOnChange(Components.CoverArt.SensorName, Changes(mediaChanged.Select(_ => this.GetCoverArt(machineIdentifier))), machineIdentifier);
         await server.InitializeAsync(cancellationToken).ConfigureAwait(false);
-    }
 
-    /// <summary>
-    /// Sends a notification each time <paramref name="values"/> changes (ignoring the initial value), until <paramref name="until"/> fires.
-    /// A newer value supersedes one still being sent. A failed send is logged and later values are still sent; an error in the
-    /// <paramref name="values"/> stream itself is logged rather than left unhandled (which would terminate the process).
-    /// </summary>
-    internal static IDisposable NotifyOnChange<TValue>(
-        IObservable<TValue> values,
-        IObservable<Unit> until,
-        Func<TValue, CancellationToken, Task> send,
-        ILogger logger,
-        string description
-    ) => values
-        .DistinctUntilChanged()
-        .Skip(1)
-        .Select(value => Observable.FromAsync(token => PlexDeviceProviderBase.SendSafelyAsync(send, value, logger, description, token)))
-        .Switch()
-        .TakeUntil(until)
-        .Subscribe(
-            static _ => { },
-            exception => logger.LogError(exception, "Plex '{Description}' notifications stopped unexpectedly.", description)
-        );
-
-    private static async Task SendSafelyAsync<TValue>(Func<TValue, CancellationToken, Task> send, TValue value, ILogger logger, string description, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await send(value, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            // Superseded by a newer value, or the server was disposed.
-        }
-        catch (Exception e)
-        {
-            logger.LogWarning(e, "Failed to send Plex '{Description}' notification.", description);
-        }
+        // The server's streams replay their current value on subscription, which NEEO can already query; only send later changes.
+        IObservable<TValue> Changes<TValue>(IObservable<TValue> values) => values.Skip(1).TakeUntil(server.Disposed);
     }
 
     private Task OnServerRemovedAsync(string machineIdentifier, CancellationToken cancellationToken)
