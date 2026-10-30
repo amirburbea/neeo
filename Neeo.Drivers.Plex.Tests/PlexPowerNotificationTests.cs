@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Reactive;
 using System.Reactive.Subjects;
@@ -14,74 +16,101 @@ namespace Neeo.Drivers.Plex.Tests;
 
 public sealed class PlexPowerNotificationTests
 {
+    private const string MachineIdentifier = "server-1";
+
     [Fact]
-    public async Task A_server_added_by_the_brain_sends_power_notifications_as_it_connects_and_disconnects()
+    public async Task A_server_added_by_the_brain_reports_its_power_state_as_it_connects_and_disconnects()
     {
-        const string MachineIdentifier = "server-1";
-        (Mock<IPlexServer> server, BehaviorSubject<bool> isConnected) = PlexPowerNotificationTests.CreateServer(MachineIdentifier, isConnected: false);
+        TestServer server = PlexPowerNotificationTests.CreateServer(isConnected: false);
         Mock<IPlexServerManager> manager = new();
-        manager.Setup(m => m.GetServer(MachineIdentifier)).Returns(server.Object);
-        Mock<IDeviceNotifier> notifier = new();
+        manager.Setup(m => m.GetServer(MachineIdentifier)).Returns(server.Mock.Object);
+        (Mock<IDeviceNotifier> notifier, List<bool> powerStates) = PlexPowerNotificationTests.CreateNotifier();
         PlexMediaPlayerDeviceProvider provider = PlexPowerNotificationTests.CreateProvider(manager.Object);
         provider.DeviceBuilder.NotifierCallback!(notifier.Object);
         await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
 
-        isConnected.OnNext(true);
-        isConnected.OnNext(false);
+        server.IsConnected.OnNext(true);
+        server.IsConnected.OnNext(false);
 
-        notifier.Verify(n => n.NotifyPowerStateAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
-        notifier.Verify(n => n.NotifyPowerStateAsync(false, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal([false, true, false], powerStates);
     }
 
     [Fact]
-    public async Task A_server_that_is_already_connected_when_added_sends_a_power_notification()
+    public async Task A_server_that_is_already_connected_when_added_reports_that_it_is_on()
     {
-        const string MachineIdentifier = "server-1";
-        (Mock<IPlexServer> server, _) = PlexPowerNotificationTests.CreateServer(MachineIdentifier, isConnected: true);
+        TestServer server = PlexPowerNotificationTests.CreateServer(isConnected: true);
         Mock<IPlexServerManager> manager = new();
-        manager.Setup(m => m.GetServer(MachineIdentifier)).Returns(server.Object);
-        Mock<IDeviceNotifier> notifier = new();
+        manager.Setup(m => m.GetServer(MachineIdentifier)).Returns(server.Mock.Object);
+        (Mock<IDeviceNotifier> notifier, List<bool> powerStates) = PlexPowerNotificationTests.CreateNotifier();
         PlexMediaPlayerDeviceProvider provider = PlexPowerNotificationTests.CreateProvider(manager.Object);
         provider.DeviceBuilder.NotifierCallback!(notifier.Object);
 
         await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
 
-        notifier.Verify(n => n.NotifyPowerStateAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal([true], powerStates);
     }
 
     [Fact]
     public async Task A_server_not_found_when_added_by_the_brain_attaches_when_later_discovered()
     {
-        const string MachineIdentifier = "server-1";
-        (Mock<IPlexServer> server, _) = PlexPowerNotificationTests.CreateServer(MachineIdentifier, isConnected: true);
+        TestServer server = PlexPowerNotificationTests.CreateServer(isConnected: true);
         Mock<IPlexServerManager> manager = new();
         manager.SetupSequence(m => m.GetServer(MachineIdentifier))
             .Returns((IPlexServer?)null)
-            .Returns(server.Object);
-        Mock<IDeviceNotifier> notifier = new();
+            .Returns(server.Mock.Object);
+        (Mock<IDeviceNotifier> notifier, List<bool> powerStates) = PlexPowerNotificationTests.CreateNotifier();
         PlexMediaPlayerDeviceProvider provider = PlexPowerNotificationTests.CreateProvider(manager.Object);
         provider.DeviceBuilder.NotifierCallback!(notifier.Object);
 
         await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
-        notifier.Verify(n => n.NotifyPowerStateAsync(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Empty(powerStates);
 
         manager.Raise(m => m.ServerDiscovered += null, new DataEventArgs<ServerData>(new ServerData("Plex", MachineIdentifier, "127.0.0.1", 32400)));
 
-        notifier.Verify(n => n.NotifyPowerStateAsync(true, MachineIdentifier, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal([true], powerStates);
+        notifier.Verify(n => n.NotifyPowerStateOnChange(It.IsAny<IObservable<bool>>(), MachineIdentifier), Times.Once);
     }
 
-    private static (Mock<IPlexServer> Server, BehaviorSubject<bool> IsConnected) CreateServer(string machineIdentifier, bool isConnected)
+    [Fact]
+    public async Task Power_state_is_no_longer_reported_once_the_server_is_disposed()
+    {
+        TestServer server = PlexPowerNotificationTests.CreateServer(isConnected: false);
+        Mock<IPlexServerManager> manager = new();
+        manager.Setup(m => m.GetServer(MachineIdentifier)).Returns(server.Mock.Object);
+        (Mock<IDeviceNotifier> notifier, List<bool> powerStates) = PlexPowerNotificationTests.CreateNotifier();
+        PlexMediaPlayerDeviceProvider provider = PlexPowerNotificationTests.CreateProvider(manager.Object);
+        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
+        await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceAddedAsync(MachineIdentifier, TestContext.Current.CancellationToken);
+
+        server.Disposed.OnNext(Unit.Default);
+        server.IsConnected.OnNext(true);
+
+        Assert.Equal([false], powerStates);
+    }
+
+    private static (Mock<IDeviceNotifier> Notifier, List<bool> PowerStates) CreateNotifier()
+    {
+        List<bool> powerStates = [];
+        Mock<IDeviceNotifier> notifier = new();
+        notifier
+            .Setup(n => n.NotifyPowerStateOnChange(It.IsAny<IObservable<bool>>(), It.IsAny<string>()))
+            .Returns((IObservable<bool> values, string _) => values.Subscribe(powerStates.Add));
+        return (notifier, powerStates);
+    }
+
+    private static TestServer CreateServer(bool isConnected)
     {
         BehaviorSubject<bool> isConnectedSubject = new(isConnected);
+        Subject<Unit> disposed = new();
         Mock<IPlexServer> server = new();
-        server.SetupGet(s => s.MachineIdentifier).Returns(machineIdentifier);
+        server.SetupGet(s => s.MachineIdentifier).Returns(MachineIdentifier);
         server.SetupGet(s => s.IsConnected).Returns(() => isConnectedSubject.Value);
         server.SetupGet(s => s.IsConnectedChanged).Returns(isConnectedSubject);
-        server.SetupGet(s => s.Disposed).Returns(new Subject<Unit>());
+        server.SetupGet(s => s.Disposed).Returns(disposed);
         server.SetupGet(s => s.SelectedPlayerChanged).Returns(new BehaviorSubject<PlayerData?>(null));
         server.SetupGet(s => s.PlayStateChanged).Returns(new BehaviorSubject<PlayState>(PlayState.Stopped));
         server.SetupGet(s => s.ActiveMediaChanged).Returns(new BehaviorSubject<MediaItem?>(null));
-        return (server, isConnectedSubject);
+        return new(server, isConnectedSubject, disposed);
     }
 
     private static PlexMediaPlayerDeviceProvider CreateProvider(IPlexServerManager manager)
@@ -92,4 +121,6 @@ public sealed class PlexPowerNotificationTests
         lifetime.SetupGet(l => l.ApplicationStarted).Returns(new CancellationToken(true));
         return new(factory.Object, manager, Mock.Of<IPlexTokenStore>(), lifetime.Object, NullLogger<PlexMediaPlayerDeviceProvider>.Instance);
     }
+
+    private sealed record TestServer(Mock<IPlexServer> Mock, BehaviorSubject<bool> IsConnected, Subject<Unit> Disposed);
 }
