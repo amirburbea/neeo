@@ -23,73 +23,39 @@ public sealed class WebOSClient(
     string? clientKey = null
 ) : IDisposable
 {
-    public const int SecurePort = 3001;
     public const int PlainPort = 3000;
+    public const int SecurePort = 3001;
 
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<WebOSResponse>> _pendingRequests = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _connectLock = new(1, 1);
+    private readonly Subject<Unit> _disposedSubject = new();
+    private readonly BehaviorSubject<string> _foregroundAppSubject = new(string.Empty);
+    private readonly BehaviorSubject<bool> _isConnectedSubject = new(false);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<WebOSResponse>> _pendingRequests = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly Lock _stateLock = new();
-    private readonly BehaviorSubject<bool> _isConnectedSubject = new(false);
+    private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new(StringComparer.Ordinal);
     private readonly BehaviorSubject<int> _volumeSubject = new(0);
-    private readonly BehaviorSubject<string> _foregroundAppSubject = new(string.Empty);
-    private readonly Subject<Unit> _disposedSubject = new();
 
     private CancellationTokenSource? _cancellationTokenSource;
+    private bool _isDisposed;
+    private bool _isRegistered;
+    private int _messageIdCounter;
     private WebOSPointerSocket? _pointerSocket;
     private ReconnectLoop? _reconnectLoop;
-    private Uri? _workingEndpoint;
-    private ClientWebSocket? _webSocket;
-    private int _messageIdCounter;
-    private bool _isRegistered;
-    private bool _isDisposed;
-    private string? _clientKey = clientKey;
     private TaskCompletionSource<string>? _registerTcs;
+    private ClientWebSocket? _webSocket;
+    private Uri? _workingEndpoint;
 
     public event EventHandler<DataEventArgs<string>>? Registered;
 
-    /// <summary>
-    /// An observable of the connection state. Replays the current state on subscription.
-    /// </summary>
-    public IObservable<bool> IsConnectedChanged => this._isConnectedSubject;
+    public string? ClientKey { get; private set; } = clientKey;
 
-    /// <summary>
-    /// An observable of the volume. Replays the current volume on subscription.
-    /// </summary>
-    public IObservable<int> VolumeChanged => this._volumeSubject;
-
-    /// <summary>
-    /// An observable of the foreground app id. Replays the current app id on subscription.
-    /// </summary>
-    public IObservable<string> ForegroundAppChanged => this._foregroundAppSubject;
+    public string DeviceId => this.MacAddress.Equals(PhysicalAddress.None) ? this.IPAddress.ToString() : this.MacAddress.ToString();
 
     /// <summary>
     /// An observable which emits (once) when the client is disposed.
     /// </summary>
     public IObservable<Unit> Disposed => this._disposedSubject;
-
-    public string DeviceId => this.MacAddress.Equals(PhysicalAddress.None) ? this.IPAddress.ToString() : this.MacAddress.ToString();
-
-    public IPAddress IPAddress => ipAddress;
-
-    public PhysicalAddress MacAddress { get; } = macAddress;
-
-    public int Port => this._workingEndpoint?.Port ?? WebOSClient.SecurePort;
-
-    public string? ClientKey => this._clientKey;
-
-    public bool IsPaired => !string.IsNullOrEmpty(this._clientKey);
-
-    public bool IsConnected => this._webSocket is { State: WebSocketState.Open } && this._isRegistered;
-
-    public int Volume
-    {
-        get => this._volumeSubject.Value;
-        internal set => this.Publish(this._volumeSubject, value);
-    }
-
-    public bool IsMuted { get; private set; }
 
     public string ForegroundApp
     {
@@ -98,18 +64,130 @@ public sealed class WebOSClient(
     }
 
     /// <summary>
-    /// Connects using the stored client key. Never prompts on the TV - an unpaired client fails (see <see cref="PairAsync"/>).
+    /// An observable of the foreground app id. Replays the current app id on subscription.
+    /// </summary>
+    public IObservable<string> ForegroundAppChanged => this._foregroundAppSubject;
+
+    public IPAddress IPAddress => ipAddress;
+
+    public bool IsConnected => this._webSocket is { State: WebSocketState.Open } && this._isRegistered;
+
+    /// <summary>
+    /// An observable of the connection state. Replays the current state on subscription.
+    /// </summary>
+    public IObservable<bool> IsConnectedChanged => this._isConnectedSubject;
+
+    public bool IsMuted { get; private set; }
+
+    public bool IsPaired => !string.IsNullOrEmpty(this.ClientKey);
+
+    public PhysicalAddress MacAddress { get; } = macAddress;
+
+    public int Port => this._workingEndpoint?.Port ?? WebOSClient.SecurePort;
+
+    public int Volume
+    {
+        get => this._volumeSubject.Value;
+        internal set => this.Publish(this._volumeSubject, value);
+    }
+
+    /// <summary>
+    /// An observable of the volume. Replays the current volume on subscription.
+    /// </summary>
+    public IObservable<int> VolumeChanged => this._volumeSubject;
+
+    /// <summary>
+    /// Connects using the stored client key. Never prompts on the TV - an unpaired client fails
+    /// (see <see cref="PairAsync"/>).
     /// </summary>
     public Task<bool> ConnectAsync(CancellationToken cancellationToken = default) => this.ConnectAsync(allowPairing: false, cancellationToken);
 
+    public void Dispose()
+    {
+        if (this._isDisposed)
+        {
+            return;
+        }
+        this._isDisposed = true;
+        Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
+        this.CleanUp();
+        this.CancelOutstanding();
+        this.PublishConnected(false);
+        this._disposedSubject.OnNext(Unit.Default);
+        this._disposedSubject.OnCompleted();
+        this._connectLock.Dispose();
+        this._sendLock.Dispose();
+    }
+
+    public async Task<WebOSAppInfo[]> GetAppsAsync(CancellationToken cancellationToken = default)
+    {
+        WebOSResponse response = await this.SendRequestAsync("ssap://com.webos.applicationLauncher/listApps", null, cancellationToken).ConfigureAwait(false);
+        if (response.Payload.TryGetProperty("apps", out JsonElement appsElement) && appsElement.ValueKind == JsonValueKind.Array)
+        {
+            return appsElement.Deserialize<WebOSAppInfo[]>(WebOSJsonSerializerOptions.Default) ?? [];
+        }
+        return [];
+    }
+
+    public async Task<WebOSAppInfo[]> GetExternalInputsAsync(CancellationToken cancellationToken = default)
+    {
+        WebOSResponse response = await this.SendRequestAsync("ssap://tv/getExternalInputList", null, cancellationToken).ConfigureAwait(false);
+        if (!response.Payload.TryGetProperty("devices", out JsonElement devicesElement) || devicesElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+        List<WebOSAppInfo> inputs = [];
+        foreach (JsonElement dev in devicesElement.EnumerateArray())
+        {
+            string id = dev.TryGetProperty("id", out JsonElement idProp) ? idProp.GetString() ?? string.Empty : string.Empty;
+            string label = dev.TryGetProperty("label", out JsonElement labelProp) ? labelProp.GetString() ?? id : id;
+            string? icon = dev.TryGetProperty("icon", out JsonElement iconProp) ? iconProp.GetString() : null;
+            if (!string.IsNullOrEmpty(id))
+            {
+                inputs.Add(new(id, label, icon));
+            }
+        }
+        return [.. inputs];
+    }
+
+    public Task LaunchAppAsync(string appId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(appId);
+        return this.SendRequestAsync("ssap://system.launcher/launch", new { id = appId }, cancellationToken);
+    }
+
     /// <summary>
-    /// Connects, showing the pairing prompt on the TV if no client key is stored yet (waiting up to 60 seconds for it to be accepted).
+    /// Connects, showing the pairing prompt on the TV if no client key is stored yet (waiting up to
+    /// 60 seconds for it to be accepted).
     /// </summary>
     public Task<bool> PairAsync(CancellationToken cancellationToken = default) => this.ConnectAsync(allowPairing: true, cancellationToken);
 
+    public Task PowerOffAsync(CancellationToken cancellationToken = default)
+    {
+        return this.SendRequestAsync("ssap://system/turnOff", null, cancellationToken);
+    }
+
+    public async Task PowerOnAsync(CancellationToken cancellationToken = default)
+    {
+        if (this.IsConnected || this.MacAddress.Equals(PhysicalAddress.None))
+        {
+            return;
+        }
+        // Requires "Turn on via Wi-Fi/LAN" (or equivalent) on the TV.
+        await this.MacAddress.WakeAsync(cancellationToken).ConfigureAwait(false);
+        // Give the TV's network a moment to come up, then reconnect rather than waiting for the
+        // next backoff tick.
+        _ = Task.Delay(TimeSpan.FromSeconds(3d), CancellationToken.None).ContinueWith(
+            _ => this.RequestReconnect(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default
+        );
+    }
+
     /// <summary>
-    /// Requests a (re)connection attempt as soon as possible, coalesced with any attempt in flight. A no-op once disposed or
-    /// while unpaired.
+    /// Requests a (re)connection attempt as soon as possible, coalesced with any attempt in flight.
+    /// A no-op once disposed or while unpaired.
     /// </summary>
     public void RequestReconnect()
     {
@@ -117,6 +195,109 @@ public sealed class WebOSClient(
         {
             this.GetReconnectLoop().Start(immediate: true);
         }
+    }
+
+    public async Task SendKeyAsync(Buttons button, CancellationToken cancellationToken = default)
+    {
+        if (WebOSRemoteKey.TryGetButtonName(button, out string buttonName))
+        {
+            if (await this.TrySendViaPointerSocketAsync(buttonName, cancellationToken).ConfigureAwait(false))
+            {
+                return;
+            }
+        }
+        // Fallback for media transport / volume if pointer socket is unavailable
+        Task fallback = button switch
+        {
+            Buttons.Play => this.SendRequestAsync("ssap://media.controls/play", null, cancellationToken),
+            Buttons.Pause => this.SendRequestAsync("ssap://media.controls/pause", null, cancellationToken),
+            Buttons.Stop => this.SendRequestAsync("ssap://media.controls/stop", null, cancellationToken),
+            Buttons.Forward => this.SendRequestAsync("ssap://media.controls/fastForward", null, cancellationToken),
+            Buttons.Reverse => this.SendRequestAsync("ssap://media.controls/rewind", null, cancellationToken),
+            Buttons.VolumeUp => this.SendRequestAsync("ssap://audio/volumeUp", null, cancellationToken),
+            Buttons.VolumeDown => this.SendRequestAsync("ssap://audio/volumeDown", null, cancellationToken),
+            Buttons.MuteToggle => this.SendRequestAsync("ssap://audio/setMute", new { mute = !this.IsMuted }, cancellationToken),
+            Buttons.ChannelUp => this.SendRequestAsync("ssap://tv/channelUp", null, cancellationToken),
+            Buttons.ChannelDown => this.SendRequestAsync("ssap://tv/channelDown", null, cancellationToken),
+            _ => Task.CompletedTask
+        };
+        await fallback.ConfigureAwait(false);
+    }
+
+    public async Task<WebOSResponse> SendRequestAsync(string uri, object? payload = default, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(this._isDisposed, this);
+        if (this._webSocket is not { State: WebSocketState.Open } socket)
+        {
+            throw new InvalidOperationException("Not connected to webOS TV.");
+        }
+        string id = $"req_{Interlocked.Increment(ref this._messageIdCounter)}";
+        WebOSRequest request = new(id, "request", uri, payload);
+        TaskCompletionSource<WebOSResponse> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        this._pendingRequests.TryAdd(id, tcs);
+        try
+        {
+            await this.SendRawAsync(socket, request, cancellationToken).ConfigureAwait(false);
+            return await tcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            this._pendingRequests.TryRemove(id, out _);
+            throw;
+        }
+    }
+
+    public Task SetMuteAsync(bool mute, CancellationToken cancellationToken = default)
+    {
+        return this.SendRequestAsync("ssap://audio/setMute", new { mute }, cancellationToken);
+    }
+
+    public async Task<int> SetVolumeAsync(int volume, CancellationToken cancellationToken = default)
+    {
+        volume = Math.Clamp(volume, 0, 100);
+        await this.SendRequestAsync("ssap://audio/setVolume", new { volume }, cancellationToken).ConfigureAwait(false);
+        this.Volume = volume;
+        return volume;
+    }
+
+    public Task SwitchInputAsync(string inputId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(inputId);
+        return this.SendRequestAsync("ssap://tv/switchInput", new { inputId }, cancellationToken);
+    }
+
+    internal void PublishConnected(bool isConnected) => this.Publish(this._isConnectedSubject, isConnected);
+
+    private static ClientWebSocket CreateSocket(Uri endpoint)
+    {
+        ClientWebSocket socket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
+        if (endpoint.Scheme == Uri.UriSchemeWss)
+        {
+            // The TV presents a self-signed certificate; this only applies to this socket.
+            socket.Options.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
+        }
+        return socket;
+    }
+
+    private void CancelOutstanding()
+    {
+        foreach ((_, TaskCompletionSource<WebOSResponse> tcs) in this._pendingRequests)
+        {
+            tcs.TrySetCanceled();
+        }
+        this._pendingRequests.Clear();
+        this._registerTcs?.TrySetCanceled();
+    }
+
+    private void CleanUp()
+    {
+        this._isRegistered = false;
+        Interlocked.Exchange(ref this._pointerSocket, null)?.Dispose();
+        this._cancellationTokenSource?.Cancel();
+        this._cancellationTokenSource?.Dispose();
+        this._cancellationTokenSource = null;
+        this._webSocket?.Dispose();
+        this._webSocket = null;
     }
 
     private async Task<bool> ConnectAsync(bool allowPairing, CancellationToken cancellationToken)
@@ -146,155 +327,39 @@ public sealed class WebOSClient(
         }
     }
 
-    public async Task<int> SetVolumeAsync(int volume, CancellationToken cancellationToken = default)
+    private async Task<bool> EnsurePointerSocketAsync(CancellationToken cancellationToken)
     {
-        volume = Math.Clamp(volume, 0, 100);
-        await this.SendRequestAsync("ssap://audio/setVolume", new { volume }, cancellationToken).ConfigureAwait(false);
-        this.Volume = volume;
-        return volume;
-    }
-
-    public Task SetMuteAsync(bool mute, CancellationToken cancellationToken = default)
-    {
-        return this.SendRequestAsync("ssap://audio/setMute", new { mute }, cancellationToken);
-    }
-
-    public Task PowerOffAsync(CancellationToken cancellationToken = default)
-    {
-        return this.SendRequestAsync("ssap://system/turnOff", null, cancellationToken);
-    }
-
-    public async Task PowerOnAsync(CancellationToken cancellationToken = default)
-    {
-        if (this.IsConnected || this.MacAddress.Equals(PhysicalAddress.None))
+        if (this._pointerSocket is { IsConnected: true })
         {
-            return;
+            return true;
         }
-        // Requires "Turn on via Wi-Fi/LAN" (or equivalent) on the TV.
-        await this.MacAddress.WakeAsync(cancellationToken).ConfigureAwait(false);
-        // Give the TV's network a moment to come up, then reconnect rather than waiting for the next backoff tick.
-        _ = Task.Delay(TimeSpan.FromSeconds(3d), CancellationToken.None).ContinueWith(
-            _ => this.RequestReconnect(),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default
-        );
-    }
-
-    public async Task SendKeyAsync(Buttons button, CancellationToken cancellationToken = default)
-    {
-        if (WebOSRemoteKey.TryGetButtonName(button, out string buttonName))
-        {
-            if (await this.TrySendViaPointerSocketAsync(buttonName, cancellationToken).ConfigureAwait(false))
-            {
-                return;
-            }
-        }
-
-        // Fallback for media transport / volume if pointer socket is unavailable
-        Task fallback = button switch
-        {
-            Buttons.Play => this.SendRequestAsync("ssap://media.controls/play", null, cancellationToken),
-            Buttons.Pause => this.SendRequestAsync("ssap://media.controls/pause", null, cancellationToken),
-            Buttons.Stop => this.SendRequestAsync("ssap://media.controls/stop", null, cancellationToken),
-            Buttons.Forward => this.SendRequestAsync("ssap://media.controls/fastForward", null, cancellationToken),
-            Buttons.Reverse => this.SendRequestAsync("ssap://media.controls/rewind", null, cancellationToken),
-            Buttons.VolumeUp => this.SendRequestAsync("ssap://audio/volumeUp", null, cancellationToken),
-            Buttons.VolumeDown => this.SendRequestAsync("ssap://audio/volumeDown", null, cancellationToken),
-            Buttons.MuteToggle => this.SendRequestAsync("ssap://audio/setMute", new { mute = !this.IsMuted }, cancellationToken),
-            Buttons.ChannelUp => this.SendRequestAsync("ssap://tv/channelUp", null, cancellationToken),
-            Buttons.ChannelDown => this.SendRequestAsync("ssap://tv/channelDown", null, cancellationToken),
-            _ => Task.CompletedTask
-        };
-        await fallback.ConfigureAwait(false);
-    }
-
-    public async Task<WebOSAppInfo[]> GetAppsAsync(CancellationToken cancellationToken = default)
-    {
-        WebOSResponse response = await this.SendRequestAsync("ssap://com.webos.applicationLauncher/listApps", null, cancellationToken).ConfigureAwait(false);
-        if (response.Payload.TryGetProperty("apps", out JsonElement appsElement) && appsElement.ValueKind == JsonValueKind.Array)
-        {
-            return appsElement.Deserialize<WebOSAppInfo[]>(WebOSJsonSerializerOptions.Default) ?? [];
-        }
-        return [];
-    }
-
-    public async Task<WebOSAppInfo[]> GetExternalInputsAsync(CancellationToken cancellationToken = default)
-    {
-        WebOSResponse response = await this.SendRequestAsync("ssap://tv/getExternalInputList", null, cancellationToken).ConfigureAwait(false);
-        if (!response.Payload.TryGetProperty("devices", out JsonElement devicesElement) || devicesElement.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
-
-        List<WebOSAppInfo> inputs = [];
-        foreach (JsonElement dev in devicesElement.EnumerateArray())
-        {
-            string id = dev.TryGetProperty("id", out JsonElement idProp) ? idProp.GetString() ?? string.Empty : string.Empty;
-            string label = dev.TryGetProperty("label", out JsonElement labelProp) ? labelProp.GetString() ?? id : id;
-            string? icon = dev.TryGetProperty("icon", out JsonElement iconProp) ? iconProp.GetString() : null;
-            if (!string.IsNullOrEmpty(id))
-            {
-                inputs.Add(new(id, label, icon));
-            }
-        }
-        return [.. inputs];
-    }
-
-    public Task LaunchAppAsync(string appId, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(appId);
-        return this.SendRequestAsync("ssap://system.launcher/launch", new { id = appId }, cancellationToken);
-    }
-
-    public Task SwitchInputAsync(string inputId, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(inputId);
-        return this.SendRequestAsync("ssap://tv/switchInput", new { inputId }, cancellationToken);
-    }
-
-    public async Task<WebOSResponse> SendRequestAsync(string uri, object? payload = default, CancellationToken cancellationToken = default)
-    {
-        ObjectDisposedException.ThrowIf(this._isDisposed, this);
-        if (this._webSocket is not { State: WebSocketState.Open } socket)
-        {
-            throw new InvalidOperationException("Not connected to webOS TV.");
-        }
-
-        string id = $"req_{Interlocked.Increment(ref this._messageIdCounter)}";
-        WebOSRequest request = new(id, "request", uri, payload);
-        TaskCompletionSource<WebOSResponse> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        this._pendingRequests.TryAdd(id, tcs);
-
         try
         {
-            await this.SendRawAsync(socket, request, cancellationToken).ConfigureAwait(false);
-            return await tcs.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch
-        {
-            this._pendingRequests.TryRemove(id, out _);
-            throw;
-        }
-    }
-
-    private async Task<bool> PerformConnectAsync(CancellationToken cancellationToken)
-    {
-        foreach (Uri endpoint in this.GetEndpoints())
-        {
-            // Only fall back to the other endpoint when this one couldn't be reached - a failure after the socket opened (e.g. a
-            // pairing prompt that wasn't accepted) would just fail again there (and show a second prompt).
-            if (await this.TryConnectToAsync(endpoint, cancellationToken).ConfigureAwait(false) is { } connected)
+            WebOSResponse response = await this.SendRequestAsync("ssap://com.webos.service.networkinput/getPointerInputSocket", null, cancellationToken).ConfigureAwait(false);
+            if (!response.Payload.TryGetProperty("socketPath", out JsonElement socketPathProp) || socketPathProp.GetString() is not { } socketPath)
             {
-                return connected;
+                return false;
             }
+            Uri baseUri = this._workingEndpoint ?? new($"wss://{this.IPAddress}:{WebOSClient.SecurePort}");
+            Uri fullUri = Uri.IsWellFormedUriString(socketPath, UriKind.Absolute)
+                ? new(socketPath)
+                : new(baseUri, socketPath);
+            WebOSPointerSocket pointer = new(fullUri, logger);
+            await pointer.ConnectAsync(cancellationToken).ConfigureAwait(false);
+            Interlocked.Exchange(ref this._pointerSocket, pointer)?.Dispose();
+            return true;
         }
-        return false;
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to initialize pointer input socket.");
+            return false;
+        }
     }
 
     /// <summary>
-    /// Newer webOS firmware (webOS 4.0+) only accepts the secure socket on <see cref="SecurePort"/> (with a self-signed certificate),
-    /// older firmware only the plain one on <see cref="PlainPort"/> - try the one that last worked first.
+    /// Newer webOS firmware (webOS 4.0+) only accepts the secure socket on <see cref="SecurePort"/>
+    /// (with a self-signed certificate), older firmware only the plain one on <see
+    /// cref="PlainPort"/> - try the one that last worked first.
     /// </summary>
     private IEnumerable<Uri> GetEndpoints()
     {
@@ -303,78 +368,165 @@ public sealed class WebOSClient(
         return this._workingEndpoint == plain ? [plain, secure] : [secure, plain];
     }
 
-    /// <returns><see langword="true"/> if connected and registered, <see langword="false"/> if the socket opened but registration
-    /// failed, or <see langword="null"/> if the socket could not be opened.</returns>
-    private async Task<bool?> TryConnectToAsync(Uri endpoint, CancellationToken cancellationToken)
+    // One loop for the client's lifetime, created on first use (a field initializer can't capture
+    // this). A short initial delay so a TV turned on with its own remote is picked up quickly; an
+    // unpaired client stops retrying (pairing connects it).
+    private ReconnectLoop GetReconnectLoop()
     {
-        logger.LogInformation("Connecting to webOS TV at {endpoint}...", endpoint);
-        ClientWebSocket socket = WebOSClient.CreateSocket(endpoint);
-        CancellationTokenSource cts = new();
-        bool opened = false;
-        bool connected = false;
+        if (Volatile.Read(ref this._reconnectLoop) is { } existing)
+        {
+            return existing;
+        }
+        ReconnectLoop loop = new(
+            TimeSpan.FromSeconds(5d),
+            TimeSpan.FromMinutes(2d),
+            async cancellationToken => await this.ConnectAsync(cancellationToken).ConfigureAwait(false) || !this.IsPaired,
+            logger
+        );
+        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is { } winner)
+        {
+            loop.Dispose();
+            return winner;
+        }
+        if (this._isDisposed)
+        {
+            loop.Dispose();
+        }
+        return loop;
+    }
+
+    private async Task MessageLoopAsync()
+    {
         try
         {
-            await socket.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
-            opened = true;
-            this._webSocket = socket;
-            this._cancellationTokenSource = cts;
-            this._workingEndpoint = endpoint;
-
-            _ = Task.Run(this.MessageLoopAsync, cts.Token);
-
-            // Also ends with a timeout (an OperationCanceledException) if the pairing prompt isn't accepted.
-            string key = await this.RegisterAsync(socket, cts.Token).ConfigureAwait(false);
-            this._clientKey = key;
-            this._isRegistered = true;
-
-            await this.SubscribeToEventsAsync(cts.Token).ConfigureAwait(false);
-            _ = this.EnsurePointerSocketAsync(cts.Token);
-            connected = true;
+            if (this._cancellationTokenSource is { Token: { } token } && this._webSocket is { State: WebSocketState.Open } webSocket)
+            {
+                await JsonWebSocket.MessageLoop(
+                    webSocket,
+                    (response, _) =>
+                    {
+                        this.ProcessIncomingResponse(response);
+                        return ValueTask.CompletedTask;
+                    },
+                    WebOSJsonSerializerContext.Default.WebOSResponse,
+                    this.OnDisconnected,
+                    cancellationToken: token
+                ).ConfigureAwait(false);
+            }
         }
-        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning("Failed to connect/register with webOS TV at {endpoint}: {message}", endpoint, ex.Message);
+            logger.LogError(ex, "webOS message loop terminated unexpectedly.");
         }
         finally
         {
-            if (!connected)
+            this.CancelOutstanding();
+        }
+    }
+
+    private void OnAppPayload(JsonElement payload)
+    {
+        if (payload.TryGetProperty("appId", out JsonElement appProp) && appProp.GetString() is { } appId)
+        {
+            this.ForegroundApp = appId;
+        }
+    }
+
+    private void OnDisconnected()
+    {
+        this.CleanUp();
+        this.PublishConnected(false);
+        if (this._isDisposed)
+        {
+            return;
+        }
+        this.GetReconnectLoop().Start();
+    }
+
+    private void OnVolumePayload(JsonElement payload)
+    {
+        if (payload.TryGetProperty("volume", out JsonElement volumeProp) && volumeProp.TryGetInt32(out int volume))
+        {
+            this.Volume = volume;
+        }
+        if (payload.TryGetProperty("muted", out JsonElement mutedProp))
+        {
+            this.IsMuted = mutedProp.GetBoolean();
+        }
+    }
+
+    private async Task<bool> PerformConnectAsync(CancellationToken cancellationToken)
+    {
+        foreach (Uri endpoint in this.GetEndpoints())
+        {
+            // Only fall back to the other endpoint when this one couldn't be reached - a failure
+            // after the socket opened (e.g. a pairing prompt that wasn't accepted) would just fail
+            // again there (and show a second prompt).
+            if (await this.TryConnectToAsync(endpoint, cancellationToken).ConfigureAwait(false) is { } connected)
             {
-                if (ReferenceEquals(this._webSocket, socket))
+                return connected;
+            }
+        }
+        return false;
+    }
+
+    private void ProcessIncomingResponse(WebOSResponse response)
+    {
+        if (response.Type == "registered")
+        {
+            string? key = response.Payload.TryGetProperty("client-key", out JsonElement keyProp) ? keyProp.GetString() : null;
+            if (key != null)
+            {
+                this.ClientKey = key;
+                this.Registered?.Invoke(this, key);
+            }
+            this._registerTcs?.TrySetResult(key ?? string.Empty);
+            return;
+        }
+        if (response.Id is { } id)
+        {
+            if (this._pendingRequests.TryRemove(id, out TaskCompletionSource<WebOSResponse>? taskSource))
+            {
+                if (response is { Type: "error" } or { Error.Length: not 0 })
                 {
-                    this.CleanUp();
+                    taskSource.TrySetException(new ApplicationException($"webOS error: {response.Error}"));
                 }
                 else
                 {
-                    cts.Dispose();
-                    socket.Dispose();
+                    taskSource.TrySetResult(response);
+                }
+            }
+            if (this._subscriptions.TryGetValue(id, out Action<JsonElement>? handler))
+            {
+                try
+                {
+                    handler(response.Payload);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Error executing subscription handler for {id}.", id);
                 }
             }
         }
-        if (connected)
-        {
-            this.PublishConnected(true);
-            logger.LogInformation("Successfully connected and paired with webOS TV at {endpoint}.", endpoint);
-            return true;
-        }
-        return opened ? false : null;
     }
 
-    private static ClientWebSocket CreateSocket(Uri endpoint)
+    // Values arrive from the message loop, connect/disconnect and request callers, so publishing is
+    // serialized (a subject must not be signalled concurrently). Only actual changes are published.
+    private void Publish<TValue>(BehaviorSubject<TValue> subject, TValue value)
     {
-        ClientWebSocket socket = new() { Options = { KeepAliveInterval = TimeSpan.FromSeconds(30d) } };
-        if (endpoint.Scheme == Uri.UriSchemeWss)
+        lock (this._stateLock)
         {
-            // The TV presents a self-signed certificate; this only applies to this socket.
-            socket.Options.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
+            if (!EqualityComparer<TValue>.Default.Equals(subject.Value, value))
+            {
+                subject.OnNext(value);
+            }
         }
-        return socket;
     }
 
     private async Task<string> RegisterAsync(ClientWebSocket socket, CancellationToken cancellationToken)
     {
         TaskCompletionSource<string> registerTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         this._registerTcs = registerTcs;
-
         Dictionary<string, object?> payload = new()
         {
             ["forcePairing"] = false,
@@ -409,239 +561,16 @@ public sealed class WebOSClient(
                 }
             }
         };
-
-        if (!string.IsNullOrEmpty(this._clientKey))
+        if (!string.IsNullOrEmpty(this.ClientKey))
         {
-            payload["client-key"] = this._clientKey;
+            payload["client-key"] = this.ClientKey;
         }
-
         WebOSRequest registerRequest = new("register_0", "register", null, payload);
         await this.SendRawAsync(socket, registerRequest, cancellationToken).ConfigureAwait(false);
-
         // TV pairing prompt timeout
         using CancellationTokenSource timeoutCts = new(TimeSpan.FromSeconds(60d));
         using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         return await registerTcs.Task.WaitAsync(linkedCts.Token).ConfigureAwait(false);
-    }
-
-    private async Task SubscribeToEventsAsync(CancellationToken cancellationToken)
-    {
-        await this.SubscribeAsync("sub_volume", "ssap://audio/getVolume", this.OnVolumePayload, cancellationToken).ConfigureAwait(false);
-        await this.SubscribeAsync("sub_app", "ssap://com.webos.applicationLauncher/getForegroundAppInfo", this.OnAppPayload, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task SubscribeAsync(string id, string uri, Action<JsonElement> handler, CancellationToken cancellationToken)
-    {
-        if (this._webSocket is not { State: WebSocketState.Open } socket)
-        {
-            return;
-        }
-        this._subscriptions[id] = handler;
-        WebOSRequest request = new(id, "subscribe", uri, null);
-        await this.SendRawAsync(socket, request, cancellationToken).ConfigureAwait(false);
-    }
-
-    private void OnVolumePayload(JsonElement payload)
-    {
-        if (payload.TryGetProperty("volume", out JsonElement volumeProp) && volumeProp.TryGetInt32(out int volume))
-        {
-            this.Volume = volume;
-        }
-        if (payload.TryGetProperty("muted", out JsonElement mutedProp))
-        {
-            this.IsMuted = mutedProp.GetBoolean();
-        }
-    }
-
-    private void OnAppPayload(JsonElement payload)
-    {
-        if (payload.TryGetProperty("appId", out JsonElement appProp) && appProp.GetString() is { } appId)
-        {
-            this.ForegroundApp = appId;
-        }
-    }
-
-    private async Task<bool> TrySendViaPointerSocketAsync(string buttonName, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (this._pointerSocket is { IsConnected: true } socket)
-            {
-                await socket.SendButtonAsync(buttonName, cancellationToken).ConfigureAwait(false);
-                return true;
-            }
-
-            if (await this.EnsurePointerSocketAsync(cancellationToken).ConfigureAwait(false) && this._pointerSocket is { IsConnected: true } newSocket)
-            {
-                await newSocket.SendButtonAsync(buttonName, cancellationToken).ConfigureAwait(false);
-                return true;
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Failed to send button {button} over pointer socket, will try fallback.", buttonName);
-        }
-        return false;
-    }
-
-    private async Task<bool> EnsurePointerSocketAsync(CancellationToken cancellationToken)
-    {
-        if (this._pointerSocket is { IsConnected: true })
-        {
-            return true;
-        }
-        try
-        {
-            WebOSResponse response = await this.SendRequestAsync("ssap://com.webos.service.networkinput/getPointerInputSocket", null, cancellationToken).ConfigureAwait(false);
-            if (!response.Payload.TryGetProperty("socketPath", out JsonElement socketPathProp) || socketPathProp.GetString() is not { } socketPath)
-            {
-                return false;
-            }
-
-            Uri baseUri = this._workingEndpoint ?? new($"wss://{this.IPAddress}:{WebOSClient.SecurePort}");
-            Uri fullUri = Uri.IsWellFormedUriString(socketPath, UriKind.Absolute)
-                ? new(socketPath)
-                : new(baseUri, socketPath);
-
-            WebOSPointerSocket pointer = new(fullUri, logger);
-            await pointer.ConnectAsync(cancellationToken).ConfigureAwait(false);
-            Interlocked.Exchange(ref this._pointerSocket, pointer)?.Dispose();
-            return true;
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex, "Failed to initialize pointer input socket.");
-            return false;
-        }
-    }
-
-    private async Task MessageLoopAsync()
-    {
-        try
-        {
-            if (this._cancellationTokenSource is { Token: { } token } && this._webSocket is { State: WebSocketState.Open } webSocket)
-            {
-                await JsonWebSocket.MessageLoop(
-                    webSocket,
-                    (response, _) =>
-                    {
-                        this.ProcessIncomingResponse(response);
-                        return ValueTask.CompletedTask;
-                    },
-                    WebOSJsonSerializerContext.Default.WebOSResponse,
-                    this.OnDisconnected,
-                    cancellationToken: token
-                ).ConfigureAwait(false);
-            }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError(ex, "webOS message loop terminated unexpectedly.");
-        }
-        finally
-        {
-            this.CancelOutstanding();
-        }
-    }
-
-    private void ProcessIncomingResponse(WebOSResponse response)
-    {
-        if (response.Type == "registered")
-        {
-            string? key = response.Payload.TryGetProperty("client-key", out JsonElement keyProp) ? keyProp.GetString() : null;
-            if (key != null)
-            {
-                this._clientKey = key;
-                this.Registered?.Invoke(this, key);
-            }
-            this._registerTcs?.TrySetResult(key ?? string.Empty);
-            return;
-        }
-
-        if (response.Id is { } id)
-        {
-            if (this._pendingRequests.TryRemove(id, out TaskCompletionSource<WebOSResponse>? taskSource))
-            {
-                if (response.Type == "error" || !string.IsNullOrEmpty(response.Error))
-                {
-                    taskSource.TrySetException(new ApplicationException($"webOS error: {response.Error}"));
-                }
-                else
-                {
-                    taskSource.TrySetResult(response);
-                }
-            }
-
-            if (this._subscriptions.TryGetValue(id, out Action<JsonElement>? handler))
-            {
-                try
-                {
-                    handler(response.Payload);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Error executing subscription handler for {id}.", id);
-                }
-            }
-        }
-    }
-
-    private void OnDisconnected()
-    {
-        this.CleanUp();
-        this.PublishConnected(false);
-        if (this._isDisposed)
-        {
-            return;
-        }
-        this.GetReconnectLoop().Start();
-    }
-
-    // One loop for the client's lifetime, created on first use (a field initializer can't capture this). A short initial delay
-    // so a TV turned on with its own remote is picked up quickly; an unpaired client stops retrying (pairing connects it).
-    private ReconnectLoop GetReconnectLoop()
-    {
-        if (Volatile.Read(ref this._reconnectLoop) is { } existing)
-        {
-            return existing;
-        }
-        ReconnectLoop loop = new(
-            TimeSpan.FromSeconds(5d),
-            TimeSpan.FromMinutes(2d),
-            async cancellationToken => await this.ConnectAsync(cancellationToken).ConfigureAwait(false) || !this.IsPaired,
-            logger
-        );
-        if (Interlocked.CompareExchange(ref this._reconnectLoop, loop, null) is { } winner)
-        {
-            loop.Dispose();
-            return winner;
-        }
-        if (this._isDisposed)
-        {
-            loop.Dispose();
-        }
-        return loop;
-    }
-
-    private void CleanUp()
-    {
-        this._isRegistered = false;
-        Interlocked.Exchange(ref this._pointerSocket, null)?.Dispose();
-        this._cancellationTokenSource?.Cancel();
-        this._cancellationTokenSource?.Dispose();
-        this._cancellationTokenSource = null;
-        this._webSocket?.Dispose();
-        this._webSocket = null;
-    }
-
-    private void CancelOutstanding()
-    {
-        foreach ((string id, TaskCompletionSource<WebOSResponse> tcs) in this._pendingRequests)
-        {
-            tcs.TrySetCanceled();
-        }
-        this._pendingRequests.Clear();
-        this._registerTcs?.TrySetCanceled();
     }
 
     private async Task SendRawAsync(WebSocket socket, WebOSRequest request, CancellationToken cancellationToken)
@@ -658,35 +587,97 @@ public sealed class WebOSClient(
         }
     }
 
-    internal void PublishConnected(bool isConnected) => this.Publish(this._isConnectedSubject, isConnected);
-
-    // Values arrive from the message loop, connect/disconnect and request callers, so publishing is serialized (a subject must not
-    // be signalled concurrently). Only actual changes are published.
-    private void Publish<TValue>(BehaviorSubject<TValue> subject, TValue value)
+    private async Task SubscribeAsync(string id, string uri, Action<JsonElement> handler, CancellationToken cancellationToken)
     {
-        lock (this._stateLock)
-        {
-            if (!EqualityComparer<TValue>.Default.Equals(subject.Value, value))
-            {
-                subject.OnNext(value);
-            }
-        }
-    }
-
-    public void Dispose()
-    {
-        if (this._isDisposed)
+        if (this._webSocket is not { State: WebSocketState.Open } socket)
         {
             return;
         }
-        this._isDisposed = true;
-        Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
-        this.CleanUp();
-        this.CancelOutstanding();
-        this.PublishConnected(false);
-        this._disposedSubject.OnNext(Unit.Default);
-        this._disposedSubject.OnCompleted();
-        this._connectLock.Dispose();
-        this._sendLock.Dispose();
+        this._subscriptions[id] = handler;
+        WebOSRequest request = new(id, "subscribe", uri, null);
+        await this.SendRawAsync(socket, request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SubscribeToEventsAsync(CancellationToken cancellationToken)
+    {
+        await this.SubscribeAsync("sub_volume", "ssap://audio/getVolume", this.OnVolumePayload, cancellationToken).ConfigureAwait(false);
+        await this.SubscribeAsync("sub_app", "ssap://com.webos.applicationLauncher/getForegroundAppInfo", this.OnAppPayload, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <returns>
+    /// <see langword="true"/> if connected and registered, <see langword="false"/> if the socket
+    /// opened but registration failed, or <see langword="null"/> if the socket could not be opened.
+    /// </returns>
+    private async Task<bool?> TryConnectToAsync(Uri endpoint, CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Connecting to webOS TV at {endpoint}...", endpoint);
+        ClientWebSocket socket = WebOSClient.CreateSocket(endpoint);
+        CancellationTokenSource cts = new();
+        bool opened = false;
+        bool connected = false;
+        try
+        {
+            await socket.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+            opened = true;
+            this._webSocket = socket;
+            this._cancellationTokenSource = cts;
+            this._workingEndpoint = endpoint;
+            _ = Task.Run(this.MessageLoopAsync, cts.Token);
+            // Also ends with a timeout (an OperationCanceledException) if the pairing prompt isn't accepted.
+            string key = await this.RegisterAsync(socket, cts.Token).ConfigureAwait(false);
+            this.ClientKey = key;
+            this._isRegistered = true;
+            await this.SubscribeToEventsAsync(cts.Token).ConfigureAwait(false);
+            _ = this.EnsurePointerSocketAsync(cts.Token);
+            connected = true;
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("Failed to connect/register with webOS TV at {endpoint}: {message}", endpoint, ex.Message);
+        }
+        finally
+        {
+            if (!connected)
+            {
+                if (ReferenceEquals(this._webSocket, socket))
+                {
+                    this.CleanUp();
+                }
+                else
+                {
+                    cts.Dispose();
+                    socket.Dispose();
+                }
+            }
+        }
+        if (connected)
+        {
+            this.PublishConnected(true);
+            logger.LogInformation("Successfully connected and paired with webOS TV at {endpoint}.", endpoint);
+            return true;
+        }
+        return opened ? false : null;
+    }
+
+    private async Task<bool> TrySendViaPointerSocketAsync(string buttonName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (this._pointerSocket is { IsConnected: true } socket)
+            {
+                await socket.SendButtonAsync(buttonName, cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+            if (await this.EnsurePointerSocketAsync(cancellationToken).ConfigureAwait(false) && this._pointerSocket is { IsConnected: true } newSocket)
+            {
+                await newSocket.SendButtonAsync(buttonName, cancellationToken).ConfigureAwait(false);
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed to send button {button} over pointer socket, will try fallback.", buttonName);
+        }
+        return false;
     }
 }

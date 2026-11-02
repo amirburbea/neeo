@@ -36,8 +36,8 @@ public static partial class NetworkMethods
         }
         else
         {
-            // Runs the *nix command and parses the output.
-            NetworkMethods.PopulateNetworkDevicesViaCommandLine(output);
+            // Reads /proc/net/arp on Linux or parses the arp command on other systems.
+            NetworkMethods.PopulateNetworkDevicesOthers(output);
         }
         return output;
     }

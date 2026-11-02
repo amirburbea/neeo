@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Neeo.Drivers.WebOS;
 
-public sealed class WebOSPointerSocket(Uri uri, ILogger? logger = null) : IDisposable
+public sealed class WebOSPointerSocket(Uri uri, ILogger logger) : IDisposable
 {
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private ClientWebSocket? _webSocket;
@@ -29,7 +29,7 @@ public sealed class WebOSPointerSocket(Uri uri, ILogger? logger = null) : IDispo
         {
             await socket.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);
             this._webSocket = socket;
-            logger?.LogDebug("Connected pointer socket to {uri}", uri);
+            logger.LogDebug("Connected pointer socket to {uri}", uri);
         }
         catch
         {
@@ -66,7 +66,6 @@ public sealed class WebOSPointerSocket(Uri uri, ILogger? logger = null) : IDispo
         {
             throw new InvalidOperationException("Pointer socket is not connected.");
         }
-
         byte[] bytes = Encoding.UTF8.GetBytes(text);
         await this._sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try

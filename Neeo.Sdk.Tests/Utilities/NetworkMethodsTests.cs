@@ -70,4 +70,56 @@ public sealed class NetworkMethodsTests
 
         Assert.Equal(PhysicalAddress.Parse("BB-BB-BB-BB-BB-BB"), Assert.Single(output).Value);
     }
+
+    [Fact]
+    public void ParseArpOutput_adds_valid_entries()
+    {
+        Dictionary<IPAddress, PhysicalAddress> output = [];
+
+        NetworkMethods.ParseArpOutput(
+            [
+                "? (192.168.1.1) at ea:a2:5c:ed:d3:cb on en0 ifscope [ethernet]",
+                "? (192.168.1.20) at 00:11:22:33:44:55 on en0 ifscope [ethernet]",
+            ],
+            output
+        );
+
+        Assert.Equal(2, output.Count);
+        Assert.Equal(PhysicalAddress.Parse("EA-A2-5C-ED-D3-CB"), output[IPAddress.Parse("192.168.1.1")]);
+        Assert.Equal(PhysicalAddress.Parse("00-11-22-33-44-55"), output[IPAddress.Parse("192.168.1.20")]);
+    }
+
+    [Fact]
+    public void ParseArpOutput_ignores_empty_and_malformed_lines()
+    {
+        Dictionary<IPAddress, PhysicalAddress> output = [];
+
+        NetworkMethods.ParseArpOutput(
+            [
+                string.Empty,
+                "not an arp line",
+                "? (not-an-ip) at 00:11:22:33:44:55 on en0",
+                "? (192.168.1.1) at incomplete on en0",
+            ],
+            output
+        );
+
+        Assert.Empty(output);
+    }
+
+    [Fact]
+    public void ParseArpOutput_overwrites_duplicate_ip_entry()
+    {
+        Dictionary<IPAddress, PhysicalAddress> output = [];
+
+        NetworkMethods.ParseArpOutput(
+            [
+                "? (192.168.1.1) at aa:aa:aa:aa:aa:aa on en0 ifscope [ethernet]",
+                "? (192.168.1.1) at bb:bb:bb:bb:bb:bb on en1 ifscope [ethernet]",
+            ],
+            output
+        );
+
+        Assert.Equal(PhysicalAddress.Parse("BB-BB-BB-BB-BB-BB"), Assert.Single(output).Value);
+    }
 }
