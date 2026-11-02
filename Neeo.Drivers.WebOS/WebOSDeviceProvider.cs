@@ -124,12 +124,10 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     private async Task OnButtonPressedAsync(string deviceId, string buttonName, CancellationToken cancellationToken)
     {
-        WebOSClient? client = this._clientManager.GetClient(deviceId);
-        if (client == null)
+        if (this._clientManager.GetClient(deviceId) is not { } client)
         {
             return;
         }
-
         Buttons? resolved = Button.TryResolve(buttonName);
         if (resolved is Buttons.PowerOn || (resolved is Buttons.PowerToggle && !client.IsConnected))
         {
@@ -142,7 +140,6 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             client.RequestReconnect();
             return;
         }
-
         if (resolved is { } button)
         {
             switch (button)
@@ -178,7 +175,6 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
                 SmartApplicationButtons.GooglePlay => "googleplaymovieswebos",
                 _ => null
             };
-
             if (appId != null)
             {
                 await client.LaunchAppAsync(appId, cancellationToken).ConfigureAwait(false);
@@ -212,14 +208,10 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
 
     private async Task<DiscoveredDevice[]> PerformDiscoveryAsync(string? optionalDeviceId, CancellationToken cancellationToken)
     {
-        if (optionalDeviceId != null && PhysicalAddress.TryParse(optionalDeviceId, out PhysicalAddress? mac))
+        if (optionalDeviceId != null && PhysicalAddress.TryParse(optionalDeviceId, out PhysicalAddress? mac) && this._clientManager.GetClient(optionalDeviceId) is { } existing)
         {
-            if (this._clientManager.GetClient(optionalDeviceId) is { } existing)
-            {
-                return [new(existing.DeviceId, $"{DeviceName} ({existing.IPAddress})", true)];
-            }
+            return [new(existing.DeviceId, $"{DeviceName} ({existing.IPAddress})", true)];
         }
-
         WebOSClient[] clients = await this._clientManager.DiscoverAsync(cancellationToken).ConfigureAwait(false);
         return [.. clients.Select(static c => new DiscoveredDevice(c.DeviceId, $"{DeviceName} ({c.IPAddress}){(c.IsPaired ? string.Empty : " - not paired")}", true))];
     }
@@ -281,7 +273,7 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             return;
         }
         // Only the first call for a device subscribes (the add callback and ClientAdded can race).
-        CompositeDisposable subscriptions = new();
+        CompositeDisposable subscriptions = [];
         if (!this._subscriptions.TryAdd(client.DeviceId, subscriptions))
         {
             return;

@@ -45,5 +45,5 @@ public static class WebOSRemoteKey
     };
 
     public static bool TryGetButtonName(Buttons button, out string buttonName) =>
-        _mappings.TryGetValue(button, out buttonName!);
+        WebOSRemoteKey._mappings.TryGetValue(button, out buttonName!);
 }

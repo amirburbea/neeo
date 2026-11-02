@@ -11,13 +11,23 @@ namespace Neeo.Sdk.Utilities;
 
 public static partial class NetworkMethods
 {
-    [GeneratedRegex("^\\? \\((?<ip>(\\d+\\.){3}\\d+)\\).+(?<mac>([a-f\\d]{2}:){5}[a-f\\d]{2})", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture)]
-    private static partial Regex ArpLineRegex();
-
-    private const string ProcNetArpPath = "/proc/net/arp";
+    /// <summary>
+    /// Parses the output lines from the <c>arp -an</c> command, adding each entry to <paramref name="output"/>.
+    /// </summary>
+    internal static void ParseArpOutput(IEnumerable<string> lines, Dictionary<IPAddress, PhysicalAddress> output)
+    {
+        foreach (string line in lines)
+        {
+            if (line.Length > 0 && NetworkMethods.ArpLineRegex().Match(line) is { Success: true, Groups: { } groups })
+            {
+                output[IPAddress.Parse(groups["ip"].Value)] = PhysicalAddress.Parse(groups["mac"].Value);
+            }
+        }
+    }
 
     /// <summary>
-    /// Parses the contents of the Linux <c>/proc/net/arp</c> table, adding each complete entry to <paramref name="output"/>.
+    /// Parses the contents of the Linux <c>/proc/net/arp</c> table, adding each complete entry to
+    /// <paramref name="output"/>.
     /// </summary>
     internal static void ParseProcNetArp(IEnumerable<string> lines, Dictionary<IPAddress, PhysicalAddress> output)
     {
@@ -28,7 +38,8 @@ public static partial class NetworkMethods
             if (columns.Length < 4
                 || !IPAddress.TryParse(columns[0], out IPAddress? address)
                 || !PhysicalAddress.TryParse(columns[3].Replace(':', '-'), out PhysicalAddress? macAddress)
-                // Flag 0x2 (ATF_COM) marks a completed entry, an unanswered one is listed with an all-zero address.
+                // Flag 0x2 (ATF_COM) marks a completed entry, an unanswered one is listed with an
+                // all-zero address.
                 || !int.TryParse(columns[2].AsSpan().TrimStart("0x"), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int flags)
                 || (flags & 0x2) == 0)
             {
@@ -38,23 +49,36 @@ public static partial class NetworkMethods
         }
     }
 
-    private static void PopulateNetworkDevicesViaCommandLine(Dictionary<IPAddress, PhysicalAddress> output)
+    [GeneratedRegex("^\\? \\((?<ip>(\\d+\\.){3}\\d+)\\).+(?<mac>([a-f\\d]{2}:){5}[a-f\\d]{2})", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture)]
+    private static partial Regex ArpLineRegex();
+
+    private static void PopulateNetworkDevicesOthers(Dictionary<IPAddress, PhysicalAddress> output)
     {
-        if (File.Exists(NetworkMethods.ProcNetArpPath))
+        if (File.Exists(Constants.ProcNetArpPath))
         {
-            // Linux: read the kernel's table directly, which needs neither the arp binary nor a child process.
-            NetworkMethods.ParseProcNetArp(File.ReadLines(NetworkMethods.ProcNetArpPath), output);
-            return;
+            // Linux: read the kernel's table directly, which needs neither the arp binary nor a
+            //        child process.
+            NetworkMethods.ParseProcNetArp(File.ReadLines(Constants.ProcNetArpPath), output);
         }
-        // macOS and other BSD-derived systems.
-        using Process process = Process.Start(startInfo: new() { FileName = "arp", Arguments = "-an", UseShellExecute = false, RedirectStandardOutput = true })!;
-        while (process.StandardOutput.ReadLine() is { } line)
+        else
         {
-            if (line.Length > 0 && NetworkMethods.ArpLineRegex().Match(line) is { Success: true, Groups: { } groups })
+            // macOS and other BSD-derived systems.
+            NetworkMethods.ParseArpOutput(ReadArpProcessOutputLines(), output);
+        }
+
+        static IEnumerable<string> ReadArpProcessOutputLines()
+        {
+            using Process process = Process.Start(startInfo: new() { FileName = "arp", Arguments = "-an", UseShellExecute = false, RedirectStandardOutput = true })!;
+            while (process.StandardOutput.ReadLine() is { } line)
             {
-                output[IPAddress.Parse(groups["ip"].Value)] = PhysicalAddress.Parse(groups["mac"].Value);
+                yield return line;
             }
+            process.WaitForExit();
         }
-        process.WaitForExit();
+    }
+
+    private static class Constants
+    {
+        public const string ProcNetArpPath = "/proc/net/arp";
     }
 }
