@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
+using System.Reactive.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.NetworkInformation;
 using System.Text.Json;
@@ -185,16 +188,21 @@ public sealed class WebOSDeviceProviderTests
         using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
         using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
         WebOSClient client = manager.GetOrCreateClient(IPAddress.Loopback, mac);
-        Mock<IDeviceNotifier> notifier = new();
-        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
+        RecordingNotifier notifier = new();
+        provider.DeviceBuilder.NotifierCallback!(notifier);
         await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
 
-        await provider.HandleVolumeChangedAsync(client, 25);
-        await provider.HandleForegroundAppChangedAsync(client, "netflix");
+        // The current values are not re-sent when subscribing.
+        Assert.DoesNotContain(notifier.Sent, entry => entry.Component is "VOLUME" or "VOLUME-LABEL" or "APP");
 
-        notifier.Verify(n => n.NotifyAsync("VOLUME", 25d, client.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.NotifyAsync("VOLUME-LABEL", "25", client.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.NotifyAsync("APP", "netflix", client.DeviceId, default), Times.Once);
+        client.Volume = 25;
+        client.Volume = 25;
+        client.ForegroundApp = "netflix";
+
+        Assert.Equal(1, notifier.Sent.Count(entry => entry is ("VOLUME", 25d, _)));
+        Assert.Equal(1, notifier.Sent.Count(entry => entry is ("VOLUME-LABEL", "25", _)));
+        Assert.Equal(1, notifier.Sent.Count(entry => entry is ("APP", "netflix", _)));
+        Assert.All(notifier.Sent, entry => Assert.Equal(client.DeviceId, entry.DeviceId));
     }
 
     [Fact]
@@ -204,15 +212,33 @@ public sealed class WebOSDeviceProviderTests
         using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
         using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
         WebOSClient client = manager.GetOrCreateClient(IPAddress.Parse("10.0.0.1"), PhysicalAddress.Parse("001122334455"));
-        Mock<IDeviceNotifier> notifier = new();
-        provider.DeviceBuilder.NotifierCallback!(notifier.Object);
+        RecordingNotifier notifier = new();
+        provider.DeviceBuilder.NotifierCallback!(notifier);
         await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
 
-        await provider.HandleConnectionChangedAsync(client, true);
-        await provider.HandleConnectionChangedAsync(client, false);
+        client.PublishConnected(true);
+        client.PublishConnected(false);
 
-        notifier.Verify(n => n.NotifyPowerStateAsync(true, client.DeviceId, default), Times.Once);
-        notifier.Verify(n => n.NotifyPowerStateAsync(false, client.DeviceId, default), Times.Once);
+        // The initial (disconnected) state is sent on subscribing.
+        Assert.Equal(new List<bool> { false, true, false }, notifier.PowerStates);
+    }
+
+    [Fact]
+    public async Task Removing_a_device_stops_notifications()
+    {
+        InMemorySettings settings = new();
+        using WebOSClientManager manager = WebOSDeviceProviderTests.CreateManager(settings);
+        using WebOSDeviceProvider provider = new(manager, NullLogger<WebOSDeviceProvider>.Instance);
+        WebOSClient client = manager.GetOrCreateClient(IPAddress.Parse("10.0.0.1"), PhysicalAddress.Parse("001122334455"));
+        RecordingNotifier notifier = new();
+        provider.DeviceBuilder.NotifierCallback!(notifier);
+        await provider.OnDeviceAddedAsync(client.DeviceId, TestContext.Current.CancellationToken);
+
+        await provider.DeviceBuilder.SubscriptionFeature!.NotifyDeviceRemovedAsync(client.DeviceId, TestContext.Current.CancellationToken);
+        int count = notifier.Sent.Count;
+        client.Volume = 40;
+
+        Assert.Equal(count, notifier.Sent.Count);
     }
 
     [Fact]
@@ -263,5 +289,49 @@ public sealed class WebOSDeviceProviderTests
         public string? Get(string key, string? defaultValue = default) => this.TryGetValue(key, out string? value) ? value : defaultValue;
 
         public void Update(Action<IDictionary<string, string>> action) => action(this);
+    }
+}
+
+file sealed class RecordingNotifier : IDeviceNotifier
+{
+    private readonly Lock _lock = new();
+    private readonly List<(string Component, object Value, string DeviceId)> _sent = [];
+    private readonly List<bool> _powerStates = [];
+
+    public List<(string Component, object Value, string DeviceId)> Sent
+    {
+        get { lock (this._lock) { return [.. this._sent]; } }
+    }
+
+    public List<bool> PowerStates
+    {
+        get { lock (this._lock) { return [.. this._powerStates]; } }
+    }
+
+    public Task NotifyAsync(string componentName, object value, string deviceId = "default", CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task NotifyPowerStateAsync(bool powerState, string deviceId = "default", CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public IDisposable NotifyOnChange<TValue>(string componentName, IObservable<TValue> values, string deviceId = "default")
+        where TValue : notnull
+    {
+        return values.DistinctUntilChanged().Subscribe(value =>
+        {
+            lock (this._lock)
+            {
+                this._sent.Add((componentName, value, deviceId));
+            }
+        });
+    }
+
+    public IDisposable NotifyPowerStateOnChange(IObservable<bool> values, string deviceId = "default")
+    {
+        return values.DistinctUntilChanged().Subscribe(value =>
+        {
+            lock (this._lock)
+            {
+                this._powerStates.Add(value);
+            }
+        });
     }
 }
