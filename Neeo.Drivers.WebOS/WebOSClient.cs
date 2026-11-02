@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.WebSockets;
+using System.Reactive;
+using System.Reactive.Subjects;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,6 +30,11 @@ public sealed class WebOSClient(
     private readonly ConcurrentDictionary<string, Action<JsonElement>> _subscriptions = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _connectLock = new(1, 1);
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly Lock _stateLock = new();
+    private readonly BehaviorSubject<bool> _isConnectedSubject = new(false);
+    private readonly BehaviorSubject<int> _volumeSubject = new(0);
+    private readonly BehaviorSubject<string> _foregroundAppSubject = new(string.Empty);
+    private readonly Subject<Unit> _disposedSubject = new();
 
     private CancellationTokenSource? _cancellationTokenSource;
     private WebOSPointerSocket? _pointerSocket;
@@ -40,15 +47,27 @@ public sealed class WebOSClient(
     private string? _clientKey = clientKey;
     private TaskCompletionSource<string>? _registerTcs;
 
-    public event EventHandler? Connected;
-
-    public event EventHandler? Disconnected;
-
-    public event EventHandler<DataEventArgs<int>>? VolumeChanged;
-
-    public event EventHandler<DataEventArgs<string>>? ForegroundAppChanged;
-
     public event EventHandler<DataEventArgs<string>>? Registered;
+
+    /// <summary>
+    /// An observable of the connection state. Replays the current state on subscription.
+    /// </summary>
+    public IObservable<bool> IsConnectedChanged => this._isConnectedSubject;
+
+    /// <summary>
+    /// An observable of the volume. Replays the current volume on subscription.
+    /// </summary>
+    public IObservable<int> VolumeChanged => this._volumeSubject;
+
+    /// <summary>
+    /// An observable of the foreground app id. Replays the current app id on subscription.
+    /// </summary>
+    public IObservable<string> ForegroundAppChanged => this._foregroundAppSubject;
+
+    /// <summary>
+    /// An observable which emits (once) when the client is disposed.
+    /// </summary>
+    public IObservable<Unit> Disposed => this._disposedSubject;
 
     public string DeviceId => this.MacAddress.Equals(PhysicalAddress.None) ? this.IPAddress.ToString() : this.MacAddress.ToString();
 
@@ -66,17 +85,17 @@ public sealed class WebOSClient(
 
     public int Volume
     {
-        get;
-        private set => this.SetValue(ref field, value, this.VolumeChanged);
+        get => this._volumeSubject.Value;
+        internal set => this.Publish(this._volumeSubject, value);
     }
 
     public bool IsMuted { get; private set; }
 
     public string ForegroundApp
     {
-        get;
-        private set => this.SetValue(ref field, value, this.ForegroundAppChanged);
-    } = string.Empty;
+        get => this._foregroundAppSubject.Value;
+        internal set => this.Publish(this._foregroundAppSubject, value);
+    }
 
     /// <summary>
     /// Connects using the stored client key. Never prompts on the TV - an unpaired client fails (see <see cref="PairAsync"/>).
@@ -333,7 +352,7 @@ public sealed class WebOSClient(
         }
         if (connected)
         {
-            this.Connected?.Invoke(this, EventArgs.Empty);
+            this.PublishConnected(true);
             logger.LogInformation("Successfully connected and paired with webOS TV at {endpoint}.", endpoint);
             return true;
         }
@@ -570,7 +589,7 @@ public sealed class WebOSClient(
     private void OnDisconnected()
     {
         this.CleanUp();
-        this.Disconnected?.Invoke(this, EventArgs.Empty);
+        this.PublishConnected(false);
         if (this._isDisposed)
         {
             return;
@@ -639,14 +658,19 @@ public sealed class WebOSClient(
         }
     }
 
-    private void SetValue<TValue>(ref TValue field, TValue value, EventHandler<DataEventArgs<TValue>>? valueChanged)
+    internal void PublishConnected(bool isConnected) => this.Publish(this._isConnectedSubject, isConnected);
+
+    // Values arrive from the message loop, connect/disconnect and request callers, so publishing is serialized (a subject must not
+    // be signalled concurrently). Only actual changes are published.
+    private void Publish<TValue>(BehaviorSubject<TValue> subject, TValue value)
     {
-        if (EqualityComparer<TValue>.Default.Equals(field, value))
+        lock (this._stateLock)
         {
-            return;
+            if (!EqualityComparer<TValue>.Default.Equals(subject.Value, value))
+            {
+                subject.OnNext(value);
+            }
         }
-        field = value;
-        valueChanged?.Invoke(this, value);
     }
 
     public void Dispose()
@@ -659,6 +683,9 @@ public sealed class WebOSClient(
         Interlocked.Exchange(ref this._reconnectLoop, null)?.Dispose();
         this.CleanUp();
         this.CancelOutstanding();
+        this.PublishConnected(false);
+        this._disposedSubject.OnNext(Unit.Default);
+        this._disposedSubject.OnCompleted();
         this._connectLock.Dispose();
         this._sendLock.Dispose();
     }

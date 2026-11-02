@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -24,6 +26,8 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     private readonly ILogger<WebOSDeviceProvider> _logger;
     // Device IDs the Brain has added for this adapter (written from the Brain's subscription callbacks, read when a client is created).
     private readonly ConcurrentDictionary<string, byte> _subscribedDevices = new(StringComparer.Ordinal);
+    // Subscriptions to each device's client observables, created once the Brain has added the device and a client exists.
+    private readonly ConcurrentDictionary<string, CompositeDisposable> _subscriptions = new(StringComparer.Ordinal);
     private IDeviceNotifier? _notifier;
     private bool _isDisposed;
 
@@ -228,23 +232,26 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
             : RegistrationResult.Failed("No TV was paired - make sure it is on, then accept the prompt on the TV within 60 seconds.");
     }
 
-    internal async Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
+    internal Task OnDeviceAddedAsync(string deviceId, CancellationToken cancellationToken)
     {
         this._subscribedDevices.TryAdd(deviceId, default);
         // Starts connecting in the background (a TV that is off is retried, and picked up when it comes on).
         if (this._clientManager.GetOrCreateKnownClient(deviceId) is { } client)
         {
-            this.AttachClientEvents(client);
-            await this.NotifyIfConnectedAsync(client).ConfigureAwait(false);
+            this.Subscribe(client);
         }
+        return Task.CompletedTask;
     }
 
     private Task OnDeviceRemovedAsync(string deviceId, CancellationToken cancellationToken)
     {
         this._subscribedDevices.TryRemove(deviceId, out _);
+        if (this._subscriptions.TryRemove(deviceId, out CompositeDisposable? subscriptions))
+        {
+            subscriptions.Dispose();
+        }
         if (this._clientManager.TryRemove(deviceId, out WebOSClient? client))
         {
-            this.DetachClientEvents(client);
             client.Dispose();
         }
         return Task.CompletedTask;
@@ -263,64 +270,32 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
     {
         if (this._subscribedDevices.ContainsKey(e.Data.DeviceId))
         {
-            this.AttachClientEvents(e.Data);
+            this.Subscribe(e.Data);
         }
     }
 
-    // A TV that is already connected when the Brain adds it will not report a change.
-    private Task NotifyIfConnectedAsync(WebOSClient client) => client.IsConnected ? this.HandleConnectionChangedAsync(client, true) : Task.CompletedTask;
-
-    private void AttachClientEvents(WebOSClient client)
+    private void Subscribe(WebOSClient client)
     {
-        // Detach first so attaching twice (the add callback and ClientAdded racing) never subscribes twice.
-        this.DetachClientEvents(client);
-        client.Connected += this.Client_Connected;
-        client.Disconnected += this.Client_Disconnected;
-        client.VolumeChanged += this.Client_VolumeChanged;
-        client.ForegroundAppChanged += this.Client_ForegroundAppChanged;
-    }
-
-    private void DetachClientEvents(WebOSClient client)
-    {
-        client.Connected -= this.Client_Connected;
-        client.Disconnected -= this.Client_Disconnected;
-        client.VolumeChanged -= this.Client_VolumeChanged;
-        client.ForegroundAppChanged -= this.Client_ForegroundAppChanged;
-    }
-
-    private void Client_Connected(object? sender, EventArgs e) => _ = this.HandleConnectionChangedAsync(sender, true);
-
-    private void Client_Disconnected(object? sender, EventArgs e) => _ = this.HandleConnectionChangedAsync(sender, false);
-
-    internal async Task HandleConnectionChangedAsync(object? sender, bool isConnected)
-    {
-        if (sender is WebOSClient client && this._notifier is { } notifier)
+        if (this._notifier is not { } notifier)
         {
-            await notifier.NotifyPowerStateAsync(isConnected, client.DeviceId).ConfigureAwait(false);
+            return;
         }
-    }
-
-    private void Client_VolumeChanged(object? sender, DataEventArgs<int> e) => _ = this.HandleVolumeChangedAsync(sender, e.Data);
-
-    internal async Task HandleVolumeChangedAsync(object? sender, int volume)
-    {
-        if (sender is WebOSClient client && this._notifier is { } notifier)
+        // Only the first call for a device subscribes (the add callback and ClientAdded can race).
+        CompositeDisposable subscriptions = new();
+        if (!this._subscriptions.TryAdd(client.DeviceId, subscriptions))
         {
-            await Task.WhenAll(
-                notifier.NotifyAsync("VOLUME", (double)volume, client.DeviceId),
-                notifier.NotifyAsync("VOLUME-LABEL", volume.ToString(CultureInfo.InvariantCulture), client.DeviceId)
-            ).ConfigureAwait(false);
+            return;
         }
-    }
+        string deviceId = client.DeviceId;
+        // The initial state is sent too: a TV that is already connected when the Brain adds it will not report a change.
+        subscriptions.Add(notifier.NotifyPowerStateOnChange(client.IsConnectedChanged.TakeUntil(client.Disposed), deviceId));
+        // Volume and app replay their current value on subscription, which NEEO can already query; only send later changes.
+        IObservable<int> volume = Changes(client.VolumeChanged);
+        subscriptions.Add(notifier.NotifyOnChange("VOLUME", volume.Select(static value => (double)value), deviceId));
+        subscriptions.Add(notifier.NotifyOnChange("VOLUME-LABEL", volume.Select(static value => value.ToString(CultureInfo.InvariantCulture)), deviceId));
+        subscriptions.Add(notifier.NotifyOnChange("APP", Changes(client.ForegroundAppChanged), deviceId));
 
-    private void Client_ForegroundAppChanged(object? sender, DataEventArgs<string> e) => _ = this.HandleForegroundAppChangedAsync(sender, e.Data);
-
-    internal async Task HandleForegroundAppChangedAsync(object? sender, string appId)
-    {
-        if (sender is WebOSClient client && this._notifier is { } notifier)
-        {
-            await notifier.NotifyAsync("APP", appId, client.DeviceId).ConfigureAwait(false);
-        }
+        IObservable<TValue> Changes<TValue>(IObservable<TValue> values) => values.Skip(1).TakeUntil(client.Disposed);
     }
 
     public void Dispose()
@@ -331,9 +306,10 @@ public sealed class WebOSDeviceProvider : IDeviceProvider, IDisposable
         }
         this._isDisposed = true;
         this._clientManager.ClientAdded -= this.ClientManager_ClientAdded;
-        foreach (WebOSClient client in this._clientManager.Clients)
+        foreach (CompositeDisposable subscriptions in this._subscriptions.Values)
         {
-            this.DetachClientEvents(client);
+            subscriptions.Dispose();
         }
+        this._subscriptions.Clear();
     }
 }
